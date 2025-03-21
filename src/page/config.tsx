@@ -9,8 +9,11 @@ type AvatarProps = {
 export function Avatar(props: AvatarProps) {
     const { url } = props
     
+    
     const [isLoaded, setIsLoaded] = useState(false);
     const [isHover, setIsHover] = useState(false);
+
+    console.log("isLoaded", url)
     
     // 图像加载动画
     const imageLoadVariants = {
