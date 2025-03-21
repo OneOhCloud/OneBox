@@ -1,17 +1,17 @@
 /* 完全隐藏滚动条 - 所有浏览器兼容方案 */
 /* Webkit 浏览器 (Chrome, Safari, Edge) */
 ::-webkit-scrollbar {
-    display: none !important;
+  display: none !important;
 }
 
 /* Firefox */
 * {
-    scrollbar-width: none !important;
+  scrollbar-width: none !important;
 }
 
 /* IE 和 Edge Legacy */
 * {
-    -ms-overflow-style: none !important;
+  -ms-overflow-style: none !important;
 }
 
 /* 确保滚动功能仍然有效 */
@@ -21,7 +21,7 @@
 .overflow-x-auto,
 .overflow-y-scroll,
 .overflow-x-scroll {
-    -webkit-overflow-scrolling: touch;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* Apple 风格动画和样式 */
@@ -34,6 +34,7 @@
     opacity: 0;
     transform: translateY(5px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -77,9 +78,16 @@
 
 @import "tailwindcss";
 @plugin "daisyui";
+
 /* @plugin "daisyui/theme" {
   name: "light";
   default: true;
-  --color-primary: blue;
-  --color-secondary: teal;
+  --radius-selector: 1rem;
+  --radius-field: 2rem;
+  --radius-box: 1rem;
+  --size-selector: 0.3125rem;
+  --size-field: 0.1875rem;
+  --border: 0.5px;
+  --depth: 1;
+  --noise: 0;
 } */

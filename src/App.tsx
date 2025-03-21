@@ -63,12 +63,11 @@ function App() {
       </div>
 
       {/* 主内容区域 */}
-      <div className="overflow-auto  mb-14">
-        {activeScreen === 'home' && <div className="animate-fade-in"><HomePage /></div>}
-        {activeScreen === 'configuration' && <div className="animate-fade-in"><ConfigurationPage /></div>}
-        {activeScreen === 'settings' && <div className="animate-fade-in"><SettingsPage /></div>}
+      <div className=" mb-14  h-[472.8px] overflow-y-hidden">
+        {activeScreen === 'home' && <div className="animate-fade-in h-full"><HomePage /></div>}
+        {activeScreen === 'configuration' && <div className="animate-fade-in h-full"><ConfigurationPage /></div>}
+        {activeScreen === 'settings' && <div className="animate-fade-in h-full"><SettingsPage /></div>}
       </div>
-
       <div className="dock  dock-sm  bg-gray-50/50 backdrop-blur-3xl  border-0 rounded-t-xs">
         <button
           onClick={() => handleScreenChange('home')}

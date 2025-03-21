@@ -73,7 +73,7 @@ export function ToggleSetting({
             </div>
             <input
                 type="checkbox"
-                className="toggle bg-[#E9E9EB] border-[#E9E9EB] checked:text-white checked:bg-[#34C759] checked:border-[#34C759]"
+                className="toggle toggle-sm	 bg-[#E9E9EB] border-[#E9E9EB] checked:text-white checked:bg-[#34C759] checked:border-[#34C759]"
                 checked={isEnabled}
                 onChange={onToggle}
             />

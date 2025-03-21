@@ -18,6 +18,7 @@
     "@tauri-apps/plugin-process": "^2.2.0",
     "@tauri-apps/plugin-updater": "^2.6.1",
     "@types/node": "^22.13.10",
+    "framer-motion": "^12.5.0",
     "lucide-react": "^0.479.0",
     "react": "^18.3.1",
     "react-bootstrap-icons": "^1.11.5",
