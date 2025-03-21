@@ -1,13 +1,11 @@
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import { Minus, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { GearWideConnected, House, Layers } from 'react-bootstrap-icons';
 import "./App.css";
 import ConfigurationPage from './page/config';
 import HomePage from './page/home';
 import SettingsPage from './page/settings';
-import { GearWideConnected, House, Layers } from 'react-bootstrap-icons';
-
-
-import { getCurrentWindow } from '@tauri-apps/api/window';
 const appWindow = getCurrentWindow();
 
 function App() {
@@ -21,9 +19,18 @@ function App() {
     }
 
     // 监听系统主题变化
-    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', event => {
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleThemeChange = (event: MediaQueryListEvent) => {
       setTheme(event.matches ? 'dark' : 'light');
-    });
+    };
+
+    mediaQuery.addEventListener('change', handleThemeChange);
+
+
+    // 清理函数，防止内存泄漏
+    return () => {
+      mediaQuery.removeEventListener('change', handleThemeChange);
+    };
   }, []);
 
   // 通用的导航处理方法，接受屏幕名称作为参数
@@ -32,13 +39,14 @@ function App() {
   };
 
   const handleClose = async () => {
-    await appWindow.close();
+    await appWindow.hide();
   };
 
   const handleMinimize = async () => {
     await appWindow.minimize();
   };
 
+  // 余下代码保持不变
   return (
     <main className="bg-gray-50 grid grid-rows-[auto_1fr_auto] h-dvh">
       <div data-tauri-drag-region
@@ -62,12 +70,12 @@ function App() {
         </div>
       </div>
 
-      {/* 主内容区域 */}
       <div className=" mb-14  h-[472.8px] overflow-y-hidden">
         {activeScreen === 'home' && <div className="animate-fade-in h-full"><HomePage /></div>}
         {activeScreen === 'configuration' && <div className="animate-fade-in h-full"><ConfigurationPage /></div>}
         {activeScreen === 'settings' && <div className="animate-fade-in h-full"><SettingsPage /></div>}
       </div>
+
       <div className="dock  dock-sm  bg-gray-50/50 backdrop-blur-3xl  border-0 rounded-t-xs">
         <button
           onClick={() => handleScreenChange('home')}

@@ -11,6 +11,11 @@
   "permissions": [
     "autostart:default",
     "autostart:default",
-    "updater:default"
+    "core:app:allow-default-window-icon",
+    "core:window:allow-destroy",
+    "core:window:allow-hide",
+    "core:window:allow-show",
+    "updater:default",
+    "window-state:default"
   ]
 }

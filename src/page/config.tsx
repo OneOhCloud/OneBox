@@ -6,6 +6,8 @@ type AvatarProps = {
 }
 
 export function Avatar(props: AvatarProps) {
+    const { url } = props
+    console.log(url)
     return (
         <div className="size-10 rounded-full  shadow-lg ">
             <img
