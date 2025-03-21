@@ -6,11 +6,13 @@ import "./App.css";
 import ConfigurationPage from './page/config';
 import HomePage from './page/home';
 import SettingsPage from './page/settings';
+import { motion } from 'framer-motion';
 const appWindow = getCurrentWindow();
 
 function App() {
   const [activeScreen, setActiveScreen] = useState<'home' | 'configuration' | 'settings'>('home');
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  const [isSettingsHovered, setIsSettingsHovered] = useState(false);
 
   // 检测系统主题并设置相应主题
   useEffect(() => {
@@ -94,12 +96,19 @@ function App() {
         </button>
 
         <button
-          onClick={() => handleScreenChange('settings')}
-          className={`${activeScreen === 'settings' ? 'text-blue-500' : ''}`}
-        >
-          <GearWideConnected />
-          <span className='text-xs'>设置</span>
-        </button>
+      onClick={() => handleScreenChange('settings')}
+      className={`${activeScreen === 'settings' ? 'text-blue-500' : ''}`}
+      onMouseEnter={() => setIsSettingsHovered(true)}
+      onMouseLeave={() => setIsSettingsHovered(false)}
+    >
+      <motion.div
+        animate={{ rotate: isSettingsHovered ? 180 : 0 }}
+        transition={{ duration: 0.3 }}
+      >
+        <GearWideConnected />
+      </motion.div>
+      <span className='text-xs'>设置</span>
+    </button>
       </div>
     </main>
   );
