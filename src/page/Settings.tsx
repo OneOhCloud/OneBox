@@ -27,7 +27,7 @@ export default function Settings() {
         </div>
         <div className="text-center text-[#8E8E93] text-sm mt-6">
           <p>版本 {version}</p>
-          <p className="mt-1">© 2024 OneOh Cloud</p>
+          <p className="mt-1">© 2025 OneOh Cloud</p>
         </div>
       </div>
     </div>

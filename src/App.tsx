@@ -7,6 +7,8 @@ import ConfigurationPage from './page/config';
 import HomePage from './page/home';
 import SettingsPage from './page/settings';
 import { motion } from 'framer-motion';
+import  { Toaster } from 'react-hot-toast';
+
 const appWindow = getCurrentWindow();
 
 function App() {
@@ -51,6 +53,7 @@ function App() {
   // 余下代码保持不变
   return (
     <main className="bg-gray-50 grid grid-rows-[auto_1fr_auto] h-dvh">
+      <Toaster position="top-center" toastOptions={{ duration: 2000 }} containerClassName="mt-[32px]" />
       <div data-tauri-drag-region
         className={`px-4 py-2.5 flex items-center justify-between ${theme === 'dark' ? 'bg-gray-800/80 backdrop-blur-lg' : 'bg-white/80 backdrop-blur-lg'} border-b ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'}`}>
         <div className="flex items-center">
