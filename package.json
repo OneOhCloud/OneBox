@@ -16,16 +16,21 @@
     "@tauri-apps/plugin-dialog": "^2.2.0",
     "@tauri-apps/plugin-opener": "^2.2.6",
     "@tauri-apps/plugin-process": "^2.2.0",
+    "@tauri-apps/plugin-sql": "~2",
     "@tauri-apps/plugin-updater": "^2.6.1",
     "@tauri-apps/plugin-window-state": "^2.2.1",
+    "@types/bytes": "^3.1.5",
     "@types/node": "^22.13.11",
+    "bytes": "^3.1.2",
     "framer-motion": "^12.5.0",
     "lucide-react": "^0.479.0",
     "react": "^18.3.1",
     "react-bootstrap-icons": "^1.11.5",
     "react-dom": "^18.3.1",
     "react-hot-toast": "^2.5.2",
-    "tailwindcss": "^4.0.15"
+    "swr": "^2.3.3",
+    "tailwindcss": "^4.0.15",
+    "tauri": "^0.15.0"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.4.0",

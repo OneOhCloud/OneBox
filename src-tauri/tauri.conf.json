@@ -43,6 +43,11 @@
       "endpoints": [
         "https://github.com/OneOhCloud/OneBox/releases/latest/download/latest.json"
       ]
+    },
+    "sql": {
+      "preload": [
+        "sqlite:data.db"
+      ]
     }
   }
 }

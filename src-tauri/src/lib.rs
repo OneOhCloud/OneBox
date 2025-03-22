@@ -1,6 +1,9 @@
 use tauri::{AppHandle, Manager};
 use tauri_plugin_autostart::MacosLauncher;
 
+// 添加新模块
+mod database;
+
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
 fn greet(name: &str) -> String {
@@ -14,10 +17,17 @@ fn get_app_version(app: AppHandle) -> String {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // 使用从数据库模块获取的迁移脚本
+    let migrations = database::get_migrations();
+
     tauri::Builder::default()
+        .plugin(
+            tauri_plugin_sql::Builder::default()
+                .add_migrations("sqlite:data.db", migrations)
+                .build(),
+        )
         .plugin(tauri_plugin_window_state::Builder::new().build())
         .plugin(tauri_plugin_process::init())
-   
         .plugin(tauri_plugin_autostart::init(
             MacosLauncher::LaunchAgent,
             Some(vec![]),
