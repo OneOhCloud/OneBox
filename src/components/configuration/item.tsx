@@ -115,9 +115,6 @@ export function SubscriptionItem(
                 trafficDetails={trafficDetailsText}
 
             />
-
-
-
         </li>
     )
 
