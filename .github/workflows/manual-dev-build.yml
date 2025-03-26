@@ -8,10 +8,6 @@ on:
         description: '构建版本号'
         required: true
         default: '0.0.0-dev'
-  # 只监听 dev 分支的变更
-  push:
-    branches:
-      - dev
 
 jobs:
   build-tauri:
