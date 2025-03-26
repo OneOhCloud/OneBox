@@ -1,0 +1,70 @@
+name: "Manual Dev Build"
+
+on:
+  # 允许手动触发工作流
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '构建版本号'
+        required: true
+        default: '0.0.0-dev'
+  # 只监听 dev 分支的变更
+  push:
+    branches:
+      - dev
+
+jobs:
+  build-tauri:
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: "macos-latest"
+            args: "--target aarch64-apple-darwin"
+          - platform: "macos-latest"
+            args: "--target x86_64-apple-darwin"
+          - platform: "ubuntu-22.04"
+            args: ""
+          - platform: "windows-latest"
+            args: ""
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+      - uses: oven-sh/setup-bun@v2
+
+      - name: install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - name: install dependencies (ubuntu only)
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.0-dev libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: install frontend dependencies
+        run: bun install
+
+      - name: download binaries
+        run: bun run scripts/download-binaries.ts
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+        with:
+          tagName: OneBox-dev-v${{ github.event.inputs.version || '0.0.0-dev' }}
+          releaseName: "OneBox Dev Build v${{ github.event.inputs.version || '0.0.0-dev' }}"
+          releaseBody: "这是一个开发版本构建。\n构建时间：${{ github.event.head_commit.timestamp }}"
+          releaseDraft: true
+          prerelease: false
+          args: ${{ matrix.args }}
