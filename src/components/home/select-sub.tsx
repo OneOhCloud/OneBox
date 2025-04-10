@@ -14,18 +14,23 @@ export default function SelectSub(props: SubscriptionProps) {
 
     useEffect(() => {
         if (data && data.length > 0) {
-            setSelectedSubscription(data[0].name);
-            props.onUpdate(data[0]);
-
+            handleBaseSubscriptionChange(data[0]);
         }
+
     }, [data]);
+
+    const handleBaseSubscriptionChange = (item: Subscription) => {
+        setSelectedSubscription(item.name);
+        props.onUpdate(item);
+
+    }
 
     const handleSubscriptionChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
         setSelectedSubscription(e.target.value);
 
         const selectedItem = data?.find(item => item.name === e.target.value);
         if (selectedItem) {
-            props.onUpdate(selectedItem);
+            handleBaseSubscriptionChange(selectedItem);
         }
     }
 

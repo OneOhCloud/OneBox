@@ -25,3 +25,6 @@ dist-ssr
 .tauri
 tmp
 src-tauri/binaries
+
+
+src-tauri/*.db

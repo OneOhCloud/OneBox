@@ -1,15 +1,17 @@
 import { useState } from "react";
 
 type SelectNodeProps = {
+    disabled: boolean;
     nodeList: string[]
 }
 
 
 export default function SelectNode(props: SelectNodeProps) {
-    const { nodeList } = props;
+    const { disabled,nodeList } = props;
     const [selectedNode, setSelectedNode] = useState(nodeList[0] || '');
 
     const handleNodeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        console.log("选择的节点", e.target.value);
         setSelectedNode(e.target.value);
     };
 
@@ -20,10 +22,9 @@ export default function SelectNode(props: SelectNodeProps) {
     }
 
     return (
-
-
         <div className="relative">
             <select
+            disabled={disabled}
                 value={selectedNode}
                 onChange={handleNodeChange}
                 className="select select-sm w-full  text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none"

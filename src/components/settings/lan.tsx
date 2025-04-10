@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { ToggleSetting } from "./common";
 import { Router } from "react-bootstrap-icons";
-import { store } from "../../single/store";
+import { getAllowLan,setAllowLan } from "../../single/store";
 
 
 export default function ToggleLan() {
@@ -10,7 +10,7 @@ export default function ToggleLan() {
   useEffect(() => {
     const loadTunState = async () => {
       try {
-        const state: boolean | undefined = await store.get('tun');
+        const state: boolean = await getAllowLan();
         if (state !== undefined) {
           setToggle(state);
         } else {
@@ -24,10 +24,8 @@ export default function ToggleLan() {
   }, []);
 
   const handleToggle = async () => {
+    await setAllowLan(!toggle);
     setToggle(!toggle);
-    await store.set('tun', !toggle);
-    await store.save();
-
   }
 
   return (

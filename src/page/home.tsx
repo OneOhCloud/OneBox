@@ -1,73 +1,104 @@
-import { message } from '@tauri-apps/plugin-dialog';
+// React & Hooks
 import { useEffect, useRef, useState } from "react";
+// Components & Icons
 import SettingsBody from '../components/home/settings-body';
 import { InfoCircle, Power } from 'react-bootstrap-icons';
+// Tauri APIs
+import { invoke } from '@tauri-apps/api/core';
+import { message } from '@tauri-apps/plugin-dialog';
+import { getCurrentWindow } from '@tauri-apps/api/window';
+import { listen } from '@tauri-apps/api/event';
+// Utils & Hooks
+import { getSingBoxConfigPath } from '../utils/helper';
+import { useSubscriptions } from '../hooks/useDB';
 
-export default function Home() {
+const appWindow = getCurrentWindow();
+const configPath = await getSingBoxConfigPath();
 
+const toggleService = {
+  start: () => invoke("start", { app: appWindow, path: configPath }),
+  stop: () => invoke("stop"),
+};
+
+type HomeProps = {
+  onNavigate: (screen: 'home' | 'configuration' | 'settings') => void;
+}
+
+export default function Home({ onNavigate }: HomeProps) {
+  // 状态管理
   const [isOn, setIsOn] = useState(false);
   const [isOnLoading, setIsOnLoading] = useState(false);
-  const handleToggle = async () => {
-    setIsOnLoading(true);
+  const [selectedMode, setSelectedMode] = useState('规则');
+  const [logs, setLogs] = useState<string[]>([]);
+  const [isEmpty, setIsEmpty] = useState(false);
+  const [indicatorStyle, setIndicatorStyle] = useState({ left: 0, width: 0 });
 
-    try {
-      // 模拟异步操作，随机成功或失败
-      await new Promise((resolve, reject) => {
-        setTimeout(async () => {
-          // 80%的概率成功，20%的概率失败
-          if (Math.random() > 0.2) {
-            resolve(true);
-          } else {
-            await message('连接失败，请检查网络', { title: '错误', kind: 'error' });
+  const modeButtonsRef = useRef<HTMLDivElement>(null);
+  const { data } = useSubscriptions();
 
-            reject(new Error('连接失败，请检查网络'));
-          }
-        }, 800); // 800ms延迟模拟网络请求
+  // 初始化检查
+  useEffect(() => {
+    invoke<boolean>('is_running').then(setIsOn);
+  }, []);
+
+  // 事件监听
+  useEffect(() => {
+    const unsubscribe = listen('core_backend', (event) => {
+      const payload = event.payload as string;
+      if (payload === 'Process terminated') {
+        setIsOn(false);
+        return;
+      }
+      setLogs(prev => [...prev, payload].slice(-100));
+    });
+
+    return () => {
+      unsubscribe.then(fn => fn());
+    };
+  }, []);
+
+  // 订阅数据监听
+  useEffect(() => {
+    setIsEmpty(!data?.length);
+  }, [data]);
+
+  // 模式指示器位置更新
+  useEffect(() => {
+    const container = modeButtonsRef.current;
+    const activeButton = container?.querySelector(`button[data-mode="${selectedMode}"]`);
+    
+    if (container && activeButton) {
+      const containerRect = container.getBoundingClientRect();
+      const buttonRect = activeButton.getBoundingClientRect();
+      
+      setIndicatorStyle({
+        left: buttonRect.left - containerRect.left,
+        width: buttonRect.width,
       });
+    }
+  }, [selectedMode]);
 
-      // 成功时切换状态
+  const handleToggle = async () => {
+    if(isEmpty) {
+      onNavigate('configuration');
+      await message('请先添加订阅配置', { title: '提示', kind: 'error' });
+      return;
+    }
+
+    setIsOnLoading(true);
+    try {
+      await (isOn ? toggleService.stop : toggleService.start)();
       setIsOn(!isOn);
-    } catch (err) {
-      // 不改变isOn状态 - 保持原有状态
+    } catch (error) {
+      await message('连接失败，请检查网络', { title: '错误', kind: 'error' });
     } finally {
       setIsOnLoading(false);
     }
   };
 
-  const [selectedMode, setSelectedMode] = useState('规则');
-
-  // 添加动画参考元素
-  const modeButtonsRef = useRef<HTMLDivElement>(null);
-  const [indicatorStyle, setIndicatorStyle] = useState({
-    left: 0,
-    width: 0,
-  });
-
-
-
-
-  // 处理模式选择
   const handleModeChange = (mode: string) => {
     setSelectedMode(mode);
   };
-
-  // 更新指示器位置的效果
-  useEffect(() => {
-    if (modeButtonsRef.current) {
-      const container = modeButtonsRef.current;
-      const activeButton = container.querySelector(`button[data-mode="${selectedMode}"]`);
-
-      if (activeButton) {
-        const containerRect = container.getBoundingClientRect();
-        const buttonRect = activeButton.getBoundingClientRect();
-
-        setIndicatorStyle({
-          left: buttonRect.left - containerRect.left,
-          width: buttonRect.width,
-        });
-      }
-    }
-  }, [selectedMode]);
 
   return (
     <div className="bg-gray-50 flex flex-col items-center justify-center p-6 h-full w-full">
@@ -122,22 +153,27 @@ export default function Home() {
 
         {['规则', '全局', '直连'].map((mode) => (
           <button
+            disabled={!isOn}
             key={mode}
             data-mode={mode}
-            className={` cursor-pointer px-6 py-1.5 text-sm font-medium transition-all duration-300 relative
+            className={`  px-6 py-1.5 text-sm font-medium transition-all duration-300 relative
               ${selectedMode === mode
                 ? 'text-gray-800'
-                : 'text-gray-500 hover:text-gray-700'}`}
+                : 'text-gray-500 hover:text-gray-700'}
+              ${isOn ? 'cursor-pointer' : 'cursor-not-allowed'}
+                `}
             onClick={() => handleModeChange(mode)}
           >
             <span className="relative z-10">{mode}</span>
           </button>
+          
         ))}
+ 
       </div>
-      <SettingsBody></SettingsBody>
+      <SettingsBody isRunning={isOn}></SettingsBody>
 
 
-    
+
     </div>
   )
 }

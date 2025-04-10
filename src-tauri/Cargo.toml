@@ -29,6 +29,12 @@ tauri-plugin-http = "2"
 tauri-plugin-os = "2"
 tauri-plugin-shell = "2"
 tauri-plugin-store = "2"
+tauri-plugin-fs = "2"
+tokio = { version = "1.44.1", features = ["full"] }
+anyhow = "1.0"
+tauri-plugin-log = "2"
+lazy_static = "1.5.0"
+
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-autostart = "2"
@@ -36,13 +42,3 @@ tauri-plugin-single-instance = "2"
 tauri-plugin-updater = "2"
 tauri-plugin-window-state = "2"
 
-
-[profile.dev]
-incremental = true # 以较小的步骤编译您的二进制文件。
-
-[profile.release]
-codegen-units = 1 # 允许 LLVM 执行更好的优化。
-lto = true # 启用链接时优化。
-opt-level = "s" # 优先考虑小的二进制文件大小。如果您更喜欢速度，请使用 `3`。
-panic = "abort" # 通过禁用 panic 处理程序来提高性能。
-strip = true # 确保移除调试符号。

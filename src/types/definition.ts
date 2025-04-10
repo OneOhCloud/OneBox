@@ -4,6 +4,12 @@ export const GITHUB_URL = 'https://github.com/OneOhCloud/OneBox'
 export const OFFICIAL_WEBSITE = 'https://oneoh.cloud'
 export const SING_BOX_VERSION = '1.11.5'
 
+ 
+// 允许局域网连接
+export const ALLOWLAN_STORE_KEY = 'allow_lan_key'
+// 是否启用 tun 模式
+export const ENABLE_TUN_STORE_KEY = 'enable_tun_key'
+
 export type OsInfo = {
     appVersion: string,
     osArch: Arch,

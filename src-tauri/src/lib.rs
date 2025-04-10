@@ -2,6 +2,7 @@ use tauri::{AppHandle, Manager};
 use tauri_plugin_autostart::MacosLauncher;
 
 // 添加新模块
+mod core;
 mod database;
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
@@ -21,6 +22,8 @@ pub fn run() {
     let migrations = database::get_migrations();
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_log::Builder::new().build())
+        .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_os::init())
@@ -30,7 +33,6 @@ pub fn run() {
                 .add_migrations("sqlite:data.db", migrations)
                 .build(),
         )
-        .plugin(tauri_plugin_window_state::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_autostart::init(
             MacosLauncher::LaunchAgent,
@@ -48,7 +50,14 @@ pub fn run() {
                 .plugin(tauri_plugin_updater::Builder::new().build())?;
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![get_app_version, greet])
+        .invoke_handler(tauri::generate_handler![
+            get_app_version,
+            greet,
+            core::version,
+            core::start,
+            core::stop,
+            core::is_running
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

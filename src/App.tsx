@@ -1,5 +1,5 @@
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import { useEffect, useState } from 'react';
+import {  useState } from 'react';
 import { X, Dash, GearWideConnected, House, Layers } from 'react-bootstrap-icons';
 import "./App.css";
 import ConfigurationPage from './page/config';
@@ -7,34 +7,20 @@ import HomePage from './page/home';
 import SettingsPage from './page/settings';
 import { motion } from 'framer-motion';
 import { Toaster } from 'react-hot-toast';
+import Dev from './page/dev';
+
+
 
 const appWindow = getCurrentWindow();
+const debug = false
+
+
 
 function App() {
   const [activeScreen, setActiveScreen] = useState<'home' | 'configuration' | 'settings'>('home');
-  const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [isSettingsHovered, setIsSettingsHovered] = useState(false);
 
-  // 检测系统主题并设置相应主题
-  useEffect(() => {
-    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-      setTheme('dark');
-    }
 
-    // 监听系统主题变化
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    const handleThemeChange = (event: MediaQueryListEvent) => {
-      setTheme(event.matches ? 'dark' : 'light');
-    };
-
-    mediaQuery.addEventListener('change', handleThemeChange);
-
-
-    // 清理函数，防止内存泄漏
-    return () => {
-      mediaQuery.removeEventListener('change', handleThemeChange);
-    };
-  }, []);
 
   // 通用的导航处理方法，接受屏幕名称作为参数
   const handleScreenChange = (screen: 'home' | 'configuration' | 'settings') => {
@@ -49,23 +35,27 @@ function App() {
     await appWindow.minimize();
   };
 
+  if (debug) {
+    return <Dev></Dev>
+  }
+
   // 余下代码保持不变
   return (
     <main className="bg-gray-50 grid grid-rows-[auto_1fr_auto] h-dvh">
       <Toaster position="top-center" toastOptions={{ duration: 2000 }} containerClassName="mt-[32px]" />
       <div data-tauri-drag-region
-        className={`px-4 py-2.5 flex items-center justify-between ${theme === 'dark' ? 'bg-gray-800/80 backdrop-blur-lg' : 'bg-white/80 backdrop-blur-lg'} border-b ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'}`}>
+        className={`px-4 py-2.5 flex items-center justify-betweenbg-white/80 backdrop-blur-lg  border-b border-gray-200`}>
         <div className="flex items-center">
           <div className="mr-3 flex items-center gap-1.5">
             <div onClick={handleClose}
               className="size-3 bg-red-500 rounded-full flex items-center justify-center hover:bg-red-600 transition-all cursor-pointer group"
               title="关闭">
-              <X size={7} className="text-transparent group-hover:text-red-900" />
+              <X size={12} className="text-transparent group-hover:text-red-900" />
             </div>
             <div onClick={handleMinimize}
               className="size-3 bg-yellow-400 rounded-full flex items-center justify-center hover:bg-yellow-500 transition-all cursor-pointer group"
               title="最小化">
-              <Dash size={7} className="text-transparent group-hover:text-yellow-900" />
+              <Dash size={12} className="text-transparent group-hover:text-yellow-900" />
             </div>
             <div className="size-3 bg-green-500 rounded-full flex opacity-50 cursor-default"></div>
           </div>
@@ -75,7 +65,8 @@ function App() {
       </div>
 
       <div className=" mb-14  h-[472.8px] overflow-y-hidden">
-        {activeScreen === 'home' && <div className="animate-fade-in h-full"><HomePage /></div>}
+
+        {activeScreen === 'home' && <div className="animate-fade-in h-full"><HomePage onNavigate={handleScreenChange} /></div>}
         {activeScreen === 'configuration' && <div className="animate-fade-in h-full"><ConfigurationPage /></div>}
         {activeScreen === 'settings' && <div className="animate-fade-in h-full"><SettingsPage /></div>}
       </div>

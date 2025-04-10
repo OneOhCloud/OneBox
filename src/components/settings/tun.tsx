@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { ToggleSetting } from "./common";
 import { Cpu } from "react-bootstrap-icons";
-import { store } from "../../single/store";
+import { getEnableTun,setEnableTun } from "../../single/store";
 
 
 export default function ToggleTun() {
@@ -10,7 +10,7 @@ export default function ToggleTun() {
     useEffect(() => {
         const loadTunState = async () => {
             try {
-                const state: boolean | undefined = await store.get('tun');
+                const state: boolean | undefined = await getEnableTun();
                 if (state !== undefined) {
                     setToggle(state);
                 } else {
@@ -26,8 +26,7 @@ export default function ToggleTun() {
 
     const handleToggle = async () => {
         setToggle(!toggle);
-        await store.set('tun', !toggle);
-        await store.save();
+        await setEnableTun(!toggle);
     }
 
 

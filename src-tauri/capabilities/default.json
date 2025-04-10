@@ -6,18 +6,28 @@
     "main"
   ],
   "permissions": [
-    "core:default",
-    "opener:default",
-    "core:window:default",
-    "core:window:allow-start-dragging",
-    "core:window:allow-minimize",
-    "core:window:allow-close",
-    "autostart:allow-enable",
     "autostart:allow-disable",
+    "autostart:allow-enable",
     "autostart:allow-is-enabled",
+    "core:default",
+    "core:window:allow-close",
+    "core:window:allow-minimize",
+    "core:window:allow-start-dragging",
+    "core:window:default",
+    "dialog:default",
+    "fs:allow-app-write",
+    "fs:default",
+    "opener:default",
+    "process:allow-exit",
+    "process:allow-restart",
     "process:default",
-    "updater:default",
-    "dialog:default"
+    "shell:allow-execute",
+    "shell:allow-kill",
+    "shell:allow-open",
+    "shell:allow-spawn",
+    "shell:allow-stdin-write",
+    "shell:default",
+    "updater:default"
 
   ]
 }
