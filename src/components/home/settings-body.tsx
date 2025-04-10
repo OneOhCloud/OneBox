@@ -1,13 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Shield } from "react-bootstrap-icons";
 import { getSubscriptionConfig } from "../../action/db";
 import { Subscription } from "../../types/definition";
 import SelectNode from "./select-node";
 import SelectSub from "./select-sub";
-import { create, BaseDirectory } from '@tauri-apps/plugin-fs';
 import * as path from '@tauri-apps/api/path';
-import { listen, UnlistenFn } from "@tauri-apps/api/event";
-import { invoke } from "@tauri-apps/api/core";
 import setMixedConfig from "../../config/sing-box";
 
 const fomatDate = (date: number) => {
@@ -24,9 +21,7 @@ export default function SettingsBody(props: SettingsBodyProps) {
 
     const { isRunning } = props;
     // 将状态和监听逻辑移到组件内部
-    const [currentNode, setCurrentNode] = useState<string>('');
-    const [tunConfig, setTunConfig] = useState<string>('');
-    const [systemProxy, setSystemProxy] = useState<string>('');
+
     const [nodeList, setNodeList] = useState<string[]>([]);
     const [sub, setSub] = useState<Subscription>();
 
@@ -59,10 +54,7 @@ export default function SettingsBody(props: SettingsBodyProps) {
         }
     };
 
-    const handleNodeChange = (node: string) => {
-        setCurrentNode(node);
-        // 通知后端更新当前节点 - 实现选择节点功能
-    };
+
 
     return (
         <div className='w-full '>

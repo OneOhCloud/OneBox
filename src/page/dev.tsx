@@ -7,9 +7,9 @@ import { listen } from '@tauri-apps/api/event';
 import { getSingBoxConfigPath } from "../utils/helper";
 
 const appWindow = getCurrentWindow();
-const configPath = await getSingBoxConfigPath();
 
 async function start() {
+    const configPath = await getSingBoxConfigPath();
     await invoke("start", {
         app: appWindow,
         path: configPath

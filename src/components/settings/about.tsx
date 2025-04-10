@@ -46,7 +46,6 @@ function About({ onClose }: AboutProps) {
     const [ua, setUa] = useState<string>("");
     const [version, setVersion] = useState<string>("");
     const [coreVersion, setCoreVersion] = useState<string>("");
-    const [showCoreInfo, setShowCoreInfo] = useState(false);
     useEffect(() => {
         getOsInfo().then((info) => {
             setOsInfo(info)

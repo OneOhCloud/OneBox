@@ -7,7 +7,7 @@ import { x } from 'tar';
 import unzipper from 'unzipper';
 
 // 配置常量
-const SING_BOX_VERSION = 'v1.11.5';
+const SING_BOX_VERSION = 'v1.11.7';
 const BINARY_NAME = 'sing-box';
 const GITHUB_RELEASE_URL = 'https://github.com/SagerNet/sing-box/releases/download/';
 

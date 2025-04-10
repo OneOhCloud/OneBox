@@ -13,10 +13,13 @@ import { getSingBoxConfigPath } from '../utils/helper';
 import { useSubscriptions } from '../hooks/useDB';
 
 const appWindow = getCurrentWindow();
-const configPath = await getSingBoxConfigPath();
+
 
 const toggleService = {
-  start: () => invoke("start", { app: appWindow, path: configPath }),
+  start: async () => {
+    const configPath = await getSingBoxConfigPath();
+    invoke("start", { app: appWindow, path: configPath })
+  },
   stop: () => invoke("stop"),
 };
 
@@ -29,7 +32,7 @@ export default function Home({ onNavigate }: HomeProps) {
   const [isOn, setIsOn] = useState(false);
   const [isOnLoading, setIsOnLoading] = useState(false);
   const [selectedMode, setSelectedMode] = useState('规则');
-  const [logs, setLogs] = useState<string[]>([]);
+  const [_, setLogs] = useState<string[]>([]);
   const [isEmpty, setIsEmpty] = useState(false);
   const [indicatorStyle, setIndicatorStyle] = useState({ left: 0, width: 0 });
 
@@ -62,15 +65,16 @@ export default function Home({ onNavigate }: HomeProps) {
     setIsEmpty(!data?.length);
   }, [data]);
 
+
   // 模式指示器位置更新
   useEffect(() => {
     const container = modeButtonsRef.current;
     const activeButton = container?.querySelector(`button[data-mode="${selectedMode}"]`);
-    
+
     if (container && activeButton) {
       const containerRect = container.getBoundingClientRect();
       const buttonRect = activeButton.getBoundingClientRect();
-      
+
       setIndicatorStyle({
         left: buttonRect.left - containerRect.left,
         width: buttonRect.width,
@@ -79,7 +83,7 @@ export default function Home({ onNavigate }: HomeProps) {
   }, [selectedMode]);
 
   const handleToggle = async () => {
-    if(isEmpty) {
+    if (isEmpty) {
       onNavigate('configuration');
       await message('请先添加订阅配置', { title: '提示', kind: 'error' });
       return;
@@ -166,9 +170,9 @@ export default function Home({ onNavigate }: HomeProps) {
           >
             <span className="relative z-10">{mode}</span>
           </button>
-          
+
         ))}
- 
+
       </div>
       <SettingsBody isRunning={isOn}></SettingsBody>
 

@@ -2,7 +2,6 @@ import { invoke } from '@tauri-apps/api/core';
 import { arch, locale, type, version } from '@tauri-apps/plugin-os';
 import { OsInfo, SING_BOX_VERSION } from '../types/definition';
 import * as path from '@tauri-apps/api/path';
-import { create, BaseDirectory } from '@tauri-apps/plugin-fs';
 
 export async function getOsInfo() {
     const osType = type()
