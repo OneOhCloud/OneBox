@@ -108,7 +108,7 @@ const mixedConfig = {
       "listen": "127.0.0.1",
       "listen_port": 5678,
       "sniff": true,
-      "set_system_proxy": true
+      "set_system_proxy": false
     }
   ],
 

@@ -13,7 +13,7 @@ fn greet(name: &str) -> String {
 #[tauri::command]
 fn get_app_version(app: AppHandle) -> String {
     let package_info = app.package_info();
-    package_info.version.to_string() // 返回版本号，如 "1.0.0"
+    package_info.version.to_string() // 返回版本号，如 "1.0.0"  
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]

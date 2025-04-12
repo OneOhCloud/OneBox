@@ -11,6 +11,9 @@ const SING_BOX_VERSION = 'v1.11.7';
 const BINARY_NAME = 'sing-box';
 const GITHUB_RELEASE_URL = 'https://github.com/SagerNet/sing-box/releases/download/';
 
+// sysproxy 下载地址, 仅支持 Windows x64 版本。
+const SYSPROXY_URL = "https://github.com/clash-verge-rev/sysproxy/releases/download/x64/sysproxy.exe";
+
 // 支持的目标架构映射
 const RUST_TARGET_TRIPLES = {
     "darwin": {
@@ -102,6 +105,19 @@ async function downloadEmbeddingExternalBinaries(): Promise<void> {
                 extension,
                 targetTriple
             );
+
+            // 为 Windows x64 下载 sysproxy
+            if (platform === 'windows' && arch === 'amd64') {
+                console.log('正在下载 Windows sysproxy...');
+                const targetPath = `src-tauri/binaries/sysproxy-${targetTriple}${extension}`;
+                
+                // 确保目标目录存在
+                const targetDir = path.dirname(targetPath);
+                !fs.existsSync(targetDir) && fs.mkdirSync(targetDir, { recursive: true });
+                
+                await downloadFile(SYSPROXY_URL, targetPath);
+                console.log('sysproxy 下载完成');
+            }
         }
     }
 }

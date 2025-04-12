@@ -18,7 +18,7 @@ const appWindow = getCurrentWindow();
 const toggleService = {
   start: async () => {
     const configPath = await getSingBoxConfigPath();
-    invoke("start", { app: appWindow, path: configPath })
+    invoke("start", { app: appWindow, path: configPath, mode:'SystemProxy' })
   },
   stop: () => invoke("stop"),
 };
