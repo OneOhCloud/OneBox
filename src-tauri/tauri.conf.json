@@ -9,16 +9,16 @@
     "beforeBuildCommand": "bun run build",
     "frontendDist": "../dist"
   },
+  
   "app": {
+    
     "windows": [
       {
-        "closable": true,
-        "minimizable": true,
-        "decorations": false,
+        "devtools": true,
+        "maximizable": false,
         "title": "OneBox",
         "width": 320,
-        "height": 570,
-        "resizable": false
+        "height": 570
       }
     ],
     "security": {

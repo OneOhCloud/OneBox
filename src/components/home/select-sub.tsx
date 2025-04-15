@@ -37,7 +37,7 @@ export default function SelectSub(props: SubscriptionProps) {
     return (
         <div className="relative">
             {isLoading ? (
-                <div className="select select-sm w-full flex items-center justify-center text-gray-500 bg-gray-100 border border-gray-300 rounded-md">
+                <div className="select select-sm select-neutral">
                     <span className="loading loading-spinner loading-xs mr-2"></span>
                     正在加载...
                 </div>
@@ -45,14 +45,14 @@ export default function SelectSub(props: SubscriptionProps) {
                 <select
                     value={selectedSubscription}
                     onChange={handleSubscriptionChange}
-                    className="select select-sm w-full text-gray-700 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none hover:border-blue-300 transition-colors"
+                    className="select select-sm select-neutral"
                 >
                     {data.map((item) => (
                         <option key={item.identifier} className="py-1">{item.name}</option>
                     ))}
                 </select>
             ) : (
-                <div className="select select-sm w-full flex items-center justify-center text-gray-500 bg-gray-100 border border-gray-300 rounded-md">
+                <div className="select select-sm select-neutral">
                     暂无订阅配置
                 </div>
             )}

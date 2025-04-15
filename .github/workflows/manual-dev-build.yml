@@ -60,7 +60,7 @@ jobs:
         with:
           tagName: OneBox-dev-v${{ github.event.inputs.version || '0.0.0-dev' }}
           releaseName: "OneBox Dev Build v${{ github.event.inputs.version || '0.0.0-dev' }}"
-          releaseBody: "这是一个开发版本构建。\n构建时间：${{ github.event.head_commit.timestamp }}"
+          releaseBody: "修复一些 bugs，添加一些新功能"
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}

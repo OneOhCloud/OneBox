@@ -1,10 +1,10 @@
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
+use sysproxy::Sysproxy;
 use tauri::Emitter;
 use tauri_plugin_shell::process::{CommandChild, CommandEvent};
 use tauri_plugin_shell::ShellExt;
-use sysproxy::Sysproxy;
 
 #[cfg(target_os = "windows")]
 static DEFAULT_BYPASS: &str = "localhost;127.*;192.168.*;10.*;172.16.*;172.17.*;172.18.*;172.19.*;172.20.*;172.21.*;172.22.*;172.23.*;172.24.*;172.25.*;172.26.*;172.27.*;172.28.*;172.29.*;172.30.*;172.31.*;<local>";
@@ -28,12 +28,14 @@ struct ProcessManager {
 }
 
 #[derive(Clone)]
+#[cfg(not(target_os = "windows"))]
 struct ProxyConfig {
     host: String,
     port: u16,
     bypass: String,
 }
 
+#[cfg(not(target_os = "windows"))]
 impl Default for ProxyConfig {
     fn default() -> Self {
         Self {
@@ -45,7 +47,7 @@ impl Default for ProxyConfig {
 }
 
 lazy_static! {
-    static ref PROCESS_MANAGER: Arc<Mutex<ProcessManager>> = Arc::new(Mutex::new(ProcessManager { 
+    static ref PROCESS_MANAGER: Arc<Mutex<ProcessManager>> = Arc::new(Mutex::new(ProcessManager {
         child: None,
         current_mode: None,
     }));
@@ -82,7 +84,7 @@ pub async fn version(app: tauri::AppHandle) -> Result<String, String> {
 }
 
 #[tauri::command]
-pub async fn stop() -> Result<(), String> {
+pub fn stop() -> Result<(), String> {
     let mut manager = PROCESS_MANAGER.lock().unwrap();
 
     // 根据当前模式执行清理操作
@@ -90,7 +92,8 @@ pub async fn stop() -> Result<(), String> {
         match mode {
             ProxyMode::SystemProxy => {
                 // 清理系统代理设置
-                let mut sysproxy: Sysproxy = Sysproxy::get_system_proxy().map_err(|e| e.to_string())?;
+                let mut sysproxy: Sysproxy =
+                    Sysproxy::get_system_proxy().map_err(|e| e.to_string())?;
                 sysproxy.enable = false;
 
                 sysproxy.set_system_proxy().map_err(|e| e.to_string())?;
@@ -115,7 +118,7 @@ pub async fn stop() -> Result<(), String> {
 
 #[tauri::command]
 pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Result<(), String> {
-    let _ = stop().await;
+    let _ = stop()?;
 
     let sidecar_command = app.shell().sidecar("sing-box").map_err(|e| e.to_string())?;
     let (mut rx, child) = sidecar_command
@@ -127,29 +130,39 @@ pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Resu
     PROCESS_MANAGER.lock().unwrap().current_mode = Some(mode);
 
     if let Err(e) = set_proxy().await {
-        stop().await?;
+        stop()?;
         return Err(e.to_string());
     }
 
     let process_manager = PROCESS_MANAGER.clone();
-    
+
     tauri::async_runtime::spawn(async move {
         let handle_event = |event: CommandEvent| {
             let (level, message) = match &event {
                 CommandEvent::Stdout(line) | CommandEvent::Stderr(line) => {
                     let line_str = String::from_utf8_lossy(line);
-                    (if matches!(&event, CommandEvent::Stdout(_)) { "stdout" } else { "stderr" }, 
-                     format!("'{}'", line_str))
-                },
+                    (
+                        if matches!(&event, CommandEvent::Stdout(_)) {
+                            "stdout"
+                        } else {
+                            "stderr"
+                        },
+                        format!("'{}'", line_str),
+                    )
+                }
                 CommandEvent::Terminated(status) => {
                     if let Ok(mut manager) = process_manager.lock() {
                         manager.child = None;
                     }
-                    ("info", format!("Process terminated with status: {:?}", status))
-                },
+                    (
+                        "info",
+                        format!("Process terminated with status: {:?}", status),
+                    )
+                
+                }
                 _ => return Ok(()),
             };
-            
+
             println!("{}: {}", level, message);
             app.emit("core_backend", Some(message))
                 .map_err(|e| e.to_string())

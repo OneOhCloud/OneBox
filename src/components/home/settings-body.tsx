@@ -6,7 +6,8 @@ import SelectNode from "./select-node";
 import SelectSub from "./select-sub";
 import * as path from '@tauri-apps/api/path';
 import setMixedConfig from "../../config/sing-box";
-
+import { fetch } from '@tauri-apps/plugin-http';
+import useSWR from "swr";
 const fomatDate = (date: number) => {
     const d = new Date(date)
     return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`
@@ -16,6 +17,8 @@ export type SettingsBodyProps = {
     isRunning: boolean;
 
 }
+
+
 
 export default function SettingsBody(props: SettingsBodyProps) {
 

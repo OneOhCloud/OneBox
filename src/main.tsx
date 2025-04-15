@@ -5,11 +5,18 @@ import { defaultWindowIcon } from '@tauri-apps/api/app';
 import { Menu } from '@tauri-apps/api/menu';
 import { TrayIcon } from '@tauri-apps/api/tray';
 import { getCurrentWindow } from '@tauri-apps/api/window';
+import { store } from './single/store';
+import { invoke } from "@tauri-apps/api/core";
 
 const appWindow = getCurrentWindow();
-// 使用全局变量来标记是否已经初始化
-let trayInitialized = false;
-let trayInstance: TrayIcon | null = null; // 托盘实例
+let trayInstance: TrayIcon | null = null;
+
+
+appWindow.listen("my-window-event", ({ event, payload }) => { 
+  console.log("Received event:", event);
+  console.log("Payload:", payload);
+});
+
 
 // 创建托盘的函数移到组件外部
 async function createTrayMenu() {
@@ -20,13 +27,23 @@ async function createTrayMenu() {
         text: '显示主界面',
         action: async () => {
           await appWindow.show();
+          await appWindow.setFocus();
         },
       },
       {
         id: 'quit',
         text: '退出',
         action: async () => {
-          await appWindow.destroy()
+
+          await appWindow.close();
+          // sleep(1000);
+          await new Promise((resolve) => {
+            invoke("stop").then(() => {
+              resolve(true);
+            }
+            );
+          });
+          await appWindow.destroy();
         },
       },
     ],
@@ -35,11 +52,13 @@ async function createTrayMenu() {
 
 // 初始化托盘的函数也移到组件外部
 async function setupTrayIcon() {
+
+  let trayInitialized = await store.get('trayInitialized') || false;
   // 使用标志变量防止多次初始化
-  if (trayInitialized) {
+  if (trayInitialized && trayInstance) {
     return trayInstance;
   }
-  
+
   try {
     const menu = await createTrayMenu();
     const options = {
@@ -48,9 +67,11 @@ async function setupTrayIcon() {
       icon: (await defaultWindowIcon()) || 'None',
       tooltip: "OneBox"
     };
-    
+
     trayInstance = await TrayIcon.new(options);
-    trayInitialized = true;
+    await store.set('trayInitialized', true);
+    await store.save();
+
     return trayInstance;
   } catch (error) {
     console.error('Error setting up tray icon:', error);

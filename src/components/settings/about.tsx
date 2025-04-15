@@ -96,7 +96,7 @@ function About({ onClose }: AboutProps) {
             </dialog>
 
             <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center pointer-events-none">
-                <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-md max-w-md w-full max-h-[100vh] overflow-hidden flex flex-col pointer-events-auto">
+                <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-none max-w-md w-full max-h-[100vh] overflow-hidden flex flex-col pointer-events-auto">
                     {/* 标题栏 */}
                     <div className="flex justify-between items-center px-4 py-3 border-b border-gray-100">
                         <div className="text-lg font-semibold">关于</div>

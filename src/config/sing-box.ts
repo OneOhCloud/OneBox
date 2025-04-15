@@ -208,6 +208,9 @@ const mixedConfig = {
     ]
   },
   "experimental": {
+    "clash_api":{
+      "external_controller": "127.0.0.1:9191",
+    },
     "cache_file": {
       "enabled": true,
       "store_fakeip": false,

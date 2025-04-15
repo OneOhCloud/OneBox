@@ -32,7 +32,6 @@ export default function Home({ onNavigate }: HomeProps) {
   const [isOn, setIsOn] = useState(false);
   const [isOnLoading, setIsOnLoading] = useState(false);
   const [selectedMode, setSelectedMode] = useState('规则');
-  const [_, setLogs] = useState<string[]>([]);
   const [isEmpty, setIsEmpty] = useState(false);
   const [indicatorStyle, setIndicatorStyle] = useState({ left: 0, width: 0 });
 
@@ -43,16 +42,18 @@ export default function Home({ onNavigate }: HomeProps) {
   useEffect(() => {
     invoke<boolean>('is_running').then(setIsOn);
   }, []);
+ 
 
+
+   
   // 事件监听
   useEffect(() => {
     const unsubscribe = listen('core_backend', (event) => {
       const payload = event.payload as string;
-      if (payload === 'Process terminated') {
+      if (payload.startsWith('Process terminated')) {
         setIsOn(false);
         return;
       }
-      setLogs(prev => [...prev, payload].slice(-100));
     });
 
     return () => {

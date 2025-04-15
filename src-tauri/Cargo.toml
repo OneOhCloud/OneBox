@@ -5,6 +5,11 @@ description = "A Tauri App"
 authors = ["OneOh Cloud LLC"]
 edition = "2021"
 
+[profile.dev]
+incremental = true
+opt-level = 0
+codegen-units=10
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [lib]
