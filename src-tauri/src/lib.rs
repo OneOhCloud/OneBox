@@ -43,8 +43,6 @@ pub fn run() {
                 if let Some(main_window) = window.app_handle().get_webview_window("main") {
                     main_window.hide().unwrap();
                 }
-                let _ = core::stop();
-                println!("CloseRequested");
             }
             WindowEvent::Destroyed => {
                 let _ = core::stop();
