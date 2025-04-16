@@ -4,15 +4,16 @@ mod core;
 mod database;
 mod plugins;
 
-// Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-#[tauri::command]
-fn greet(name: &str) -> String {
-    format!("Hello, {}! You've been greeted from Rust!", name)
-}
+
 #[tauri::command]
 fn get_app_version(app: AppHandle) -> String {
     let package_info = app.package_info();
     package_info.version.to_string() // 返回版本号，如 "1.0.0"
+}
+#[tauri::command]
+fn open_devtools(app: AppHandle) {
+    let window = app.get_webview_window("main").unwrap();
+    window.open_devtools();
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -23,7 +24,7 @@ pub fn run() {
     builder
         .invoke_handler(tauri::generate_handler![
             get_app_version,
-            greet,
+            open_devtools,
             core::version,
             core::start,
             core::stop,

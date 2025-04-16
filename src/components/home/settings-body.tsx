@@ -49,15 +49,15 @@ export default function SettingsBody(props: SettingsBodyProps) {
     return (
         <div className='w-full '>
             <div >
-                <fieldset className="fieldset w-full">
-                    <legend className="fieldset-legend">当前订阅</legend>
+                <div className="fieldset w-full">
+                    <div className="fieldset-legend min-w-[270px]">当前订阅</div>
                     <SelectSub onUpdate={handleUpdate}></SelectSub>
-                </fieldset>
+                </div>
 
-                <fieldset className="fieldset w-full">
-                    <legend className="fieldset-legend">节点选择</legend>
+                <div className="fieldset w-full">
+                    <div className="fieldset-legend min-w-[270px]">节点选择</div>
                     <SelectNode disabled={!isRunning} nodeList={nodeList} ></SelectNode>
-                </fieldset>
+                </div>
             </div>
             {
                 sub && (

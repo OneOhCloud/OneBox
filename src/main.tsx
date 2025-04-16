@@ -26,6 +26,14 @@ async function createTrayMenu() {
           await appWindow.setFocus();
         },
       },
+      // 打开开发者工具
+      {
+        id: 'devtools',
+        text: '开发者工具',
+        action: async () => {
+         await invoke("open_devtools");
+        },
+      },
       {
         id: 'quit',
         text: '退出',
