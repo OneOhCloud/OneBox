@@ -1,9 +1,11 @@
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
+use std::path::Path;
 use std::sync::{Arc, Mutex};
 use sysproxy::Sysproxy;
+use tauri::utils::platform;
 use tauri::Emitter;
-use tauri_plugin_shell::process::{CommandChild, CommandEvent};
+use tauri_plugin_shell::process::{Command, CommandChild, CommandEvent};
 use tauri_plugin_shell::ShellExt;
 
 #[cfg(target_os = "windows")]
@@ -116,15 +118,42 @@ pub fn stop() -> Result<(), String> {
     Ok(())
 }
 
+fn get_sidecar_path(program: &Path) -> Result<String, anyhow::Error> {
+    match platform::current_exe()?.parent() {
+        #[cfg(windows)]
+        Some(exe_dir) => Ok(exe_dir
+            .join(command)
+            .with_extension("exe")
+            .to_string_lossy()
+            .into_owned()),
+        #[cfg(not(windows))]
+        Some(exe_dir) => Ok(exe_dir.join(program).to_string_lossy().into_owned()),
+        None => Err(anyhow::anyhow!("Failed to get the executable directory")),
+    }
+}
+
 #[tauri::command]
 pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Result<(), String> {
     let _ = stop()?;
+    let sidecar_command: Command;
 
-    let sidecar_command = app.shell().sidecar("sing-box").map_err(|e| e.to_string())?;
-    let (mut rx, child) = sidecar_command
-        .args(["run", "-c", &path])
-        .spawn()
-        .map_err(|e| e.to_string())?;
+    if mode == ProxyMode::TunProxy {
+        let sidecar_path = get_sidecar_path(Path::new("sing-box")).unwrap();
+        let command = format!(
+            r#"do shell script "sudo '{}' run -c '{}'" with administrator privileges"#,
+            sidecar_path.escape_default(),
+            path.escape_default()
+        );
+
+        println!("Starting sidecar command: {}", command);
+        sidecar_command = app.shell().command("osascript").args(vec!["-e", &command]);
+    } else {
+        let _command: Command = app.shell().sidecar("sing-box").map_err(|e| e.to_string())?;
+
+        sidecar_command = _command.args(["run", "-c", &path]);
+    }
+
+    let (mut rx, child) = sidecar_command.spawn().map_err(|e| e.to_string())?;
 
     PROCESS_MANAGER.lock().unwrap().child = Some(child);
     PROCESS_MANAGER.lock().unwrap().current_mode = Some(mode);
@@ -158,7 +187,6 @@ pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Resu
                         "info",
                         format!("Process terminated with status: {:?}", status),
                     )
-                
                 }
                 _ => return Ok(()),
             };
