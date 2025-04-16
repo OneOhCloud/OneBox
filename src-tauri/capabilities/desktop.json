@@ -15,6 +15,7 @@
     "core:window:allow-destroy",
     "core:window:allow-hide",
     "core:window:allow-show",
+    "core:window:allow-set-focus",
     "opener:allow-open-path",
     "opener:allow-open-url",
     "os:allow-arch",

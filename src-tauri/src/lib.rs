@@ -1,4 +1,5 @@
 use tauri::{AppHandle, Manager, Window, WindowEvent};
+
 mod core;
 mod database;
 mod plugins;
@@ -29,9 +30,13 @@ pub fn run() {
             core::is_running
         ])
         .setup(|app| {
+
             #[cfg(desktop)]
-            app.handle()
-                .plugin(tauri_plugin_updater::Builder::new().build())?;
+            {
+                app.handle()
+                    .plugin(tauri_plugin_updater::Builder::new().build())?;
+            }
+
             Ok(())
         })
         .on_window_event(|window: &Window, event: &WindowEvent| match event {

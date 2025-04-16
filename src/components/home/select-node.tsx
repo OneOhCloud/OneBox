@@ -7,20 +7,59 @@ import NodeOption from "./node-option";
 const baseUrl = "http://localhost:9191";
 
 type SelectNodeProps = {
-    disabled: boolean;
     nodeList: string[]
+    disabled: boolean;
 }
 
 export default function SelectNode(props: SelectNodeProps) {
-    const { disabled, nodeList } = props;
+    const { nodeList, disabled } = props;
+    const [show, setShow] = useState(false);
+
+    useEffect(() => {
+        if (!disabled) {
+            setTimeout(() => {
+                setShow(true);
+            }, 300);
+
+        } else {
+            setShow(false);
+        }
+    }, [disabled]);
+
+    if (disabled) {
+        return <>
+            <div className="select select-sm select-neutral opacity-50 cursor-not-allowed">
+                未启动
+            </div>
+        </>
+    }
+
+    if(!show) {
+        return <div className="select select-sm select-neutral">
+            更新中...
+        </div>
+    }
+
+
+
+
+    return <SelecItem nodeList={nodeList} />
+
+}
+
+type SelecItemProps = {
+    nodeList: string[]
+
+
+}
+
+export function SelecItem(props: SelecItemProps) {
+    const { nodeList } = props;
     const [isOpen, setIsOpen] = useState(false);
 
     const proxiesUrl = `${baseUrl}/proxies/${encodeURIComponent('流量出口')}`;
 
-    const { data, mutate, isLoading } = useSWR(proxiesUrl, async (url) => {
-        if (disabled) {
-            return "未启动";
-        }
+    const { data, mutate, isLoading, error } = useSWR(proxiesUrl, async (url) => {
         const response = await fetch(decodeURIComponent(url), {
             method: 'GET',
             headers: {
@@ -28,16 +67,15 @@ export default function SelectNode(props: SelectNodeProps) {
                 'Accept': 'application/json',
             },
         });
-
         let res = await response.json();
         return res.now;
     });
 
-    useEffect(() => {
-        setTimeout(() => {
-            mutate();
-        }, 2000);
-    }, [disabled]);
+
+
+    if (error) {
+        console.error(error);
+    }
 
     const handleNodeChange = async (node: string) => {
 
@@ -51,18 +89,13 @@ export default function SelectNode(props: SelectNodeProps) {
                 },
                 body: JSON.stringify({ 'name': node }),
             });
-        }catch (error) {
+        } catch (error) {
             console.error("Error changing node:", error);
         } finally {
             mutate();
             setIsOpen(false);
 
         }
-
-
-
-
-
 
     };
 
@@ -72,13 +105,13 @@ export default function SelectNode(props: SelectNodeProps) {
         </div>
     }
 
-    const isLoadingState = isLoading || (!disabled && data == "未启动");
+    const isLoadingState = isLoading
 
     return (
         <div className="relative">
             <div
-                className={`select select-sm select-neutral cursor-pointer ${disabled ? 'opacity-50' : ''}`}
-                onClick={() => !disabled && !isLoadingState && setIsOpen(!isOpen)}
+                className={`select select-sm select-neutral cursor-pointer `}
+                onClick={() => !isLoadingState && setIsOpen(!isOpen)}
             >
                 {isLoadingState ? (
                     <div className="flex justify-between items-center w-full">
@@ -86,10 +119,10 @@ export default function SelectNode(props: SelectNodeProps) {
                         <div className="h-4 w-12 bg-base-300 animate-pulse rounded"></div>
                     </div>
                 ) : (
-                    <NodeOption nodeName={data} disabled={disabled} />
+                    <NodeOption nodeName={data} />
                 )}
             </div>
-            {isOpen && !disabled && !isLoadingState && data && (
+            {isOpen && !isLoadingState && data && (
                 <div className="absolute bottom-full left-0 w-full mb-1 bg-base-100 rounded-lg shadow-lg z-50 max-h-50 overflow-y-auto">
                     {nodeList.map((item, index) => (
                         <div
@@ -97,7 +130,7 @@ export default function SelectNode(props: SelectNodeProps) {
                             className="px-4 py-2 hover:bg-base-200 cursor-pointer"
                             onClick={() => handleNodeChange(item)}
                         >
-                            <NodeOption nodeName={item} disabled={disabled} />
+                            <NodeOption nodeName={item} />
                         </div>
                     ))}
                 </div>

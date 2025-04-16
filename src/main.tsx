@@ -12,10 +12,6 @@ const appWindow = getCurrentWindow();
 let trayInstance: TrayIcon | null = null;
 
 
-appWindow.listen("my-window-event", ({ event, payload }) => { 
-  console.log("Received event:", event);
-  console.log("Payload:", payload);
-});
 
 
 // 创建托盘的函数移到组件外部
@@ -35,7 +31,6 @@ async function createTrayMenu() {
         text: '退出',
         action: async () => {
 
-          await appWindow.close();
           // sleep(1000);
           await new Promise((resolve) => {
             invoke("stop").then(() => {
@@ -53,13 +48,25 @@ async function createTrayMenu() {
 // 初始化托盘的函数也移到组件外部
 async function setupTrayIcon() {
 
-  let trayInitialized = await store.get('trayInitialized') || false;
+  let trayID: string = await store.get('trayID') || '';
+  if (trayID) {
+    try{
+     let t = await TrayIcon.getById(trayID)
+      if(t){
+       await t.close();
+      }
+    }catch (error) {
+      console.error('Error removing tray icon:', error);
+    }
+  }
+
   // 使用标志变量防止多次初始化
-  if (trayInitialized && trayInstance) {
+  if (trayInstance) {
     return trayInstance;
   }
 
   try {
+
     const menu = await createTrayMenu();
     const options = {
       menu,
@@ -69,7 +76,9 @@ async function setupTrayIcon() {
     };
 
     trayInstance = await TrayIcon.new(options);
-    await store.set('trayInitialized', true);
+    console.log("托盘图标创建成功",trayInstance.id);
+    
+    await store.set('trayID', trayInstance.id);
     await store.save();
 
     return trayInstance;

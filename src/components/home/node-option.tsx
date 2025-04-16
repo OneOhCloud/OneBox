@@ -2,16 +2,11 @@ import useSWR from "swr";
 import { fetch } from '@tauri-apps/plugin-http';
 
 type NodeOptionProps = {
-    disabled: boolean;
     nodeName: string;
 };
 
-export default function NodeOption({ nodeName, disabled }: NodeOptionProps) {
+export default function NodeOption({ nodeName }: NodeOptionProps) {
     const { data } = useSWR(`http://localhost:9191/proxies/${encodeURIComponent(nodeName)}`, async (url) => {
-        if (disabled) {
-            return null;
-        }
-
         const response = await fetch(url, {
             method: 'GET',
             headers: {
@@ -32,7 +27,7 @@ export default function NodeOption({ nodeName, disabled }: NodeOptionProps) {
 
     return (
         <div className="flex justify-between items-center w-full">
-            <span className="truncate">{nodeName || '未选择'}</span>
+            <span className="truncate">{nodeName || '启动中'}</span>
             <span className="ml-2 text-sm">{delay !== '-' ? `${delay}ms` : delay}</span>
         </div>
     );

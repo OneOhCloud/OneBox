@@ -15,7 +15,6 @@ const mixedConfig = {
         "tag": "dns_proxy",
         "address": "8.8.8.8",
         "strategy": "ipv4_only",
-        "client_subnet": "114.114.114.114/24",
         "detour": "流量出口"
       },
       {
@@ -174,7 +173,7 @@ const mixedConfig = {
         "tag": "geosite-cn",
         "type": "remote",
         "format": "binary",
-        "url": "https://fastly.jsdelivr.net/gh/SagerNet/sing-geosite@rule-set/geosite-cn.srs",
+        "url": "https://fastly.jsdelivr.net/gh/OneOhCloud/one-geosite@rules/geosite-one-cn.srs",
         "download_detour": "direct"
       },
       {

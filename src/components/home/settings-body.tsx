@@ -4,8 +4,7 @@ import { getSubscriptionConfig } from "../../action/db";
 import { Subscription } from "../../types/definition";
 import SelectNode from "./select-node";
 import SelectSub from "./select-sub";
-import * as path from '@tauri-apps/api/path';
-import setMixedConfig from "../../config/sing-box";
+import setMixedConfig from "../../config/mixed-config";
 
 const fomatDate = (date: number) => {
     const d = new Date(date)
@@ -31,14 +30,7 @@ export default function SettingsBody(props: SettingsBodyProps) {
     const handleUpdate = async (item: Subscription) => {
         try {
             let config = await getSubscriptionConfig(item.identifier);
- 
-            const appConfigPath = await path.appConfigDir();
-            const filePath = await path.join(appConfigPath, 'config.json');
-            console.log("配置文件路径:", filePath);
-            
-            
             setSub(item);
-
             let outbounds = config.outbounds;
             let nameList = outbounds.find((item: any) => item.type === "selector");
             if (nameList) {

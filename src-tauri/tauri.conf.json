@@ -16,6 +16,8 @@
       {
         "devtools": true,
         "maximizable": false,
+        "decorations": true,
+        "resizable": false,
         "title": "OneBox",
         "width": 320,
         "height": 570
