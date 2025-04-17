@@ -12,8 +12,15 @@ const mixedConfig = {
   "dns": {
     "servers": [
       {
+        "tag": "alibaba",
+        "address": "223.6.6.6",
+        "strategy": "ipv4_only",
+        "detour": "direct"
+      },
+      {
         "tag": "dns_proxy",
-        "address": "8.8.8.8",
+        //  只有这个 dns 在 sing-box 1.1.* 版本可用, 其余地址会导致 dns 解析失败
+        "address": "tcp://1.0.0.1",
         "strategy": "ipv4_only",
         "detour": "流量出口"
       },
@@ -23,12 +30,7 @@ const mixedConfig = {
         "strategy": "ipv4_only",
         "detour": "direct"
       },
-      {
-        "tag": "alibaba",
-        "address": "223.6.6.6",
-        "strategy": "ipv4_only",
-        "detour": "direct"
-      },
+  
       {
         "tag": "tencent",
         "address": "119.29.29.29",
@@ -166,7 +168,7 @@ const mixedConfig = {
         "tag": "geoip-cn",
         "type": "remote",
         "format": "binary",
-        "url": "https://fastly.jsdelivr.net/gh/OneOhCloud/one-geoip@rule-set/one-china.srs",
+        "url": "https://fastly.jsdelivr.net/gh/SagerNet/sing-geoip@rule-set/geoip-cn.srs",
         "download_detour": "direct"
       },
       {
@@ -207,7 +209,7 @@ const mixedConfig = {
     ]
   },
   "experimental": {
-    "clash_api": {
+    "clash_api":{
       "external_controller": "127.0.0.1:9191",
     },
     "cache_file": {
@@ -240,7 +242,7 @@ export default async function setMixedConfig(identifier: string) {
   let dbConfigData = await getSubscriptionConfig(identifier);
 
   const appConfigPath = await path.appConfigDir();
-  const dbCacheFilePath = await path.join(appConfigPath, 'mixed-cache.db');
+  const dbCacheFilePath = await path.join(appConfigPath, 'cache.db');
   const newConfig = JSON.parse(JSON.stringify(mixedConfig));
   newConfig["experimental"]["cache_file"]["path"] = dbCacheFilePath;
 
@@ -256,7 +258,7 @@ export default async function setMixedConfig(identifier: string) {
 
 
   let serverList = dbConfigData.outbounds.filter((item: any) => {
-    return item.type !== "selector" && item.type !== "urltest" && item.type !== "direct" && item.type !== "block";
+    return item.type !== "selector" && item.type !== "urltest" && item.type !== "direct" && item.type !== "block"; 
   });
 
   const urltestNameList: string[] = [];

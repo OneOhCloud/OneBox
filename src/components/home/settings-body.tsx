@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Shield } from "react-bootstrap-icons";
 import { getSubscriptionConfig } from "../../action/db";
 import { Subscription } from "../../types/definition";
@@ -23,18 +23,15 @@ export default function SettingsBody({ isRunning }: SettingsBodyProps) {
     const [sub, setSub] = useState<Subscription>();
     const { data, isLoading } = useSubscriptions()
 
+
+
+
     const handleUpdate = async (identifier: string, isUpdate: boolean) => {
         try {
-            const tunMode = await getEnableTun();
             const config = await getSubscriptionConfig(identifier);
-            
             setSub(data?.find(item => item.identifier === identifier));
-            
             const selector = config.outbounds.find((item: any) => item.type === "selector");
             if (selector) setNodeList(selector.outbounds);
-
-            await (tunMode ? setTunConfig : setMixedConfig)(identifier);
-            
             if (isUpdate && isRunning) {
                 await vpnServiceManager.stop();
             }
@@ -42,6 +39,8 @@ export default function SettingsBody({ isRunning }: SettingsBodyProps) {
             console.error('更新配置失败:', error);
         }
     };
+
+
 
     return (
         <div className='w-full'>

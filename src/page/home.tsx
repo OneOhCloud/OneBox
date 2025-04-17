@@ -10,6 +10,9 @@ import { listen } from '@tauri-apps/api/event';
 // Utils & Hooks
 import { useSubscriptions } from '../hooks/useDB';
 import { vpnServiceManager } from "../utils/helper";
+import { getEnableTun, getStoreValue } from "../single/store";
+import setTunConfig from "../config/tun-config";
+import setMixedConfig from "../config/mixed-config";
 
 
 
@@ -34,7 +37,7 @@ export default function Home({ onNavigate }: HomeProps) {
       console.error('Error checking VPN status:', error);
     });
   }, []);
- 
+
 
   // 事件监听
   useEffect(() => {
@@ -82,7 +85,17 @@ export default function Home({ onNavigate }: HomeProps) {
 
     setIsOnLoading(true);
     try {
-      await (isOn ? vpnServiceManager.stop : vpnServiceManager.start)();
+      // await (isOn ? vpnServiceManager.stop : vpnServiceManager.start)();
+      if (isOn) {
+        await vpnServiceManager.stop();
+      }
+      else {
+        const identifier = await getStoreValue('selected_subscription_identifier');
+        const tunMode = await getEnableTun();
+        await (tunMode ? setTunConfig : setMixedConfig)(identifier);
+        await vpnServiceManager.start();
+      }
+
       setIsOn(!isOn);
     } catch (error) {
       await message('连接失败，请检查网络', { title: '错误', kind: 'error' });
