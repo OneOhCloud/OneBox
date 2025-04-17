@@ -1,12 +1,10 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Shield } from "react-bootstrap-icons";
 import { getSubscriptionConfig } from "../../action/db";
 import { Subscription } from "../../types/definition";
 import SelectNode from "./select-node";
 import SelectSub from "./select-sub";
-import setMixedConfig from "../../config/mixed-config";
-import { getEnableTun } from "../../single/store";
-import setTunConfig from "../../config/tun-config";
+
 import { vpnServiceManager } from "../../utils/helper";
 import { useSubscriptions } from "../../hooks/useDB";
 
