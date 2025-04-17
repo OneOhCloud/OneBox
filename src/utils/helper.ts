@@ -3,6 +3,12 @@ import { arch, locale, type, version } from '@tauri-apps/plugin-os';
 import { OsInfo, SING_BOX_VERSION } from '../types/definition';
 import * as path from '@tauri-apps/api/path';
 
+import { getCurrentWindow } from '@tauri-apps/api/window';
+import { getEnableTun } from '../single/store';
+
+const appWindow = getCurrentWindow();
+
+
 export async function getOsInfo() {
     const osType = type()
     const osArch = arch()
@@ -49,3 +55,19 @@ export async function getSingBoxConfigPath() {
     const filePath = await path.join(appConfigPath, 'config.json');
     return filePath;
 }
+
+
+type vpnServiceManagerMode = 'SystemProxy' | 'TunProxy'
+
+export const vpnServiceManager = {
+    start: async () => {
+        const configPath = await getSingBoxConfigPath();
+        const tunMode: boolean | undefined = await getEnableTun();
+        let mode: vpnServiceManagerMode = 'SystemProxy';
+        if (tunMode) {
+            mode = 'TunProxy';
+        }
+        invoke("start", { app: appWindow, path: configPath, mode: mode })
+    },
+    stop: () => invoke("stop"),
+};

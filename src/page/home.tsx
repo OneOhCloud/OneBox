@@ -6,22 +6,12 @@ import { InfoCircle, Power } from 'react-bootstrap-icons';
 // Tauri APIs
 import { invoke } from '@tauri-apps/api/core';
 import { message } from '@tauri-apps/plugin-dialog';
-import { getCurrentWindow } from '@tauri-apps/api/window';
 import { listen } from '@tauri-apps/api/event';
 // Utils & Hooks
-import { getSingBoxConfigPath } from '../utils/helper';
 import { useSubscriptions } from '../hooks/useDB';
+import { vpnServiceManager } from "../utils/helper";
 
-const appWindow = getCurrentWindow();
 
-
-const toggleService = {
-  start: async () => {
-    const configPath = await getSingBoxConfigPath();
-    invoke("start", { app: appWindow, path: configPath, mode:'SystemProxy' })
-  },
-  stop: () => invoke("stop"),
-};
 
 type HomeProps = {
   onNavigate: (screen: 'home' | 'configuration' | 'settings') => void;
@@ -40,12 +30,12 @@ export default function Home({ onNavigate }: HomeProps) {
 
   // 初始化检查
   useEffect(() => {
-    invoke<boolean>('is_running').then(setIsOn);
+    invoke<boolean>('is_running').then(setIsOn).catch((error) => {
+      console.error('Error checking VPN status:', error);
+    });
   }, []);
  
 
-
-   
   // 事件监听
   useEffect(() => {
     const unsubscribe = listen('core_backend', (event) => {
@@ -92,7 +82,7 @@ export default function Home({ onNavigate }: HomeProps) {
 
     setIsOnLoading(true);
     try {
-      await (isOn ? toggleService.stop : toggleService.start)();
+      await (isOn ? vpnServiceManager.stop : vpnServiceManager.start)();
       setIsOn(!isOn);
     } catch (error) {
       await message('连接失败，请检查网络', { title: '错误', kind: 'error' });

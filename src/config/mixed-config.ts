@@ -207,7 +207,7 @@ const mixedConfig = {
     ]
   },
   "experimental": {
-    "clash_api":{
+    "clash_api": {
       "external_controller": "127.0.0.1:9191",
     },
     "cache_file": {
@@ -240,7 +240,7 @@ export default async function setMixedConfig(identifier: string) {
   let dbConfigData = await getSubscriptionConfig(identifier);
 
   const appConfigPath = await path.appConfigDir();
-  const dbCacheFilePath = await path.join(appConfigPath, 'cache.db');
+  const dbCacheFilePath = await path.join(appConfigPath, 'mixed-cache.db');
   const newConfig = JSON.parse(JSON.stringify(mixedConfig));
   newConfig["experimental"]["cache_file"]["path"] = dbCacheFilePath;
 
@@ -256,7 +256,7 @@ export default async function setMixedConfig(identifier: string) {
 
 
   let serverList = dbConfigData.outbounds.filter((item: any) => {
-    return item.type !== "selector" && item.type !== "urltest" && item.type !== "direct" && item.type !== "block"; 
+    return item.type !== "selector" && item.type !== "urltest" && item.type !== "direct" && item.type !== "block";
   });
 
   const urltestNameList: string[] = [];

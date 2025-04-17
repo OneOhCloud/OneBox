@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { ToggleSetting } from "./common";
 import { Cpu } from "react-bootstrap-icons";
 import { getEnableTun,setEnableTun } from "../../single/store";
+import { vpnServiceManager } from "../../utils/helper";
 
 
 export default function ToggleTun() {
@@ -27,6 +28,7 @@ export default function ToggleTun() {
     const handleToggle = async () => {
         setToggle(!toggle);
         await setEnableTun(!toggle);
+        await vpnServiceManager.stop();
     }
 
 

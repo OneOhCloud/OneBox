@@ -20,7 +20,16 @@ export async function getAllowLan(): Promise<boolean> {
     let b =  await store.get(ALLOWLAN_STORE_KEY);
     return Boolean(b);
 }
+
 export async function setAllowLan(value: boolean) {
     await store.set(ALLOWLAN_STORE_KEY, value);
+    await store.save();
+}
+
+export async function getStoreValue(key: string): Promise<any> {
+    return await store.get(key);
+}
+export async function setStoreValue(key: string, value: any) {
+    await store.set(key, value);
     await store.save();
 }
