@@ -4,6 +4,7 @@ import { SettingItem } from "./common";
 import { relaunch } from '@tauri-apps/plugin-process';
 import { check } from '@tauri-apps/plugin-updater';
 import { confirm, message } from '@tauri-apps/plugin-dialog';
+import { vpnServiceManager } from "../../utils/helper";
 
 export default function UpdaterItem() {
     const [updateAvailable, setUpdateAvailable] = useState(false);
@@ -93,7 +94,7 @@ export default function UpdaterItem() {
         });
 
         if (confirmed) {
-            console.log('update installed');
+            await vpnServiceManager.stop()
             await relaunch();
         }
     };

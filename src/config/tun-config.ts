@@ -13,13 +13,6 @@ const tunConfig = {
     "dns": {
         "servers": [
             {
-                "tag": "dns_proxy",
-                "address": "8.8.8.8",
-                "client_subnet": "114.114.114.114/24",
-                "strategy": "ipv4_only",
-                "detour": "流量出口"
-            },
-            {
                 "tag": "system",
                 "address": "local",
                 "strategy": "ipv4_only",
@@ -55,6 +48,12 @@ const tunConfig = {
                 "server": "alibaba"
             },
             {
+                "rule_set": [
+                    "geosite-telegram"
+                ],
+                "server": "remote"
+            },
+            {
                 "clash_mode": "直连",
                 "server": "system"
             },
@@ -68,14 +67,14 @@ const tunConfig = {
                     ".n2ray.dev",
                     ".ksjhaoka.com",
                     ".mixcapp.com",
-                    ".wiwide.net",
-                    "wiportal.wiwide.com",
                     ".msftconnecttest.com",
-                    "nmcheck.gnome.org",
-                    "detectportal.firefox.com",
+                    ".wiwide.net",
                     "connectivitycheck.android.com",
-                    "www.miwifi.com",
-                    "router.asus.com"
+                    "detectportal.firefox.com",
+                    "nmcheck.gnome.org",
+                    "router.asus.com",
+                    "wiportal.wiwide.com",
+                    "www.miwifi.com"
                 ],
                 "rule_set": [
                     "geoip-cn",
@@ -94,18 +93,6 @@ const tunConfig = {
                     "CNAME"
                 ],
                 "server": "remote"
-            },
-            {
-                "rule_set": [
-                    "geoip-cn",
-                    "geosite-cn",
-                    "geosite-apple",
-                    "geosite-microsoft-cn",
-                    "geosite-samsung",
-                    "geosite-private"
-                ],
-                "invert": true,
-                "server": "dns_proxy"
             }
         ],
         "fakeip": {
@@ -130,13 +117,6 @@ const tunConfig = {
             "strict_route": true,
             "sniff": true,
             "sniff_override_destination": true,
-            "platform": {
-                "http_proxy": {
-                    "enabled": false,
-                    "server": "127.0.0.1",
-                    "server_port": 5678
-                }
-            },
             "route_exclude_address": [
                 "10.0.0.0/8",
                 "100.64.0.0/10",
@@ -157,29 +137,13 @@ const tunConfig = {
                 "ff05::/16",
                 "240e::/20",
             ]
-        },
-        {
-            "tag": "mixed",
-            "type": "mixed",
-            "listen": "127.0.0.1",
-            "listen_port": 5678,
-            "sniff": true,
-            "set_system_proxy": false
         }
     ],
     "route": {
         "rules": [
+
             {
-                "inbound": [
-                    "mixed"
-                ],
-                "action": "resolve"
-            },
-            {
-                "inbound": [
-                    "mixed",
-                    "tun"
-                ],
+                "inbound": "tun",
                 "action": "sniff"
             },
             {

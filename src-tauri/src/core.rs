@@ -101,8 +101,12 @@ pub fn stop() -> Result<(), String> {
                 sysproxy.set_system_proxy().map_err(|e| e.to_string())?;
             }
             ProxyMode::TunProxy => {
-                // 在这里添加 TUN 模式的清理操作
-                // TODO: 实现 TUN 模式的清理逻辑
+                // 清理系统代理设置
+                let mut sysproxy: Sysproxy =
+                    Sysproxy::get_system_proxy().map_err(|e| e.to_string())?;
+                sysproxy.enable = false;
+
+                sysproxy.set_system_proxy().map_err(|e| e.to_string())?;
             }
         }
     }
@@ -155,13 +159,21 @@ pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Resu
 
     let (mut rx, child) = sidecar_command.spawn().map_err(|e| e.to_string())?;
 
+    if mode == ProxyMode::SystemProxy {
+        if let Err(e) = set_proxy().await {
+            stop()?;
+            return Err(e.to_string());
+        }
+    } else {
+        // 清理系统代理设置
+        let mut sysproxy: Sysproxy = Sysproxy::get_system_proxy().map_err(|e| e.to_string())?;
+        sysproxy.enable = false;
+
+        sysproxy.set_system_proxy().map_err(|e| e.to_string())?;
+    }
+
     PROCESS_MANAGER.lock().unwrap().child = Some(child);
     PROCESS_MANAGER.lock().unwrap().current_mode = Some(mode);
-
-    if let Err(e) = set_proxy().await {
-        stop()?;
-        return Err(e.to_string());
-    }
 
     let process_manager = PROCESS_MANAGER.clone();
 
