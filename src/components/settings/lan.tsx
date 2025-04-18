@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import { ToggleSetting } from "./common";
 import { Router } from "react-bootstrap-icons";
-import { getAllowLan,setAllowLan } from "../../single/store";
+import { getAllowLan, setAllowLan } from "../../single/store";
+import { ToggleSetting } from "./common";
 
 
 export default function ToggleLan() {

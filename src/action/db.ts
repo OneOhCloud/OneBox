@@ -1,9 +1,9 @@
 
-import { getSingBoxUserAgent } from '../utils/helper';
-import { fetch } from '@tauri-apps/plugin-http'
-import toast from 'react-hot-toast'
+import { fetch } from '@tauri-apps/plugin-http';
+import toast from 'react-hot-toast';
 import { getDataBaseInstance } from '../single/db';
 import { Subscription, SubscriptionConfig } from '../types/definition';
+import { getSingBoxUserAgent } from '../utils/helper';
 
 
 function getRemoteNameByContentDisposition(contentDisposition: string) {

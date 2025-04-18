@@ -1,12 +1,12 @@
+import { invoke } from "@tauri-apps/api/core";
 import { openUrl } from '@tauri-apps/plugin-opener';
 import { useEffect, useState } from "react";
 import { Github, Globe, InfoCircleFill, XLg } from "react-bootstrap-icons";
+import toast from 'react-hot-toast';
+import { aboutText } from "../../page/data";
 import { GITHUB_URL, OFFICIAL_WEBSITE, OsInfo } from "../../types/definition";
 import { formatOsInfo, getOsInfo, getSingBoxUserAgent } from "../../utils/helper";
-import { aboutText } from "../../page/data";
 import { SettingItem } from "./common";
-import toast from 'react-hot-toast';
-import { invoke } from "@tauri-apps/api/core";
 
 // 关于组件接口定义
 interface AboutProps {

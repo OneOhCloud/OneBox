@@ -1,5 +1,5 @@
 import * as path from '@tauri-apps/api/path';
-import { create, BaseDirectory } from '@tauri-apps/plugin-fs';
+import { BaseDirectory, create } from '@tauri-apps/plugin-fs';
 import { getSubscriptionConfig } from '../action/db';
 import { getSingBoxConfigPath } from '../utils/helper';
 

@@ -86,7 +86,7 @@ pub async fn version(app: tauri::AppHandle) -> Result<String, String> {
 }
 
 #[tauri::command]
-pub fn stop() -> Result<(), String> {
+pub fn stop(app: tauri::AppHandle) -> Result<(), String> {
     let mut manager = PROCESS_MANAGER.lock().unwrap();
 
     // 根据当前模式执行清理操作
@@ -118,6 +118,7 @@ pub fn stop() -> Result<(), String> {
 
     // 清理模式状态
     manager.current_mode = None;
+    app.emit("status-changed", ()).unwrap();
 
     Ok(())
 }
@@ -138,7 +139,7 @@ fn get_sidecar_path(program: &Path) -> Result<String, anyhow::Error> {
 
 #[tauri::command]
 pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Result<(), String> {
-    let _ = stop()?;
+    let _ = stop(app.clone())?;
     let sidecar_command: Command;
 
     if mode == ProxyMode::TunProxy {
@@ -161,7 +162,7 @@ pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Resu
 
     if mode == ProxyMode::SystemProxy {
         if let Err(e) = set_proxy().await {
-            stop()?;
+            stop(app)?;
             return Err(e.to_string());
         }
     } else {
@@ -176,6 +177,7 @@ pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Resu
     PROCESS_MANAGER.lock().unwrap().current_mode = Some(mode);
 
     let process_manager = PROCESS_MANAGER.clone();
+    app.emit("status-changed", ()).unwrap();
 
     tauri::async_runtime::spawn(async move {
         let handle_event = |event: CommandEvent| {

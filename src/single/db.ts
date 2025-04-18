@@ -1,4 +1,4 @@
-import Database from '@tauri-apps/plugin-sql'
+import Database from '@tauri-apps/plugin-sql';
 
 let dbPromise: Promise<Database> | null = null;
 

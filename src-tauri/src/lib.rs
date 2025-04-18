@@ -4,7 +4,6 @@ mod core;
 mod database;
 mod plugins;
 
-
 #[tauri::command]
 fn get_app_version(app: AppHandle) -> String {
     let package_info = app.package_info();
@@ -19,7 +18,9 @@ fn open_devtools(app: AppHandle) {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let migrations = database::get_migrations();
-    let builder = tauri::Builder::default().plugin(tauri_plugin_http::init());
+    let builder = tauri::Builder::default()
+        .plugin(tauri_plugin_clipboard_manager::init())
+        .plugin(tauri_plugin_http::init());
     let builder = plugins::register_plugins(builder, migrations);
     builder
         .invoke_handler(tauri::generate_handler![
@@ -31,7 +32,6 @@ pub fn run() {
             core::is_running
         ])
         .setup(|app| {
-
             #[cfg(desktop)]
             {
                 app.handle()
@@ -51,7 +51,7 @@ pub fn run() {
                 }
             }
             WindowEvent::Destroyed => {
-                let _ = core::stop();
+                let _ = core::stop(window.app_handle().clone());
                 println!("Destroyed");
             }
             _ => {}

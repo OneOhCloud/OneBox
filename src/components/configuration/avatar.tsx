@@ -1,6 +1,6 @@
+import { motion } from "framer-motion";
 import { useState } from "react";
 import { GlobeAsiaAustralia } from "react-bootstrap-icons";
-import { motion } from "framer-motion";
 
 type AvatarProps = {
     url: string

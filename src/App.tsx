@@ -1,12 +1,12 @@
-import {  useState } from 'react';
+import { motion } from 'framer-motion';
+import { useState } from 'react';
 import { GearWideConnected, House, Layers } from 'react-bootstrap-icons';
+import { Toaster } from 'react-hot-toast';
 import "./App.css";
 import ConfigurationPage from './page/config';
+import Dev from './page/dev';
 import HomePage from './page/home';
 import SettingsPage from './page/settings';
-import { motion } from 'framer-motion';
-import { Toaster } from 'react-hot-toast';
-import Dev from './page/dev';
 
 
 

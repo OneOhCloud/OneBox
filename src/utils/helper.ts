@@ -1,7 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
+import * as path from '@tauri-apps/api/path';
 import { arch, locale, type, version } from '@tauri-apps/plugin-os';
 import { OsInfo, SING_BOX_VERSION } from '../types/definition';
-import * as path from '@tauri-apps/api/path';
 
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { getEnableTun } from '../single/store';
@@ -67,7 +67,7 @@ export const vpnServiceManager = {
         if (tunMode) {
             mode = 'TunProxy';
         }
-        invoke("start", { app: appWindow, path: configPath, mode: mode })
+        await invoke("start", { app: appWindow, path: configPath, mode: mode })
     },
-    stop: () => invoke("stop"),
+    stop: async () => await invoke("stop", { app: appWindow }),
 };

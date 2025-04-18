@@ -1,12 +1,11 @@
 import { useState } from "react";
 import { Shield } from "react-bootstrap-icons";
 import { getSubscriptionConfig } from "../../action/db";
+import { useSubscriptions } from "../../hooks/useDB";
 import { Subscription } from "../../types/definition";
+import { vpnServiceManager } from "../../utils/helper";
 import SelectNode from "./select-node";
 import SelectSub from "./select-sub";
-
-import { vpnServiceManager } from "../../utils/helper";
-import { useSubscriptions } from "../../hooks/useDB";
 
 const formatDate = (date: number) => {
     return new Date(date).toLocaleDateString('zh-CN');
@@ -20,8 +19,6 @@ export default function SettingsBody({ isRunning }: SettingsBodyProps) {
     const [nodeList, setNodeList] = useState<string[]>([]);
     const [sub, setSub] = useState<Subscription>();
     const { data, isLoading } = useSubscriptions()
-
-
 
 
     const handleUpdate = async (identifier: string, isUpdate: boolean) => {

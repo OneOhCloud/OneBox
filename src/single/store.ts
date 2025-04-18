@@ -1,5 +1,5 @@
 import { LazyStore } from '@tauri-apps/plugin-store';
-import { ALLOWLAN_STORE_KEY , ENABLE_TUN_STORE_KEY} from '../types/definition';
+import { ALLOWLAN_STORE_KEY, ENABLE_TUN_STORE_KEY } from '../types/definition';
 
 
 export const store = new LazyStore('settings.json', {

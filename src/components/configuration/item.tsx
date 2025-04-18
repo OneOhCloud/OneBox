@@ -3,10 +3,10 @@ import bytes from "bytes"
 import { AnimatePresence, motion } from "framer-motion"
 import { ArrowClockwise, CaretDownFill, CaretUpFill, Trash } from "react-bootstrap-icons"
 import { mutate } from "swr"
+import { deleteSubscription, updateSubscription } from "../../action/db"
 import { contentVariants, itemVariants } from "../../page/variants"
 import { GET_SUBSCRIPTIONS_LIST_SWR_KEY, Subscription } from "../../types/definition"
 import Avatar from "./avatar"
-import { deleteSubscription, updateSubscription } from "../../action/db"
 
 
 type SubscriptionItemProps = {

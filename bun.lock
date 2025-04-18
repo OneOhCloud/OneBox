@@ -5,8 +5,9 @@
       "name": "one-box",
       "dependencies": {
         "@tailwindcss/vite": "^4.1.4",
-        "@tauri-apps/api": "^2.4.1",
+        "@tauri-apps/api": "^2.4.0",
         "@tauri-apps/plugin-autostart": "^2.3.0",
+        "@tauri-apps/plugin-clipboard-manager": "~2",
         "@tauri-apps/plugin-dialog": "^2.2.1",
         "@tauri-apps/plugin-fs": "~2.2.1",
         "@tauri-apps/plugin-http": "~2.4.3",
@@ -33,7 +34,7 @@
         "zod": "^3.24.2",
       },
       "devDependencies": {
-        "@tauri-apps/cli": "^2.5.0",
+        "@tauri-apps/cli": "^2.4.0",
         "@types/react": "^19.1.2",
         "@types/react-dom": "^19.1.2",
         "@vitejs/plugin-react": "^4.3.4",
@@ -248,6 +249,8 @@
     "@tauri-apps/cli-win32-x64-msvc": ["@tauri-apps/cli-win32-x64-msvc@2.5.0", "", { "os": "win32", "cpu": "x64" }, "sha512-lj43EFYbnAta8pd9JnUq87o+xRUR0odz+4rixBtTUwUgdRdwQ2V9CzFtsMu6FQKpFQ6mujRK6P1IEwhL6ADRsQ=="],
 
     "@tauri-apps/plugin-autostart": ["@tauri-apps/plugin-autostart@2.3.0", "", { "dependencies": { "@tauri-apps/api": "^2.0.0" } }, "sha512-yxQTpc4NolT1r317yjKVhrG+YwCWPBOj7p+70m/q0w1JHc53pGcHmTboAbA3kGY6PQ+9y9oE7cdmHq7PH9z/SQ=="],
+
+    "@tauri-apps/plugin-clipboard-manager": ["@tauri-apps/plugin-clipboard-manager@2.2.2", "", { "dependencies": { "@tauri-apps/api": "^2.0.0" } }, "sha512-bZvDLMqfcNmsw7Ag8I49jlaCjdpDvvlJHnpp6P+Gg/3xtpSERdwlDxm7cKGbs2mj46dsw4AuG3RoAgcpwgioUA=="],
 
     "@tauri-apps/plugin-dialog": ["@tauri-apps/plugin-dialog@2.2.1", "", { "dependencies": { "@tauri-apps/api": "^2.0.0" } }, "sha512-wZmCouo4PgTosh/UoejPw9DPs6RllS5Pp3fuOV2JobCu36mR5AXU2MzU9NZiVaFi/5Zfc8RN0IhcZHnksJ1o8A=="],
 

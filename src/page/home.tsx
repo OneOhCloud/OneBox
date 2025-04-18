@@ -1,24 +1,23 @@
-// React & Hooks
-import { useEffect, useRef, useState } from "react";
-// Components & Icons
-import SettingsBody from '../components/home/settings-body';
-import { InfoCircle, Power } from 'react-bootstrap-icons';
-// Tauri APIs
 import { invoke } from '@tauri-apps/api/core';
-import { message } from '@tauri-apps/plugin-dialog';
 import { listen } from '@tauri-apps/api/event';
-// Utils & Hooks
-import { useSubscriptions } from '../hooks/useDB';
-import { vpnServiceManager } from "../utils/helper";
-import { getEnableTun, getStoreValue } from "../single/store";
-import setTunConfig from "../config/tun-config";
+import { message } from '@tauri-apps/plugin-dialog';
+import { useEffect, useRef, useState } from "react";
+import { InfoCircle, Power } from 'react-bootstrap-icons';
+import SettingsBody from '../components/home/settings-body';
 import setMixedConfig from "../config/mixed-config";
+import setTunConfig from "../config/tun-config";
+import { useSubscriptions } from '../hooks/useDB';
+import { getEnableTun, getStoreValue } from "../single/store";
+import { vpnServiceManager } from "../utils/helper";
 
 
 
 type HomeProps = {
   onNavigate: (screen: 'home' | 'configuration' | 'settings') => void;
 }
+
+
+
 
 export default function Home({ onNavigate }: HomeProps) {
   // 状态管理
@@ -39,14 +38,12 @@ export default function Home({ onNavigate }: HomeProps) {
   }, []);
 
 
-  // 事件监听
+
+
+  //事件监听 
   useEffect(() => {
-    const unsubscribe = listen('core_backend', (event) => {
-      const payload = event.payload as string;
-      if (payload.startsWith('Process terminated')) {
-        setIsOn(false);
-        return;
-      }
+    const unsubscribe = listen('status-changed', async (event) => {
+      setIsOn(await invoke<boolean>('is_running'));
     });
 
     return () => {

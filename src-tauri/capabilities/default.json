@@ -27,7 +27,7 @@
     "shell:allow-spawn",
     "shell:allow-stdin-write",
     "shell:default",
-    "updater:default"
-
+    "updater:default",
+    "clipboard-manager:allow-write-text"
   ]
 }

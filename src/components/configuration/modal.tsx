@@ -1,10 +1,10 @@
+import { motion } from "framer-motion";
+import { useState } from "react";
+import { Plus } from "react-bootstrap-icons";
+import { mutate } from "swr";
+import { z } from "zod"; // 导入 zod
 import { addSubscription } from "../../action/db";
 import { GET_SUBSCRIPTIONS_LIST_SWR_KEY } from "../../types/definition";
-import { motion } from "framer-motion";
-import { mutate } from "swr";
-import { Plus } from "react-bootstrap-icons";
-import { useState } from "react";
-import { z } from "zod"; // 导入 zod
 
 // 定义验证模式
 const subscriptionSchema = z.object({

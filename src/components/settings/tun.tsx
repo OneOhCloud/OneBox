@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
-import { ToggleSetting } from "./common";
 import { Cpu } from "react-bootstrap-icons";
-import { getEnableTun,setEnableTun } from "../../single/store";
+import { getEnableTun, setEnableTun } from "../../single/store";
 import { vpnServiceManager } from "../../utils/helper";
+import { ToggleSetting } from "./common";
 
 
 export default function ToggleTun() {

@@ -12,8 +12,9 @@
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.4",
-    "@tauri-apps/api": "^2.4.1",
+    "@tauri-apps/api": "^2.4.0",
     "@tauri-apps/plugin-autostart": "^2.3.0",
+    "@tauri-apps/plugin-clipboard-manager": "~2",
     "@tauri-apps/plugin-dialog": "^2.2.1",
     "@tauri-apps/plugin-fs": "~2.2.1",
     "@tauri-apps/plugin-http": "~2.4.3",
@@ -40,7 +41,7 @@
     "zod": "^3.24.2"
   },
   "devDependencies": {
-    "@tauri-apps/cli": "^2.5.0",
+    "@tauri-apps/cli": "^2.4.0",
     "@types/react": "^19.1.2",
     "@types/react-dom": "^19.1.2",
     "@vitejs/plugin-react": "^4.3.4",

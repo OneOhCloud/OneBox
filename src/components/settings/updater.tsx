@@ -1,10 +1,10 @@
-import { useEffect, useState } from "react";
-import { CloudArrowUpFill, CloudArrowDown } from "react-bootstrap-icons";
-import { SettingItem } from "./common";
+import { confirm, message } from '@tauri-apps/plugin-dialog';
 import { relaunch } from '@tauri-apps/plugin-process';
 import { check } from '@tauri-apps/plugin-updater';
-import { confirm, message } from '@tauri-apps/plugin-dialog';
+import { useEffect, useState } from "react";
+import { CloudArrowDown, CloudArrowUpFill } from "react-bootstrap-icons";
 import { vpnServiceManager } from "../../utils/helper";
+import { SettingItem } from "./common";
 
 export default function UpdaterItem() {
     const [updateAvailable, setUpdateAvailable] = useState(false);

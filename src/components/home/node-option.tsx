@@ -1,5 +1,5 @@
-import useSWR from "swr";
 import { fetch } from '@tauri-apps/plugin-http';
+import useSWR from "swr";
 
 type NodeOptionProps = {
     nodeName: string;

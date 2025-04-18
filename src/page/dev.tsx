@@ -1,9 +1,9 @@
-import { getCurrentWindow } from "@tauri-apps/api/window";
-import { useState, useEffect } from "react";
-import { X, Dash } from "react-bootstrap-icons";
-import { Toaster } from "react-hot-toast";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from '@tauri-apps/api/event';
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import { useEffect, useState } from "react";
+import { Dash, X } from "react-bootstrap-icons";
+import { Toaster } from "react-hot-toast";
 import { getSingBoxConfigPath } from "../utils/helper";
 
 const appWindow = getCurrentWindow();
