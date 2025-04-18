@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { getStoreValue, setStoreValue } from "../../single/store";
-import { Subscription } from "../../types/definition";
+import { SSI_STORE_KEY, Subscription } from "../../types/definition";
 
 type SubscriptionProps = {
     data: Subscription[] | undefined;
@@ -14,7 +14,7 @@ export default function SelectSub({ data, isLoading, onUpdate }: SubscriptionPro
     useEffect(() => {
         const init = async () => {
             if (!data?.length) return;
-            const savedId = await getStoreValue('selected_subscription_identifier');
+            const savedId = await getStoreValue(SSI_STORE_KEY);
             const item = data.find(item => item.identifier === savedId) || data[0];
             await updateSubscription(item);
         };
@@ -22,9 +22,9 @@ export default function SelectSub({ data, isLoading, onUpdate }: SubscriptionPro
     }, [data]);
 
     const updateSubscription = async (item: Subscription) => {
-        const prevId = await getStoreValue('selected_subscription_identifier');
+        const prevId = await getStoreValue(SSI_STORE_KEY);
         setSelected(item.name);
-        await setStoreValue('selected_subscription_identifier', item.identifier);
+        await setStoreValue(SSI_STORE_KEY, item.identifier);
         onUpdate(item.identifier, prevId !== item.identifier);
     }
 

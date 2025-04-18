@@ -8,6 +8,7 @@ import setMixedConfig from "../config/mixed-config";
 import setTunConfig from "../config/tun-config";
 import { useSubscriptions } from '../hooks/useDB';
 import { getEnableTun, getStoreValue } from "../single/store";
+import { SSI_STORE_KEY } from '../types/definition';
 import { vpnServiceManager } from "../utils/helper";
 
 
@@ -87,7 +88,7 @@ export default function Home({ onNavigate }: HomeProps) {
         await vpnServiceManager.stop();
       }
       else {
-        const identifier = await getStoreValue('selected_subscription_identifier');
+        const identifier: string = await getStoreValue(SSI_STORE_KEY);
         const tunMode = await getEnableTun();
         await (tunMode ? setTunConfig : setMixedConfig)(identifier);
         await vpnServiceManager.start();
@@ -97,7 +98,9 @@ export default function Home({ onNavigate }: HomeProps) {
     } catch (error) {
       await message('连接失败，请检查网络', { title: '错误', kind: 'error' });
     } finally {
-      setIsOnLoading(false);
+      setTimeout(() => {
+        setIsOnLoading(false);
+      }, 1600);
     }
   };
 

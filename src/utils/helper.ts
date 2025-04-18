@@ -46,7 +46,8 @@ export async function getSingBoxUserAgent() {
     } else if (osInfo.osType === 'macos') {
         prefix = 'SFM';
     }
-    return `${prefix}/${osInfo.appVersion} (${osInfo.osType} ${osInfo.osArch} ${osInfo.osVersion}; sing-box ${SING_BOX_VERSION}; language ${osInfo.osLocale})`;
+    const version = SING_BOX_VERSION.replace('v', '');
+    return `${prefix}/${osInfo.appVersion} (${osInfo.osType} ${osInfo.osArch} ${osInfo.osVersion}; sing-box ${version}; language ${osInfo.osLocale})`;
 }
 
 

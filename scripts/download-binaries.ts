@@ -1,13 +1,12 @@
-import fs from 'fs';
+import fs, { createWriteStream } from 'fs';
 import path from 'path';
-import { createWriteStream } from 'fs';
 import { pipeline } from 'stream';
-import { promisify } from 'util';
 import { x } from 'tar';
 import unzipper from 'unzipper';
+import { promisify } from 'util';
+import { SING_BOX_VERSION } from '../src/types/definition';
 
 // 配置常量
-const SING_BOX_VERSION = 'v1.11.7';
 const BINARY_NAME = 'sing-box';
 const GITHUB_RELEASE_URL = 'https://github.com/SagerNet/sing-box/releases/download/';
 
@@ -110,11 +109,11 @@ async function downloadEmbeddingExternalBinaries(): Promise<void> {
             if (platform === 'windows' && arch === 'amd64') {
                 console.log('正在下载 Windows sysproxy...');
                 const targetPath = `src-tauri/binaries/sysproxy-${targetTriple}${extension}`;
-                
+
                 // 确保目标目录存在
                 const targetDir = path.dirname(targetPath);
                 !fs.existsSync(targetDir) && fs.mkdirSync(targetDir, { recursive: true });
-                
+
                 await downloadFile(SYSPROXY_URL, targetPath);
                 console.log('sysproxy 下载完成');
             }

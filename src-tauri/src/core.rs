@@ -169,7 +169,6 @@ pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Resu
         // 清理系统代理设置
         let mut sysproxy: Sysproxy = Sysproxy::get_system_proxy().map_err(|e| e.to_string())?;
         sysproxy.enable = false;
-
         sysproxy.set_system_proxy().map_err(|e| e.to_string())?;
     }
 

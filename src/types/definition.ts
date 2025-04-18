@@ -2,9 +2,10 @@ import { Arch, OsType } from "@tauri-apps/plugin-os"
 
 export const GITHUB_URL = 'https://github.com/OneOhCloud/OneBox'
 export const OFFICIAL_WEBSITE = 'https://oneoh.cloud'
-export const SING_BOX_VERSION = '1.11.5'
+export const SING_BOX_VERSION = "v1.11.7"
+export const SSI_STORE_KEY = 'selected_subscription_identifier'
 
- 
+
 // 允许局域网连接
 export const ALLOWLAN_STORE_KEY = 'allow_lan_key'
 // 是否启用 tun 模式
@@ -31,7 +32,7 @@ export type Subscription = {
     last_update_time: number
 }
 
-export type SubscriptionConfig  = {
+export type SubscriptionConfig = {
     id: number
     identifier: string
     config_content: string
