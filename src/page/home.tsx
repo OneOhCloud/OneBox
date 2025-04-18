@@ -42,7 +42,7 @@ export default function Home({ onNavigate }: HomeProps) {
 
   //事件监听 
   useEffect(() => {
-    const unsubscribe = listen('status-changed', async (event) => {
+    const unsubscribe = listen('status-changed', async (_) => {
       setIsOn(await invoke<boolean>('is_running'));
     });
 
