@@ -1,4 +1,5 @@
 use tauri::{AppHandle, Manager, Window, WindowEvent};
+use tauri_plugin_http::reqwest;
 
 mod core;
 mod database;
@@ -15,6 +16,19 @@ fn open_devtools(app: AppHandle) {
     window.open_devtools();
 }
 
+#[tauri::command]
+async fn ping(url: String) -> bool {
+    let client = reqwest::ClientBuilder::new()
+        .timeout(std::time::Duration::from_secs(4))
+        .build()
+        .unwrap();
+
+    match client.get(url).send().await {
+        Ok(res) => res.status().is_success(),
+        Err(_) => false,
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let migrations = database::get_migrations();
@@ -24,6 +38,7 @@ pub fn run() {
     let builder = plugins::register_plugins(builder, migrations);
     builder
         .invoke_handler(tauri::generate_handler![
+            ping,
             get_app_version,
             open_devtools,
             core::version,
