@@ -4,6 +4,7 @@ use tauri_plugin_http::reqwest;
 mod core;
 mod database;
 mod plugins;
+mod privilege;
 
 #[tauri::command]
 fn get_app_version(app: AppHandle) -> String {
@@ -33,6 +34,7 @@ async fn ping(url: String) -> bool {
 pub fn run() {
     let migrations = database::get_migrations();
     let builder = tauri::Builder::default()
+        .plugin(tauri_plugin_stronghold::Builder::new(|pass| todo!()).build())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_http::init());
     let builder = plugins::register_plugins(builder, migrations);
@@ -44,7 +46,8 @@ pub fn run() {
             core::version,
             core::start,
             core::stop,
-            core::is_running
+            core::is_running,
+            privilege::is_privileged,
         ])
         .setup(|app| {
             #[cfg(desktop)]
@@ -52,6 +55,14 @@ pub fn run() {
                 app.handle()
                     .plugin(tauri_plugin_updater::Builder::new().build())?;
             }
+
+            let salt_path = app
+                .path()
+                .app_local_data_dir()
+                .expect("could not resolve app local data path")
+                .join("salt.txt");
+            app.handle()
+                .plugin(tauri_plugin_stronghold::Builder::with_argon2(&salt_path).build())?;
 
             Ok(())
         })

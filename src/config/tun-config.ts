@@ -17,7 +17,7 @@ const tunConfig = {
                 "address": "local",
                 "strategy": "ipv4_only",
                 "detour": "direct"
-            },
+            },  
             {
                 "tag": "alibaba",
                 "address": "223.6.6.6",
@@ -185,7 +185,7 @@ const tunConfig = {
                 "invert": true
             }
         ],
-        "final": "direct",
+        "final": "流量出口",
         "auto_detect_interface": true,
         "rule_set": [
             {

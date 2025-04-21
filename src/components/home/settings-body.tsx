@@ -30,7 +30,7 @@ const NetworkStatus = ({ isOk, icon: Icon, tip }: { isOk: boolean; icon: typeof 
                 repeatDelay: 2
             }}
         >
-            <Icon className={`size-4 ${isOk ? 'text-green-500' : 'text-red-500'} transition-colors duration-300`} />
+            <Icon className={`size-4 ${isOk ? 'text-gray-500' : 'text-red-500'} transition-colors duration-300`} />
         </motion.div>
     </motion.div>
 );
@@ -39,7 +39,7 @@ export default function SettingsBody({ isRunning }: { isRunning: boolean }) {
     const [nodeList, setNodeList] = useState<string[]>([]);
     const [sub, setSub] = useState<Subscription>();
     const { data, isLoading } = useSubscriptions();
-    const [networkStatus, setNetworkStatus] = useState({ baidu: false, google: false });
+    const [networkStatus, setNetworkStatus] = useState({ baidu: true, google: true });
 
     const handleUpdate = async (identifier: string, isUpdate: boolean) => {
         try {
@@ -62,6 +62,7 @@ export default function SettingsBody({ isRunning }: { isRunning: boolean }) {
     };
 
     useEffect(() => {
+
         checkNetwork('baidu', 'baidu');
         checkNetwork('google', 'google');
 
@@ -73,13 +74,15 @@ export default function SettingsBody({ isRunning }: { isRunning: boolean }) {
                 <div className="fieldset w-full">
                     <div className="fieldset-legend min-w-[270px]">
                         <div>当前订阅</div>
-                        <div className="flex gap-2 px-2 items-center" onClick={() => {
-                            checkNetwork('baidu', 'baidu');
-                            checkNetwork('google', 'google');
-                        }}>
-                            <NetworkStatus isOk={networkStatus.baidu} icon={Reception4} tip="网络" />
-                            <NetworkStatus isOk={networkStatus.google} icon={Globe} tip="外网" />
-                        </div>
+                        {isRunning && (
+                            <div className="flex gap-2 px-2 items-center" onClick={() => {
+                                checkNetwork('baidu', 'baidu');
+                                checkNetwork('google', 'google');
+                            }}>
+                                <NetworkStatus isOk={networkStatus.baidu} icon={Reception4} tip="网络" />
+                                <NetworkStatus isOk={networkStatus.google} icon={Globe} tip="外网" />
+                            </div>
+                        )}
                     </div>
                     <SelectSub onUpdate={handleUpdate} data={data} isLoading={isLoading} />
                 </div>
