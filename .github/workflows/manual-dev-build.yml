@@ -67,10 +67,16 @@ jobs:
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # 作者签名
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+          # 苹果签名
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+
+          # 苹果公证
           APPLE_API_KEY_PATH: temp_auth_key.p8
           APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+
         with:
           tagName: OneBox-dev-v${{ github.event.inputs.version || '0.0.0-dev' }}
           releaseName: "OneBox Dev Build v${{ github.event.inputs.version || '0.0.0-dev' }}"
