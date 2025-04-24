@@ -58,10 +58,19 @@ jobs:
       - name: download binaries
         run: bun run scripts/download-binaries.ts
 
+      - name: Create temporary AuthKey file (macOS only)
+        if: matrix.platform == 'macos-latest'
+        run: |
+          echo "${{ secrets.APPLE_AUTH_KEY }}" > temp_auth_key.p8
+        shell: bash
+
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+          APPLE_API_KEY_PATH: temp_auth_key.p8
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
         with:
           tagName: OneBox-dev-v${{ github.event.inputs.version || '0.0.0-dev' }}
           releaseName: "OneBox Dev Build v${{ github.event.inputs.version || '0.0.0-dev' }}"
@@ -69,3 +78,8 @@ jobs:
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
+
+      - name: Clean up temporary AuthKey file (macOS only)
+        if: matrix.platform == 'macos-latest'
+        run: rm -f temp_auth_key.p8
+        shell: bash

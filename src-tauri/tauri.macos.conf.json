@@ -11,7 +11,7 @@
       "frameworks": [],
       "minimumSystemVersion": "10.15",
       "exceptionDomain": "",
-      "signingIdentity": null,
+      "signingIdentity": "CD3A7A1BE6BB131F0D9B0FC8758FACF33C9499A7",
       "entitlements": "packages/macos/entitlements.plist"
     }
   }
