@@ -138,19 +138,27 @@ fn get_sidecar_path(program: &Path) -> Result<String, anyhow::Error> {
 }
 
 #[tauri::command]
-pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Result<(), String> {
+pub async fn start(
+    app: tauri::AppHandle,
+    path: String,
+    mode: ProxyMode,
+    username: String,
+    password: String,
+) -> Result<(), String> {
     let _ = stop(app.clone())?;
     let sidecar_command: Command;
 
     if mode == ProxyMode::TunProxy {
         let sidecar_path = get_sidecar_path(Path::new("sing-box")).unwrap();
         let command = format!(
-            r#"do shell script "sudo '{}' run -c '{}'" with administrator privileges"#,
+            r#"do shell script "sudo '{}' run -c '{}'" user name "{}" password "{}" with administrator privileges"#,
             sidecar_path.escape_default(),
-            path.escape_default()
+            path.escape_default(),
+            username.escape_default(),
+            password.escape_default()
         );
 
-        println!("Starting sidecar command: {}", command);
+        println!("Starting sidecar command with username: {}", username);
         sidecar_command = app.shell().command("osascript").args(vec!["-e", &command]);
     } else {
         let _command: Command = app.shell().sidecar("sing-box").map_err(|e| e.to_string())?;

@@ -34,7 +34,6 @@ async fn ping(url: String) -> bool {
 pub fn run() {
     let migrations = database::get_migrations();
     let builder = tauri::Builder::default()
-        .plugin(tauri_plugin_stronghold::Builder::new(|pass| todo!()).build())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_http::init());
     let builder = plugins::register_plugins(builder, migrations);
@@ -48,6 +47,7 @@ pub fn run() {
             core::stop,
             core::is_running,
             privilege::is_privileged,
+            privilege::get_current_username,
         ])
         .setup(|app| {
             #[cfg(desktop)]
@@ -56,15 +56,33 @@ pub fn run() {
                     .plugin(tauri_plugin_updater::Builder::new().build())?;
             }
 
-            let salt_path = app
-                .path()
-                .app_local_data_dir()
-                .expect("could not resolve app local data path")
-                .join("salt.txt");
-            app.handle()
-                .plugin(tauri_plugin_stronghold::Builder::with_argon2(&salt_path).build())?;
+            println!("app local data path: {:?}", app.path().app_local_data_dir());
+            println!("app config path: {:?}", app.path().app_config_dir());
+            println!("app cache path: {:?}", app.path().app_cache_dir());
+            println!("app log path: {:?}", app.path().app_log_dir());
+
+            #[cfg(target_os = "macos")]
+            {
+                app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+                if let Some(main_window) = app.get_webview_window("main") {
+                    main_window.show().unwrap();
+                    main_window.set_focus().unwrap();
+                }
+            }
 
             Ok(())
+        })
+        .on_menu_event(|app, event| match event.id.as_ref() {
+            "show" => {
+                // 显示窗口
+                if let Some(main_window) = app.get_webview_window("main") {
+                    main_window.show().unwrap();
+                    main_window.set_focus().unwrap();
+                }
+            }
+            _ => {
+                println!("menu item {:?} not handled", event.id);
+            }
         })
         .on_window_event(|window: &Window, event: &WindowEvent| match event {
             WindowEvent::CloseRequested { api, .. } => {
@@ -75,6 +93,10 @@ pub fn run() {
                 if let Some(main_window) = window.app_handle().get_webview_window("main") {
                     main_window.hide().unwrap();
                 }
+            }
+            WindowEvent::Resized { .. } => {
+                // 窗口大小改变
+                println!("窗口大小改变");
             }
             WindowEvent::Destroyed => {
                 let _ = core::stop(window.app_handle().clone());

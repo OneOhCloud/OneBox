@@ -10,7 +10,7 @@ import SettingsPage from './page/settings';
 
 
 
-const debug = true;
+const debug = false;
 
 
 

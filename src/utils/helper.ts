@@ -1,10 +1,11 @@
 import { invoke } from '@tauri-apps/api/core';
 import * as path from '@tauri-apps/api/path';
 import { arch, locale, type, version } from '@tauri-apps/plugin-os';
-import { OsInfo, SING_BOX_VERSION } from '../types/definition';
+import { OsInfo, PRIVILEGED_PASSWORD_STORE_KEY, SING_BOX_VERSION } from '../types/definition';
 
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import { getEnableTun } from '../single/store';
+import { message } from '@tauri-apps/plugin-dialog';
+import { getEnableTun, getStoreValue } from '../single/store';
 
 const appWindow = getCurrentWindow();
 
@@ -62,13 +63,41 @@ type vpnServiceManagerMode = 'SystemProxy' | 'TunProxy'
 
 export const vpnServiceManager = {
     start: async () => {
+        let username = "";
+        let password = "";
         const configPath = await getSingBoxConfigPath();
         const tunMode: boolean | undefined = await getEnableTun();
         let mode: vpnServiceManagerMode = 'SystemProxy';
         if (tunMode) {
             mode = 'TunProxy';
+            let ok = await verifyPrivileged();
+            if (!ok) {
+                await message('请先授权', { title: '提示', kind: 'error' });
+            }
+            username = await invoke<string>("get_current_username");
+            password = await getStoreValue(PRIVILEGED_PASSWORD_STORE_KEY);
         }
-        await invoke("start", { app: appWindow, path: configPath, mode: mode })
+        await invoke("start", { app: appWindow, path: configPath, mode: mode, username: username, password: password });
     },
     stop: async () => await invoke("stop", { app: appWindow }),
+};
+
+
+export const verifyPrivileged = async () => {
+    const username = await invoke<string>("get_current_username");
+    if (!username) {
+        return false;
+    }
+    const password = await getStoreValue(PRIVILEGED_PASSWORD_STORE_KEY);
+    if (!password) {
+        return false;
+    }
+
+    const ok = await invoke<boolean>("is_privileged", {
+        username,
+        password,
+    });
+
+    return ok;
+
 };

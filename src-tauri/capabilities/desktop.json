@@ -14,8 +14,8 @@
     "core:app:allow-default-window-icon",
     "core:window:allow-destroy",
     "core:window:allow-hide",
-    "core:window:allow-show",
     "core:window:allow-set-focus",
+    "core:window:allow-show",
     "opener:allow-open-path",
     "opener:allow-open-url",
     "os:allow-arch",
@@ -45,7 +45,7 @@
         {
           "url": "https://*:*"
         }
-       ]
+      ]
     }
   ]
 }

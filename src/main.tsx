@@ -25,10 +25,6 @@ async function createTrayMenu() {
       {
         id: 'show',
         text: '仪表盘',
-        action: async () => {
-          await appWindow.show();
-          await appWindow.setFocus();
-        },
       },
       {
         id: "enable",
@@ -92,7 +88,6 @@ async function setupTrayIcon() {
     const menu = await createTrayMenu();
     const options = {
       menu,
-      menuOnLeftClick: true,
       icon: (await defaultWindowIcon()) || 'None',
       tooltip: "OneBox"
 
@@ -113,7 +108,12 @@ async function setupStatusListener() {
     if (trayInstance) {
       await trayInstance.setMenu(newMenu);
     }
+
   });
+
+
+
+
 }
 
 setupTrayIcon();

@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
 import { Globe, Reception4, Shield } from "react-bootstrap-icons";
+import useSWR from "swr";
 import { getSubscriptionConfig } from "../../action/db";
 import { useSubscriptions } from "../../hooks/useDB";
 import { Subscription } from "../../types/definition";
@@ -35,11 +36,20 @@ const NetworkStatus = ({ isOk, icon: Icon, tip }: { isOk: boolean; icon: typeof 
     </motion.div>
 );
 
+const fetchNetworkStatus = async (url: string) => {
+    try {
+        return await invoke<boolean>('ping', { url: `https://www.${url}.com` });
+    } catch {
+        return false;
+    }
+};
+
 export default function SettingsBody({ isRunning }: { isRunning: boolean }) {
     const [nodeList, setNodeList] = useState<string[]>([]);
     const [sub, setSub] = useState<Subscription>();
     const { data, isLoading } = useSubscriptions();
-    const [networkStatus, setNetworkStatus] = useState({ baidu: true, google: true });
+    const { data: baiduStatus } = useSWR(isRunning ? 'baidu' : null, () => fetchNetworkStatus('baidu'), { refreshInterval: 5000 });
+    const { data: googleStatus } = useSWR(isRunning ? 'google' : null, () => fetchNetworkStatus('google'), { refreshInterval: 5000 });
 
     const handleUpdate = async (identifier: string, isUpdate: boolean) => {
         try {
@@ -52,21 +62,8 @@ export default function SettingsBody({ isRunning }: { isRunning: boolean }) {
             console.error('更新配置失败:', error);
         }
     };
-    const checkNetwork = async (url: string, key: 'baidu' | 'google') => {
-        try {
-            const res = await invoke<boolean>('ping', { url: `https://www.${url}.com` });
-            setNetworkStatus(prev => ({ ...prev, [key]: res }));
-        } catch {
-            setNetworkStatus(prev => ({ ...prev, [key]: false }));
-        }
-    };
 
-    useEffect(() => {
-
-        checkNetwork('baidu', 'baidu');
-        checkNetwork('google', 'google');
-
-    }, [isRunning, isLoading]);
+    useEffect(() => { }, [isRunning, isLoading]);
 
     return (
         <div className='w-full'>
@@ -75,12 +72,9 @@ export default function SettingsBody({ isRunning }: { isRunning: boolean }) {
                     <div className="fieldset-legend min-w-[270px]">
                         <div>当前订阅</div>
                         {isRunning && (
-                            <div className="flex gap-2 px-2 items-center" onClick={() => {
-                                checkNetwork('baidu', 'baidu');
-                                checkNetwork('google', 'google');
-                            }}>
-                                <NetworkStatus isOk={networkStatus.baidu} icon={Reception4} tip="网络" />
-                                <NetworkStatus isOk={networkStatus.google} icon={Globe} tip="外网" />
+                            <div className="flex gap-2 px-2 items-center">
+                                <NetworkStatus isOk={baiduStatus ?? true} icon={Reception4} tip="网络" />
+                                <NetworkStatus isOk={googleStatus ?? true} icon={Globe} tip="外网" />
                             </div>
                         )}
                     </div>

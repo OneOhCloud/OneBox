@@ -4,12 +4,13 @@ import { message } from '@tauri-apps/plugin-dialog';
 import { useEffect, useRef, useState } from "react";
 import { InfoCircle, Power } from 'react-bootstrap-icons';
 import SettingsBody from '../components/home/settings-body';
+import AuthDialog from '../components/settings/auth-dialog';
 import setMixedConfig from "../config/mixed-config";
 import setTunConfig from "../config/tun-config";
 import { useSubscriptions } from '../hooks/useDB';
 import { getEnableTun, getStoreValue } from "../single/store";
 import { SSI_STORE_KEY } from '../types/definition';
-import { vpnServiceManager } from "../utils/helper";
+import { verifyPrivileged, vpnServiceManager } from "../utils/helper";
 
 
 
@@ -27,15 +28,20 @@ export default function Home({ onNavigate }: HomeProps) {
   const [selectedMode, setSelectedMode] = useState('规则');
   const [isEmpty, setIsEmpty] = useState(false);
   const [indicatorStyle, setIndicatorStyle] = useState({ left: 0, width: 0 });
+  const [privilegedDialog, setPrivilegedDialog] = useState(false);
+
 
   const modeButtonsRef = useRef<HTMLDivElement>(null);
   const { data } = useSubscriptions();
 
   // 初始化检查
   useEffect(() => {
+    //  检查是否正在运行
     invoke<boolean>('is_running').then(setIsOn).catch((error) => {
       console.error('Error checking VPN status:', error);
     });
+
+
   }, []);
 
 
@@ -90,7 +96,20 @@ export default function Home({ onNavigate }: HomeProps) {
       else {
         const identifier: string = await getStoreValue(SSI_STORE_KEY);
         const tunMode = await getEnableTun();
-        await (tunMode ? setTunConfig : setMixedConfig)(identifier);
+        if (tunMode) {
+          let canPrivileged = await verifyPrivileged();
+          if (!canPrivileged) {
+            setPrivilegedDialog(true);
+            return;
+          }
+
+          await setTunConfig(identifier);
+
+        } else {
+          await setMixedConfig(identifier);
+
+        }
+
         await vpnServiceManager.start();
       }
 
@@ -110,6 +129,10 @@ export default function Home({ onNavigate }: HomeProps) {
 
   return (
     <div className="bg-gray-50 flex flex-col items-center justify-center p-6 h-full w-full">
+      <AuthDialog onAuthSuccess={() => {
+        setPrivilegedDialog(false);
+
+      }} open={privilegedDialog} onClose={() => { setPrivilegedDialog(false) }} />
 
       <label className={`cursor-pointer ${isOnLoading ? 'pointer-events-none' : ''}`}>
         <input type="checkbox" checked={isOn} onChange={() => { }} className="hidden" />
