@@ -61,14 +61,14 @@ jobs:
       - name: Create temporary AuthKey file (macOS only)
         if: matrix.platform == 'macos-latest'
         run: |
-          echo "${{ secrets.APPLE_AUTH_KEY }}" > temp_auth_key.p8
+          echo "${{ secrets.APPLE_AUTH_KEY }}" > $GITHUB_WORKSPACE/temp_auth_key.p8
         shell: bash
 
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-          
+
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
 
           # 作者签名
@@ -79,7 +79,7 @@ jobs:
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
 
           # 苹果公证
-          APPLE_API_KEY_PATH: temp_auth_key.p8
+          APPLE_API_KEY_PATH: $GITHUB_WORKSPACE/temp_auth_key.p8  # 使用绝对路径
           APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
 
