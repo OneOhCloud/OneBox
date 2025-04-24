@@ -18,11 +18,13 @@ pub struct PlatformPrivilegeHelper;
 #[cfg(target_os = "windows")]
 impl PrivilegeHelper for PlatformPrivilegeHelper {
     fn get_current_user() -> String {
-        panic!("Windows platform is not supported yet");
+        println!("Windows platform is not supported yet");
+        "unknown".to_string()
     }
 
     async fn is_privileged(username: String, password: String) -> bool {
-        panic!("Windows platform is not supported yet");
+        println!("Windows platform is not supported yet");
+        false
     }
 }
 
@@ -41,7 +43,8 @@ impl PrivilegeHelper for PlatformPrivilegeHelper {
     async fn is_privileged(username: String, password: String) -> bool {
         // 这里可以实现 Linux 上的权限验证逻辑
         // 例如使用 sudo 命令来验证用户是否有权限
-        panic!("Linux platform is not supported yet");
+        println!("Linux platform is not supported yet");
+        false
     }
 }
 
