@@ -21,7 +21,7 @@ impl PrivilegeHelper for PlatformPrivilegeHelper {
         panic!("Windows platform is not supported yet");
     }
 
-    fn is_privileged(username: String, password: String) -> bool {
+    async fn is_privileged(username: String, password: String) -> bool {
         panic!("Windows platform is not supported yet");
     }
 }
@@ -38,7 +38,7 @@ impl PrivilegeHelper for PlatformPrivilegeHelper {
         let username = String::from_utf8_lossy(&output.stdout);
         username.trim().to_string()
     }
-    fn is_privileged(username: String, password: String) -> bool {
+    async fn is_privileged(username: String, password: String) -> bool {
         // 这里可以实现 Linux 上的权限验证逻辑
         // 例如使用 sudo 命令来验证用户是否有权限
         panic!("Linux platform is not supported yet");
