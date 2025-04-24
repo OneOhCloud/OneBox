@@ -40,7 +40,7 @@ impl PrivilegeHelper for PlatformPrivilegeHelper {
         let username = String::from_utf8_lossy(&output.stdout);
         username.trim().to_string()
     }
-    async fn is_privileged(username: String, password: String) -> bool {
+    async fn is_privileged(_username: String, _password: String) -> bool {
         // 这里可以实现 Linux 上的权限验证逻辑
         // 例如使用 sudo 命令来验证用户是否有权限
         println!("Linux platform is not supported yet");
