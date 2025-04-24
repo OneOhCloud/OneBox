@@ -27,6 +27,7 @@ pub enum ProxyMode {
 struct ProcessManager {
     child: Option<CommandChild>,
     current_mode: Option<ProxyMode>,
+    tun_password: Option<String>, // 仅记录密码
 }
 
 #[derive(Clone)]
@@ -52,6 +53,7 @@ lazy_static! {
     static ref PROCESS_MANAGER: Arc<Mutex<ProcessManager>> = Arc::new(Mutex::new(ProcessManager {
         child: None,
         current_mode: None,
+        tun_password: None,
     }));
 }
 
@@ -101,12 +103,16 @@ pub fn stop(app: tauri::AppHandle) -> Result<(), String> {
                 sysproxy.set_system_proxy().map_err(|e| e.to_string())?;
             }
             ProxyMode::TunProxy => {
-                // 清理系统代理设置
-                let mut sysproxy: Sysproxy =
-                    Sysproxy::get_system_proxy().map_err(|e| e.to_string())?;
-                sysproxy.enable = false;
-
-                sysproxy.set_system_proxy().map_err(|e| e.to_string())?;
+                // 如果记录了密码，使用 sudo + 密码杀死所有 sing-box 进程
+                if let Some(password) = &manager.tun_password {
+                    let command = format!("echo '{}' | sudo -S pkill -9 -f sing-box", password);
+                    println!("Executing command: {}", command);
+                    std::process::Command::new("sh")
+                        .arg("-c")
+                        .arg(command)
+                        .output()
+                        .map_err(|e| e.to_string())?;
+                }
             }
         }
     }
@@ -118,6 +124,7 @@ pub fn stop(app: tauri::AppHandle) -> Result<(), String> {
 
     // 清理模式状态
     manager.current_mode = None;
+    manager.tun_password = None; // 清理密码
     app.emit("status-changed", ()).unwrap();
 
     Ok(())
@@ -142,7 +149,6 @@ pub async fn start(
     app: tauri::AppHandle,
     path: String,
     mode: ProxyMode,
-    username: String,
     password: String,
 ) -> Result<(), String> {
     let _ = stop(app.clone())?;
@@ -151,15 +157,13 @@ pub async fn start(
     if mode == ProxyMode::TunProxy {
         let sidecar_path = get_sidecar_path(Path::new("sing-box")).unwrap();
         let command = format!(
-            r#"do shell script "sudo '{}' run -c '{}'" user name "{}" password "{}" with administrator privileges"#,
+            r#"echo '{}' | sudo -S '{}' run -c '{}'"#,
+            password.escape_default(),
             sidecar_path.escape_default(),
-            path.escape_default(),
-            username.escape_default(),
-            password.escape_default()
+            path.escape_default()
         );
 
-        println!("Starting sidecar command with username: {}", username);
-        sidecar_command = app.shell().command("osascript").args(vec!["-e", &command]);
+        sidecar_command = app.shell().command("sh").args(vec!["-c", &command]);
     } else {
         let _command: Command = app.shell().sidecar("sing-box").map_err(|e| e.to_string())?;
 
@@ -180,10 +184,16 @@ pub async fn start(
         sysproxy.set_system_proxy().map_err(|e| e.to_string())?;
     }
 
-    PROCESS_MANAGER.lock().unwrap().child = Some(child);
-    PROCESS_MANAGER.lock().unwrap().current_mode = Some(mode);
+    let mut manager = PROCESS_MANAGER.lock().unwrap();
+
+    if mode == ProxyMode::TunProxy {
+        manager.tun_password = Some(password); // 记录密码
+    }
+    manager.child = Some(child);
+    manager.current_mode = Some(mode);
 
     let process_manager = PROCESS_MANAGER.clone();
+
     app.emit("status-changed", ()).unwrap();
 
     tauri::async_runtime::spawn(async move {

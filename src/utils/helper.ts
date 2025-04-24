@@ -63,7 +63,6 @@ type vpnServiceManagerMode = 'SystemProxy' | 'TunProxy'
 
 export const vpnServiceManager = {
     start: async () => {
-        let username = "";
         let password = "";
         const configPath = await getSingBoxConfigPath();
         const tunMode: boolean | undefined = await getEnableTun();
@@ -74,10 +73,9 @@ export const vpnServiceManager = {
             if (!ok) {
                 await message('请先授权', { title: '提示', kind: 'error' });
             }
-            username = await invoke<string>("get_current_username");
             password = await getStoreValue(PRIVILEGED_PASSWORD_STORE_KEY);
         }
-        await invoke("start", { app: appWindow, path: configPath, mode: mode, username: username, password: password });
+        await invoke("start", { app: appWindow, path: configPath, mode: mode, password: password });
     },
     stop: async () => await invoke("stop", { app: appWindow }),
 };
