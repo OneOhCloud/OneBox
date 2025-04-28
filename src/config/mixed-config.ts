@@ -30,7 +30,6 @@ const mixedConfig = {
         "strategy": "ipv4_only",
         "detour": "direct"
       },
-  
       {
         "tag": "tencent",
         "address": "119.29.29.29",
@@ -209,7 +208,7 @@ const mixedConfig = {
     ]
   },
   "experimental": {
-    "clash_api":{
+    "clash_api": {
       "external_controller": "127.0.0.1:9191",
     },
     "cache_file": {
@@ -258,7 +257,7 @@ export default async function setMixedConfig(identifier: string) {
 
 
   let serverList = dbConfigData.outbounds.filter((item: any) => {
-    return item.type !== "selector" && item.type !== "urltest" && item.type !== "direct" && item.type !== "block"; 
+    return item.type !== "selector" && item.type !== "urltest" && item.type !== "direct" && item.type !== "block";
   });
 
   const urltestNameList: string[] = [];

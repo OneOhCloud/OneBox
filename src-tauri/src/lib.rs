@@ -11,6 +11,7 @@ fn get_app_version(app: AppHandle) -> String {
     let package_info = app.package_info();
     package_info.version.to_string() // 返回版本号，如 "1.0.0"
 }
+
 #[tauri::command]
 fn open_devtools(app: AppHandle) {
     let window = app.get_webview_window("main").unwrap();
@@ -29,6 +30,13 @@ async fn ping(url: String) -> bool {
         Err(_) => false,
     }
 }
+
+// #[tauri::command]·
+// fn get_local_ip_address() -> String {
+//     let my_local_ip = local_ip().unwrap();
+//     my_local_ip.to_string()
+//
+//}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {

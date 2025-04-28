@@ -2,7 +2,7 @@ import { Arch, OsType } from "@tauri-apps/plugin-os"
 
 export const GITHUB_URL = 'https://github.com/OneOhCloud/OneBox'
 export const OFFICIAL_WEBSITE = 'https://oneoh.cloud'
-export const SING_BOX_VERSION = "v1.11.8"
+export const SING_BOX_VERSION = "v1.11.9"
 export const SSI_STORE_KEY = 'selected_subscription_identifier'
 export const PRIVILEGED_PASSWORD_STORE_KEY = 'privileged_password_key'
 
@@ -11,6 +11,8 @@ export const PRIVILEGED_PASSWORD_STORE_KEY = 'privileged_password_key'
 export const ALLOWLAN_STORE_KEY = 'allow_lan_key'
 // 是否启用 tun 模式
 export const ENABLE_TUN_STORE_KEY = 'enable_tun_key'
+// 当前规则模式
+export const RULE_MODE_STORE_KEY = 'rule_mode_key'
 
 export type OsInfo = {
     appVersion: string,

@@ -78,6 +78,8 @@ export const vpnServiceManager = {
         await invoke("start", { app: appWindow, path: configPath, mode: mode, password: password });
     },
     stop: async () => await invoke("stop", { app: appWindow }),
+
+
 };
 
 

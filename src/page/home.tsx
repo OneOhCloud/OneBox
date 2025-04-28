@@ -5,11 +5,13 @@ import { useEffect, useRef, useState } from "react";
 import { InfoCircle, Power } from 'react-bootstrap-icons';
 import SettingsBody from '../components/home/settings-body';
 import AuthDialog from '../components/settings/auth-dialog';
+import setGlobalMixedConfig from '../config/global-mixed-config';
+import setGlobalTunConfig from '../config/global-tun-config';
 import setMixedConfig from "../config/mixed-config";
 import setTunConfig from "../config/tun-config";
 import { useSubscriptions } from '../hooks/useDB';
-import { getEnableTun, getStoreValue } from "../single/store";
-import { SSI_STORE_KEY } from '../types/definition';
+import { getEnableTun, getStoreValue, setStoreValue } from "../single/store";
+import { RULE_MODE_STORE_KEY, SSI_STORE_KEY } from '../types/definition';
 import { verifyPrivileged, vpnServiceManager } from "../utils/helper";
 
 
@@ -19,13 +21,13 @@ type HomeProps = {
 }
 
 
-
+type SelectedModeType = '规则' | '全局';
 
 export default function Home({ onNavigate }: HomeProps) {
   // 状态管理
   const [isOn, setIsOn] = useState(false);
   const [isOnLoading, setIsOnLoading] = useState(false);
-  const [selectedMode, setSelectedMode] = useState('规则');
+  const [selectedMode, setSelectedMode] = useState<SelectedModeType>('规则');
   const [isEmpty, setIsEmpty] = useState(false);
   const [indicatorStyle, setIndicatorStyle] = useState({ left: 0, width: 0 });
   const [privilegedDialog, setPrivilegedDialog] = useState(false);
@@ -40,8 +42,19 @@ export default function Home({ onNavigate }: HomeProps) {
     invoke<boolean>('is_running').then(setIsOn).catch((error) => {
       console.error('Error checking VPN status:', error);
     });
+    // 检查是否有配置
 
-
+    // RULE_MODE_STORE_KEY
+    getStoreValue(RULE_MODE_STORE_KEY).then((s) => {
+      if (s) {
+        setSelectedMode(s as SelectedModeType);
+      } else {
+        setSelectedMode('规则');
+      }
+    }).catch((error) => {
+      console.error('Error checking RULE_MODE_STORE_KEY:', error);
+    }
+    );
   }, []);
 
 
@@ -80,50 +93,87 @@ export default function Home({ onNavigate }: HomeProps) {
     }
   }, [selectedMode]);
 
+
+  // 抽取配置逻辑
+  const configureProxy = async (identifier: string, useTun: boolean) => {
+    if (useTun) {
+      const privileged = await verifyPrivileged();
+      if (!privileged) {
+        setPrivilegedDialog(true);
+        return false;
+      }
+      const fn = selectedMode === '全局' ? setGlobalTunConfig : setTunConfig;
+      await fn(identifier);
+    } else {
+      const fn = selectedMode === '全局' ? setGlobalMixedConfig : setMixedConfig;
+      await fn(identifier);
+    }
+    return true;
+  };
+
+
+  const turnOff = async () => {
+    await vpnServiceManager.stop();
+  }
+
+  const turnOn = async () => {
+    if (isEmpty) {
+      onNavigate('configuration');
+      return message('请先添加订阅配置', { title: '提示', kind: 'error' });
+    }
+    const identifier = await getStoreValue(SSI_STORE_KEY);
+    const useTun = await getEnableTun();
+    const ok = await configureProxy(identifier, useTun);
+    if (!ok) return;
+    await vpnServiceManager.start();
+
+
+  }
+
+  const restart = async () => {
+    setIsOnLoading(true);
+    try {
+      await turnOff();
+      await turnOn();
+    } catch (error) {
+      await message('重新连接失败，请检查网络', { title: '错误', kind: 'error' });
+    } finally {
+      setTimeout(() => setIsOnLoading(false), 1600);
+
+    }
+
+
+  }
+
   const handleToggle = async () => {
     if (isEmpty) {
       onNavigate('configuration');
-      await message('请先添加订阅配置', { title: '提示', kind: 'error' });
-      return;
+      return message('请先添加订阅配置', { title: '提示', kind: 'error' });
     }
-
     setIsOnLoading(true);
     try {
-      // await (isOn ? vpnServiceManager.stop : vpnServiceManager.start)();
       if (isOn) {
-        await vpnServiceManager.stop();
+        await turnOff();
+      } else {
+        await turnOn();
       }
-      else {
-        const identifier: string = await getStoreValue(SSI_STORE_KEY);
-        const tunMode = await getEnableTun();
-        if (tunMode) {
-          let canPrivileged = await verifyPrivileged();
-          if (!canPrivileged) {
-            setPrivilegedDialog(true);
-            return;
-          }
-
-          await setTunConfig(identifier);
-
-        } else {
-          await setMixedConfig(identifier);
-
-        }
-
-        await vpnServiceManager.start();
-      }
-
-      setIsOn(!isOn);
+      setIsOn(prev => !prev);
     } catch (error) {
       await message('连接失败，请检查网络', { title: '错误', kind: 'error' });
     } finally {
-      setTimeout(() => {
-        setIsOnLoading(false);
-      }, 1600);
+      setTimeout(() => setIsOnLoading(false), 1600);
     }
   };
 
-  const handleModeChange = (mode: string) => {
+
+
+
+  const handleModeChange = async (mode: SelectedModeType) => {
+    if (isOnLoading || isOn) {
+      await restart();
+
+    }
+    await setStoreValue(RULE_MODE_STORE_KEY, mode);
     setSelectedMode(mode);
   };
 
@@ -131,8 +181,9 @@ export default function Home({ onNavigate }: HomeProps) {
     <div className="bg-gray-50 flex flex-col items-center justify-center p-6 h-full w-full">
       <AuthDialog onAuthSuccess={() => {
         setPrivilegedDialog(false);
-
       }} open={privilegedDialog} onClose={() => { setPrivilegedDialog(false) }} />
+
+
 
       <label className={`cursor-pointer ${isOnLoading ? 'pointer-events-none' : ''}`}>
         <input type="checkbox" checked={isOn} onChange={() => { }} className="hidden" />
@@ -165,12 +216,15 @@ export default function Home({ onNavigate }: HomeProps) {
         </div>
       </label>
 
+
       <div className="w-full text-center text-sm mb-2 flex items-center justify-center" style={{ color: isOn ? '#3B82F6' : '#9CA3AF' }}>
         <InfoCircle size={16} className="mr-1.5 text-gray-300" />
         <span className="text-base">
           {isOnLoading ? '正在切换...' : isOn ? '已连接' : '未连接'}
         </span>
+
       </div>
+
 
       <div className="bg-gray-100 p-1 rounded-xl mb-4 inline-flex relative" ref={modeButtonsRef}>
         {/* 动画指示器 */}
@@ -182,29 +236,25 @@ export default function Home({ onNavigate }: HomeProps) {
           }}
         />
 
-        {['规则', '全局', '直连'].map((mode) => (
+        {['规则', '全局'].map((mode) => (
           <button
-            disabled={!isOn}
             key={mode}
             data-mode={mode}
-            className={`  px-6 py-1.5 text-sm font-medium transition-all duration-300 relative
+            className={`  px-6 py-1.5 text-sm font-medium transition-all duration-300 relative cursor-pointer
               ${selectedMode === mode
                 ? 'text-gray-800'
                 : 'text-gray-500 hover:text-gray-700'}
-              ${isOn ? 'cursor-pointer' : 'cursor-not-allowed'}
                 `}
-            onClick={() => handleModeChange(mode)}
+            onClick={() => handleModeChange(mode as SelectedModeType)}
           >
             <span className="relative z-10">{mode}</span>
           </button>
 
         ))}
-
       </div>
+
       <SettingsBody isRunning={isOn}></SettingsBody>
 
-
-
-    </div>
+    </div >
   )
 }
