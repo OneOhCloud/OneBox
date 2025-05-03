@@ -8,7 +8,7 @@ use tauri::Emitter;
 use tauri_plugin_shell::process::{Command, CommandChild, CommandEvent};
 use tauri_plugin_shell::ShellExt;
 
-#[cfg(any(target_os = "macos", target_os = "windows"))]
+#[cfg(any(target_os = "macos", target_os = "linux"))]
 use sysproxy::Sysproxy;
 
 // 默认绕过列表
@@ -87,7 +87,7 @@ lazy_static! {
 
 /// 设置系统代理
 async fn set_proxy(_app: &tauri::AppHandle) -> anyhow::Result<()> {
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
     {
         let config = ProxyConfig::default();
         let sys = Sysproxy {
@@ -128,7 +128,7 @@ async fn set_proxy(_app: &tauri::AppHandle) -> anyhow::Result<()> {
 
 /// 取消系统代理
 async fn unset_proxy(_app: &tauri::AppHandle) -> anyhow::Result<()> {
-    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
     {
         // 清理系统代理设置
         let mut sysproxy = Sysproxy::get_system_proxy().map_err(|e| anyhow::anyhow!(e))?;
