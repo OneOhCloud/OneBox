@@ -1,6 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { message } from '@tauri-apps/plugin-dialog';
+import { type } from '@tauri-apps/plugin-os';
 import { useEffect, useRef, useState } from "react";
 import { InfoCircle, Power } from 'react-bootstrap-icons';
 import SettingsBody from '../components/home/settings-body';
@@ -96,7 +97,7 @@ export default function Home({ onNavigate }: HomeProps) {
 
   // 抽取配置逻辑
   const configureProxy = async (identifier: string, useTun: boolean) => {
-    if (useTun) {
+    if (useTun && (type() == 'linux' || type() == 'macos')) {
       const privileged = await verifyPrivileged();
       if (!privileged) {
         setPrivilegedDialog(true);
