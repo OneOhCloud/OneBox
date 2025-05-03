@@ -2,11 +2,14 @@ use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
-use sysproxy::Sysproxy;
+
 use tauri::utils::platform;
 use tauri::Emitter;
 use tauri_plugin_shell::process::{Command, CommandChild, CommandEvent};
 use tauri_plugin_shell::ShellExt;
+
+#[cfg(any(target_os = "macos", target_os = "windows"))]
+use sysproxy::Sysproxy;
 
 // 默认绕过列表
 #[cfg(target_os = "windows")]
@@ -84,7 +87,7 @@ lazy_static! {
 
 /// 设置系统代理
 async fn set_proxy(_app: &tauri::AppHandle) -> anyhow::Result<()> {
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
     {
         let config = ProxyConfig::default();
         let sys = Sysproxy {
@@ -125,7 +128,7 @@ async fn set_proxy(_app: &tauri::AppHandle) -> anyhow::Result<()> {
 
 /// 取消系统代理
 async fn unset_proxy(_app: &tauri::AppHandle) -> anyhow::Result<()> {
-    #[cfg(target_os = "macos")]
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
     {
         // 清理系统代理设置
         let mut sysproxy = Sysproxy::get_system_proxy().map_err(|e| anyhow::anyhow!(e))?;
