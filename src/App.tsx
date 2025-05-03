@@ -8,11 +8,7 @@ import Dev from './page/dev';
 import HomePage from './page/home';
 import SettingsPage from './page/settings';
 
-
-
 const debug = false;
-
-
 
 function App() {
   const [activeScreen, setActiveScreen] = useState<'home' | 'configuration' | 'settings'>('home');

@@ -182,15 +182,31 @@ pub fn stop(app: tauri::AppHandle) -> Result<(), String> {
                 tauri::async_runtime::block_on(unset_proxy(&app)).map_err(|e| e.to_string())?;
             }
             ProxyMode::TunProxy => {
-                // TUN 模式，使用 sudo + 密码杀死所有 sing-box 进程
-                if let Some(password) = &manager.tun_password {
-                    let command = format!("echo '{}' | sudo -S pkill -9 -f sing-box", password);
+                if matches!(
+                    tauri_plugin_os::type_(),
+                    tauri_plugin_os::OsType::Linux | tauri_plugin_os::OsType::Macos
+                ) {
+                    // 类 Unix 系统 使用 sudo + 密码杀死所有 sing-box 进程
+                    if let Some(password) = &manager.tun_password {
+                        let command = format!("echo '{}' | sudo -S pkill -9 -f sing-box", password);
+                        println!("Executing command: {}", command);
+                        std::process::Command::new("sh")
+                            .arg("-c")
+                            .arg(command)
+                            .output()
+                            .map_err(|e| e.to_string())?;
+                    }
+                } else if matches!(tauri_plugin_os::type_(), tauri_plugin_os::OsType::Windows) {
+                    // Windows 系统，使用 taskkill 杀死所有 sing-box 进程
+                    let command = "runas /trustlevel:0x40000 taskkill /F /IM sing-box.exe";
                     println!("Executing command: {}", command);
-                    std::process::Command::new("sh")
-                        .arg("-c")
+                    std::process::Command::new("cmd")
+                        .arg("/C")
                         .arg(command)
                         .output()
                         .map_err(|e| e.to_string())?;
+                } else {
+                    panic!("Unsupported OS type for TUN mode");
                 }
             }
         }
@@ -235,30 +251,51 @@ pub async fn start(
     // 启动前先停止已有进程
     let _ = stop(app.clone())?;
 
-    let sidecar_command: Command = if mode == ProxyMode::TunProxy {
-        let sidecar_path = get_sidecar_path(Path::new("sing-box")).unwrap();
-        let command = format!(
-            r#"echo '{}' | sudo -S '{}' run -c '{}'"#,
-            password.escape_default(),
-            sidecar_path.escape_default(),
-            path.escape_default()
-        );
-        app.shell().command("sh").args(vec!["-c", &command])
-    } else {
-        let cmd = app.shell().sidecar("sing-box").map_err(|e| e.to_string())?;
+    let sidecar_command: Command = if mode == ProxyMode::SystemProxy {
+        // 普通权限执行
+        let cmd: Command = app.shell().sidecar("sing-box").map_err(|e| e.to_string())?;
         cmd.args(["run", "-c", &path])
+    } else {
+        let sidecar_path = get_sidecar_path(Path::new("sing-box")).unwrap();
+        if matches!(
+            tauri_plugin_os::type_(),
+            tauri_plugin_os::OsType::Linux | tauri_plugin_os::OsType::Macos
+        ) {
+            // 类 Unix 系统特权启动
+            let command = format!(
+                r#"echo '{}' | sudo -S '{}' run -c '{}'"#,
+                password.escape_default(),
+                sidecar_path.escape_default(),
+                path.escape_default()
+            );
+            app.shell().command("sh").args(vec!["-c", &command])
+        } else if matches!(tauri_plugin_os::type_(), tauri_plugin_os::OsType::Windows) {
+            // Windows 平台特权启动
+            let command = format!(
+                r#"runas /trustlevel:0x40000 "{}" run -c "{}""#,
+                sidecar_path.escape_default(),
+                path.escape_default()
+            );
+            app.shell().command("cmd").args(vec!["/C", &command])
+        } else {
+            panic!("Unsupported OS type for TUN mode");
+        }
     };
 
     let (mut rx, child) = sidecar_command.spawn().map_err(|e| e.to_string())?;
 
-    // 根据模式设置或清理系统代理
+    // 根据当前模式执行不同的操作
     if mode == ProxyMode::SystemProxy {
+        // 设置系统代理
         if let Err(e) = set_proxy(&app).await {
+            // 如果设置系统代理失败，杀死进程
             stop(app)?;
             return Err(e.to_string());
         }
     } else {
+        // 如果是 TUN 模式，取消系统代理
         if let Err(e) = unset_proxy(&app).await {
+            // 如果取消系统代理失败，杀死进程
             stop(app)?;
             return Err(e.to_string());
         }

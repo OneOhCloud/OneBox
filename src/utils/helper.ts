@@ -67,7 +67,8 @@ export const vpnServiceManager = {
         const configPath = await getSingBoxConfigPath();
         const tunMode: boolean | undefined = await getEnableTun();
         let mode: vpnServiceManagerMode = 'SystemProxy';
-        if (tunMode) {
+        let osType = type();
+        if (tunMode && (osType == 'linux' || osType == 'macos')) {
             mode = 'TunProxy';
             let ok = await verifyPrivileged();
             if (!ok) {
