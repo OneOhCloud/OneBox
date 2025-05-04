@@ -7,7 +7,7 @@ on:
       version:
         description: '构建版本号'
         required: true
-        default: '0.0.0-dev'
+        default: '0.0.0'
 
 jobs:
   build-tauri:
@@ -84,8 +84,8 @@ jobs:
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
 
         with:
-          tagName: OneBox-dev-v${{ github.event.inputs.version || '0.0.0-dev' }}
-          releaseName: "OneBox Dev Build v${{ github.event.inputs.version || '0.0.0-dev' }}"
+          tagName: v${{ github.event.inputs.version || '0.0.0' }}
+          releaseName: "v${{ github.event.inputs.version || '0.0.0' }}"
           releaseBody: "修复一些 bugs，添加一些新功能"
           releaseDraft: true
           prerelease: false
