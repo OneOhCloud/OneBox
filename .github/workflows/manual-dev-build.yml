@@ -3,11 +3,7 @@ name: "Manual Dev Build"
 on:
   # 允许手动触发工作流
   workflow_dispatch:
-    inputs:
-      version:
-        description: '构建版本号'
-        required: true
-        default: '0.0.0'
+
 
 jobs:
   build-tauri:
@@ -29,6 +25,10 @@ jobs:
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v4
+
+      - name: 读版本号
+        id: tauri_version
+        run: echo "version=$(jq -r .version src-tauri/tauri.conf.json)" >> $GITHUB_OUTPUT
 
       - name: setup node
         uses: actions/setup-node@v4
@@ -84,8 +84,8 @@ jobs:
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
 
         with:
-          tagName: v${{ github.event.inputs.version || '0.0.0' }}
-          releaseName: "v${{ github.event.inputs.version || '0.0.0' }}"
+          tagName: v${{ steps.tauri_version.outputs.version || '0.0.0' }}
+          releaseName: "v${{ steps.tauri_version.outputs.version || '0.0.0' }}"
           releaseBody: "修复一些 bugs，添加一些新功能"
           releaseDraft: true
           prerelease: false
