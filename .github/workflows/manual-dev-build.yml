@@ -28,6 +28,7 @@ jobs:
       - name: Get Tauri Version
         id: tauri_version
         run: echo "version=$(node -p "require('./src-tauri/tauri.conf.json').version")" >> $GITHUB_OUTPUT
+        shell: bash
 
       - name: Set Up Node.js
         uses: actions/setup-node@v4
