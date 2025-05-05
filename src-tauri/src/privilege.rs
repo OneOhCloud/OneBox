@@ -1,3 +1,4 @@
+#[cfg(not(target_os = "windows"))]
 use std::process::Command;
 
 // 定义 trait 作为接口
@@ -22,7 +23,7 @@ impl PrivilegeHelper for PlatformPrivilegeHelper {
         "unknown".to_string()
     }
 
-    async fn is_privileged(username: String, password: String) -> bool {
+    async fn is_privileged(_username: String, _password: String) -> bool {
         println!("Windows platform is not supported yet");
         false
     }

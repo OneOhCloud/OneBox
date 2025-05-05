@@ -20,7 +20,7 @@ async function getLanIP(): Promise<string> {
 
 export default function ToggleLan() {
   const [toggle, setToggle] = useState(false);
-  const [lanIP, setLanIP] = useState<string | null>(null);
+  const [lanIP, setLanIP] = useState<string >("127.0.0.1");
 
   useEffect(() => {
     const loadTunState = async () => {
