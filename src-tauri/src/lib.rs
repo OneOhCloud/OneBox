@@ -3,6 +3,7 @@ use tauri_plugin_http::reqwest;
 
 mod core;
 mod database;
+mod lan;
 mod plugins;
 mod privilege;
 
@@ -50,6 +51,7 @@ pub fn run() {
             ping,
             get_app_version,
             open_devtools,
+            lan::get_lan_ip,
             core::version,
             core::start,
             core::stop,
