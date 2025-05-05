@@ -42,10 +42,10 @@ export default function Home({ onNavigate }: HomeProps) {
     //  检查是否正在运行
     invoke<boolean>('is_running').then(setIsOn).catch((error) => {
       console.error('Error checking VPN status:', error);
+      setIsOn(false);
     });
-    // 检查是否有配置
 
-    // RULE_MODE_STORE_KEY
+    // 获取当前规则模式
     getStoreValue(RULE_MODE_STORE_KEY).then((s) => {
       if (s) {
         setSelectedMode(s as SelectedModeType);
@@ -53,7 +53,7 @@ export default function Home({ onNavigate }: HomeProps) {
         setSelectedMode('规则');
       }
     }).catch((error) => {
-      console.error('Error checking RULE_MODE_STORE_KEY:', error);
+      console.error('获取规则模式发生错误:', error);
     }
     );
   }, []);
@@ -97,6 +97,7 @@ export default function Home({ onNavigate }: HomeProps) {
 
   // 抽取配置逻辑
   const configureProxy = async (identifier: string, useTun: boolean) => {
+    // 在 linux 和 macOS 上使用 TUN 模式时需要输入超级管理员密码
     if (useTun && (type() == 'linux' || type() == 'macos')) {
       const privileged = await verifyPrivileged();
       if (!privileged) {
@@ -153,16 +154,13 @@ export default function Home({ onNavigate }: HomeProps) {
     }
     setIsOnLoading(true);
     try {
-      if (isOn) {
-        await turnOff();
-      } else {
-        await turnOn();
-      }
+      // 根据当前状态决定是开启还是关闭
+      isOn ? await turnOff() : await turnOn();
       setIsOn(prev => !prev);
     } catch (error) {
       await message('连接失败，请检查网络', { title: '错误', kind: 'error' });
     } finally {
-      setTimeout(() => setIsOnLoading(false), 1600);
+      setTimeout(() => setIsOnLoading(false), 1200);
     }
   };
 
@@ -184,8 +182,6 @@ export default function Home({ onNavigate }: HomeProps) {
         setPrivilegedDialog(false);
       }} open={privilegedDialog} onClose={() => { setPrivilegedDialog(false) }} />
 
-
-
       <label className={`cursor-pointer ${isOnLoading ? 'pointer-events-none' : ''}`}>
         <input type="checkbox" checked={isOn} onChange={() => { }} className="hidden" />
         <div
@@ -201,7 +197,6 @@ export default function Home({ onNavigate }: HomeProps) {
                 bg-white rounded-full w-24 h-24 flex items-center justify-center
                 shadow-md transition-all duration-300 ease-in-out
                 ${isOn ? 'ring-2 ring-blue-500' : ''}
-          
               `}
             >
               <Power

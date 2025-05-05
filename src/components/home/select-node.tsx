@@ -28,14 +28,14 @@ export default function SelectNode(props: SelectNodeProps) {
 
     if (disabled) {
         return <>
-            <div className="select select-sm select-neutral opacity-50 cursor-not-allowed">
+            <div className="select select-sm  select-ghost border-1 border-zinc-200  opacity-50 cursor-not-allowed">
                 未启动
             </div>
         </>
     }
 
-    if(!show) {
-        return <div className="select select-sm select-neutral">
+    if (!show) {
+        return <div className="select select-sm  select-ghost border-1 border-zinc-200 ">
             更新中...
         </div>
     }
@@ -100,7 +100,7 @@ export function SelecItem(props: SelecItemProps) {
     };
 
     if (nodeList.length === 0) {
-        return <div className="select select-sm select-neutral">
+        return <div className="select select-sm  select-ghost border-1 border-zinc-200 ">
             当前配置没有节点
         </div>
     }
@@ -110,7 +110,7 @@ export function SelecItem(props: SelecItemProps) {
     return (
         <div className="relative">
             <div
-                className={`select select-sm select-neutral cursor-pointer `}
+                className={`select select-sm  select-ghost border-1 border-zinc-200  cursor-pointer `}
                 onClick={() => !isLoadingState && setIsOpen(!isOpen)}
             >
                 {isLoadingState ? (
