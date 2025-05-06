@@ -19,12 +19,10 @@ pub struct PlatformPrivilegeHelper;
 #[cfg(target_os = "windows")]
 impl PrivilegeHelper for PlatformPrivilegeHelper {
     fn get_current_user() -> String {
-        println!("Windows platform is not supported yet");
-        "unknown".to_string()
+        "".to_string()
     }
 
     async fn is_privileged(_username: String, _password: String) -> bool {
-        println!("Windows platform is not supported yet");
         false
     }
 }
