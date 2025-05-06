@@ -9,9 +9,9 @@ pub async fn get_lan_ip() -> Result<String, String> {
             .output()
             .await
             .map_err(|e| e.to_string())?;
-        
+
         let output_str = String::from_utf8_lossy(&output.stdout);
-        
+
         // 使用 Rust 代码解析结果
         for line in output_str.lines() {
             if line.contains("IPv4") && !line.contains("169.254.") && !line.contains("100.127.") {
@@ -20,8 +20,8 @@ pub async fn get_lan_ip() -> Result<String, String> {
                 }
             }
         }
-        
-        Err("unknow".to_string())
+
+        Err("unknown".to_string())
     }
     #[cfg(target_os = "linux")]
     {

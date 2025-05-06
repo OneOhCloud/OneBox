@@ -1,5 +1,6 @@
 import * as path from '@tauri-apps/api/path';
 import { BaseDirectory, create } from '@tauri-apps/plugin-fs';
+import { type } from '@tauri-apps/plugin-os';
 import { getSubscriptionConfig } from '../action/db';
 import { getSingBoxConfigPath } from '../utils/helper';
 
@@ -197,6 +198,15 @@ export default async function setGlobalTunConfig(identifier: string) {
 
     const appConfigPath = await path.appConfigDir();
     const dbCacheFilePath = await path.join(appConfigPath, 'tun-cache.db');
+
+    //  Windows 使用 system stack 兼容性是最佳的。
+    if (type() === "windows") {
+        tunConfig.inbounds[0].stack = "system";
+    }
+
+    // 其余平台使用 gvisor stack 避免潜在问题
+    // 比如在 macOS 上使用 system stack 时会导致诸多问题，需要追踪 sing-box 是否解决此问题。
+
     const newConfig = JSON.parse(JSON.stringify(tunConfig));
     newConfig["experimental"]["cache_file"]["path"] = dbCacheFilePath;
 
