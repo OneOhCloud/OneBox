@@ -3134,7 +3134,7 @@ checksum = "42f5e15c9953c5e4ccceeb2e7382a716482c34515315f7b03532b8b4e8393d2d"
 
 [[package]]
 name = "one-box"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "anyhow",
  "lazy_static",
@@ -3159,6 +3159,7 @@ dependencies = [
  "tauri-plugin-updater",
  "tauri-plugin-window-state",
  "tokio",
+ "winapi",
 ]
 
 [[package]]

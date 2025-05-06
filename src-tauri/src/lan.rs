@@ -1,11 +1,17 @@
 use tokio::process::Command;
 
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
+
 #[tauri::command]
 pub async fn get_lan_ip() -> Result<String, String> {
     #[cfg(target_os = "windows")]
     {
+        use winapi::um::winbase::CREATE_NO_WINDOW;
+
         // 先执行 ipconfig 命令获取所有网络配置
         let output = Command::new("ipconfig")
+            .creation_flags(CREATE_NO_WINDOW)
             .output()
             .await
             .map_err(|e| e.to_string())?;
