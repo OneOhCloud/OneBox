@@ -106,7 +106,12 @@ export default function Home({ onNavigate }: HomeProps) {
       }
       const fn = selectedMode === '全局' ? setGlobalTunConfig : setTunConfig;
       await fn(identifier);
-    } else {
+    } else if (useTun && type() == 'windows') {
+      const fn = selectedMode === '全局' ? setGlobalTunConfig : setTunConfig;
+      await fn(identifier);
+    }
+
+    else {
       const fn = selectedMode === '全局' ? setGlobalMixedConfig : setMixedConfig;
       await fn(identifier);
     }

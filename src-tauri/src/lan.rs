@@ -1,8 +1,5 @@
 use tokio::process::Command;
 
-#[cfg(target_os = "windows")]
-use std::os::windows::process::CommandExt;
-
 #[tauri::command]
 pub async fn get_lan_ip() -> Result<String, String> {
     #[cfg(target_os = "windows")]
