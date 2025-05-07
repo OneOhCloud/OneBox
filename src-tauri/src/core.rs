@@ -3,23 +3,17 @@ use serde::{Deserialize, Serialize};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 
-use tauri::utils::platform;
 use tauri::Emitter;
 use tauri_plugin_shell::process::{Command, CommandChild, CommandEvent};
 use tauri_plugin_shell::ShellExt;
 
-#[cfg(any(target_os = "macos", target_os = "linux"))]
-use sysproxy::Sysproxy;
-
-// 默认绕过列表
-#[cfg(target_os = "windows")]
-static DEFAULT_BYPASS: &str = "localhost;127.*;192.168.*;10.*;172.16.*;172.17.*;172.18.*;172.19.*;172.20.*;172.21.*;172.22.*;172.23.*;172.24.*;172.25.*;172.26.*;172.27.*;172.28.*;172.29.*;172.30.*;172.31.*;<local>";
+use crate::vpn::helper;
 #[cfg(target_os = "linux")]
-static DEFAULT_BYPASS: &str =
-    "localhost,127.0.0.1,192.168.0.0/16,10.0.0.0/8,172.16.0.0/12,172.29.0.0/16,::1";
+use crate::vpn::linux as platform_impl;
 #[cfg(target_os = "macos")]
-static DEFAULT_BYPASS: &str =
-    "127.0.0.1,192.168.0.0/16,10.0.0.0/8,172.16.0.0/12,172.29.0.0/16,localhost,*.local,*.crashlytics.com,<local>";
+use crate::vpn::macos as platform_impl;
+#[cfg(target_os = "windows")]
+use crate::vpn::windows as platform_impl;
 
 /// 代理模式
 #[derive(Default, Clone, PartialEq, Serialize, Deserialize)]
@@ -36,46 +30,6 @@ struct ProcessManager {
     tun_password: Option<String>, // 仅记录密码
 }
 
-/// 代理配置
-#[derive(Clone)]
-struct ProxyConfig {
-    host: String,
-    port: u16,
-    bypass: String,
-}
-
-#[cfg(target_os = "macos")]
-impl Default for ProxyConfig {
-    fn default() -> Self {
-        Self {
-            host: "127.0.0.1".to_string(),
-            port: 5678,
-            bypass: DEFAULT_BYPASS.to_string(),
-        }
-    }
-}
-#[cfg(target_os = "windows")]
-impl Default for ProxyConfig {
-    fn default() -> Self {
-        Self {
-            host: "127.0.0.1".to_string(),
-            port: 5678,
-            bypass: DEFAULT_BYPASS.to_string(),
-        }
-    }
-}
-
-#[cfg(target_os = "linux")]
-impl Default for ProxyConfig {
-    fn default() -> Self {
-        Self {
-            host: "127.0.0.1".to_string(),
-            port: 5678,
-            bypass: DEFAULT_BYPASS.to_string(),
-        }
-    }
-}
-
 // 全局进程管理器
 lazy_static! {
     static ref PROCESS_MANAGER: Arc<Mutex<ProcessManager>> = Arc::new(Mutex::new(ProcessManager {
@@ -85,82 +39,6 @@ lazy_static! {
     }));
 }
 
-/// 设置系统代理
-async fn set_proxy(_app: &tauri::AppHandle) -> anyhow::Result<()> {
-    #[cfg(any(target_os = "macos", target_os = "linux"))]
-    {
-        let config = ProxyConfig::default();
-        let sys = Sysproxy {
-            enable: true,
-            host: config.host,
-            port: config.port,
-            bypass: config.bypass,
-        };
-        sys.set_system_proxy()?;
-        Ok(())
-    }
-    #[cfg(target_os = "windows")]
-    {
-        let config = ProxyConfig::default();
-        let sidecar_path = get_sidecar_path(Path::new("sysproxy"))?;
-        let address = format!("{}:{}", config.host, config.port);
-
-        let sidecar_command =
-            _app.shell()
-                .command(sidecar_path)
-                .args(["global", &address, DEFAULT_BYPASS]);
-
-        let output = sidecar_command
-            .output()
-            .await
-            .map_err(|e| anyhow::anyhow!("Failed to set proxy: {}", e))?;
-        if !output.status.success() {
-            return Err(anyhow::anyhow!(
-                "Failed to set proxy: {}",
-                String::from_utf8_lossy(&output.stderr)
-            ));
-        }
-        println!("Proxy set to {}:{}", config.host, config.port);
-        println!("Bypass list: {}", config.bypass);
-        Ok(())
-    }
-}
-
-/// 取消系统代理
-async fn unset_proxy(_app: &tauri::AppHandle) -> anyhow::Result<()> {
-    #[cfg(any(target_os = "macos", target_os = "linux"))]
-    {
-        // 清理系统代理设置
-        let mut sysproxy = Sysproxy::get_system_proxy().map_err(|e| anyhow::anyhow!(e))?;
-        sysproxy.enable = false;
-
-        sysproxy
-            .set_system_proxy()
-            .map_err(|e| anyhow::anyhow!(e))?;
-        println!("Proxy unset");
-        Ok(())
-    }
-    #[cfg(target_os = "windows")]
-    {
-        let sidecar_path = get_sidecar_path(Path::new("sysproxy"))?;
-        let sidecar_command = _app.shell().command(sidecar_path).args(["set", "1"]);
-
-        let output = sidecar_command
-            .output()
-            .await
-            .map_err(|e| anyhow::anyhow!("Failed to unset proxy: {}", e))?;
-        if !output.status.success() {
-            return Err(anyhow::anyhow!(
-                "Failed to unset proxy: {}",
-                String::from_utf8_lossy(&output.stderr)
-            ));
-        }
-        println!("Proxy unset");
-        Ok(())
-    }
-}
-
-/// 获取 sing-box 版本
 #[tauri::command]
 pub async fn version(app: tauri::AppHandle) -> Result<String, String> {
     let sidecar_command = app.shell().sidecar("sing-box").map_err(|e| e.to_string())?;
@@ -170,77 +48,6 @@ pub async fn version(app: tauri::AppHandle) -> Result<String, String> {
         .await
         .map_err(|e| e.to_string())?;
     String::from_utf8(output.stdout).map_err(|e| e.to_string())
-}
-
-/// 停止代理进程并清理代理设置
-#[tauri::command]
-pub fn stop(app: tauri::AppHandle) -> Result<(), String> {
-    let mut manager = PROCESS_MANAGER.lock().unwrap();
-
-    // 根据当前模式执行清理操作
-    if let Some(mode) = &manager.current_mode {
-        match mode {
-            ProxyMode::SystemProxy => {
-                // 系统代理模式，清理系统代理
-                tauri::async_runtime::block_on(unset_proxy(&app)).map_err(|e| e.to_string())?;
-            }
-            ProxyMode::TunProxy => {
-                if matches!(
-                    tauri_plugin_os::type_(),
-                    tauri_plugin_os::OsType::Linux | tauri_plugin_os::OsType::Macos
-                ) {
-                    // 类 Unix 系统 使用 sudo + 密码杀死所有 sing-box 进程
-                    if let Some(password) = &manager.tun_password {
-                        let command = format!("echo '{}' | sudo -S pkill -9 -f sing-box", password);
-                        println!("Executing command: {}", command);
-                        std::process::Command::new("sh")
-                            .arg("-c")
-                            .arg(command)
-                            .output()
-                            .map_err(|e| e.to_string())?;
-                    }
-                } else if matches!(tauri_plugin_os::type_(), tauri_plugin_os::OsType::Windows) {
-                    // Windows 系统，使用 taskkill 杀死所有 sing-box 进程
-                    let command = "runas /trustlevel:0x40000 taskkill /F /IM sing-box.exe";
-                    println!("Executing command: {}", command);
-                    std::process::Command::new("cmd")
-                        .arg("/C")
-                        .arg(command)
-                        .output()
-                        .map_err(|e| e.to_string())?;
-                } else {
-                    panic!("Unsupported OS type for TUN mode");
-                }
-            }
-        }
-    }
-
-    // 停止进程
-    if let Some(child) = manager.child.take() {
-        child.kill().map_err(|e| e.to_string())?;
-    }
-
-    // 清理状态
-    manager.current_mode = None;
-    manager.tun_password = None;
-    app.emit("status-changed", ()).unwrap();
-
-    Ok(())
-}
-
-/// 获取 sidecar 路径
-fn get_sidecar_path(program: &Path) -> Result<String, anyhow::Error> {
-    match platform::current_exe()?.parent() {
-        #[cfg(windows)]
-        Some(exe_dir) => Ok(exe_dir
-            .join(program)
-            .with_extension("exe")
-            .to_string_lossy()
-            .into_owned()),
-        #[cfg(not(windows))]
-        Some(exe_dir) => Ok(exe_dir.join(program).to_string_lossy().into_owned()),
-        None => Err(anyhow::anyhow!("Failed to get the executable directory")),
-    }
 }
 
 /// 启动代理进程
@@ -259,30 +66,8 @@ pub async fn start(
         let cmd: Command = app.shell().sidecar("sing-box").map_err(|e| e.to_string())?;
         cmd.args(["run", "-c", &path])
     } else {
-        let sidecar_path = get_sidecar_path(Path::new("sing-box")).unwrap();
-        if matches!(
-            tauri_plugin_os::type_(),
-            tauri_plugin_os::OsType::Linux | tauri_plugin_os::OsType::Macos
-        ) {
-            // 类 Unix 系统特权启动
-            let command = format!(
-                r#"echo '{}' | sudo -S '{}' run -c '{}'"#,
-                password.escape_default(),
-                sidecar_path.escape_default(),
-                path.escape_default()
-            );
-            app.shell().command("sh").args(vec!["-c", &command])
-        } else if matches!(tauri_plugin_os::type_(), tauri_plugin_os::OsType::Windows) {
-            // Windows 平台特权启动
-            let command = format!(
-                r#"runas /trustlevel:0x40000 "{}" run -c "{}""#,
-                sidecar_path.escape_default(),
-                path.escape_default()
-            );
-            app.shell().command("cmd").args(vec!["/C", &command])
-        } else {
-            panic!("Unsupported OS type for TUN mode");
-        }
+        let sidecar_path = helper::get_sidecar_path(Path::new("sing-box")).unwrap();
+        platform_impl::create_privileged_command(&app, sidecar_path, path.clone(), password.clone())
     };
 
     let (mut rx, child) = sidecar_command.spawn().map_err(|e| e.to_string())?;
@@ -290,16 +75,16 @@ pub async fn start(
     // 根据当前模式执行不同的操作
     if mode == ProxyMode::SystemProxy {
         // 设置系统代理
-        if let Err(e) = set_proxy(&app).await {
+        if let Err(e) = platform_impl::set_proxy(&app).await {
             // 如果设置系统代理失败，杀死进程
-            stop(app)?;
+            stop(app.clone())?;
             return Err(e.to_string());
         }
     } else {
         // 如果是 TUN 模式，取消系统代理
-        if let Err(e) = unset_proxy(&app).await {
+        if let Err(e) = platform_impl::unset_proxy(&app).await {
             // 如果取消系统代理失败，杀死进程
-            stop(app)?;
+            stop(app.clone())?;
             return Err(e.to_string());
         }
     }
@@ -354,6 +139,40 @@ pub async fn start(
             }
         }
     });
+
+    Ok(())
+}
+
+/// 停止代理进程并清理代理设置
+#[tauri::command]
+pub fn stop(app: tauri::AppHandle) -> Result<(), String> {
+    let mut manager = PROCESS_MANAGER.lock().unwrap();
+
+    // 根据当前模式执行清理操作
+    if let Some(mode) = &manager.current_mode {
+        match mode {
+            ProxyMode::SystemProxy => {
+                // 系统代理模式，清理系统代理
+                tauri::async_runtime::block_on(platform_impl::unset_proxy(&app))
+                    .map_err(|e| e.to_string())?;
+            }
+            ProxyMode::TunProxy => {
+                if let Some(password) = &manager.tun_password {
+                    platform_impl::stop_tun_process(password)?;
+                }
+            }
+        }
+    }
+
+    // 停止进程
+    if let Some(child) = manager.child.take() {
+        child.kill().map_err(|e| e.to_string())?;
+    }
+
+    // 清理状态
+    manager.current_mode = None;
+    manager.tun_password = None;
+    app.emit("status-changed", ()).unwrap();
 
     Ok(())
 }
