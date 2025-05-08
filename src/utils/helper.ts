@@ -65,13 +65,12 @@ export const vpnServiceManager = {
     start: async () => {
         const configPath = await getSingBoxConfigPath();
         const tunMode: boolean | undefined = await getEnableTun();
-        let mode: vpnServiceManagerMode = 'SystemProxy';
+        let mode: vpnServiceManagerMode = tunMode ? 'TunProxy' : 'SystemProxy';
         let osType = type();
         let password = "";
 
         // 在 linux 和 macOS 上使用 TUN 模式时需要输入超级管理员密码
         if (tunMode && (osType == 'linux' || osType == 'macos')) {
-            mode = 'TunProxy';
             let ok = await verifyPrivileged();
             if (!ok) {
                 // 一般来说不会弹出这个提示，如果弹出此提示，说明之前的交互逻辑有问题。

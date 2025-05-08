@@ -59,14 +59,14 @@ pub fn create_privileged_command(
     sidecar_path: String,
     path: String,
     password: String,
-) -> TauriCommand {
+) -> Option<TauriCommand> {
     let command = format!(
         r#"echo '{}' | sudo -S '{}' run -c '{}'"#,
         password.escape_default(),
         sidecar_path.escape_default(),
         path.escape_default()
     );
-    app.shell().command("sh").args(vec!["-c", &command])
+    Some(app.shell().command("sh").args(vec!["-c", &command]))
 }
 
 /// 停止TUN模式下的进程

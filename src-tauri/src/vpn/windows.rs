@@ -1,9 +1,14 @@
 use anyhow;
 use std::path::Path;
-use std::process::Command;
 use tauri::AppHandle;
 use tauri_plugin_shell::process::Command as TauriCommand;
 use tauri_plugin_shell::ShellExt;
+
+use std::ffi::OsStr;
+use std::os::windows::ffi::OsStrExt;
+use windows::core::PCWSTR;
+use windows::Win32::Foundation::HWND;
+use windows::Win32::UI::Shell::ShellExecuteW;
 
 use crate::vpn::helper;
 // 默认绕过列表
@@ -54,7 +59,9 @@ pub async fn set_proxy(app: &AppHandle) -> anyhow::Result<()> {
 }
 
 /// 取消系统代理
-pub async fn unset_proxy(app: &AppHandle, sidecar_path: String) -> anyhow::Result<()> {
+pub async fn unset_proxy(app: &AppHandle) -> anyhow::Result<()> {
+    let sidecar_path = helper::get_sidecar_path(Path::new("sysproxy"))?;
+
     let sidecar_command = app.shell().command(sidecar_path).args(["set", "1"]);
 
     let output = sidecar_command
@@ -71,29 +78,68 @@ pub async fn unset_proxy(app: &AppHandle, sidecar_path: String) -> anyhow::Resul
     Ok(())
 }
 
-/// 特权模式下启动进程
+/// 特权模式下启动进程（使用 Windows ShellExecuteW UAC 提权）
+#[cfg(target_os = "windows")]
 pub fn create_privileged_command(
-    app: &AppHandle,
+    _app: &AppHandle,
     sidecar_path: String,
     path: String,
     _password: String,
-) -> TauriCommand {
-    let command = format!(
-        r#"runas /trustlevel:0x40000 "{}" run -c "{}""#,
-        sidecar_path.escape_default(),
-        path.escape_default()
-    );
-    app.shell().command("cmd").args(vec!["/C", &command])
+) -> Option<TauriCommand> {
+    let args = format!("run -c {}", path);
+    let sidecar_wide: Vec<u16> = OsStr::new(&sidecar_path)
+        .encode_wide()
+        .chain(Some(0))
+        .collect();
+    let args_wide: Vec<u16> = OsStr::new(&args).encode_wide().chain(Some(0)).collect();
+    let verb = OsStr::new("runas")
+        .encode_wide()
+        .chain(Some(0))
+        .collect::<Vec<u16>>();
+    let res = unsafe {
+        ShellExecuteW(
+            HWND(0),
+            PCWSTR(verb.as_ptr()),
+            PCWSTR(sidecar_wide.as_ptr()),
+            PCWSTR(args_wide.as_ptr()),
+            PCWSTR(std::ptr::null()),
+            windows::Win32::UI::WindowsAndMessaging::SHOW_WINDOW_CMD(0),
+        )
+    };
+    if res.0 as usize <= 32 {
+        panic!("ShellExecuteW failed: code {}", res.0 as usize);
+        
+    }
+    None
 }
 
-/// 停止TUN模式下的进程
+/// 停止TUN模式下的进程（使用 Windows ShellExecuteW UAC 提权）
+#[cfg(target_os = "windows")]
 pub fn stop_tun_process(_password: &str) -> Result<(), String> {
-    let command = "runas /trustlevel:0x40000 taskkill /F /IM sing-box.exe";
-    println!("Executing command: {}", command);
-    Command::new("cmd")
-        .arg("/C")
-        .arg(command)
-        .output()
-        .map_err(|e| e.to_string())?;
+    let taskkill = OsStr::new("taskkill")
+        .encode_wide()
+        .chain(Some(0))
+        .collect::<Vec<u16>>();
+    let args = OsStr::new("/F /IM sing-box.exe")
+        .encode_wide()
+        .chain(Some(0))
+        .collect::<Vec<u16>>();
+    let verb = OsStr::new("runas")
+        .encode_wide()
+        .chain(Some(0))
+        .collect::<Vec<u16>>();
+    let res = unsafe {
+        ShellExecuteW(
+            HWND(0),
+            PCWSTR(verb.as_ptr()),
+            PCWSTR(taskkill.as_ptr()),
+            PCWSTR(args.as_ptr()),
+            PCWSTR(std::ptr::null()),
+            windows::Win32::UI::WindowsAndMessaging::SHOW_WINDOW_CMD(0),
+        )
+    };
+    if res.0 as usize <= 32 {
+        return Err(format!("ShellExecuteW failed: code {}", res.0 as usize));
+    }
     Ok(())
 }
