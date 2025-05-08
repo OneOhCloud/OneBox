@@ -158,8 +158,8 @@ pub async fn start(
         }
         manager.child = None;
         manager.current_mode = Some(mode);
-        // 睡眠 0.5s 等待进程启动
-        std::thread::sleep(std::time::Duration::from_millis(500));
+        // 睡眠 1.5s 等待进程启动
+        std::thread::sleep(std::time::Duration::from_millis(1500));
 
         app.emit("status-changed", ()).unwrap();
     }
