@@ -1,6 +1,7 @@
 import * as path from '@tauri-apps/api/path';
 import { BaseDirectory, create } from '@tauri-apps/plugin-fs';
 import { getSubscriptionConfig } from '../action/db';
+import { getAllowLan } from '../single/store';
 import { getSingBoxConfigPath } from '../utils/helper';
 
 const mixedConfig = {
@@ -106,7 +107,7 @@ const mixedConfig = {
       "tag": "mixed",
       "type": "mixed",
       "listen": "127.0.0.1",
-      "listen_port": 5678,
+      "listen_port": 6789,
       "sniff": true,
       "set_system_proxy": false
     }
@@ -242,8 +243,20 @@ export default async function setMixedConfig(identifier: string) {
 
   const appConfigPath = await path.appConfigDir();
   const dbCacheFilePath = await path.join(appConfigPath, 'cache.db');
+
+  // 深拷贝配置文件
   const newConfig = JSON.parse(JSON.stringify(mixedConfig));
   newConfig["experimental"]["cache_file"]["path"] = dbCacheFilePath;
+
+  const allowLan = await getAllowLan();
+
+  if (allowLan) {
+    newConfig["inbounds"][0]["listen"] = "0.0.0.0";
+  } else {
+    newConfig["inbounds"][0]["listen"] = "127.0.0.1";
+  }
+
+
 
   const outbounds = newConfig["outbounds"];
   const outbounds1 = outbounds[1]["outbounds"];

@@ -96,7 +96,9 @@ export default function Home({ onNavigate }: HomeProps) {
 
 
   // 抽取配置逻辑
-  const configureProxy = async (identifier: string, useTun: boolean) => {
+  const configureProxy = async (identifier: string) => {
+    const useTun = await getEnableTun();
+
     // 在 linux 和 macOS 上使用 TUN 模式时需要输入超级管理员密码
     if (useTun && (type() == 'linux' || type() == 'macos')) {
       const privileged = await verifyPrivileged();
@@ -129,11 +131,9 @@ export default function Home({ onNavigate }: HomeProps) {
       return message('请先添加订阅配置', { title: '提示', kind: 'error' });
     }
     const identifier = await getStoreValue(SSI_STORE_KEY);
-    const useTun = await getEnableTun();
-    const ok = await configureProxy(identifier, useTun);
+    const ok = await configureProxy(identifier);
     if (!ok) return;
     await vpnServiceManager.start();
-
 
   }
 
@@ -148,7 +148,6 @@ export default function Home({ onNavigate }: HomeProps) {
       setTimeout(() => setIsOnLoading(false), 1600);
 
     }
-
 
   }
 

@@ -71,7 +71,7 @@ async function embeddingExternalBinaries(
         !fs.existsSync(tmpDir) && fs.mkdirSync(tmpDir, { recursive: true });
 
         // 下载和解压文件
-        console.log(`正在下载 ${platform}-${arch} 版本的 sing-box...`);
+        console.log(`正在下载 ${platform}-${arch}-${SING_BOX_VERSION} 版本的 sing-box...`);
         await downloadFile(downloadUrl, downloadPath);
         await extractFile(downloadPath, fileExtension, tmpDir);
 

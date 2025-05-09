@@ -33,17 +33,37 @@ pub struct PlatformPrivilegeHelper;
 #[cfg(target_os = "linux")]
 impl PrivilegeHelper for PlatformPrivilegeHelper {
     fn get_current_user() -> String {
-        let output = Command::new("whoami")
-            .output()
-            .expect("Failed to execute command");
-        let username = String::from_utf8_lossy(&output.stdout);
-        username.trim().to_string()
+        "root".to_string()
     }
-    async fn is_privileged(_username: String, _password: String) -> bool {
-        // 这里可以实现 Linux 上的权限验证逻辑
-        // 例如使用 sudo 命令来验证用户是否有权限
-        println!("Linux platform is not supported yet");
-        false
+    async fn is_privileged(username: String, password: String) -> bool {
+        let mut child = match Command::new("sudo")
+            .arg("-S")
+            .arg("whoami")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+        {
+            Ok(child) => child,
+            Err(_) => return false,
+        };
+
+        if let Some(mut stdin) = child.stdin.take() {
+            if stdin
+                .write_all(format!("{}\n", password).as_bytes())
+                .is_err()
+            {
+                return false;
+            }
+        }
+
+        let output = match child.wait_with_output() {
+            Ok(output) => output,
+            Err(_) => return false,
+        };
+
+        let stdout_str = String::from_utf8_lossy(&output.stdout);
+        stdout_str.trim() == "root"
     }
 }
 

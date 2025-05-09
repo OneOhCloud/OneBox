@@ -2,6 +2,7 @@ import * as path from '@tauri-apps/api/path';
 import { BaseDirectory, create } from '@tauri-apps/plugin-fs';
 import { type } from '@tauri-apps/plugin-os';
 import { getSubscriptionConfig } from '../action/db';
+import { getAllowLan } from '../single/store';
 import { getSingBoxConfigPath } from '../utils/helper';
 
 const tunConfig = {
@@ -111,6 +112,14 @@ const tunConfig = {
                 "172.19.0.1/30",
                 "fdfe:dcba:9876::1/126"
             ],
+            "platform": {
+                "http_proxy": {
+                    "enabled": false,
+                    "server": "127.0.0.1",
+                    "server_port": 6789,
+
+                }
+            },
             "mtu": 9000,
             "stack": "gvisor",
             "auto_route": true,
@@ -137,6 +146,14 @@ const tunConfig = {
                 "ff05::/16",
                 "240e::/20",
             ]
+        },
+        {
+            "tag": "mixed",
+            "type": "mixed",
+            "listen": "127.0.0.1",
+            "listen_port": 6789,
+            "sniff": true,
+            "set_system_proxy": false
         }
     ],
     "route": {
@@ -284,7 +301,17 @@ export default async function setTunConfig(identifier: string) {
     // 其余平台使用 gvisor stack 避免潜在问题
     // 比如在 macOS 上使用 system stack 时会导致诸多问题，需要追踪 sing-box 是否解决此问题。
 
+    // 深拷贝配置文件
     const newConfig = JSON.parse(JSON.stringify(tunConfig));
+
+    const allowLan = await getAllowLan();
+    if (allowLan) {
+        newConfig["inbounds"][1]["listen"] = "0.0.0.0";
+    } else {
+        newConfig["inbounds"][1]["listen"] = "127.0.0.1";
+    }
+
+
 
 
 

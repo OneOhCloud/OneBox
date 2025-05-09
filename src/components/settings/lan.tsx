@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { Router } from "react-bootstrap-icons";
-import { getAllowLan } from "../../single/store";
+import { getAllowLan, setAllowLan } from "../../single/store";
 import { ToggleSetting } from "./common";
 
 import { invoke } from "@tauri-apps/api/core";
 import { message } from "@tauri-apps/plugin-dialog";
+import { vpnServiceManager } from "../../utils/helper";
 
 
 async function getLanIP(): Promise<string> {
@@ -20,7 +21,7 @@ async function getLanIP(): Promise<string> {
 
 export default function ToggleLan() {
   const [toggle, setToggle] = useState(false);
-  const [lanIP, setLanIP] = useState<string >("127.0.0.1");
+  const [lanIP, setLanIP] = useState<string>("127.0.0.1");
 
   useEffect(() => {
     const loadTunState = async () => {
@@ -47,10 +48,15 @@ export default function ToggleLan() {
   }, []);
 
   const handleToggle = async () => {
-    if (lanIP === "127.0.0.1") {
+    if (!lanIP || lanIP === "127.0.0.1") {
       await message('无法开启局域网连接', { title: '错误', kind: 'error' });
       return;
     } else {
+      await setAllowLan(!toggle);
+      setToggle(!toggle);
+      await vpnServiceManager.stop();
+
+
     }
   }
 
