@@ -104,9 +104,7 @@ pub async fn start(
         manager.current_mode = Some(mode);
 
         let process_manager = PROCESS_MANAGER.clone();
-
-        app.emit("status-changed", ()).unwrap();
-
+        let app_clone = app.clone();
         // 后台异步处理进程事件
         tauri::async_runtime::spawn(async move {
             let handle_event = |event: CommandEvent| {
@@ -137,7 +135,9 @@ pub async fn start(
                 };
 
                 println!("{}: {}", level, message);
-                app.emit("core_backend", Some(message))
+
+                app_clone
+                    .emit("core_backend", Some(message))
                     .map_err(|e| e.to_string())
             };
 
@@ -147,6 +147,9 @@ pub async fn start(
                 }
             }
         });
+        // 睡眠 1.5s 等待进程启动
+        std::thread::sleep(std::time::Duration::from_millis(1500));
+        app.emit("status-changed", ()).unwrap();
     } else {
         // Windows TUN 模式等不可管理进程场景
         let mut manager = match PROCESS_MANAGER.lock() {
@@ -209,29 +212,18 @@ pub fn stop(app: tauri::AppHandle) -> Result<(), String> {
 /// 判断代理进程是否运行中
 #[tauri::command]
 pub async fn is_running() -> bool {
-    let is_system_proxy = {
-        let manager = PROCESS_MANAGER.lock().unwrap();
-        if manager.current_mode == Some(ProxyMode::SystemProxy) {
-            return manager.child.is_some();
-        }
-        false
-    };
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(2))
+        .no_proxy()
+        .build()
+        .unwrap();
 
-    if !is_system_proxy {
-        let client = reqwest::Client::builder()
-            .timeout(std::time::Duration::from_secs(2))
-            .no_proxy()
-            .build()
-            .unwrap();
-
-        let res = client.get("http://127.0.0.1:9191/version");
-        let res = res.send().await;
-        if let Ok(res) = res {
-            if res.status() == 200 {
-                return true;
-            }
+    let res = client.get("http://127.0.0.1:9191/version");
+    let res = res.send().await;
+    if let Ok(res) = res {
+        if res.status() == 200 {
+            return true;
         }
     }
-
     false
 }
