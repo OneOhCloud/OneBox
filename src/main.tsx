@@ -48,7 +48,7 @@ async function createTrayMenu() {
         id: 'copy_proxy',
         text: '复制环境变量',
         action: async () => {
-          const proxyConfig = 'export https_proxy=http://127.0.0.1:5678 http_proxy=http://127.0.0.1:5678 all_proxy=socks5://127.0.0.1:5678';
+          const proxyConfig = 'export https_proxy=http://127.0.0.1:6789 http_proxy=http://127.0.0.1:6789 all_proxy=socks5://127.0.0.1:6789';
           try {
             await writeText(proxyConfig);
             console.log('Proxy configuration copied to clipboard');

@@ -21,7 +21,7 @@ impl Default for ProxyConfig {
     fn default() -> Self {
         Self {
             host: "127.0.0.1".to_string(),
-            port: 5678,
+            port: 6789,
             bypass: DEFAULT_BYPASS.to_string(),
         }
     }

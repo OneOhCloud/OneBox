@@ -26,7 +26,7 @@ impl Default for ProxyConfig {
     fn default() -> Self {
         Self {
             host: "127.0.0.1".to_string(),
-            port: 5678,
+            port: 6789,
             bypass: DEFAULT_BYPASS.to_string(),
         }
     }
@@ -108,7 +108,6 @@ pub fn create_privileged_command(
     };
     if res.0 as usize <= 32 {
         panic!("ShellExecuteW failed: code {}", res.0 as usize);
-        
     }
     None
 }
