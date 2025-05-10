@@ -209,18 +209,29 @@ pub fn stop(app: tauri::AppHandle) -> Result<(), String> {
 /// 判断代理进程是否运行中
 #[tauri::command]
 pub async fn is_running() -> bool {
-    let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(2))
-        .no_proxy()
-        .build()
-        .unwrap();
+    let is_system_proxy = {
+        let manager = PROCESS_MANAGER.lock().unwrap();
+        if manager.current_mode == Some(ProxyMode::SystemProxy) {
+            return manager.child.is_some();
+        }
+        false
+    };
 
-    let res = client.get("http://127.0.0.1:9191/version");
-    let res = res.send().await;
-    if let Ok(res) = res {
-        if res.status() == 200 {
-            return true;
+    if !is_system_proxy {
+        let client = reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(2))
+            .no_proxy()
+            .build()
+            .unwrap();
+
+        let res = client.get("http://127.0.0.1:9191/version");
+        let res = res.send().await;
+        if let Ok(res) = res {
+            if res.status() == 200 {
+                return true;
+            }
         }
     }
+
     false
 }
