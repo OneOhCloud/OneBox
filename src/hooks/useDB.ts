@@ -1,7 +1,7 @@
-import toast from 'react-hot-toast'
-import useSWR from 'swr'
-import { GET_SUBSCRIPTIONS_LIST_SWR_KEY, Subscription } from '../types/definition'
+import toast from 'react-hot-toast';
+import useSWR from 'swr';
 import { getDataBaseInstance } from '../single/db';
+import { GET_SUBSCRIPTIONS_LIST_SWR_KEY, Subscription } from '../types/definition';
 
 
 

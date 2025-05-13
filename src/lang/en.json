@@ -1,0 +1,19 @@
+{
+    "home": "Home",
+    "settings": "Settings",
+    "configuration": "Config",
+    "connected": "Connected",
+    "connecting": "Connecting",
+    "connect_failed": "Connect failed",
+    "disconnected": "Disconnected",
+    "rules": "Rules",
+    "global": "Global",
+    "current_subscription": "Current subscription",
+    "node_selection": "Node selection",
+    "please_add_subscription": "Please add subscription first",
+    "tips": "Tips",
+    "error": "Error",
+    "reconnect_failed": "Reconnect failed, please check network",
+    "switching": "Switching...",
+    "not_connected": "Not Connected"
+}

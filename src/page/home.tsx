@@ -13,26 +13,22 @@ import setTunConfig from "../config/tun-config";
 import { useSubscriptions } from '../hooks/useDB';
 import { getEnableTun, getStoreValue, setStoreValue } from "../single/store";
 import { RULE_MODE_STORE_KEY, SSI_STORE_KEY } from '../types/definition';
-import { verifyPrivileged, vpnServiceManager } from "../utils/helper";
-
-
+import { t, verifyPrivileged, vpnServiceManager } from "../utils/helper";
 
 type HomeProps = {
   onNavigate: (screen: 'home' | 'configuration' | 'settings') => void;
 }
 
-
-type SelectedModeType = '规则' | '全局';
+type SelectedModeType = 'rules' | 'global';
 
 export default function Home({ onNavigate }: HomeProps) {
   // 状态管理
   const [isOn, setIsOn] = useState(false);
   const [isOnLoading, setIsOnLoading] = useState(false);
-  const [selectedMode, setSelectedMode] = useState<SelectedModeType>('规则');
+  const [selectedMode, setSelectedMode] = useState<SelectedModeType>('rules');
   const [isEmpty, setIsEmpty] = useState(false);
   const [indicatorStyle, setIndicatorStyle] = useState({ left: 0, width: 0 });
   const [privilegedDialog, setPrivilegedDialog] = useState(false);
-
 
   const modeButtonsRef = useRef<HTMLDivElement>(null);
   const { data } = useSubscriptions();
@@ -47,19 +43,17 @@ export default function Home({ onNavigate }: HomeProps) {
 
     // 获取当前规则模式
     getStoreValue(RULE_MODE_STORE_KEY).then((s) => {
-      if (s) {
-        setSelectedMode(s as SelectedModeType);
+      if (s === '规则') {
+        setSelectedMode('rules');
+      } else if (s === '全局') {
+        setSelectedMode('global');
       } else {
-        setSelectedMode('规则');
+        setSelectedMode('rules');
       }
     }).catch((error) => {
       console.error('获取规则模式发生错误:', error);
-    }
-    );
+    });
   }, []);
-
-
-
 
   //事件监听 
   useEffect(() => {
@@ -77,7 +71,6 @@ export default function Home({ onNavigate }: HomeProps) {
     setIsEmpty(!data?.length);
   }, [data]);
 
-
   // 模式指示器位置更新
   useEffect(() => {
     const container = modeButtonsRef.current;
@@ -94,7 +87,6 @@ export default function Home({ onNavigate }: HomeProps) {
     }
   }, [selectedMode]);
 
-
   // 抽取配置逻辑
   const configureProxy = async (identifier: string) => {
     const useTun = await getEnableTun();
@@ -106,20 +98,17 @@ export default function Home({ onNavigate }: HomeProps) {
         setPrivilegedDialog(true);
         return false;
       }
-      const fn = selectedMode === '全局' ? setGlobalTunConfig : setTunConfig;
+      const fn = selectedMode === 'global' ? setGlobalTunConfig : setTunConfig;
       await fn(identifier);
     } else if (useTun && type() == 'windows') {
-      const fn = selectedMode === '全局' ? setGlobalTunConfig : setTunConfig;
+      const fn = selectedMode === 'global' ? setGlobalTunConfig : setTunConfig;
       await fn(identifier);
-    }
-
-    else {
-      const fn = selectedMode === '全局' ? setGlobalMixedConfig : setMixedConfig;
+    } else {
+      const fn = selectedMode === 'global' ? setGlobalMixedConfig : setMixedConfig;
       await fn(identifier);
     }
     return true;
   };
-
 
   const turnOff = async () => {
     await vpnServiceManager.stop();
@@ -128,13 +117,12 @@ export default function Home({ onNavigate }: HomeProps) {
   const turnOn = async () => {
     if (isEmpty) {
       onNavigate('configuration');
-      return message('请先添加订阅配置', { title: '提示', kind: 'error' });
+      return message(t('please_add_subscription'), { title: t('tips'), kind: 'error' });
     }
     const identifier = await getStoreValue(SSI_STORE_KEY);
     const ok = await configureProxy(identifier);
     if (!ok) return;
     await vpnServiceManager.start();
-
   }
 
   const restart = async () => {
@@ -143,18 +131,16 @@ export default function Home({ onNavigate }: HomeProps) {
       await turnOff();
       await turnOn();
     } catch (error) {
-      await message('重新连接失败，请检查网络', { title: '错误', kind: 'error' });
+      await message(t('reconnect_failed'), { title: t('error'), kind: 'error' });
     } finally {
       setTimeout(() => setIsOnLoading(false), 1600);
-
     }
-
   }
 
   const handleToggle = async () => {
     if (isEmpty) {
       onNavigate('configuration');
-      return message('请先添加订阅配置', { title: '提示', kind: 'error' });
+      return message(t('please_add_subscription'), { title: t('tips'), kind: 'error' });
     }
     setIsOnLoading(true);
     try {
@@ -162,21 +148,19 @@ export default function Home({ onNavigate }: HomeProps) {
       isOn ? await turnOff() : await turnOn();
       setIsOn(prev => !prev);
     } catch (error) {
-      await message('连接失败，请检查网络', { title: '错误', kind: 'error' });
+      await message(t('connect_failed'), { title: t('error'), kind: 'error' });
     } finally {
       setTimeout(() => setIsOnLoading(false), 1200);
     }
   };
 
-
-
-
   const handleModeChange = async (mode: SelectedModeType) => {
     if (isOnLoading || isOn) {
       await restart();
-
     }
-    await setStoreValue(RULE_MODE_STORE_KEY, mode);
+    // 转换回中文存储
+    const storeMode = mode === 'rules' ? '规则' : '全局';
+    await setStoreValue(RULE_MODE_STORE_KEY, storeMode);
     setSelectedMode(mode);
   };
 
@@ -211,20 +195,17 @@ export default function Home({ onNavigate }: HomeProps) {
                   ${isOnLoading ? ' opacity-70' : ''}
                 `}
               />
-            </div>
-          </div>
+            </div>        
+              </div>
         </div>
       </label>
-
 
       <div className="w-full text-center text-sm mb-2 flex items-center justify-center" style={{ color: isOn ? '#3B82F6' : '#9CA3AF' }}>
         <InfoCircle size={16} className="mr-1.5 text-gray-300" />
         <span className="text-base">
-          {isOnLoading ? '正在切换...' : isOn ? '已连接' : '未连接'}
+          {isOnLoading ? t('switching') : isOn ? t('connected') : t('not_connected')}
         </span>
-
       </div>
-
 
       <div className="bg-gray-100 p-1 rounded-xl mb-4 inline-flex relative" ref={modeButtonsRef}>
         {/* 动画指示器 */}
@@ -236,20 +217,15 @@ export default function Home({ onNavigate }: HomeProps) {
           }}
         />
 
-        {['规则', '全局'].map((mode) => (
+        {['rules', 'global'].map((mode) => (
           <button
             key={mode}
             data-mode={mode}
-            className={`  px-6 py-1.5 text-sm font-medium transition-all duration-300 relative cursor-pointer
-              ${selectedMode === mode
-                ? 'text-gray-800'
-                : 'text-gray-500 hover:text-gray-700'}
-                `}
+            className={`relative px-4 py-1 rounded-lg transition-colors duration-300 ${selectedMode === mode ? 'text-black' : 'text-gray-500 hover:text-gray-700'}`}
             onClick={() => handleModeChange(mode as SelectedModeType)}
           >
-            <span className="relative z-10">{mode}</span>
+            {t(mode)}
           </button>
-
         ))}
       </div>
 

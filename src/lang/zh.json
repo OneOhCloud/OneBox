@@ -1,0 +1,19 @@
+{
+    "home": "主页",
+    "settings": "设置",
+    "configuration": "配置",
+    "connected": "已连接",
+    "connecting": "连接中",
+    "connect_failed": "连接失败",
+    "disconnected": "未连接",
+    "rules": "规则",
+    "global": "全局",
+    "current_subscription": "当前订阅",
+    "node_selection": "节点选择",
+    "please_add_subscription": "请先添加订阅配置",
+    "tips": "提示",
+    "error": "错误",
+    "reconnect_failed": "重新连接失败，请检查网络",
+    "switching": "正在切换...",
+    "not_connected": "未连接"
+}

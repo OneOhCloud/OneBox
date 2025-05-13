@@ -3,23 +3,28 @@ import { useState } from 'react';
 import { GearWideConnected, House, Layers } from 'react-bootstrap-icons';
 import { Toaster } from 'react-hot-toast';
 import "./App.css";
+
 import ConfigurationPage from './page/config';
 import Dev from './page/dev';
 import HomePage from './page/home';
 import SettingsPage from './page/settings';
+import { t } from './utils/helper';
 
 const debug = false;
+
+
 
 function App() {
   const [activeScreen, setActiveScreen] = useState<'home' | 'configuration' | 'settings'>('home');
   const [isSettingsHovered, setIsSettingsHovered] = useState(false);
 
-
-
   // 通用的导航处理方法，接受屏幕名称作为参数
   const handleScreenChange = (screen: 'home' | 'configuration' | 'settings') => {
     setActiveScreen(screen);
   };
+
+
+
 
   if (debug) {
     return <Dev></Dev>
@@ -44,7 +49,7 @@ function App() {
           className={` ${activeScreen === 'home' ? 'text-blue-500' : ''}`}
         >
           <House />
-          <span className='text-xs'>主页</span>
+          <span className='text-xs'>{t("home")}</span>
         </button>
 
         <button
@@ -52,7 +57,7 @@ function App() {
           className={`${activeScreen === 'configuration' ? 'text-blue-500' : ''}`}
         >
           <Layers />
-          <span className='text-xs'>配置</span>
+          <span className='text-xs'>{t("configuration")}</span>
         </button>
 
         <button
@@ -67,7 +72,7 @@ function App() {
           >
             <GearWideConnected />
           </motion.div>
-          <span className='text-xs'>设置</span>
+          <span className='text-xs'>{t("settings")}</span>
         </button>
       </div>
     </main>

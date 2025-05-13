@@ -5,9 +5,15 @@ import { OsInfo, PRIVILEGED_PASSWORD_STORE_KEY, SING_BOX_VERSION } from '../type
 
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { message } from '@tauri-apps/plugin-dialog';
+import en from '../lang/en.json';
+import zh from '../lang/zh.json';
 import { getEnableTun, getStoreValue } from '../single/store';
-
 const appWindow = getCurrentWindow();
+const osLocale = await locale();
+const enLang = en as Record<string, string>;
+const zhLang = zh as Record<string, string>;
+// const currentLang = osLocale?.startsWith('zh') ? zhLang : enLang;
+const currentLang = osLocale?.startsWith('zh') ? enLang : enLang;
 
 
 export async function getOsInfo() {
@@ -104,3 +110,8 @@ export const verifyPrivileged = async () => {
     return ok;
 
 };
+
+
+export const t = (id: string): string => {
+    return currentLang[id] || id;
+}
