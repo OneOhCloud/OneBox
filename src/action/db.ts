@@ -62,7 +62,7 @@ export async function updateSubscription(identifier: string) {
             }
         });
         const { upload, download, total, expire } = getRemoteInfoBySubscriptionUserinfo(response.headers.get('subscription-userinfo') || '')
-        const officialWebsite = response.headers.get('official-website') || 'https://oneoh.cloud'
+        const officialWebsite = response.headers.get('official-website') || 'https://sing-box.net'
         const used_traffic = parseInt(upload) + parseInt(download)
         const total_traffic = parseInt(total)
         const expire_time = parseInt(expire) * 1000
@@ -95,7 +95,7 @@ export async function addSubscription(url: string, name: string | undefined) {
             }
         });
 
-        const officialWebsite = response.headers.get('official-website') || 'https://oneoh.cloud'
+        const officialWebsite = response.headers.get('official-website') || 'https://sing-box.net'
         const subJson = await response.json()
 
         if (name === undefined || name === '' || name === "默认配置") {

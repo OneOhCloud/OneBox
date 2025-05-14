@@ -12,8 +12,8 @@ const appWindow = getCurrentWindow();
 const osLocale = await locale();
 const enLang = en as Record<string, string>;
 const zhLang = zh as Record<string, string>;
-// const currentLang = osLocale?.startsWith('zh') ? zhLang : enLang;
-const currentLang = osLocale?.startsWith('zh') ? enLang : enLang;
+const currentLang = osLocale?.startsWith('zh') ? zhLang : enLang;
+// const currentLang = osLocale?.startsWith('zh') ? enLang : enLang;
 
 
 export async function getOsInfo() {
