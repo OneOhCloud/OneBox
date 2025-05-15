@@ -9,12 +9,18 @@ import en from '../lang/en.json';
 import zh from '../lang/zh.json';
 import { getEnableTun, getStoreValue } from '../single/store';
 const appWindow = getCurrentWindow();
-const osLocale = await locale();
 const enLang = en as Record<string, string>;
 const zhLang = zh as Record<string, string>;
-const currentLang = osLocale?.startsWith('zh') ? zhLang : enLang;
-// const currentLang = osLocale?.startsWith('zh') ? enLang : enLang;
+let currentLang = enLang; // 默认使用英文
 
+// 初始化语言设置
+async function initLanguage() {
+    const osLocale = await locale();
+    currentLang = osLocale?.startsWith('zh') ? zhLang : enLang;
+}
+
+// 启动时初始化语言
+initLanguage();
 
 export async function getOsInfo() {
     const osType = type()
