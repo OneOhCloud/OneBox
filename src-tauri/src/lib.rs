@@ -21,24 +21,29 @@ fn open_devtools(app: AppHandle) {
 }
 
 #[tauri::command]
-async fn ping(url: String) -> bool {
-    let client = reqwest::ClientBuilder::new()
-        .timeout(std::time::Duration::from_secs(4))
-        .build()
-        .unwrap();
+async fn ping(url: String, proxy: bool) -> bool {
+    let client;
+    if proxy {
+        // 使用系统代理
+        let proxy = format!("http://{}:{}", "127.0.0.1", 6789);
+        client = reqwest::ClientBuilder::new()
+            .proxy(reqwest::Proxy::all(&proxy).unwrap())
+            .timeout(std::time::Duration::from_secs(4))
+            .build()
+            .unwrap();
+    } else {
+        client = reqwest::ClientBuilder::new()
+            .timeout(std::time::Duration::from_secs(4))
+            .no_proxy()
+            .build()
+            .unwrap();
+    }
 
     match client.get(url).send().await {
         Ok(res) => res.status().is_success(),
         Err(_) => false,
     }
 }
-
-// #[tauri::command]·
-// fn get_local_ip_address() -> String {
-//     let my_local_ip = local_ip().unwrap();
-//     my_local_ip.to_string()
-//
-//}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -66,11 +71,11 @@ pub fn run() {
                 app.handle()
                     .plugin(tauri_plugin_updater::Builder::new().build())?;
             }
-
-            println!("app local data path: {:?}", app.path().app_local_data_dir());
-            println!("app config path: {:?}", app.path().app_config_dir());
-            println!("app cache path: {:?}", app.path().app_cache_dir());
             println!("app log path: {:?}", app.path().app_log_dir());
+            println!("app data path: {:?}", app.path().app_data_dir());
+            println!("app cache path: {:?}", app.path().app_cache_dir());
+            println!("app config path: {:?}", app.path().app_config_dir());
+            println!("app local data path: {:?}", app.path().app_local_data_dir());
 
             #[cfg(target_os = "macos")]
             {

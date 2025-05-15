@@ -93,17 +93,22 @@ export default function Home({ onNavigate }: HomeProps) {
 
     // 在 linux 和 macOS 上使用 TUN 模式时需要输入超级管理员密码
     if (useTun && (type() == 'linux' || type() == 'macos')) {
+      console.log('在 Linux 或 macOS 上使用 TUN 模式，需要输入超级管理员密码');
       const privileged = await verifyPrivileged();
+      console.log('是否有超级管理员权限:', privileged);
       if (!privileged) {
+        console.log('没有超级管理员权限，弹出授权对话框');
         setPrivilegedDialog(true);
         return false;
       }
       const fn = selectedMode === 'global' ? setGlobalTunConfig : setTunConfig;
       await fn(identifier);
     } else if (useTun && type() == 'windows') {
+      console.log('在 Windows 上使用 TUN 模式，无需密码');
       const fn = selectedMode === 'global' ? setGlobalTunConfig : setTunConfig;
       await fn(identifier);
     } else {
+      console.log('使用普通模式');
       const fn = selectedMode === 'global' ? setGlobalMixedConfig : setMixedConfig;
       await fn(identifier);
     }
@@ -195,8 +200,8 @@ export default function Home({ onNavigate }: HomeProps) {
                   ${isOnLoading ? ' opacity-70' : ''}
                 `}
               />
-            </div>        
-              </div>
+            </div>
+          </div>
         </div>
       </label>
 

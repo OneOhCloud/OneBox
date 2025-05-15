@@ -66,6 +66,7 @@ pub fn create_privileged_command(
         sidecar_path.escape_default(),
         path.escape_default()
     );
+    println!("Executing command: {}", command);
     Some(app.shell().command("sh").args(vec!["-c", &command]))
 }
 

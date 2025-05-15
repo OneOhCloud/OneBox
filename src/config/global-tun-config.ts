@@ -218,7 +218,7 @@ export default async function setGlobalTunConfig(identifier: string) {
     const dbCacheFilePath = await path.join(appConfigPath, 'tun-cache.db');
 
     //  Windows 使用 system stack 兼容性是最佳的。
-    if (type() === "windows") {
+    if (type() === "windows" || type() === "linux") {
         tunConfig.inbounds[0].stack = "system";
     }
     // 其余平台使用 gvisor stack 避免潜在问题
@@ -263,7 +263,7 @@ export default async function setGlobalTunConfig(identifier: string) {
 
     outbounds.push(...serverList);
 
-    const file = await create('config.json', { baseDir: BaseDirectory.AppData });
+  const file = await create('config.json', { baseDir: BaseDirectory.AppConfig });
     await file.write(new TextEncoder().encode(JSON.stringify(newConfig)));
     await file.close();
 

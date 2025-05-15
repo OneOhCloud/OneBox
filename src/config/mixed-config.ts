@@ -282,12 +282,16 @@ export default async function setMixedConfig(identifier: string) {
   outbounds2.push(...urltestNameList);
 
   outbounds.push(...serverList);
-
-  const file = await create('config.json', { baseDir: BaseDirectory.AppData });
+  console.log("写入配置文件中");
+  const file = await create('config.json', { baseDir: BaseDirectory.AppConfig });
   await file.write(new TextEncoder().encode(JSON.stringify(newConfig)));
+
   await file.close();
 
   // open file
   const filePath = await getSingBoxConfigPath();
+  // linux: /home/{username}/.config/cloud.oneoh.onebox/config.json
+  //        /home/{username}/.config/cloud.oneoh.onebox/config.json
+
   console.log("配置文件路径:", filePath);
 }

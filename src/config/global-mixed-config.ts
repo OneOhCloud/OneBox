@@ -205,7 +205,7 @@ export default async function setGlobalMixedConfig(identifier: string) {
 
     outbounds.push(...serverList);
 
-    const file = await create('config.json', { baseDir: BaseDirectory.AppData });
+  const file = await create('config.json', { baseDir: BaseDirectory.AppConfig });
     await file.write(new TextEncoder().encode(JSON.stringify(newConfig)));
     await file.close();
 

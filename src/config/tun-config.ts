@@ -294,7 +294,7 @@ export default async function setTunConfig(identifier: string) {
 
 
     //  Windows 使用 system stack 兼容性是最佳的。
-    if (type() === "windows") {
+    if (type() === "windows" || type() === "linux") {
         tunConfig.inbounds[0].stack = "system";
     }
 
@@ -342,7 +342,7 @@ export default async function setTunConfig(identifier: string) {
 
     outbounds.push(...serverList);
 
-    const file = await create('config.json', { baseDir: BaseDirectory.AppData });
+  const file = await create('config.json', { baseDir: BaseDirectory.AppConfig });
     await file.write(new TextEncoder().encode(JSON.stringify(newConfig)));
     await file.close();
 

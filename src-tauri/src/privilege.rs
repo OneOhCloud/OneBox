@@ -1,6 +1,9 @@
 #[cfg(not(target_os = "windows"))]
 use std::process::Command;
 
+#[cfg(target_os = "linux")]
+use std::{io::Write, process::Stdio};
+
 // 定义 trait 作为接口
 pub trait PrivilegeHelper {
     fn get_current_user() -> String {
@@ -35,7 +38,7 @@ impl PrivilegeHelper for PlatformPrivilegeHelper {
     fn get_current_user() -> String {
         "root".to_string()
     }
-    async fn is_privileged(username: String, password: String) -> bool {
+    async fn is_privileged(_username: String, password: String) -> bool {
         let mut child = match Command::new("sudo")
             .arg("-S")
             .arg("whoami")
