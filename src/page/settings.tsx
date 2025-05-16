@@ -1,6 +1,7 @@
 import AboutItem from '../components/settings/about';
 import ToggleAutoStart from '../components/settings/auto-start';
 import ToggleLan from '../components/settings/lan';
+import ToggleLanguage from '../components/settings/language';
 import ToggleTun from '../components/settings/tun';
 import UpdaterItem from '../components/settings/updater';
 import { useVersion } from '../hooks/useVersion';
@@ -16,6 +17,8 @@ export default function Settings() {
             <ToggleAutoStart />
             <ToggleLan />
             <ToggleTun />
+            <ToggleLanguage />
+
           </div>
         </div>
 

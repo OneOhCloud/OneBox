@@ -6,7 +6,7 @@ import useSWR from "swr";
 import { getSubscriptionConfig } from "../../action/db";
 import { useSubscriptions } from "../../hooks/useDB";
 import { Subscription } from "../../types/definition";
-import { vpnServiceManager } from "../../utils/helper";
+import { t, vpnServiceManager } from "../../utils/helper";
 import SelectNode from "./select-node";
 import SelectSub from "./select-sub";
 
@@ -15,7 +15,7 @@ const formatDate = (date: number) => new Date(date).toLocaleDateString('zh-CN');
 const NetworkStatus = ({ isOk, icon: Icon, tip }: { isOk: boolean; icon: typeof Globe; tip: string }) => (
     <motion.div
         className="tooltip"
-        data-tip={`${tip}${isOk ? '正常' : '异常'}`}
+        data-tip={`${tip}${isOk ? t("network_normal") : t("network_abnormal")}`}
         initial={{ opacity: 0, scale: 0.8 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.3, type: "spring", stiffness: 200 }}
@@ -59,7 +59,7 @@ export default function SettingsBody({ isRunning }: { isRunning: boolean }) {
             if (selector) setNodeList(selector.outbounds);
             if (isUpdate && isRunning) await vpnServiceManager.stop();
         } catch (error) {
-            console.error('更新配置失败:', error);
+            console.error(t("update_config_failed") + ":", error);
         }
     };
 
@@ -70,26 +70,52 @@ export default function SettingsBody({ isRunning }: { isRunning: boolean }) {
             <div>
                 <div className="fieldset w-full">
                     <div className="fieldset-legend min-w-[270px]">
-                        <div>当前订阅</div>
+                        <div>
+                            {
+                                /* 当前订阅 */
+                                t("current_subscription")
+                            }
+                        </div>
                         {isRunning && (
                             <div className="flex gap-2 px-2 items-center">
-                                <NetworkStatus isOk={baiduStatus ?? true} icon={Reception4} tip="网络" />
-                                <NetworkStatus isOk={googleStatus ?? true} icon={Globe} tip="外网" />
+                                <NetworkStatus isOk={baiduStatus ?? true} icon={Reception4} tip={
+                                    t("normal_network")
+                                } />
+                                <NetworkStatus isOk={googleStatus ?? true} icon={Globe} tip={
+                                    t("vpn_network")
+                                } />
                             </div>
                         )}
                     </div>
                     <SelectSub onUpdate={handleUpdate} data={data} isLoading={isLoading} />
                 </div>
                 <div className="fieldset w-full">
-                    <div className="fieldset-legend min-w-[270px]">节点选择</div>
+                    <div className="fieldset-legend min-w-[270px]">
+                        {
+                            /* 节点选择 */
+                            t("node_selection")
+                        }
+
+                    </div>
                     <SelectNode disabled={!isRunning} nodeList={nodeList} />
                 </div>
             </div>
             {sub && (
                 <div className="w-full flex items-center justify-center mt-4 mb-2">
                     <Shield size={14} className="text-gray-400 mr-1" />
-                    <span className="text-xs text-gray-400">当前订阅 </span>
-                    <span className="text-xs text-blue-500 ml-1">有效至 {formatDate(sub.expire_time)}</span>
+                    <span className="text-xs text-gray-400">
+                        {
+                            /* 当前订阅 */
+                            t("current_subscription")
+                        }
+                    </span>
+                    <span className="text-xs text-blue-500 ml-1">
+                        {
+                            /* 有效至  */
+                            t("expired_at") + " "
+                        }
+                        {formatDate(sub.expire_time)}
+                    </span>
                 </div>
             )}
         </div>

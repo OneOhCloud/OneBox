@@ -3,9 +3,9 @@ import { openUrl } from '@tauri-apps/plugin-opener';
 import { useEffect, useState } from "react";
 import { Github, Globe, InfoCircleFill, XLg } from "react-bootstrap-icons";
 import toast from 'react-hot-toast';
-import { aboutText } from "../../page/data";
+import { aboutText } from "../../types/copyright";
 import { GITHUB_URL, OFFICIAL_WEBSITE, OsInfo } from "../../types/definition";
-import { formatOsInfo, getOsInfo, getSingBoxUserAgent } from "../../utils/helper";
+import { formatOsInfo, getOsInfo, getSingBoxUserAgent, t } from "../../utils/helper";
 import { SettingItem } from "./common";
 
 // 关于组件接口定义
@@ -78,7 +78,10 @@ function About({ onClose }: AboutProps) {
         <>
             <dialog id="core_info_modal" className="modal modal-bottom sm:modal-middle">
                 <div className="modal-box p-4 bg-gray-50">
-                    <h3 className="font-bold text-lg">内核信息</h3>
+                    <h3 className="font-bold text-lg">{
+                        // 内核信息
+                        t("core_info")
+                    }</h3>
                     <div className="p-4 bg-white rounded-lg mt-2">
                         <div className='whitespace-pre-wrap overflow-x-auto  font-mono text-xs'>
                             {version}
@@ -86,12 +89,12 @@ function About({ onClose }: AboutProps) {
                     </div>
                     <div className="modal-action">
                         <form method="dialog">
-                            <button className="btn btn-sm">关闭</button>
+                            <button className="btn btn-sm">{t("close")}</button>
                         </form>
                     </div>
                 </div>
                 <form method="dialog" className="modal-backdrop">
-                    <button>关闭</button>
+                    <button>{t("close")}</button>
                 </form>
             </dialog>
 
@@ -99,7 +102,7 @@ function About({ onClose }: AboutProps) {
                 <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-none max-w-md w-full max-h-[100vh] overflow-hidden flex flex-col pointer-events-auto">
                     {/* 标题栏 */}
                     <div className="flex justify-between items-center px-4 py-3 border-b border-gray-100">
-                        <div className="text-lg font-semibold">关于</div>
+                        <div className="text-lg font-semibold">{t("about")}</div>
                         <button
                             onClick={onClose}
                             className="p-1 rounded-full hover:bg-gray-100"
@@ -113,20 +116,20 @@ function About({ onClose }: AboutProps) {
 
 
                         <h2 className="text-xl font-bold">OneBox</h2>
-                        <p className="text-gray-500 text-xs mt-1">版本 {osInfo.appVersion}</p>
+                        <p className="text-gray-500 text-xs mt-1"> {t("version") + " " + osInfo.appVersion}</p>
                     </div>
 
                     {/* 合并系统信息和版权信息到一个可滚动区域 */}
                     <div className="flex-1 overflow-auto px-4 py-3 bg-gray-50 rounded-t-2xl ">
                         {/* 系统信息部分 */}
-                        <h3 className="text-sm font-medium text-gray-500 mb-2">系统信息</h3>
+                        <h3 className="text-sm font-medium text-gray-500 mb-2">{t("system_info")}</h3>
                         <div className="bg-white rounded-lg divide-y divide-gray-100 mb-4">
-                            <InfoItem label="操作系统" value={formatOsInfo(osInfo.osType, osInfo.osArch)} />
+                            <InfoItem label={t("os")} value={formatOsInfo(osInfo.osType, osInfo.osArch)} />
                             <div onClick={() => {
                                 // @ts-ignore
                                 document.getElementById('core_info_modal').showModal()
                             }}>
-                                <InfoItem label="内核版本" value={coreVersion} />
+                                <InfoItem label={t("kernel_version")} value={coreVersion} />
                             </div>
 
                             <div className='w-full flex justify-center'>
@@ -136,9 +139,9 @@ function About({ onClose }: AboutProps) {
                                             await navigator.clipboard.writeText(ua);
                                         }
                                         toast.promise(handleCopy(ua), {
-                                            loading: '正在复制',
-                                            success: '复制成功',
-                                            error: '复制失败',
+                                            loading: t("copying"),
+                                            success: t("copy_success"),
+                                            error: t("copy_error"),
                                         });
 
                                     }}>{ua}</p>
@@ -151,7 +154,7 @@ function About({ onClose }: AboutProps) {
 
                         {/* 版权信息部分 */}
                         <div className='flex justify-between  items-center mb-2'>
-                            <h3 className="text-sm font-medium text-gray-500 ">版权信息</h3>
+                            <h3 className="text-sm font-medium text-gray-500 ">{t("copyright")}</h3>
                             <div className='flex gap-1  '>
 
                                 <button className='btn  btn-circle btn-sm  border-0 ' onClick={() => openUrl(OFFICIAL_WEBSITE)}>
@@ -203,7 +206,7 @@ export default function AboutItem() {
 
             <SettingItem
                 icon={<InfoCircleFill className="text-[#007AFF]" size={22} />}
-                title="关于"
+                title={t("about")}
                 onPress={() => setShowAbout(true)}
             />
         </div>

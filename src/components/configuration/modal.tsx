@@ -5,11 +5,12 @@ import { mutate } from "swr";
 import { z } from "zod"; // 导入 zod
 import { addSubscription } from "../../action/db";
 import { GET_SUBSCRIPTIONS_LIST_SWR_KEY } from "../../types/definition";
+import { t } from "../../utils/helper";
 
 // 定义验证模式
 const subscriptionSchema = z.object({
     name: z.string().optional(),
-    url: z.string().url("请输入有效的 URL 地址").min(1, "URL 不能为空")
+    url: z.string().url(t("please_input_valid_url")).min(1, t("url_cannot_empty"))
 });
 
 type ValidationErrors = {
@@ -81,12 +82,19 @@ export function AddSubConfigurationModal() {
             </button>
             <dialog id="addSubConfigurationModal" className="modal">
                 <div className="modal-box bg-white">
-                    <h3 className="font-bold text-lg">添加订阅</h3>
+                    <h3 className="font-bold text-lg">
+                        {/* 添加订阅 */
+                            t("add_subscription")
+                        }
+                    </h3>
                     <div className="flex flex-col gap-8 mt-8">
                         <div>
                             <input
                                 className={`input input-sm w-full ${errors.name ? 'input-error' : ''}`}
-                                type="text" placeholder="名称默认由远程提供，可空"
+                                type="text" placeholder={
+                                    // 名称默认由远程提供，可空
+                                    t("name_placeholder_1")
+                                }
                                 value={name}
                                 onChange={(e) => {
                                     setName(e.target.value)
@@ -101,7 +109,7 @@ export function AddSubConfigurationModal() {
                             <input
                                 className={`input input-sm w-full ${errors.url ? 'input-error' : ''}`}
                                 type="text"
-                                placeholder="订阅地址: https://xxxxxxxx"
+                                placeholder={t("name_placeholder_2")}
                                 value={url}
                                 onChange={(e) => {
                                     setUrl(e.target.value)
@@ -116,9 +124,13 @@ export function AddSubConfigurationModal() {
 
                     <div className="modal-action">
                         <form method="dialog" >
-                            <button className="btn btn-ghost btn-sm">关闭</button>
+                            <button className="btn btn-ghost btn-sm">{t("close")}</button>
                         </form>
-                        <button className="btn  btn-sm btn-primary" onClick={handleAdd}>添加</button>
+                        <button className="btn  btn-sm btn-primary" onClick={handleAdd}>
+                            {/* 添加 */
+                                t("add")
+                            }
+                        </button>
 
                     </div>
                 </div>

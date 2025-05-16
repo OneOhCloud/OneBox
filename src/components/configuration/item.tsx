@@ -6,6 +6,7 @@ import { mutate } from "swr"
 import { deleteSubscription, updateSubscription } from "../../action/db"
 import { contentVariants, itemVariants } from "../../page/variants"
 import { GET_SUBSCRIPTIONS_LIST_SWR_KEY, Subscription } from "../../types/definition"
+import { t } from "../../utils/helper"
 import Avatar from "./avatar"
 
 
@@ -47,12 +48,12 @@ function Item(props: ItemProps) {
                     >
                         <div className="flex items-center justify-between">
                             <div className="flex gap-2">
-                                <span className="text-xs text-gray-400">流量</span>
+                                <span className="text-xs text-gray-400">{t("remaining_traffic")}</span>
                                 <span className="text-xs text-blue-500">{trafficDetails}</span>
                             </div>
 
                             <div className="flex gap-2">
-                                <span className="text-xs text-gray-400">剩余</span>
+                                <span className="text-xs text-gray-400">{t("remaining_days")}</span>
                                 <span className="text-xs text-blue-500">{remainingDays}</span>
                             </div>
 
@@ -93,7 +94,7 @@ export function SubscriptionItem(
 
     const remainingDays = Math.floor((item.expire_time - item.last_update_time) / (1000 * 60 * 60 * 24))
     const trafficDetailsText = `${bytes(item.used_traffic)}/${bytes(item.total_traffic)}`
-    const remainingDaysText = `${remainingDays} 天`
+    const remainingDaysText = `${remainingDays} ${t("days")}`
 
 
     return (

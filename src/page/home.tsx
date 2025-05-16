@@ -2,7 +2,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { message } from '@tauri-apps/plugin-dialog';
 import { type } from '@tauri-apps/plugin-os';
-import { useEffect, useRef, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 import { InfoCircle, Power } from 'react-bootstrap-icons';
 import SettingsBody from '../components/home/settings-body';
 import AuthDialog from '../components/settings/auth-dialog';
@@ -11,17 +11,17 @@ import setGlobalTunConfig from '../config/global-tun-config';
 import setMixedConfig from "../config/mixed-config";
 import setTunConfig from "../config/tun-config";
 import { useSubscriptions } from '../hooks/useDB';
+import { NavContext } from '../single/context';
 import { getEnableTun, getStoreValue, setStoreValue } from "../single/store";
 import { RULE_MODE_STORE_KEY, SSI_STORE_KEY } from '../types/definition';
 import { t, verifyPrivileged, vpnServiceManager } from "../utils/helper";
 
-type HomeProps = {
-  onNavigate: (screen: 'home' | 'configuration' | 'settings') => void;
-}
-
 type SelectedModeType = 'rules' | 'global';
 
-export default function Home({ onNavigate }: HomeProps) {
+export default function HomePage() {
+  // 使用NavContext替代props
+  const { setActiveScreen } = useContext(NavContext);
+
   // 状态管理
   const [isOn, setIsOn] = useState(false);
   const [isOnLoading, setIsOnLoading] = useState(false);
@@ -121,7 +121,7 @@ export default function Home({ onNavigate }: HomeProps) {
 
   const turnOn = async () => {
     if (isEmpty) {
-      onNavigate('configuration');
+      setActiveScreen('configuration');
       return message(t('please_add_subscription'), { title: t('tips'), kind: 'error' });
     }
     const identifier = await getStoreValue(SSI_STORE_KEY);
@@ -144,7 +144,7 @@ export default function Home({ onNavigate }: HomeProps) {
 
   const handleToggle = async () => {
     if (isEmpty) {
-      onNavigate('configuration');
+      setActiveScreen('configuration');
       return message(t('please_add_subscription'), { title: t('tips'), kind: 'error' });
     }
     setIsOnLoading(true);

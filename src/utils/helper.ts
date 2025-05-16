@@ -7,16 +7,34 @@ import { getCurrentWindow } from '@tauri-apps/api/window';
 import { message } from '@tauri-apps/plugin-dialog';
 import en from '../lang/en.json';
 import zh from '../lang/zh.json';
-import { getEnableTun, getStoreValue } from '../single/store';
+import { getEnableTun, getLanguage, getStoreValue } from '../single/store';
 const appWindow = getCurrentWindow();
 const enLang = en as Record<string, string>;
 const zhLang = zh as Record<string, string>;
-let currentLang = enLang; // 默认使用英文
 
-// 初始化语言设置
+
+const languageOptions = {
+    currentLang: "en",
+    en: enLang,
+    zh: zhLang,
+
+}
+
+
 async function initLanguage() {
-    const osLocale = await locale();
-    currentLang = osLocale?.startsWith('zh') ? zhLang : enLang;
+    try {
+        // 优先使用用户设置的语言
+        const userLanguage = await getLanguage();
+        if (userLanguage) {
+            languageOptions.currentLang = userLanguage;
+        }
+
+
+    } catch (error) {
+        console.error('Failed to initialize language:', error);
+        // 出错时使用默认语言
+        languageOptions.currentLang = 'en';
+    }
 }
 
 // 启动时初始化语言
@@ -119,5 +137,19 @@ export const verifyPrivileged = async () => {
 
 
 export const t = (id: string): string => {
-    return currentLang[id] || id;
+    const lang = languageOptions.currentLang;
+    getLanguage().then((language) => {
+        languageOptions.currentLang = language;
+    });
+    // @ts-ignore
+    const translation = languageOptions[lang][id];
+    if (translation) {
+        return translation;
+    } else {
+        console.warn(`Translation for "${id}" not found in "${lang}"`);
+        return id; // 返回原始 ID 作为默认值
+    }
 }
+
+
+

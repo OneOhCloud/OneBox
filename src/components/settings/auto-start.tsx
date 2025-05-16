@@ -4,6 +4,7 @@ import { disable, enable, isEnabled } from '@tauri-apps/plugin-autostart';
 import { useEffect, useState } from 'react';
 import { Power } from "react-bootstrap-icons";
 import toast from 'react-hot-toast';
+import { t } from "../../utils/helper";
 
 export default function ToggleAutoStart() {
     const [isOn, setIsOn] = useState(false);
@@ -15,7 +16,7 @@ export default function ToggleAutoStart() {
                 setIsOn(isAutoStartEnabled);
             } catch (error) {
                 console.error("检查自动启动状态失败:", error);
-                toast.error("无法获取自动启动状态");
+                toast.error(t("auto_start_failed"));
             }
         };
         checkAutoStart();
@@ -38,7 +39,7 @@ export default function ToggleAutoStart() {
             // 操作失败，回滚到之前的状态
             setIsOn(previousState);
             console.error("切换自动启动设置失败:", error);
-            toast.error(`${!isOn ? "启用" : "禁用"} 开机启动失败`);
+            toast.error(t("auto_start_failed_1"));
         } finally {
         }
     };
@@ -47,7 +48,7 @@ export default function ToggleAutoStart() {
         <div>
             <ToggleSetting
                 icon={<Power className="text-[#FF9500]" size={22} />}
-                title="开机启动"
+                title={t("auto_start")}
                 isEnabled={isOn}
                 onToggle={handleToggle}
             />

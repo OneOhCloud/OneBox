@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Cpu } from "react-bootstrap-icons";
 import { getEnableTun, setEnableTun } from "../../single/store";
-import { vpnServiceManager } from "../../utils/helper";
+import { t, vpnServiceManager } from "../../utils/helper";
 import { ToggleSetting } from "./common";
 
 
@@ -38,8 +38,8 @@ export default function ToggleTun() {
     return (
         <ToggleSetting
             icon={<Cpu className="text-[#5856D6]" size={22} />}
-            title="Tun 模式"
-            subTitle="接管所有流量"
+            title={t("tun_mode")}
+            subTitle={t("tun_mode_desc")}
             isEnabled={toggle}
             onToggle={handleToggle}
         />

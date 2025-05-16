@@ -5,7 +5,7 @@ import { ToggleSetting } from "./common";
 
 import { invoke } from "@tauri-apps/api/core";
 import { message } from "@tauri-apps/plugin-dialog";
-import { vpnServiceManager } from "../../utils/helper";
+import { t, vpnServiceManager } from "../../utils/helper";
 
 
 async function getLanIP(): Promise<string> {
@@ -49,7 +49,12 @@ export default function ToggleLan() {
 
   const handleToggle = async () => {
     if (!lanIP || lanIP === "127.0.0.1") {
-      await message('无法开启局域网连接', { title: '错误', kind: 'error' });
+      await message(t(
+        "cannot_open_lan_connection"
+      ), {
+        title: t("error"),
+        kind: "error",
+      });
       return;
     } else {
       await setAllowLan(!toggle);
@@ -63,7 +68,7 @@ export default function ToggleLan() {
   return (
     <ToggleSetting
       icon={<Router className="text-[#5856D6]" size={22} />}
-      title="允许局域网连接"
+      title={t("allow_lan_connection")}
       subTitle={`${lanIP}:6789`}
       isEnabled={toggle}
       onToggle={handleToggle}

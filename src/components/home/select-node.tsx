@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 import { fetch } from '@tauri-apps/plugin-http';
 import useSWR from "swr";
+import { t } from "../../utils/helper";
 import NodeOption from "./node-option";
 
 const baseUrl = "http://localhost:9191";
@@ -29,14 +30,21 @@ export default function SelectNode(props: SelectNodeProps) {
     if (disabled) {
         return <>
             <div className="select select-sm  select-ghost border-1 border-zinc-200  opacity-50 cursor-not-allowed">
-                未启动
+                {
+                    /* 未启动 */
+                    t("not_started")
+                }
+
             </div>
         </>
     }
 
     if (!show) {
         return <div className="select select-sm  select-ghost border-1 border-zinc-200 ">
-            更新中...
+            {
+                /* 更新中... */
+                t("updating")
+            }
         </div>
     }
 
@@ -101,7 +109,10 @@ export function SelecItem(props: SelecItemProps) {
 
     if (nodeList.length === 0) {
         return <div className="select select-sm  select-ghost border-1 border-zinc-200 ">
-            当前配置没有节点
+            {
+                /* 当前配置没有节点 */
+                t("no_node")
+            }
         </div>
     }
 

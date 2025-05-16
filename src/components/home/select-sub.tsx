@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { getStoreValue, setStoreValue } from "../../single/store";
 import { SSI_STORE_KEY, Subscription } from "../../types/definition";
+import { t } from "../../utils/helper";
 
 type SubscriptionProps = {
     data: Subscription[] | undefined;
@@ -31,12 +32,20 @@ export default function SelectSub({ data, isLoading, onUpdate }: SubscriptionPro
     if (isLoading) {
         return <div className="select select-sm  select-ghost border-1 border-zinc-200 ">
             <span className="loading loading-spinner loading-xs mr-2"></span>
-            正在加载...
+            {
+                /* 正在加载... */
+                t("loading")
+            }
         </div>;
     }
 
     if (!data?.length) {
-        return <div className="select select-sm  select-ghost border-1 border-zinc-200 ">暂无订阅配置</div>;
+        return <div className="select select-sm  select-ghost border-1 border-zinc-200 ">
+            {
+                /* 暂无订阅配置 */
+                t("no_subscription")
+            }
+        </div>;
     }
 
     return (

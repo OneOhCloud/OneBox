@@ -3,7 +3,7 @@ import { relaunch } from '@tauri-apps/plugin-process';
 import { check } from '@tauri-apps/plugin-updater';
 import { useEffect, useState } from "react";
 import { CloudArrowDown, CloudArrowUpFill } from "react-bootstrap-icons";
-import { vpnServiceManager } from "../../utils/helper";
+import { t, vpnServiceManager } from "../../utils/helper";
 import { SettingItem } from "./common";
 
 export default function UpdaterItem() {
@@ -77,7 +77,13 @@ export default function UpdaterItem() {
                     }
                 });
             } else {
-                await message('没有检测到新版本', { title: '更新', kind: 'info' });
+                // await message('没有检测到新版本', { title: '更新', kind: 'info' });
+                await message(
+                    t('no_update_available')
+                    , {
+                        title: t('update'),
+                        kind: 'info',
+                    });
                 console.log('No updates available');
             }
         } catch (error) {
@@ -88,8 +94,8 @@ export default function UpdaterItem() {
 
     // 确认是否安装更新
     const confirmInstallation = async () => {
-        const confirmed = await confirm('更新已下载完成，是否立即安装并重启应用？', {
-            title: '安装更新',
+        const confirmed = await confirm(t("update_downloaded"), {
+            title: t("update_install"),
             kind: 'info',
         });
 
@@ -125,9 +131,9 @@ export default function UpdaterItem() {
         <>
             <SettingItem
                 icon={<CloudArrowUpFill className="text-[#34C759]" size={22} />}
-                title={simulateUpdate ? "模拟更新" : "更新"}
+                title={simulateUpdate ? "模拟更新" : t("update")}
                 badge={updateAvailable ? <span className="badge badge-sm bg-[#FF3B30] border-[#FF3B30] text-white mr-2">New</span> : undefined}
-                subTitle={updateAvailable ? "有新版本可用" : "当前已是最新版本"}
+                subTitle={updateAvailable ? t("update_available") : t("is_latest_version")}
                 onPress={(!downloading) ? updateApp : undefined}
                 disabled={downloading}
             />
@@ -139,7 +145,7 @@ export default function UpdaterItem() {
                 >
                     <div className="flex items-center">
                         <div className="mr-4"><CloudArrowDown size={22} /></div>
-                        <span className="text-[#1C1C1E]">进度 {downloadProgress} %</span>
+                        <span className="text-[#1C1C1E] text-xs">{t("progress")} {downloadProgress} %</span>
                     </div>
                     <div className="flex items-center">
                         <span className="loading  loading-xs loading-infinity  text-primary"></span>

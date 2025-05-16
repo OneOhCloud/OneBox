@@ -1,5 +1,6 @@
 import { fetch } from '@tauri-apps/plugin-http';
 import useSWR from "swr";
+import { t } from '../../utils/helper';
 
 type NodeOptionProps = {
     nodeName: string;
@@ -27,7 +28,7 @@ export default function NodeOption({ nodeName }: NodeOptionProps) {
 
     return (
         <div className="flex justify-between items-center w-full">
-            <span className="truncate">{nodeName || '启动中'}</span>
+            <span className="truncate">{nodeName || t('starting')}</span>
             <span className="ml-2 text-sm">{delay !== '-' ? `${delay}ms` : delay}</span>
         </div>
     );

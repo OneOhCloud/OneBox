@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useRef, useState } from "react";
 import { setStoreValue } from "../../single/store";
 import { PRIVILEGED_PASSWORD_STORE_KEY } from "../../types/definition";
+import { t } from "../../utils/helper";
 
 interface AuthDialogProps {
     open: boolean; // 控制对话框的打开状态
@@ -50,9 +51,9 @@ export default function AuthDialog(props: AuthDialogProps) {
         if (status === "loading") {
             return <span className="loading loading-infinity loading-sm"></span>;
         } else if (status === "success") {
-            return "授权成功";
+            return t("auth_success");
         } else if (status === "failed") {
-            return "授权失败";
+            return t("auth_failed");
         }
     };
 
@@ -76,14 +77,16 @@ export default function AuthDialog(props: AuthDialogProps) {
         <dialog ref={modalRef} id="auth_modal" className="modal">
             <div className="modal-box">
                 <div className="modal-header mb-4">
-                    当前状态: {getStatus()}
+                    {
+                        // 当前状态
+                        t("current_status") + ": " + getStatus()}
                 </div>
                 <div className="text-xs text-gray-700 mb-2">
-                    授权后才能启动 tun 模式
+                    {t("auth_dialog_description")}
                 </div>
                 <div>
                     <div className="mb-4">
-                        <label className="block mb-2">开机密码</label>
+                        <label className="block mb-2">{t("boot_password")}</label>
                         <input
                             type="password"
                             value={identifier.password}
@@ -102,14 +105,14 @@ export default function AuthDialog(props: AuthDialogProps) {
                         }}
                         className="btn btn-sm"
                     >
-                        取消
+                        {t("close")}
                     </button>
                     <button
                         onClick={handleSubmit}
                         className="btn btn-sm btn-primary"
                         disabled={status === "loading"}
                     >
-                        {status === "loading" ? (<span className="loading loading-infinity loading-sm"></span>) : "提交"}
+                        {status === "loading" ? (<span className="loading loading-infinity loading-sm"></span>) : t("confirm")}
                     </button>
                 </div>
             </div>

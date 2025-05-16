@@ -2,6 +2,7 @@ import { useState } from "react";
 import { SubscriptionItem } from "../components/configuration/item";
 import { AddSubConfigurationModal } from "../components/configuration/modal";
 import { useSubscriptions } from "../hooks/useDB";
+import { t } from "../utils/helper";
 
 
 export default function Configuration() {
@@ -15,13 +16,17 @@ export default function Configuration() {
         <div className="h-full mb-4 w-full">
 
             <div className="p-2 flex justify-between items-center">
-                <h3 className="text-gray-500  text-sm  font-bold">订阅管理</h3>
+                <h3 className="text-gray-500  text-sm  font-bold">{
+                    t("subscription_management")
+                }</h3>
                 <AddSubConfigurationModal ></AddSubConfigurationModal>
             </div>
 
             {data?.length === 0 && (
                 <div className="flex justify-center items-center h-full">
-                    <p className="text-gray-500 text-sm">没有订阅</p>
+                    <p className="text-gray-500 text-sm">
+                        {t("no_subscription_config")}
+                    </p>
                 </div>
             )}
 
