@@ -67,7 +67,7 @@ export default function ToggleLan() {
 
   return (
     <ToggleSetting
-      icon={<Router className="text-[#5856D6]" size={22} />}
+      icon={<Router className="text-[#5856D6] " size={22} />}
       title={t("allow_lan_connection")}
       subTitle={`${lanIP}:6789`}
       isEnabled={toggle}

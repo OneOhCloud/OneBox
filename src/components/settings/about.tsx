@@ -28,7 +28,7 @@ const getVersion = async () => {
 function InfoItem({ label, value }: InfoItemProps) {
     return (
         <div className="flex justify-between py-2 px-3">
-            <span className="text-sm text-gray-700">{label}</span>
+            <span className="text-sm text-gray-700 capitalize">{label}</span>
             <span className="text-sm text-gray-500">{value}</span>
         </div>
     );
@@ -78,8 +78,8 @@ function About({ onClose }: AboutProps) {
         <>
             <dialog id="core_info_modal" className="modal modal-bottom sm:modal-middle">
                 <div className="modal-box p-4 bg-gray-50">
-                    <h3 className="font-bold text-lg">{
-                        // 内核信息
+                    <h3 className="font-bold text-lg  uppercase">{
+                        // 内核信息1
                         t("core_info")
                     }</h3>
                     <div className="p-4 bg-white rounded-lg mt-2">
@@ -89,12 +89,12 @@ function About({ onClose }: AboutProps) {
                     </div>
                     <div className="modal-action">
                         <form method="dialog">
-                            <button className="btn btn-sm">{t("close")}</button>
+                            <button className="btn btn-sm capitalize">{t("close")}</button>
                         </form>
                     </div>
                 </div>
                 <form method="dialog" className="modal-backdrop">
-                    <button>{t("close")}</button>
+                    <button className="capitalize">{t("close")}</button>
                 </form>
             </dialog>
 
@@ -102,7 +102,7 @@ function About({ onClose }: AboutProps) {
                 <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-none max-w-md w-full max-h-[100vh] overflow-hidden flex flex-col pointer-events-auto">
                     {/* 标题栏 */}
                     <div className="flex justify-between items-center px-4 py-3 border-b border-gray-100">
-                        <div className="text-lg font-semibold">{t("about")}</div>
+                        <div className="text-lg font-semibold capitalize">{t("about")}</div>
                         <button
                             onClick={onClose}
                             className="p-1 rounded-full hover:bg-gray-100"
@@ -122,7 +122,7 @@ function About({ onClose }: AboutProps) {
                     {/* 合并系统信息和版权信息到一个可滚动区域 */}
                     <div className="flex-1 overflow-auto px-4 py-3 bg-gray-50 rounded-t-2xl ">
                         {/* 系统信息部分 */}
-                        <h3 className="text-sm font-medium text-gray-500 mb-2">{t("system_info")}</h3>
+                        <h3 className="text-sm font-medium text-gray-500 mb-2 capitalize">{t("system_info")}</h3>
                         <div className="bg-white rounded-lg divide-y divide-gray-100 mb-4">
                             <InfoItem label={t("os")} value={formatOsInfo(osInfo.osType, osInfo.osArch)} />
                             <div onClick={() => {
@@ -154,7 +154,7 @@ function About({ onClose }: AboutProps) {
 
                         {/* 版权信息部分 */}
                         <div className='flex justify-between  items-center mb-2'>
-                            <h3 className="text-sm font-medium text-gray-500 ">{t("copyright")}</h3>
+                            <h3 className="text-sm font-medium text-gray-500  capitalize">{t("copyright")}</h3>
                             <div className='flex gap-1  '>
 
                                 <button className='btn  btn-circle btn-sm  border-0 ' onClick={() => openUrl(OFFICIAL_WEBSITE)}>

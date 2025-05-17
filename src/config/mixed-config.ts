@@ -1,8 +1,8 @@
 import * as path from '@tauri-apps/api/path';
-import { BaseDirectory, create } from '@tauri-apps/plugin-fs';
 import { getSubscriptionConfig } from '../action/db';
 import { getAllowLan } from '../single/store';
 import { getSingBoxConfigPath } from '../utils/helper';
+import { writeConfigFile } from './helper';
 
 const mixedConfig = {
   "log": {
@@ -283,15 +283,7 @@ export default async function setMixedConfig(identifier: string) {
 
   outbounds.push(...serverList);
   console.log("写入配置文件中");
-  const file = await create('config.json', { baseDir: BaseDirectory.AppConfig });
-  await file.write(new TextEncoder().encode(JSON.stringify(newConfig)));
-
-  await file.close();
-
-  // open file
+  await writeConfigFile('config.json', new TextEncoder().encode(JSON.stringify(newConfig)));
   const filePath = await getSingBoxConfigPath();
-  // linux: /home/{username}/.config/cloud.oneoh.onebox/config.json
-  //        /home/{username}/.config/cloud.oneoh.onebox/config.json
-
   console.log("配置文件路径:", filePath);
 }

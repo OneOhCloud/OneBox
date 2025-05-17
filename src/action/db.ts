@@ -3,7 +3,7 @@ import { fetch } from '@tauri-apps/plugin-http';
 import toast from 'react-hot-toast';
 import { getDataBaseInstance } from '../single/db';
 import { Subscription, SubscriptionConfig } from '../types/definition';
-import { getSingBoxUserAgent } from '../utils/helper';
+import { getSingBoxUserAgent, t } from '../utils/helper';
 
 
 function getRemoteNameByContentDisposition(contentDisposition: string) {
@@ -18,7 +18,6 @@ function getRemoteNameByContentDisposition(contentDisposition: string) {
 
 function getRemoteInfoBySubscriptionUserinfo(subscriptionUserinfo: string) {
     try {
-        // upload=0; download=139679618402; total=1099511627776; expire=1795082722
         const info = subscriptionUserinfo.split('; ').reduce((acc, item) => {
             const [key, value] = item.split('=');
             if (key && value) {
@@ -49,7 +48,7 @@ export async function updateSubscription(identifier: string) {
         const db = await getDataBaseInstance();
         const result: Subscription[] = await db.select('SELECT subscription_url FROM subscriptions WHERE identifier = ?', [identifier])
         if (result.length === 0) {
-            toast.error('订阅不存在')
+            toast.error(t('subscription_not_exist'))
             return
         }
         const url = result[0].subscription_url
@@ -70,13 +69,18 @@ export async function updateSubscription(identifier: string) {
 
 
         const subJson = await response.json()
-        await db.execute('UPDATE subscriptions SET official_website = ?, used_traffic = ?, total_traffic = ?, expire_time = ?, last_update_time = ? WHERE identifier = ?', [officialWebsite, used_traffic, total_traffic, expire_time, last_update_time, identifier])
+        await db.execute(
+            'UPDATE subscriptions SET official_website = ?, used_traffic = ?, total_traffic = ?, expire_time = ?, last_update_time = ? WHERE identifier = ?',
+            [officialWebsite, used_traffic, total_traffic, expire_time, last_update_time, identifier]
+        )
         await db.execute('UPDATE subscription_configs SET config_content = ? WHERE identifier = ?', [JSON.stringify(subJson), identifier])
-        toast.success('更新订阅成功')
+        // toast.success('更新订阅成功')
+        toast.success(t('update_subscription_success'))
 
     } catch (error) {
         console.error('Error updating subscription:', error)
-        toast.error('更新订阅失败')
+        // toast.error('更新订阅失败')
+        toast.error(t('update_subscription_failed'))
     }
 
 }
@@ -84,7 +88,7 @@ export async function updateSubscription(identifier: string) {
 
 
 export async function addSubscription(url: string, name: string | undefined) {
-    toast.loading('正在添加订阅...')
+    toast.loading(t('adding_subscription'))
     try {
         const response = await fetch(url, {
             method: 'GET',
@@ -114,11 +118,13 @@ export async function addSubscription(url: string, name: string | undefined) {
         await db.execute('INSERT INTO subscriptions (identifier, name, subscription_url, official_website, used_traffic, total_traffic, expire_time, last_update_time) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
             [identifier, name, url, officialWebsite, used_traffic, total_traffic, expire_time, last_update_time])
         await db.execute('INSERT INTO subscription_configs (identifier, config_content) VALUES (?, ?)', [identifier, JSON.stringify(subJson)])
-        toast.success('添加订阅成功')
+        // toast.success('添加订阅成功')
+        toast.success(t('add_subscription_success'))
 
     } catch (error) {
         console.error('Error adding subscription:', error)
-        toast.error('添加订阅失败')
+        // toast.error('添加订阅失败')
+        toast.error(t('add_subscription_failed'))
     }
 }
 
@@ -129,26 +135,28 @@ export async function deleteSubscription(identifier: string) {
         const db = await getDataBaseInstance();
         await db.execute('DELETE FROM subscriptions WHERE identifier = ?', [identifier])
         await db.execute('DELETE FROM subscription_configs WHERE identifier = ?', [identifier])
-        toast.success('删除订阅成功')
+        toast.success(t("delete_subscription_success"))
     } catch (error) {
         console.error('Error deleting subscription:', error)
-        toast.error('删除订阅失败')
+        toast.error(t('delete_subscription_failed'))
     }
 }
 
 
-export async function getSubscriptionConfig(identifier: string){
+export async function getSubscriptionConfig(identifier: string) {
     try {
         const db = await getDataBaseInstance();
         const result: SubscriptionConfig[] = await db.select('SELECT config_content FROM subscription_configs WHERE identifier = ?', [identifier])
         if (result.length === 0) {
-            toast.error('订阅不存在')
+            // toast.error('订阅不存在')
+            toast.error(t('subscription_not_exist'))
             return
         }
         return JSON.parse(result[0].config_content)
     } catch (error) {
         console.error('Error getting subscription config:', error)
-        toast.error('获取订阅配置失败')
+        // toast.error('获取订阅配置失败')
+        toast.error(t('get_subscription_config_failed'))
     }
 
 }

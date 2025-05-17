@@ -8,7 +8,7 @@ import { writeText } from '@tauri-apps/plugin-clipboard-manager';
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
-import { vpnServiceManager } from './utils/helper';
+import { t, vpnServiceManager } from './utils/helper';
 
 const appWindow = getCurrentWindow();
 let trayInstance: TrayIcon | null = null;
@@ -24,11 +24,13 @@ async function createTrayMenu() {
     items: [
       {
         id: 'show',
-        text: '仪表盘',
+        // text: '仪表盘',
+        text: t("menu_dashboard"),
       },
       {
         id: "enable",
-        text: "启用代理", // 根据状态设置文本
+        // text: "启用代理", // 根据状态设置文本
+        text: t("menu_enable_proxy"), // 根据状态设置文本
         checked: status, // 根据状态设置选中状态
         enabled: true, // 可根据需要设置是否启用
         action: async () => {
@@ -46,7 +48,8 @@ async function createTrayMenu() {
       },
       {
         id: 'copy_proxy',
-        text: '复制环境变量',
+        // text: '复制环境变量',
+        text: t("menu_copy_env"),
         action: async () => {
           const proxyConfig = 'export https_proxy=http://127.0.0.1:6789 http_proxy=http://127.0.0.1:6789 all_proxy=socks5://127.0.0.1:6789';
           try {
@@ -60,14 +63,16 @@ async function createTrayMenu() {
 
       {
         id: 'devtools',
-        text: '调试工具',
+        // text: '调试工具',
+        text: t("menu_devtools"),
         action: async () => {
           await invoke("open_devtools");
         },
       },
       {
         id: 'quit',
-        text: '退出程序',
+        // text: '退出程序',
+        text: t("menu_quit"),
         action: async () => {
           await invoke("stop");
           await appWindow.close();

@@ -1,8 +1,8 @@
 import * as path from '@tauri-apps/api/path';
-import { BaseDirectory, create } from '@tauri-apps/plugin-fs';
 import { getSubscriptionConfig } from '../action/db';
 import { getAllowLan } from '../single/store';
 import { getSingBoxConfigPath } from '../utils/helper';
+import { writeConfigFile } from './helper';
 
 const mixedConfig = {
     "log": {
@@ -205,11 +205,10 @@ export default async function setGlobalMixedConfig(identifier: string) {
 
     outbounds.push(...serverList);
 
-  const file = await create('config.json', { baseDir: BaseDirectory.AppConfig });
-    await file.write(new TextEncoder().encode(JSON.stringify(newConfig)));
-    await file.close();
 
-    // open file
+
+    await writeConfigFile('config.json', new TextEncoder().encode(JSON.stringify(newConfig)));
+
     const filePath = await getSingBoxConfigPath();
     console.log("配置文件路径:", filePath);
 }

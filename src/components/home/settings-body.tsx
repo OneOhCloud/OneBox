@@ -70,9 +70,8 @@ export default function SettingsBody({ isRunning }: { isRunning: boolean }) {
             <div>
                 <div className="fieldset w-full">
                     <div className="fieldset-legend min-w-[270px]">
-                        <div>
+                        <div className="capitalize">
                             {
-                                /* 当前订阅 */
                                 t("current_subscription")
                             }
                         </div>
@@ -90,7 +89,7 @@ export default function SettingsBody({ isRunning }: { isRunning: boolean }) {
                     <SelectSub onUpdate={handleUpdate} data={data} isLoading={isLoading} />
                 </div>
                 <div className="fieldset w-full">
-                    <div className="fieldset-legend min-w-[270px]">
+                    <div className="fieldset-legend min-w-[270px] capitalize">
                         {
                             /* 节点选择 */
                             t("node_selection")
@@ -101,21 +100,28 @@ export default function SettingsBody({ isRunning }: { isRunning: boolean }) {
                 </div>
             </div>
             {sub && (
-                <div className="w-full flex items-center justify-center mt-4 mb-2">
-                    <Shield size={14} className="text-gray-400 mr-1" />
-                    <span className="text-xs text-gray-400">
-                        {
-                            /* 当前订阅 */
-                            t("current_subscription")
-                        }
-                    </span>
-                    <span className="text-xs text-blue-500 ml-1">
-                        {
-                            /* 有效至  */
-                            t("expired_at") + " "
-                        }
-                        {formatDate(sub.expire_time)}
-                    </span>
+                <div className="w-full   mt-4 mb-2">
+                    <div className="flex items-center justify-center">
+                        <Shield size={14} className="text-gray-400 mr-1" />
+                        <span className="text-xs text-gray-400 capitalize">
+                            {
+                                /* 当前订阅 */
+                                t("current_subscription")
+                            }
+                        </span>
+                    </div>
+
+                    <div className="flex items-center justify-center">
+                        <span className="text-xs text-blue-500 ml-1">
+                            {
+                                /* 有效至  */
+                                t("expired_at") + " "
+                            }
+                            {formatDate(sub.expire_time)}
+                        </span>
+                    </div>
+
+
                 </div>
             )}
         </div>

@@ -1,9 +1,9 @@
 import * as path from '@tauri-apps/api/path';
-import { BaseDirectory, create } from '@tauri-apps/plugin-fs';
 import { type } from '@tauri-apps/plugin-os';
 import { getSubscriptionConfig } from '../action/db';
 import { getAllowLan } from '../single/store';
 import { getSingBoxConfigPath } from '../utils/helper';
+import { writeConfigFile } from './helper';
 
 const tunConfig = {
     "log": {
@@ -339,12 +339,9 @@ export default async function setTunConfig(identifier: string) {
     })
 
     outbounds2.push(...urltestNameList);
-
     outbounds.push(...serverList);
+    await writeConfigFile('config.json', new TextEncoder().encode(JSON.stringify(newConfig)));
 
-  const file = await create('config.json', { baseDir: BaseDirectory.AppConfig });
-    await file.write(new TextEncoder().encode(JSON.stringify(newConfig)));
-    await file.close();
 
     // open file
     const filePath = await getSingBoxConfigPath();

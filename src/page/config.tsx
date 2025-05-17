@@ -16,7 +16,7 @@ export default function Configuration() {
         <div className="h-full mb-4 w-full">
 
             <div className="p-2 flex justify-between items-center">
-                <h3 className="text-gray-500  text-sm  font-bold">{
+                <h3 className="text-gray-500  text-sm  font-bold  capitalize">{
                     t("subscription_management")
                 }</h3>
                 <AddSubConfigurationModal ></AddSubConfigurationModal>

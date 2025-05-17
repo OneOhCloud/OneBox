@@ -40,7 +40,7 @@ function App() {
             className={` ${activeScreen === 'home' ? 'text-blue-500' : ''}`}
           >
             <House />
-            <span className='text-xs'>{t("home")}</span>
+            <span className='text-xs capitalize'>{t("home")}</span>
           </button>
 
           <button
@@ -48,7 +48,7 @@ function App() {
             className={`${activeScreen === 'configuration' ? 'text-blue-500' : ''}`}
           >
             <Layers />
-            <span className='text-xs'>{t("configuration")}</span>
+            <span className='text-xs capitalize'>{t("configuration")}</span>
           </button>
 
           <button
@@ -63,7 +63,7 @@ function App() {
             >
               <GearWideConnected />
             </motion.div>
-            <span className='text-xs'>{t("settings")}</span>
+            <span className='text-xs capitalize'>{t("settings")}</span>
           </button>
         </div>
       </main>

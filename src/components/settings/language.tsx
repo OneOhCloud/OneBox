@@ -1,3 +1,4 @@
+import { emit } from '@tauri-apps/api/event';
 import { useCallback, useContext, useEffect, useState } from 'react';
 import { Globe } from "react-bootstrap-icons";
 import { NavContext } from '../../single/context';
@@ -25,12 +26,13 @@ export default function LanguageSwitch() {
         const newValue = !isZh;
         setIsZh(newValue);
         await setLanguage(newValue ? 'zh' : 'en');
+        emit('status-changed');
         setActiveScreen('home');
     }, [isZh]);
 
     return (
         <ToggleSetting
-            icon={<Globe className="text-[#5856D6]" size={22} />}
+            icon={<Globe className="text-[#5856D6] " size={22} />}
             title={t('language')}
             subTitle={t('language_description')}
             isEnabled={isZh}

@@ -207,7 +207,7 @@ export default function HomePage() {
 
       <div className="w-full text-center text-sm mb-2 flex items-center justify-center" style={{ color: isOn ? '#3B82F6' : '#9CA3AF' }}>
         <InfoCircle size={16} className="mr-1.5 text-gray-300" />
-        <span className="text-base">
+        <span className="text-base capitalize">
           {isOnLoading ? t('switching') : isOn ? t('connected') : t('not_connected')}
         </span>
       </div>
@@ -226,7 +226,7 @@ export default function HomePage() {
           <button
             key={mode}
             data-mode={mode}
-            className={`relative px-4 py-1 rounded-lg transition-colors duration-300 ${selectedMode === mode ? 'text-black' : 'text-gray-500 hover:text-gray-700'}`}
+            className={`capitalize relative px-4 py-1 rounded-lg transition-colors duration-300 ${selectedMode === mode ? 'text-black' : 'text-gray-500 hover:text-gray-700'}`}
             onClick={() => handleModeChange(mode as SelectedModeType)}
           >
             {t(mode)}

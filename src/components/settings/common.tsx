@@ -37,14 +37,14 @@ export function SettingItem({
 }: SettingItemProps) {
     return (
         <div
-            className="flex items-center justify-between p-4 hover:bg-gray-50 active:bg-gray-100 cursor-pointer transition-colors"
+            className="flex items-center justify-between p-4 hover:bg-gray-100 active:bg-gray-100 cursor-pointer transition-colors"
             onClick={() => {
                 !disabled && onPress()
             }}
         >
             <div className="flex items-center">
                 <div className="mr-4">{icon}</div>
-                <span className="text-[#1C1C1E]">{title}</span>
+                <span className="text-[#1C1C1E] capitalize">{title}</span>
             </div>
             <div className="flex items-center">
                 {badge}
@@ -63,11 +63,11 @@ export function ToggleSetting({
     onToggle
 }: ToggleSettingProps) {
     return (
-        <div className="flex items-center justify-between p-4  hover:bg-gray-50 active:bg-gray-100 cursor-pointer transition-colors">
+        <div className="flex items-center justify-between p-4  hover:bg-gray-100 active:bg-gray-50 cursor-pointer transition-colors">
             <div className="flex items-center">
                 <div className="mr-4">{icon}</div>
                 <div>
-                    <div className="text-[#1C1C1E]">{title}</div>
+                    <div className="text-[#1C1C1E] capitalize">{title}</div>
                     {subTitle && <div className="text-xs text-[#8E8E93]">{subTitle}</div>}
                 </div>
             </div>

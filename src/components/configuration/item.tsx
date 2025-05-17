@@ -44,20 +44,14 @@ function Item(props: ItemProps) {
                 >
                     <motion.div
                         variants={contentVariants}
-                        className="flex flex-col gap-2 px-6 py-4 bg-gray-100 rounded-b"
+                        className="flex flex-col gap-2 px-4 py-4 bg-gray-100 rounded-b"
                     >
-                        <div className="flex items-center justify-between">
-                            <div className="flex gap-2">
-                                <span className="text-xs text-gray-400">{t("remaining_traffic")}</span>
-                                <span className="text-xs text-blue-500">{trafficDetails}</span>
-                            </div>
-
-                            <div className="flex gap-2">
-                                <span className="text-xs text-gray-400">{t("remaining_days")}</span>
-                                <span className="text-xs text-blue-500">{remainingDays}</span>
-                            </div>
-
-                            <div className="flex gap-2 items-center justify-end">
+                        <div className="flex flex-col gap-2">
+                            <div className="flex  items-center justify-between">
+                                <div className="flex gap-2">
+                                    <span className="text-xs text-gray-400 capitalize">{t("remaining_traffic")}</span>
+                                    <span className="text-xs text-blue-500">{trafficDetails}</span>
+                                </div>
                                 <button
                                     className="btn btn-xs btn-ghost btn-circle border-0 transition-colors "
                                     onClick={async () => {
@@ -68,6 +62,15 @@ function Item(props: ItemProps) {
                                     <ArrowClockwise className="size-[0.8rem] text-gray-400" />
                                 </button>
 
+                            </div>
+
+                            <div className="flex  items-center justify-between">
+
+
+                                <div className="flex gap-2">
+                                    <span className="text-xs text-gray-400 capitalize">{t("remaining_days")}</span>
+                                    <span className="text-xs text-blue-500">{remainingDays}</span>
+                                </div>
                                 <button
                                     className="btn btn-xs btn-ghost btn-circle border-0 transition-colors "
                                     onClick={async () => {
@@ -77,6 +80,7 @@ function Item(props: ItemProps) {
                                     <Trash className="size-[0.8rem] text-gray-400" />
                                 </button>
                             </div>
+
                         </div>
                     </motion.div>
                 </motion.div>
@@ -107,7 +111,7 @@ export function SubscriptionItem(
                     <Avatar url={item.official_website} />
                 </div>
                 <div className="max-w-[160px] flex flex-col gap-2 ">
-                    <div className="truncate text-sm">{item.name}</div>
+                    <div className="truncate text-sm ">{item.name}</div>
                     <div className=" text-xs flex items-center ">
                         <progress className="progress h-1" value={useage} max="100"></progress>
 
@@ -124,7 +128,6 @@ export function SubscriptionItem(
                         </button>
                     )
                 }
-
             </div>
 
             <Item

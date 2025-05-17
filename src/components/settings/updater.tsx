@@ -77,7 +77,6 @@ export default function UpdaterItem() {
                     }
                 });
             } else {
-                // await message('没有检测到新版本', { title: '更新', kind: 'info' });
                 await message(
                     t('no_update_available')
                     , {
