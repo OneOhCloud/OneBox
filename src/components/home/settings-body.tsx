@@ -3,7 +3,6 @@ import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
 import { Globe, Reception4, Shield } from "react-bootstrap-icons";
 import useSWR from "swr";
-import { getSubscriptionConfig } from "../../action/db";
 import { useSubscriptions } from "../../hooks/useDB";
 import { Subscription } from "../../types/definition";
 import { t, vpnServiceManager } from "../../utils/helper";
@@ -14,8 +13,8 @@ const formatDate = (date: number) => new Date(date).toLocaleDateString('zh-CN');
 
 const NetworkStatus = ({ isOk, icon: Icon, tip }: { isOk: boolean; icon: typeof Globe; tip: string }) => (
     <motion.div
-        className="tooltip"
-        data-tip={`${tip}${isOk ? t("network_normal") : t("network_abnormal")}`}
+        className="tooltip tooltip-left"
+        data-tip={`${tip} ${isOk ? t("network_normal") : t("network_abnormal")}`}
         initial={{ opacity: 0, scale: 0.8 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.3, type: "spring", stiffness: 200 }}
@@ -45,7 +44,6 @@ const fetchNetworkStatus = async (url: string, proxy: boolean) => {
 };
 
 export default function SettingsBody({ isRunning }: { isRunning: boolean }) {
-    const [nodeList, setNodeList] = useState<string[]>([]);
     const [sub, setSub] = useState<Subscription>();
     const { data, isLoading } = useSubscriptions();
     const { data: baiduStatus } = useSWR(isRunning ? 'baidu' : null, () => fetchNetworkStatus('baidu', false), { refreshInterval: 5000 });
@@ -53,10 +51,7 @@ export default function SettingsBody({ isRunning }: { isRunning: boolean }) {
 
     const handleUpdate = async (identifier: string, isUpdate: boolean) => {
         try {
-            const config = await getSubscriptionConfig(identifier);
             setSub(data?.find(item => item.identifier === identifier));
-            const selector = config.outbounds.find((item: any) => item.type === "selector");
-            if (selector) setNodeList(selector.outbounds);
             if (isUpdate && isRunning) await vpnServiceManager.stop();
         } catch (error) {
             console.error(t("update_config_failed") + ":", error);
@@ -90,13 +85,9 @@ export default function SettingsBody({ isRunning }: { isRunning: boolean }) {
                 </div>
                 <div className="fieldset w-full">
                     <div className="fieldset-legend min-w-[270px] capitalize">
-                        {
-                            /* 节点选择 */
-                            t("node_selection")
-                        }
-
+                        {t("node_selection")}
                     </div>
-                    <SelectNode disabled={!isRunning} nodeList={nodeList} />
+                    <SelectNode disabled={!isRunning} />
                 </div>
             </div>
             {sub && (
@@ -104,19 +95,13 @@ export default function SettingsBody({ isRunning }: { isRunning: boolean }) {
                     <div className="flex items-center justify-center">
                         <Shield size={14} className="text-gray-400 mr-1" />
                         <span className="text-xs text-gray-400 capitalize">
-                            {
-                                /* 当前订阅 */
-                                t("current_subscription")
-                            }
+                            {t("current_subscription")}
                         </span>
                     </div>
 
-                    <div className="flex items-center justify-center">
-                        <span className="text-xs text-blue-500 ml-1">
-                            {
-                                /* 有效至  */
-                                t("expired_at") + " "
-                            }
+                    <div className="flex items-center justify-center mt-1">
+                        <span className="text-xs text-blue-500 ">
+                            {t("expired_at") + " "}
                             {formatDate(sub.expire_time)}
                         </span>
                     </div>

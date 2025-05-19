@@ -2,8 +2,8 @@ const a = {
   "proxies": {
     "GLOBAL": {
       "all": [
-        "流量出口",
-        "自动选择",
+        "ExitGateway",
+        "auto",
         "电信专用",
         "新加坡6",
         "日　本1",
@@ -29,7 +29,7 @@ const a = {
       ],
       "history": [],
       "name": "GLOBAL",
-      "now": "流量出口",
+      "now": "ExitGateway",
       "type": "Fallback",
       "udp": true
     },
@@ -39,14 +39,14 @@ const a = {
       "udp": true,
       "history": []
     },
-    "流量出口": {
+    "ExitGateway": {
       "type": "Selector",
-      "name": "流量出口",
+      "name": "ExitGateway",
       "udp": true,
       "history": [],
-      "now": "自动选择",
+      "now": "auto",
       "all": [
-        "自动选择",
+        "auto",
         "电信专用",
         "新加坡6",
         "日　本1",
@@ -71,9 +71,9 @@ const a = {
         "到期:2026-11-19"
       ]
     },
-    "自动选择": {
+    "auto": {
       "type": "URLTest",
-      "name": "自动选择",
+      "name": "auto",
       "udp": true,
       "history": [
         {

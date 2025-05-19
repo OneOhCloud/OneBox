@@ -97,9 +97,7 @@ async function setupTrayIcon() {
       tooltip: "OneBox"
 
     };
-
     trayInstance = await TrayIcon.new(options);
-    console.log("托盘图标创建成功", trayInstance.id);
     return trayInstance;
   } catch (error) {
     console.error('Error setting up tray icon:', error);
@@ -113,12 +111,7 @@ async function setupStatusListener() {
     if (trayInstance) {
       await trayInstance.setMenu(newMenu);
     }
-
   });
-
-
-
-
 }
 
 setupTrayIcon();

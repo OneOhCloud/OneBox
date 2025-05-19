@@ -2,7 +2,7 @@ import * as path from '@tauri-apps/api/path';
 import { getSubscriptionConfig } from '../action/db';
 import { getAllowLan } from '../single/store';
 import { getSingBoxConfigPath } from '../utils/helper';
-import { writeConfigFile } from './helper';
+import { ruleSet, updateVPNServerConfigFromDB, writeConfigFile } from './helper';
 
 const mixedConfig = {
   "log": {
@@ -23,7 +23,7 @@ const mixedConfig = {
         //  只有这个 dns 在 sing-box 1.1.* 版本可用, 其余地址会导致 dns 解析失败
         "address": "tcp://1.0.0.1",
         "strategy": "ipv4_only",
-        "detour": "流量出口"
+        "detour": "ExitGateway"
       },
       {
         "tag": "system",
@@ -137,7 +137,7 @@ const mixedConfig = {
       },
       {
         "clash_mode": "全局",
-        "outbound": "流量出口"
+        "outbound": "ExitGateway"
       },
       {
         "ip_is_private": true,
@@ -161,52 +161,10 @@ const mixedConfig = {
         "outbound": "direct"
       }
     ],
-    "final": "流量出口",
+    "final": "ExitGateway",
     "auto_detect_interface": true,
-    "rule_set": [
-      {
-        "tag": "geoip-cn",
-        "type": "remote",
-        "format": "binary",
-        "url": "https://fastly.jsdelivr.net/gh/SagerNet/sing-geoip@rule-set/geoip-cn.srs",
-        "download_detour": "direct"
-      },
-      {
-        "tag": "geosite-cn",
-        "type": "remote",
-        "format": "binary",
-        "url": "https://fastly.jsdelivr.net/gh/OneOhCloud/one-geosite@rules/geosite-one-cn.srs",
-        "download_detour": "direct"
-      },
-      {
-        "tag": "geosite-apple",
-        "type": "remote",
-        "format": "binary",
-        "url": "https://fastly.jsdelivr.net/gh/SagerNet/sing-geosite@rule-set/geosite-apple.srs",
-        "download_detour": "direct"
-      },
-      {
-        "tag": "geosite-microsoft-cn",
-        "type": "remote",
-        "format": "binary",
-        "url": "https://fastly.jsdelivr.net/gh/SagerNet/sing-geosite@rule-set/geosite-microsoft@cn.srs",
-        "download_detour": "direct"
-      },
-      {
-        "tag": "geosite-samsung",
-        "type": "remote",
-        "format": "binary",
-        "url": "https://fastly.jsdelivr.net/gh/SagerNet/sing-geosite@rule-set/geosite-samsung.srs",
-        "download_detour": "direct"
-      },
-      {
-        "tag": "geosite-private",
-        "type": "remote",
-        "format": "binary",
-        "url": "https://fastly.jsdelivr.net/gh/SagerNet/sing-geosite@rule-set/geosite-private.srs",
-        "download_detour": "direct"
-      }
-    ]
+    "rule_set": ruleSet
+
   },
   "experimental": {
     "clash_api": {
@@ -224,19 +182,22 @@ const mixedConfig = {
       "type": "direct"
     },
     {
-      "tag": "流量出口",
+      "tag": "ExitGateway",
       "type": "selector",
-      "outbounds": [],// 将下面的 {},{},{}  outbounds.tag
+      "outbounds": ["auto"],
       "interrupt_exist_connections": true
     },
     {
-      "tag": "自动选择",
+      "tag": "auto",
       "type": "urltest",
-      "outbounds": [] // 将下面的 {},{},{}  outbounds.tag
+      "outbounds": []
     }
-    // {},{},{} 
   ]
 }
+
+
+
+
 
 export default async function setMixedConfig(identifier: string) {
   let dbConfigData = await getSubscriptionConfig(identifier);
@@ -257,32 +218,9 @@ export default async function setMixedConfig(identifier: string) {
   }
 
 
-
-  const outbounds = newConfig["outbounds"];
-  const outbounds1 = outbounds[1]["outbounds"];
-  const outbounds2 = outbounds[2]["outbounds"];
-
-  let selectorNameList = dbConfigData.outbounds.find((item: any) => item.type === "selector").outbounds;
+  updateVPNServerConfigFromDB(dbConfigData, newConfig);
 
 
-
-  outbounds1.push(...selectorNameList);
-
-
-  let serverList = dbConfigData.outbounds.filter((item: any) => {
-    return item.type !== "selector" && item.type !== "urltest" && item.type !== "direct" && item.type !== "block";
-  });
-
-  const urltestNameList: string[] = [];
-  serverList.forEach((item: any) => {
-    urltestNameList.push(item.tag);
-
-  })
-
-  outbounds2.push(...urltestNameList);
-
-  outbounds.push(...serverList);
-  console.log("写入配置文件中");
   await writeConfigFile('config.json', new TextEncoder().encode(JSON.stringify(newConfig)));
   const filePath = await getSingBoxConfigPath();
   console.log("配置文件路径:", filePath);

@@ -8,7 +8,9 @@ import { ToggleSetting } from "./common";
 
 export default function LanguageSwitch() {
     const [isZh, setIsZh] = useState(false);
-    const { setActiveScreen } = useContext(NavContext);
+
+    const { handleLanguageChange } = useContext(NavContext);
+
 
 
     // 初始化时加载语言设置
@@ -26,8 +28,11 @@ export default function LanguageSwitch() {
         const newValue = !isZh;
         setIsZh(newValue);
         await setLanguage(newValue ? 'zh' : 'en');
+        // zh: 提交这个事件是为了更新托盘菜单语言
+        // en: This event is submitted to update the tray menu language
         emit('status-changed');
-        setActiveScreen('home');
+        handleLanguageChange(newValue ? 'zh' : 'en');
+        // setActiveScreen('home');
     }, [isZh]);
 
     return (

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { fetch } from '@tauri-apps/plugin-http';
 import useSWR from "swr";
@@ -8,24 +8,29 @@ import NodeOption from "./node-option";
 const baseUrl = "http://localhost:9191";
 
 type SelectNodeProps = {
-    nodeList: string[]
     disabled: boolean;
 }
 
 export default function SelectNode(props: SelectNodeProps) {
-    const { nodeList, disabled } = props;
-    const [show, setShow] = useState(false);
+    const { disabled } = props;
+    const { data, isLoading, error } = useSWR(`swr-${baseUrl}/proxies/ExitGateway-${props.disabled}`, async () => {
+        const url = `${baseUrl}/proxies/ExitGateway`;
+        const response = await fetch(url, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+            },
+        });
+        let res = await response.json();
+        return res.all;
+    }
+        , {
+            refreshInterval: 1000,
+        });
 
-    useEffect(() => {
-        if (!disabled) {
-            setTimeout(() => {
-                setShow(true);
-            }, 300);
 
-        } else {
-            setShow(false);
-        }
-    }, [disabled]);
+
 
     if (disabled) {
         return <>
@@ -39,19 +44,19 @@ export default function SelectNode(props: SelectNodeProps) {
         </>
     }
 
-    if (!show) {
+    if (error) {
+        console.error(error);
+    }
+    if (isLoading) {
         return <div className="select select-sm  select-ghost border-1 border-zinc-200 ">
-            {
-                /* 更新中... */
-                t("updating")
-            }
+            <div className="h-4 w-24 bg-base-300 animate-pulse rounded"></div>
         </div>
     }
 
 
 
 
-    return <SelecItem nodeList={nodeList} />
+    return <SelecItem nodeList={data} />
 
 }
 
@@ -65,7 +70,7 @@ export function SelecItem(props: SelecItemProps) {
     const { nodeList } = props;
     const [isOpen, setIsOpen] = useState(false);
 
-    const proxiesUrl = `${baseUrl}/proxies/${encodeURIComponent('流量出口')}`;
+    const proxiesUrl = `${baseUrl}/proxies/${encodeURIComponent('ExitGateway')}`;
 
     const { data, mutate, isLoading, error } = useSWR(proxiesUrl, async (url) => {
         const response = await fetch(decodeURIComponent(url), {
@@ -77,6 +82,9 @@ export function SelecItem(props: SelecItemProps) {
         });
         let res = await response.json();
         return res.now;
+    }, {
+        refreshInterval: 1000,
+
     });
 
 

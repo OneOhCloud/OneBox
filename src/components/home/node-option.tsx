@@ -26,9 +26,26 @@ export default function NodeOption({ nodeName }: NodeOptionProps) {
     });
     const delay = data?.history?.[0]?.delay ?? '-';
 
+    if (!nodeName) {
+        return (
+            <div className="select select-sm  select-ghost border-1 border-zinc-200 ">
+                {t('starting')}
+            </div>
+        );
+    }
+
+    if (nodeName === 'auto') {
+        return (
+            <div className="flex justify-between items-center w-full">
+                <span className="truncate">{t("auto")}</span>
+                <span className="ml-2 text-sm">{delay !== '-' ? `${delay}ms` : delay}</span>
+            </div>
+        );
+    }
+
     return (
         <div className="flex justify-between items-center w-full">
-            <span className="truncate">{nodeName || t('starting')}</span>
+            <span className="truncate">{nodeName}</span>
             <span className="ml-2 text-sm">{delay !== '-' ? `${delay}ms` : delay}</span>
         </div>
     );
