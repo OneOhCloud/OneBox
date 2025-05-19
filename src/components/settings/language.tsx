@@ -3,15 +3,13 @@ import { useCallback, useContext, useEffect, useState } from 'react';
 import { Globe } from "react-bootstrap-icons";
 import { NavContext } from '../../single/context';
 import { getLanguage, setLanguage } from '../../single/store';
-import { t } from '../../utils/helper';
+import { t, updateLanguage } from '../../utils/helper';
 import { ToggleSetting } from "./common";
 
 export default function LanguageSwitch() {
     const [isZh, setIsZh] = useState(false);
 
     const { handleLanguageChange } = useContext(NavContext);
-
-
 
     // 初始化时加载语言设置
     useEffect(() => {
@@ -28,6 +26,7 @@ export default function LanguageSwitch() {
         const newValue = !isZh;
         setIsZh(newValue);
         await setLanguage(newValue ? 'zh' : 'en');
+        await updateLanguage();
         // zh: 提交这个事件是为了更新托盘菜单语言
         // en: This event is submitted to update the tray menu language
         emit('status-changed');

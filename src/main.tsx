@@ -8,7 +8,7 @@ import { writeText } from '@tauri-apps/plugin-clipboard-manager';
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
-import { t, vpnServiceManager } from './utils/helper';
+import { initLanguage, t, vpnServiceManager } from './utils/helper';
 
 const appWindow = getCurrentWindow();
 let trayInstance: TrayIcon | null = null;
@@ -18,6 +18,7 @@ let trayInstance: TrayIcon | null = null;
 // 创建托盘菜单
 async function createTrayMenu() {
   // 获取当前运行状态
+  await initLanguage();
   const status = await invoke<boolean>("is_running"); // 假设 invoke 返回 boolean
 
   return await Menu.new({

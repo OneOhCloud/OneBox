@@ -11,34 +11,29 @@ import { getEnableTun, getLanguage, getStoreValue } from '../single/store';
 const appWindow = getCurrentWindow();
 const enLang = en as Record<string, string>;
 const zhLang = zh as Record<string, string>;
-
+let currentLanguage: "zh" | "en" = "en";
 
 const languageOptions = {
-    currentLang: "en",
     en: enLang,
     zh: zhLang,
 
 }
-
-
-async function initLanguage() {
+export async function initLanguage() {
     try {
         // 优先使用用户设置的语言
-        const userLanguage = await getLanguage();
+        const userLanguage = await getLanguage() as "zh" | "en";
         if (userLanguage) {
-            languageOptions.currentLang = userLanguage;
+            currentLanguage = userLanguage;
         }
 
 
     } catch (error) {
         console.error('Failed to initialize language:', error);
         // 出错时使用默认语言
-        languageOptions.currentLang = 'en';
+        currentLanguage = 'en';
     }
 }
 
-// 启动时初始化语言
-initLanguage();
 
 export async function getOsInfo() {
     const osType = type()
@@ -139,21 +134,19 @@ export const verifyPrivileged = async () => {
 
 };
 
-
+// 同步版本的翻译函数
 export const t = (id: string): string => {
-    const lang = languageOptions.currentLang;
-    getLanguage().then((language) => {
-        languageOptions.currentLang = language;
-    });
-    // @ts-ignore
-    const translation = languageOptions[lang][id];
+    const translation = languageOptions[currentLanguage][id];
     if (translation) {
         return translation;
     } else {
-        console.warn(`Translation for "${id}" not found in "${lang}"`);
-        return id; // 返回原始 ID 作为默认值
+        console.warn(`Translation for "${id}" not found in "${currentLanguage}"`);
+        return id;
     }
 }
 
-
+// 当用户更改语言时，需要更新当前语言
+export async function updateLanguage() {
+    currentLanguage = await getLanguage() as "zh" | "en";
+}
 
