@@ -13,6 +13,8 @@
     "auto_start_failed": "failed to get auto start status",
     "auto_start": "auto start",
     "auto": "auto",
+    "authentication": "authentication",
+    "auth_pending": "authorization pending",
     "boot_password": "boot password",
     "cannot_open_lan_connection": "cannot open lan connection",
     "close": "close",

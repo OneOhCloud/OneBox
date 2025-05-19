@@ -98,6 +98,10 @@ export const vpnServiceManager = {
         let mode: vpnServiceManagerMode = tunMode ? 'TunProxy' : 'SystemProxy';
         let osType = type();
         let password = "";
+        console.log("启动VPN服务");
+        console.log("模式:", mode);
+        console.log("配置文件路径:", configPath);
+
 
         // 在 linux 和 macOS 上使用 TUN 模式时需要输入超级管理员密码
         if (tunMode && (osType == 'linux' || osType == 'macos')) {

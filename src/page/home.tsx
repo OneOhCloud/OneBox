@@ -126,8 +126,11 @@ export default function HomePage() {
     }
     const identifier = await getStoreValue(SSI_STORE_KEY);
     const ok = await configureProxy(identifier);
-    if (!ok) return;
-    await vpnServiceManager.start();
+    if (!ok) {
+      await turnOff();
+    } else {
+      await vpnServiceManager.start();
+    }
   }
 
   const restart = async () => {
@@ -138,7 +141,7 @@ export default function HomePage() {
     } catch (error) {
       await message(t('reconnect_failed'), { title: t('error'), kind: 'error' });
     } finally {
-      setTimeout(() => setIsOnLoading(false), 1600);
+      setTimeout(() => setIsOnLoading(false), 1200);
     }
   }
 
@@ -171,8 +174,14 @@ export default function HomePage() {
 
   return (
     <div className="bg-gray-50 flex flex-col items-center justify-center p-6 h-full w-full">
-      <AuthDialog onAuthSuccess={() => {
+      <AuthDialog onAuthSuccess={async () => {
         setPrivilegedDialog(false);
+        setIsOnLoading(true);
+        await turnOn();
+        setTimeout(() => {
+          setIsOnLoading(false);
+        }, 1200);
+
       }} open={privilegedDialog} onClose={() => { setPrivilegedDialog(false) }} />
 
       <label className={`cursor-pointer ${isOnLoading ? 'pointer-events-none' : ''}`}>

@@ -21,6 +21,13 @@ const tunConfig = {
                 "detour": "direct"
             },
             {
+                "tag": "dns_proxy",
+                //  只有这个 dns 在 sing-box 1.1.* 版本可用, 其余地址会导致 dns 解析失败
+                "address": "tcp://1.0.0.1",
+                "strategy": "ipv4_only",
+                "detour": "ExitGateway"
+            },
+            {
                 "tag": "remote",
                 "address": "fakeip"
             }
@@ -52,7 +59,7 @@ const tunConfig = {
             "inet6_range": "fc00::/18"
         },
         "strategy": "ipv4_only",
-        "final": "system"
+        "final": "dns_proxy"
     },
     "inbounds": [
         {
@@ -64,7 +71,7 @@ const tunConfig = {
             ],
             "platform": {
                 "http_proxy": {
-                    "enabled": false,
+                    "enabled": true,
                     "server": "127.0.0.1",
                     "server_port": 6789,
 
@@ -162,10 +169,12 @@ const tunConfig = {
 }
 
 export default async function setGlobalTunConfig(identifier: string) {
+    console.log("写入[全局]TUN代理配置文件");
+
     let dbConfigData = await getSubscriptionConfig(identifier);
 
     const appConfigPath = await path.appConfigDir();
-    const dbCacheFilePath = await path.join(appConfigPath, 'tun-cache.db');
+    const dbCacheFilePath = await path.join(appConfigPath, 'tun-cache-v1.db');
 
     //  Windows 使用 system stack 兼容性是最佳的。
     if (type() === "windows" || type() === "linux") {

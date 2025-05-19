@@ -70,20 +70,21 @@ export function SelecItem(props: SelecItemProps) {
     const { nodeList } = props;
     const [isOpen, setIsOpen] = useState(false);
 
-    const proxiesUrl = `${baseUrl}/proxies/${encodeURIComponent('ExitGateway')}`;
+    const proxiesUrl = `${baseUrl}/proxies/ExitGateway`;
 
     const { data, mutate, isLoading, error } = useSWR(proxiesUrl, async (url) => {
-        const response = await fetch(decodeURIComponent(url), {
+        const response = await fetch(url, {
             method: 'GET',
             headers: {
                 'Content-Type': 'application/json',
-                'Accept': 'application/json',
+                'Accept': 'application/json'
             },
         });
         let res = await response.json();
+        console.log("当前节点:", res);
         return res.now;
     }, {
-        refreshInterval: 1000,
+        refreshInterval: 1000
 
     });
 
@@ -94,8 +95,6 @@ export function SelecItem(props: SelecItemProps) {
     }
 
     const handleNodeChange = async (node: string) => {
-
-
         try {
             await fetch(proxiesUrl, {
                 method: 'PUT',
@@ -114,8 +113,10 @@ export function SelecItem(props: SelecItemProps) {
         }
 
     };
+    console.log("当前节点:", data);
+    console.log("节点列表:", nodeList);
 
-    if (nodeList.length === 0) {
+    if (!nodeList || nodeList.length === 0) {
         return <div className="select select-sm  select-ghost border-1 border-zinc-200 ">
             {
                 /* 当前配置没有节点 */
@@ -141,6 +142,8 @@ export function SelecItem(props: SelecItemProps) {
                     <NodeOption nodeName={data} />
                 )}
             </div>
+
+
             {isOpen && !isLoadingState && data && (
                 <div className="absolute bottom-full left-0 w-full mb-1 bg-base-100 rounded-lg shadow-lg z-50 max-h-50 overflow-y-auto">
                     {nodeList.map((item, index) => (

@@ -1,7 +1,6 @@
 import * as path from '@tauri-apps/api/path';
 import { getSubscriptionConfig } from '../action/db';
 import { getAllowLan } from '../single/store';
-import { getSingBoxConfigPath } from '../utils/helper';
 import { ruleSet, updateVPNServerConfigFromDB, writeConfigFile } from './helper';
 
 const mixedConfig = {
@@ -200,10 +199,12 @@ const mixedConfig = {
 
 
 export default async function setMixedConfig(identifier: string) {
+  console.log("写入[规则]系统代理配置文件");
+
   let dbConfigData = await getSubscriptionConfig(identifier);
 
   const appConfigPath = await path.appConfigDir();
-  const dbCacheFilePath = await path.join(appConfigPath, 'cache.db');
+  const dbCacheFilePath = await path.join(appConfigPath, 'cache-v1.db');
 
   // 深拷贝配置文件
   const newConfig = JSON.parse(JSON.stringify(mixedConfig));
@@ -217,11 +218,7 @@ export default async function setMixedConfig(identifier: string) {
     newConfig["inbounds"][0]["listen"] = "127.0.0.1";
   }
 
-
   updateVPNServerConfigFromDB(dbConfigData, newConfig);
-
-
   await writeConfigFile('config.json', new TextEncoder().encode(JSON.stringify(newConfig)));
-  const filePath = await getSingBoxConfigPath();
-  console.log("配置文件路径:", filePath);
+
 }

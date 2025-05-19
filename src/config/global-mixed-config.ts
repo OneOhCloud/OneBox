@@ -1,8 +1,7 @@
 import * as path from '@tauri-apps/api/path';
 import { getSubscriptionConfig } from '../action/db';
 import { getAllowLan } from '../single/store';
-import { getSingBoxConfigPath } from '../utils/helper';
-import { ruleSet, updateVPNServerConfigFromDB, writeConfigFile } from './helper';
+import { updateVPNServerConfigFromDB, writeConfigFile } from './helper';
 
 const mixedConfig = {
     "log": {
@@ -65,14 +64,6 @@ const mixedConfig = {
     "route": {
         "rules": [
             {
-                "inbound": "mixed",
-                "action": "resolve"
-            },
-            {
-                "inbound": "mixed",
-                "action": "sniff"
-            },
-            {
                 "protocol": "dns",
                 "action": "hijack-dns"
             },
@@ -88,7 +79,6 @@ const mixedConfig = {
         ],
         "final": "ExitGateway",
         "auto_detect_interface": true,
-        "rule_set": ruleSet
     },
     "experimental": {
         "clash_api": {
@@ -120,10 +110,11 @@ const mixedConfig = {
 }
 
 export default async function setGlobalMixedConfig(identifier: string) {
+    console.log("写入[全局]系统代理配置文件");
     let dbConfigData = await getSubscriptionConfig(identifier);
 
     const appConfigPath = await path.appConfigDir();
-    const dbCacheFilePath = await path.join(appConfigPath, 'cache.db');
+    const dbCacheFilePath = await path.join(appConfigPath, 'cache-v1.db');
     // 深拷贝配置文件
     const newConfig = JSON.parse(JSON.stringify(mixedConfig));
     newConfig["experimental"]["cache_file"]["path"] = dbCacheFilePath;
@@ -138,11 +129,6 @@ export default async function setGlobalMixedConfig(identifier: string) {
 
     updateVPNServerConfigFromDB(dbConfigData, newConfig);
 
-
-
-
     await writeConfigFile('config.json', new TextEncoder().encode(JSON.stringify(newConfig)));
 
-    const filePath = await getSingBoxConfigPath();
-    console.log("配置文件路径:", filePath);
 }

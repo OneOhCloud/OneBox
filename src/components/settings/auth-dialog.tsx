@@ -5,117 +5,115 @@ import { PRIVILEGED_PASSWORD_STORE_KEY } from "../../types/definition";
 import { t } from "../../utils/helper";
 
 interface AuthDialogProps {
-    open: boolean; // 控制对话框的打开状态
-    onClose: () => void; // 关闭对话框的回调函数
-    onAuthSuccess: () => void; // 回调函数，通知父组件授权成功
+    open: boolean;
+    onClose: () => void;
+    onAuthSuccess: () => void;
 }
 
-export default function AuthDialog(props: AuthDialogProps) {
-    const { open, onClose, onAuthSuccess } = props;
-    const [status, setStatus] = useState<string>("pending");
-    const [identifier, setIdentifier] = useState<{ username: string; password: string }>({
-        username: "",
-        password: "",
-    });
-
+export default function AuthDialog({ open, onClose, onAuthSuccess }: AuthDialogProps) {
+    const [isLoading, setIsLoading] = useState(false);
+    const [isError, setIsError] = useState(false);
+    const [username, setUsername] = useState("");
+    const [password, setPassword] = useState("");
     const modalRef = useRef<HTMLDialogElement>(null);
 
-    const verify = async (username: string, password: string) => {
-        setStatus("loading");
+    // 初始化和清理
+    useEffect(() => {
+        if (open) {
+            setPassword("");
+            setIsError(false);
+            invoke<string>("get_current_username")
+                .then(username => {
+                    setUsername(username);
+                    modalRef.current?.showModal();
+                })
+                .catch(err => console.error("无法获取用户名:", err));
+        }
+
+        return () => modalRef.current?.close();
+    }, [open]);
+
+    // 验证处理
+    const handleVerify = async () => {
+        if (!password) return;
+
+        setIsLoading(true);
+        setIsError(false);
+
         try {
-            const result = await invoke<boolean>("is_privileged", {
-                username,
-                password,
-            });
-            if (result) {
+            const isPrivileged = await invoke<boolean>("is_privileged", { username, password });
+
+            if (isPrivileged) {
                 setStoreValue(PRIVILEGED_PASSWORD_STORE_KEY, password);
-                setStatus("success");
                 onAuthSuccess();
                 modalRef.current?.close();
             } else {
-                modalRef.current?.showModal();
-
-                setStatus("failed");
+                setIsError(true);
             }
         } catch (error) {
-            console.error("Error invoking is_privileged:", error);
-            setStatus("failed");
+            console.error("验证错误:", error);
+            setIsError(true);
+        } finally {
+            setIsLoading(false);
         }
     };
 
-    const handleSubmit = async () => {
-        await verify(identifier.username, identifier.password);
+    // 关闭处理
+    const handleClose = () => {
+        setPassword("");
+        setIsError(false);
+        onClose();
+        modalRef.current?.close();
     };
-
-    const getStatus = () => {
-        if (status === "loading") {
-            return <span className="loading loading-infinity loading-sm"></span>;
-        } else if (status === "success") {
-            return t("auth_success");
-        } else if (status === "failed") {
-            return t("auth_failed");
-        }
-    };
-
-    useEffect(() => {
-        // 初始化获取用户名并根据状态打开对话框
-        setStatus("pending");
-        invoke<string>("get_current_username")
-            .then(async (username) => {
-                setIdentifier((prev) => ({ ...prev, username }));
-                if (open) {
-                    modalRef.current?.showModal();
-
-                }
-            })
-            .catch((err) => {
-                console.error(err);
-            });
-    }, [open]);
 
     return (
-        <dialog ref={modalRef} id="auth_modal" className="modal">
-            <div className="modal-box">
-                <div className="modal-header mb-4">
-                    {
-                        // 当前状态
-                        t("current_status") + ": " + getStatus()}
-                </div>
-                <div className="text-xs text-gray-700 mb-2">
+        <dialog ref={modalRef} className="modal">
+            <div className="modal-box max-w-sm p-6">
+                <h3 className="text-lg font-medium mb-4">{t("authentication")}</h3>
+
+                <p className="text-xs text-gray-500 mb-6">
                     {t("auth_dialog_description")}
-                </div>
-                <div>
-                    <div className="mb-4">
-                        <label className="block mb-2">{t("boot_password")}</label>
+                </p>
+
+                <form onSubmit={e => { e.preventDefault(); handleVerify(); }} className="space-y-4">
+                    <div className="form-control">
                         <input
                             type="password"
-                            value={identifier.password}
-                            onChange={(e) =>
-                                setIdentifier({ ...identifier, password: e.target.value })
-                            }
-                            className="input input-sm"
+                            value={password}
+                            onChange={e => setPassword(e.target.value)}
+                            className={`input input-bordered w-full ${isError ? "input-error" : ""}`}
+                            placeholder={t("boot_password")}
+                            autoFocus
                         />
+
+                        {isError && (
+                            <p className="mt-2 text-sm text-error">{t("auth_failed")}</p>
+                        )}
                     </div>
-                </div>
-                <div className="modal-action">
-                    <button
-                        onClick={() => {
-                            onClose();
-                            modalRef.current?.close();
-                        }}
-                        className="btn btn-sm"
-                    >
-                        {t("close")}
-                    </button>
-                    <button
-                        onClick={handleSubmit}
-                        className="btn btn-sm btn-primary"
-                        disabled={status === "loading"}
-                    >
-                        {status === "loading" ? (<span className="loading loading-infinity loading-sm"></span>) : t("confirm")}
-                    </button>
-                </div>
+
+                    <div className="flex justify-end gap-2 mt-6">
+                        <button
+                            type="button"
+                            onClick={handleClose}
+                            className="btn btn-sm btn-ghost"
+                        >
+                            {t("close")}
+                        </button>
+
+                        <button
+                            type="submit"
+                            className="btn btn-sm btn-primary"
+                            disabled={isLoading || !password}
+                        >
+                            {isLoading ? (
+                                <span className="loading loading-spinner loading-xs"></span>
+                            ) : t("confirm")}
+                        </button>
+                    </div>
+                </form>
             </div>
+
+            <div className="modal-backdrop  bg-opacity-30" onClick={handleClose}></div>
         </dialog>
     );
 }

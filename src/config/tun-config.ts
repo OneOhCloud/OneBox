@@ -2,7 +2,6 @@ import * as path from '@tauri-apps/api/path';
 import { type } from '@tauri-apps/plugin-os';
 import { getSubscriptionConfig } from '../action/db';
 import { getAllowLan } from '../single/store';
-import { getSingBoxConfigPath } from '../utils/helper';
 import { ruleSet, updateVPNServerConfigFromDB, writeConfigFile } from './helper';
 
 const tunConfig = {
@@ -114,7 +113,7 @@ const tunConfig = {
             ],
             "platform": {
                 "http_proxy": {
-                    "enabled": false,
+                    "enabled": true,
                     "server": "127.0.0.1",
                     "server_port": 6789,
 
@@ -158,10 +157,12 @@ const tunConfig = {
     ],
     "route": {
         "rules": [
-
             {
-                "inbound": "tun",
-                "action": "sniff"
+                "inbound": [
+                    "mixed",
+                    "tun"
+                ],
+                action: "sniff"
             },
             {
                 "protocol": "dns",
@@ -198,8 +199,7 @@ const tunConfig = {
                     "geosite-samsung",
                     "geosite-private"
                 ],
-                "outbound": "ExitGateway",
-                "invert": true
+                "outbound": "direct",
             }
         ],
         "final": "ExitGateway",
@@ -237,10 +237,12 @@ const tunConfig = {
 }
 
 export default async function setTunConfig(identifier: string) {
+    console.log("写入[规则]TUN代理配置文件");
+
     let dbConfigData = await getSubscriptionConfig(identifier);
 
     const appConfigPath = await path.appConfigDir();
-    const dbCacheFilePath = await path.join(appConfigPath, 'tun-cache.db');
+    const dbCacheFilePath = await path.join(appConfigPath, 'tun-cache-v1.db');
 
 
     //  Windows 使用 system stack 兼容性是最佳的。
@@ -268,8 +270,4 @@ export default async function setTunConfig(identifier: string) {
 
     await writeConfigFile('config.json', new TextEncoder().encode(JSON.stringify(newConfig)));
 
-
-    // open file
-    const filePath = await getSingBoxConfigPath();
-    console.log("配置文件路径:", filePath);
 }
