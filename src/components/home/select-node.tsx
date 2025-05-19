@@ -6,14 +6,22 @@ import { t } from "../../utils/helper";
 import NodeOption from "./node-option";
 
 const baseUrl = "http://localhost:9191";
+const proxiesUrl = `${baseUrl}/proxies/ExitGateway`;
 
 type SelectNodeProps = {
     disabled: boolean;
 }
 
 export default function SelectNode(props: SelectNodeProps) {
+
     const { disabled } = props;
-    const { data, isLoading, error } = useSWR(`swr-${baseUrl}/proxies/ExitGateway-${props.disabled}`, async () => {
+    const { data, isLoading, error, mutate } = useSWR(`swr-${baseUrl}/proxies/ExitGateway-${props.disabled}`, async () => {
+        if (disabled) {
+            return {
+                all: [],
+                now: "",
+            }
+        }
         const url = `${baseUrl}/proxies/ExitGateway`;
         const response = await fetch(url, {
             method: 'GET',
@@ -23,11 +31,10 @@ export default function SelectNode(props: SelectNodeProps) {
             },
         });
         let res = await response.json();
-        return res.all;
-    }
-        , {
-            refreshInterval: 1000,
-        });
+        return res
+    }, {
+        refreshInterval: 3000,
+    });
 
 
 
@@ -53,46 +60,23 @@ export default function SelectNode(props: SelectNodeProps) {
         </div>
     }
 
-
-
-
-    return <SelecItem nodeList={data} />
+    return <SelecItem nodeList={data.all} currentNode={data.now} onUpdate={() => {
+        mutate()
+    }} />
 
 }
 
 type SelecItemProps = {
+    currentNode: string;
     nodeList: string[]
-
-
+    onUpdate: () => void;
 }
 
 export function SelecItem(props: SelecItemProps) {
-    const { nodeList } = props;
+    const { currentNode, nodeList, onUpdate } = props;
     const [isOpen, setIsOpen] = useState(false);
 
-    const proxiesUrl = `${baseUrl}/proxies/ExitGateway`;
 
-    const { data, mutate, isLoading, error } = useSWR(proxiesUrl, async (url) => {
-        const response = await fetch(url, {
-            method: 'GET',
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
-            },
-        });
-        let res = await response.json();
-        console.log("当前节点:", res);
-        return res.now;
-    }, {
-        refreshInterval: 1000
-
-    });
-
-
-
-    if (error) {
-        console.error(error);
-    }
 
     const handleNodeChange = async (node: string) => {
         try {
@@ -104,17 +88,15 @@ export function SelecItem(props: SelecItemProps) {
                 },
                 body: JSON.stringify({ 'name': node }),
             });
+            onUpdate();
         } catch (error) {
             console.error("Error changing node:", error);
         } finally {
-            mutate();
             setIsOpen(false);
 
         }
 
     };
-    console.log("当前节点:", data);
-    console.log("节点列表:", nodeList);
 
     if (!nodeList || nodeList.length === 0) {
         return <div className="select select-sm  select-ghost border-1 border-zinc-200 ">
@@ -125,26 +107,18 @@ export function SelecItem(props: SelecItemProps) {
         </div>
     }
 
-    const isLoadingState = isLoading
 
     return (
         <div className="relative">
             <div
                 className={`select select-sm  select-ghost border-1 border-zinc-200  cursor-pointer `}
-                onClick={() => !isLoadingState && setIsOpen(!isOpen)}
+                onClick={() => setIsOpen(!isOpen)}
             >
-                {isLoadingState ? (
-                    <div className="flex justify-between items-center w-full">
-                        <div className="h-4 w-24 bg-base-300 animate-pulse rounded"></div>
-                        <div className="h-4 w-12 bg-base-300 animate-pulse rounded"></div>
-                    </div>
-                ) : (
-                    <NodeOption nodeName={data} />
-                )}
+                <NodeOption nodeName={currentNode} />
             </div>
 
 
-            {isOpen && !isLoadingState && data && (
+            {isOpen && currentNode && (
                 <div className="absolute bottom-full left-0 w-full mb-1 bg-base-100 rounded-lg shadow-lg z-50 max-h-50 overflow-y-auto">
                     {nodeList.map((item, index) => (
                         <div
