@@ -50,14 +50,14 @@ function App() {
       <main className="bg-gray-50 grid grid-rows-[auto_1fr_auto] h-dvh">
         <Toaster position="top-center" toastOptions={{ duration: 2000 }} containerClassName="mt-[32px]" />
 
-        <div className="max-h-[488px] overflow-y-hidden ">
+        <div className="flex-1 overflow-y-hidden ">
           {activeScreen === 'home' && <div className="animate-fade-in h-full"><HomePage /></div>}
           {activeScreen === 'configuration' && <div className="animate-fade-in h-full"><ConfigurationPage /></div>}
           {activeScreen === 'settings' && <div className="animate-fade-in h-full"><SettingsPage /></div>}
         </div>
 
         {language && (
-          <div className="dock  dock-sm  bg-gray-50 backdrop-blur-xl  border-0 rounded-t-xs">
+          <div className="dock  dock-sm  bg-gray-50 border-0">
             <button
               onClick={() => setActiveScreen('home')}
               className={` ${activeScreen === 'home' ? 'text-blue-500' : ''}`}
