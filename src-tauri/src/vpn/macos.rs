@@ -61,7 +61,7 @@ pub fn create_privileged_command(
     password: String,
 ) -> Option<TauriCommand> {
     let command = format!(
-        r#"echo '{}' | sudo -S '{}' run -c '{}'"#,
+        r#"echo '{}' | sudo -S '{}' run -c '{}' --disable-color"#,
         password.escape_default(),
         sidecar_path.escape_default(),
         path.escape_default()

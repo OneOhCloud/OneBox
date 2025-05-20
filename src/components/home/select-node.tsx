@@ -5,7 +5,7 @@ import useSWR from "swr";
 import { t } from "../../utils/helper";
 import NodeOption from "./node-option";
 
-const baseUrl = "http://localhost:9191";
+const baseUrl = "http://127.0.0.1:9191";
 const proxiesUrl = `${baseUrl}/proxies/ExitGateway`;
 
 type SelectNodeProps = {
@@ -54,7 +54,7 @@ export default function SelectNode(props: SelectNodeProps) {
     if (error) {
         console.error(error);
     }
-    if (isLoading) {
+    if (isLoading || !data) {
         return <div className="select select-sm  select-ghost border-1 border-zinc-200 ">
             <div className="h-4 w-24 bg-base-300 animate-pulse rounded"></div>
         </div>

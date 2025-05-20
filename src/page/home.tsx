@@ -42,14 +42,14 @@ export default function HomePage() {
     });
 
     // 获取当前规则模式
-    getStoreValue(RULE_MODE_STORE_KEY).then((s) => {
-      if (s === '规则') {
-        setSelectedMode('rules');
-      } else if (s === '全局') {
-        setSelectedMode('global');
+    getStoreValue(RULE_MODE_STORE_KEY).then((v: SelectedModeType) => {
+      if (v) {
+        setSelectedMode(v);
       } else {
+        setStoreValue(RULE_MODE_STORE_KEY, 'rules');
         setSelectedMode('rules');
       }
+
     }).catch((error) => {
       console.error('获取规则模式发生错误:', error);
     });
@@ -91,7 +91,12 @@ export default function HomePage() {
   const configureProxy = async (identifier: string) => {
     const useTun = await getEnableTun();
 
-    // 在 linux 和 macOS 上使用 TUN 模式时需要输入超级管理员密码
+    //zh: 直接使用 getStoreValue(RULE_MODE_STORE_KEY) 代替 setStoreValue 来获取当前模式，这样不会读到旧的值
+    //en: Directly use getStoreValue(RULE_MODE_STORE_KEY) instead of setStoreValue to get the current mode, so that the old value will not be read
+    const currentMode = await getStoreValue(RULE_MODE_STORE_KEY)
+
+    //zh: 在 linux 和 macOS 上使用 TUN 模式时需要输入超级管理员密码
+    //en: When using TUN mode on linux and macOS, you need to enter the super administrator password
     if (useTun && (type() == 'linux' || type() == 'macos')) {
       console.log('在 Linux 或 macOS 上使用 TUN 模式，需要输入超级管理员密码');
       const privileged = await verifyPrivileged();
@@ -101,15 +106,15 @@ export default function HomePage() {
         setPrivilegedDialog(true);
         return false;
       }
-      const fn = selectedMode === 'global' ? setGlobalTunConfig : setTunConfig;
+      const fn = currentMode === 'global' ? setGlobalTunConfig : setTunConfig;
       await fn(identifier);
     } else if (useTun && type() == 'windows') {
       console.log('在 Windows 上使用 TUN 模式，无需密码');
-      const fn = selectedMode === 'global' ? setGlobalTunConfig : setTunConfig;
+      const fn = currentMode === 'global' ? setGlobalTunConfig : setTunConfig;
       await fn(identifier);
     } else {
       console.log('使用普通模式');
-      const fn = selectedMode === 'global' ? setGlobalMixedConfig : setMixedConfig;
+      const fn = currentMode === 'global' ? setGlobalMixedConfig : setMixedConfig;
       await fn(identifier);
     }
     return true;
@@ -163,13 +168,17 @@ export default function HomePage() {
   };
 
   const handleModeChange = async (mode: SelectedModeType) => {
+
+    // zh: 一定要先保存当前的模式！！
+    // en: You must save the current mode first!!
+    await setStoreValue(RULE_MODE_STORE_KEY, mode);
+    setSelectedMode(mode);
+
+    // zh: 然后重启服务
+    // en: Then restart the service
     if (isOnLoading || isOn) {
       await restart();
     }
-    // 转换回中文存储
-    const storeMode = mode === 'rules' ? '规则' : '全局';
-    await setStoreValue(RULE_MODE_STORE_KEY, storeMode);
-    setSelectedMode(mode);
   };
 
   return (

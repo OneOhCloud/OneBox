@@ -1,7 +1,7 @@
 import * as path from '@tauri-apps/api/path';
 import { getSubscriptionConfig } from '../action/db';
 import { getAllowLan } from '../single/store';
-import { ruleSet, updateVPNServerConfigFromDB, writeConfigFile } from './helper';
+import { ruleSet, updateVPNServerConfigFromDB } from './helper';
 
 const mixedConfig = {
   "log": {
@@ -204,7 +204,7 @@ export default async function setMixedConfig(identifier: string) {
   let dbConfigData = await getSubscriptionConfig(identifier);
 
   const appConfigPath = await path.appConfigDir();
-  const dbCacheFilePath = await path.join(appConfigPath, 'cache-v1.db');
+  const dbCacheFilePath = await path.join(appConfigPath, 'mixed-cache-rule--v1.db');
 
   // 深拷贝配置文件
   const newConfig = JSON.parse(JSON.stringify(mixedConfig));
@@ -218,7 +218,6 @@ export default async function setMixedConfig(identifier: string) {
     newConfig["inbounds"][0]["listen"] = "127.0.0.1";
   }
 
-  updateVPNServerConfigFromDB(dbConfigData, newConfig);
-  await writeConfigFile('config.json', new TextEncoder().encode(JSON.stringify(newConfig)));
+  updateVPNServerConfigFromDB('config.json', dbConfigData, newConfig);
 
 }

@@ -1,7 +1,7 @@
 import * as path from '@tauri-apps/api/path';
 import { getSubscriptionConfig } from '../action/db';
 import { getAllowLan } from '../single/store';
-import { updateVPNServerConfigFromDB, writeConfigFile } from './helper';
+import { updateVPNServerConfigFromDB } from './helper';
 
 const mixedConfig = {
     "log": {
@@ -72,6 +72,14 @@ const mixedConfig = {
                 "action": "reject"
             },
             {
+                "domain_suffix": [
+                    "local",
+                    "lan",
+                    "localdomain",
+                    "localhost",
+                    "bypass.local",
+                    "captive.apple.com",
+                ],
                 "ip_is_private": true,
                 "outbound": "direct"
             }
@@ -114,7 +122,7 @@ export default async function setGlobalMixedConfig(identifier: string) {
     let dbConfigData = await getSubscriptionConfig(identifier);
 
     const appConfigPath = await path.appConfigDir();
-    const dbCacheFilePath = await path.join(appConfigPath, 'cache-v1.db');
+    const dbCacheFilePath = await path.join(appConfigPath, 'mixed-cache-gloabl-v1.db');
     // 深拷贝配置文件
     const newConfig = JSON.parse(JSON.stringify(mixedConfig));
     newConfig["experimental"]["cache_file"]["path"] = dbCacheFilePath;
@@ -126,9 +134,7 @@ export default async function setGlobalMixedConfig(identifier: string) {
     } else {
         newConfig["inbounds"][0]["listen"] = "127.0.0.1";
     }
+    updateVPNServerConfigFromDB('config.json', dbConfigData, newConfig);
 
-    updateVPNServerConfigFromDB(dbConfigData, newConfig);
-
-    await writeConfigFile('config.json', new TextEncoder().encode(JSON.stringify(newConfig)));
 
 }

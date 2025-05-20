@@ -80,13 +80,13 @@ export async function writeConfigFile(fileName: string, data: Uint8Array) {
         await writeFile(fileName, data, {
             baseDir: BaseDirectory.AppConfig,
         });
+
     } else {
         const file = await create(fileName, { baseDir: BaseDirectory.AppConfig });
         await file.write(data);
         await file.close();
+
     }
-
-
 }
 
 
@@ -96,7 +96,7 @@ type Item = {
 }
 
 
-export async function updateVPNServerConfigFromDB(dbConfigData: any, newConfig: any) {
+export async function updateVPNServerConfigFromDB(fileName: string, dbConfigData: any, newConfig: any) {
 
     const outboundsSelectorIndex = 1;
     const outboundsUrltestIndex = 2;
@@ -126,5 +126,7 @@ export async function updateVPNServerConfigFromDB(dbConfigData: any, newConfig: 
     outboundsUrltest.push(...urltestNameList);
 
     outbound_groups.push(...vpnServerList);
+    await writeConfigFile(fileName, new TextEncoder().encode(JSON.stringify(newConfig)));
+
 
 }

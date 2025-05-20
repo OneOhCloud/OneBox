@@ -60,13 +60,13 @@ pub async fn start(
     password: String,
 ) -> Result<(), String> {
     // 启动前先停止已有进程
-    let _ = stop(app.clone())?;
-    println!("mode: {:?}", mode);
+    let _ = stop(app.clone()).await?;
+    let mode_clone = mode.clone();
 
     let sidecar_command_opt = if mode == ProxyMode::SystemProxy {
         // 普通权限执行
         let cmd: Command = app.shell().sidecar("sing-box").map_err(|e| e.to_string())?;
-        Some(cmd.args(["run", "-c", &path]))
+        Some(cmd.args(["run", "-c", &path, "--disable-color"]))
     } else {
         let sidecar_path = helper::get_sidecar_path(Path::new("sing-box")).unwrap();
         platform_impl::create_privileged_command(&app, sidecar_path, path.clone(), password.clone())
@@ -75,66 +75,82 @@ pub async fn start(
     if let Some(sidecar_command) = sidecar_command_opt {
         let (mut rx, child) = sidecar_command.spawn().map_err(|e| e.to_string())?;
 
-        // 根据当前模式执行不同的操作
-        if mode == ProxyMode::SystemProxy {
-            // 设置系统代理
-            if let Err(e) = platform_impl::set_proxy(&app).await {
-                // 如果设置系统代理失败，杀死进程
-                stop(app.clone())?;
-                return Err(e.to_string());
-            }
+        // 临时存储密码，稍后再设置到 manager
+        let tun_password = if mode == ProxyMode::TunProxy {
+            Some(password.clone())
         } else {
-            // 如果是 TUN 模式，取消系统代理
-            if let Err(e) = platform_impl::unset_proxy(&app).await {
-                // 如果取消系统代理失败，杀死进程
-                stop(app.clone())?;
-                return Err(e.to_string());
-            }
-        }
-
-        let mut manager = match PROCESS_MANAGER.lock() {
-            Ok(m) => m,
-            Err(e) => e.into_inner(),
+            None
         };
 
-        if mode == ProxyMode::TunProxy {
-            manager.tun_password = Some(password);
+        // 保存子进程，但不要在异步操作中持有 mutex guard
+        {
+            let mut manager = match PROCESS_MANAGER.lock() {
+                Ok(m) => m,
+                Err(e) => e.into_inner(),
+            };
+
+            if let Some(pass) = &tun_password {
+                manager.tun_password = Some(pass.clone());
+            }
+            manager.child = Some(child);
+        } // MutexGuard 在这里被释放
+
+        // 根据当前模式执行不同的操作
+        let proxy_result = if mode == ProxyMode::SystemProxy {
+            // 设置系统代理
+            platform_impl::set_proxy(&app).await
+        } else {
+            // 如果是 TUN 模式，取消系统代理
+            platform_impl::unset_proxy(&app).await
+        };
+
+        // 如果设置代理失败，清理进程并返回错误
+        if let Err(e) = proxy_result {
+            // 清理子进程
+            let mut manager = match PROCESS_MANAGER.lock() {
+                Ok(m) => m,
+                Err(e) => e.into_inner(),
+            };
+
+            if let Some(child) = manager.child.take() {
+                let _ = child.kill(); // 忽略可能的错误
+            }
+            manager.tun_password = None;
+            return Err(e.to_string());
         }
-        manager.child = Some(child);
-        manager.current_mode = Some(mode);
+
+        // 只有在所有操作都成功后才设置当前模式
+        {
+            let mut manager = match PROCESS_MANAGER.lock() {
+                Ok(m) => m,
+                Err(e) => e.into_inner(),
+            };
+            manager.current_mode = Some(mode);
+        } // MutexGuard 在这里被释放
 
         let process_manager = PROCESS_MANAGER.clone();
         let app_clone = app.clone();
         // 后台异步处理进程事件
         tauri::async_runtime::spawn(async move {
             let handle_event = |event: CommandEvent| {
-                let (level, message) = match &event {
-                    CommandEvent::Stdout(line) | CommandEvent::Stderr(line) => {
-                        let line_str = String::from_utf8_lossy(line);
-                        (
-                            if matches!(&event, CommandEvent::Stdout(_)) {
-                                "stdout"
-                            } else {
-                                "stderr"
-                            },
-                            format!("'{}'", line_str),
-                        )
-                    }
+                let message = match &event {
+                    CommandEvent::Stdout(line) => String::from_utf8_lossy(line.trim_ascii()),
+                    CommandEvent::Stderr(line) => String::from_utf8_lossy(line.trim_ascii()),
                     CommandEvent::Terminated(status) => {
                         if let Ok(mut manager) = process_manager.lock() {
                             manager.child = None;
                         } else if let Err(e) = process_manager.lock() {
                             e.into_inner().child = None;
                         }
-                        (
-                            "info",
-                            format!("Process terminated with status: {:?}", status),
-                        )
+
+                        let msg = format!("Process terminated with status: {:?}", status);
+                        app_clone.emit("core_backend", &msg).unwrap();
+                        std::borrow::Cow::Owned(msg)
                     }
                     _ => return Ok(()),
                 };
 
-                println!("{}: {}", level, message);
+                println!("[{:#?}]:{}", mode_clone, message);
 
                 app_clone
                     .emit("core_backend", Some(message))
@@ -144,6 +160,9 @@ pub async fn start(
             while let Some(event) = rx.recv().await {
                 if let Err(e) = handle_event(event) {
                     eprintln!("Event handling error: {}", e);
+                    app_clone
+                        .emit("core_backend", Some(format!("Event handling error: {}", e)))
+                        .unwrap();
                 }
             }
         });
@@ -152,17 +171,20 @@ pub async fn start(
         app.emit("status-changed", ()).unwrap();
     } else {
         // Windows TUN 模式等不可管理进程场景
-        let mut manager = match PROCESS_MANAGER.lock() {
-            Ok(m) => m,
-            Err(e) => e.into_inner(),
-        };
-        if mode == ProxyMode::TunProxy {
-            manager.tun_password = Some(password);
-        }
-        manager.child = None;
-        manager.current_mode = Some(mode);
+        {
+            let mut manager = match PROCESS_MANAGER.lock() {
+                Ok(m) => m,
+                Err(e) => e.into_inner(),
+            };
+            if mode == ProxyMode::TunProxy {
+                manager.tun_password = Some(password);
+            }
+            manager.child = None;
+            manager.current_mode = Some(mode);
+        } // MutexGuard 在这里被释放
+
         // 睡眠 1.5s 等待进程启动
-        std::thread::sleep(std::time::Duration::from_millis(1500));
+        std::thread::sleep(std::time::Duration::from_millis(1000));
 
         app.emit("status-changed", ()).unwrap();
     }
@@ -172,22 +194,36 @@ pub async fn start(
 
 /// 停止代理进程并清理代理设置
 #[tauri::command]
-pub fn stop(app: tauri::AppHandle) -> Result<(), String> {
-    let mut manager = match PROCESS_MANAGER.lock() {
-        Ok(m) => m,
-        Err(e) => e.into_inner(),
-    };
+pub async fn stop(app: tauri::AppHandle) -> Result<(), String> {
+    // 在临时作用域中获取需要的信息，避免在await跨越时持有MutexGuard
+    let (current_mode, tun_password, child_option) = {
+        let mut manager = match PROCESS_MANAGER.lock() {
+            Ok(m) => m,
+            Err(e) => e.into_inner(),
+        };
+
+        let mode = manager.current_mode.clone();
+        let password = manager.tun_password.clone();
+        let child = manager.child.take();
+
+        // 提前清理状态，避免后续await时仍持有锁
+        manager.current_mode = None;
+        manager.tun_password = None;
+
+        (mode, password, child)
+    }; // MutexGuard在此作用域结束时释放
 
     // 根据当前模式执行清理操作
-    if let Some(mode) = &manager.current_mode {
+    if let Some(mode) = &current_mode {
         match mode {
             ProxyMode::SystemProxy => {
                 // 系统代理模式，清理系统代理
-                tauri::async_runtime::block_on(platform_impl::unset_proxy(&app))
+                platform_impl::unset_proxy(&app)
+                    .await
                     .map_err(|e| e.to_string())?;
             }
             ProxyMode::TunProxy => {
-                if let Some(password) = &manager.tun_password {
+                if let Some(password) = &tun_password {
                     platform_impl::stop_tun_process(password)?;
                 }
             }
@@ -195,13 +231,10 @@ pub fn stop(app: tauri::AppHandle) -> Result<(), String> {
     }
 
     // 停止进程
-    if let Some(child) = manager.child.take() {
+    if let Some(child) = child_option {
         child.kill().map_err(|e| e.to_string())?;
     }
 
-    // 清理状态
-    manager.current_mode = None;
-    manager.tun_password = None;
     // 睡眠 0.5 等待进程退出
     std::thread::sleep(std::time::Duration::from_millis(500));
     app.emit("status-changed", ()).unwrap();

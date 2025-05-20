@@ -7,7 +7,7 @@ type NodeOptionProps = {
 };
 
 export default function NodeOption({ nodeName }: NodeOptionProps) {
-    const { data } = useSWR(`http://localhost:9191/proxies/${encodeURIComponent(nodeName)}`, async (url) => {
+    const { data } = useSWR(`http://127.0.0.1:9191/proxies/${encodeURIComponent(nodeName)}`, async (url) => {
         const response = await fetch(url, {
             method: 'GET',
             headers: {
@@ -19,9 +19,7 @@ export default function NodeOption({ nodeName }: NodeOptionProps) {
         let res = await response.json()
         return res
     }, {
-        refreshInterval: 5000, // 每5秒刷新一次
-        revalidateOnFocus: false, // 失去焦点时不重新验证
-        revalidateOnReconnect: false, // 重新连接时不重新验证
+        refreshInterval: 5000,
 
     });
     const delay = data?.history?.[0]?.delay ?? '-';

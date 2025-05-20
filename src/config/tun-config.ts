@@ -2,7 +2,7 @@ import * as path from '@tauri-apps/api/path';
 import { type } from '@tauri-apps/plugin-os';
 import { getSubscriptionConfig } from '../action/db';
 import { getAllowLan } from '../single/store';
-import { ruleSet, updateVPNServerConfigFromDB, writeConfigFile } from './helper';
+import { ruleSet, updateVPNServerConfigFromDB } from './helper';
 
 const tunConfig = {
     "log": {
@@ -242,7 +242,7 @@ export default async function setTunConfig(identifier: string) {
     let dbConfigData = await getSubscriptionConfig(identifier);
 
     const appConfigPath = await path.appConfigDir();
-    const dbCacheFilePath = await path.join(appConfigPath, 'tun-cache-v1.db');
+    const dbCacheFilePath = await path.join(appConfigPath, 'tun-cache-rule-v1.db');
 
 
     //  Windows 使用 system stack 兼容性是最佳的。
@@ -256,8 +256,6 @@ export default async function setTunConfig(identifier: string) {
     // 深拷贝配置文件
     const newConfig = JSON.parse(JSON.stringify(tunConfig));
     newConfig["experimental"]["cache_file"]["path"] = dbCacheFilePath;
-
-
     const allowLan = await getAllowLan();
     if (allowLan) {
         newConfig["inbounds"][1]["listen"] = "0.0.0.0";
@@ -265,9 +263,5 @@ export default async function setTunConfig(identifier: string) {
         newConfig["inbounds"][1]["listen"] = "127.0.0.1";
     }
 
-
-    updateVPNServerConfigFromDB(dbConfigData, newConfig);
-
-    await writeConfigFile('config.json', new TextEncoder().encode(JSON.stringify(newConfig)));
-
+    updateVPNServerConfigFromDB('config.json', dbConfigData, newConfig);
 }

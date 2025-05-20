@@ -86,7 +86,7 @@ pub fn create_privileged_command(
     path: String,
     _password: String,
 ) -> Option<TauriCommand> {
-    let args = format!("run -c {}", path);
+    let args = format!("run -c {} --disable-color", path);
     let sidecar_wide: Vec<u16> = OsStr::new(&sidecar_path)
         .encode_wide()
         .chain(Some(0))
