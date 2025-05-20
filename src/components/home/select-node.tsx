@@ -41,7 +41,7 @@ export default function SelectNode(props: SelectNodeProps) {
 
     if (disabled) {
         return <>
-            <div className="select select-sm  select-ghost border-1 border-zinc-200  opacity-50 cursor-not-allowed">
+            <div className="select select-sm  select-ghost border-[0.8px] border-gray-200  opacity-50 cursor-not-allowed">
                 {
                     /* 未启动 */
                     t("not_started")
@@ -55,7 +55,7 @@ export default function SelectNode(props: SelectNodeProps) {
         console.error(error);
     }
     if (isLoading || !data) {
-        return <div className="select select-sm  select-ghost border-1 border-zinc-200 ">
+        return <div className="select select-sm  select-ghost border-[0.8px] border-gray-200 ">
             <div className="h-4 w-24 bg-base-300 animate-pulse rounded"></div>
         </div>
     }
@@ -99,7 +99,7 @@ export function SelecItem(props: SelecItemProps) {
     };
 
     if (!nodeList || nodeList.length === 0) {
-        return <div className="select select-sm  select-ghost border-1 border-zinc-200 ">
+        return <div className="select select-sm  select-ghost border-[0.8px] border-gray-200 ">
             {
                 /* 当前配置没有节点 */
                 t("no_node")
@@ -111,7 +111,7 @@ export function SelecItem(props: SelecItemProps) {
     return (
         <div className="relative">
             <div
-                className={`select select-sm  select-ghost border-1 border-zinc-200  cursor-pointer `}
+                className={`select select-sm  select-ghost border-[0.8px] border-gray-200  cursor-pointer `}
                 onClick={() => setIsOpen(!isOpen)}
             >
                 <NodeOption nodeName={currentNode} />

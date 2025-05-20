@@ -123,7 +123,7 @@ function About({ onClose }: AboutProps) {
                     <div className="flex-1 overflow-auto px-4 py-3 bg-gray-50 rounded-t-2xl ">
                         {/* 系统信息部分 */}
                         <h3 className="text-sm font-medium text-gray-500 mb-2 capitalize">{t("system_info")}</h3>
-                        <div className="bg-white rounded-lg divide-y divide-gray-100 mb-4">
+                        <div className="bg-white rounded-lg divide-y divide-gray-50 mb-4">
                             <InfoItem label={t("os")} value={formatOsInfo(osInfo.osType, osInfo.osArch)} />
                             <div onClick={() => {
                                 // @ts-ignore

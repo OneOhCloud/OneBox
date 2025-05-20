@@ -26,7 +26,7 @@ export default function NodeOption({ nodeName }: NodeOptionProps) {
 
     if (!nodeName) {
         return (
-            <div className="select select-sm  select-ghost border-1 border-zinc-200 ">
+            <div className="select select-sm  select-ghost border-[0.8px] border-gray-200 ">
                 {t('starting')}
             </div>
         );

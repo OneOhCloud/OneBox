@@ -30,7 +30,7 @@ export default function SelectSub({ data, isLoading, onUpdate }: SubscriptionPro
     }
 
     if (isLoading) {
-        return <div className="select select-sm  select-ghost border-1 border-zinc-200 ">
+        return <div className="select select-sm  select-ghost border-[0.8px] border-gray-200 ">
             <span className="loading loading-spinner loading-xs mr-2"></span>
             {
                 /* 正在加载... */
@@ -40,7 +40,7 @@ export default function SelectSub({ data, isLoading, onUpdate }: SubscriptionPro
     }
 
     if (!data?.length) {
-        return <div className="select select-sm  select-ghost border-1 border-zinc-200 ">
+        return <div className="select select-sm  select-ghost border-[0.8px] border-gray-200 ">
             {
                 /* 暂无订阅配置 */
                 t("no_subscription")
@@ -55,7 +55,7 @@ export default function SelectSub({ data, isLoading, onUpdate }: SubscriptionPro
                 const item = data.find(item => item.name === e.target.value);
                 if (item) updateSubscription(item);
             }}
-            className="select select-sm  select-ghost border-1 border-zinc-200 "
+            className="select select-sm  select-ghost border-[0.8px] border-gray-200 "
         >
             {data.map(item => (
                 <option key={item.identifier} className="py-1">{item.name}</option>
