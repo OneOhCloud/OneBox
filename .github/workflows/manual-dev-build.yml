@@ -37,6 +37,20 @@ jobs:
       - name: Set Up Bun
         uses: oven-sh/setup-bun@v2
 
+      - name: Install Linux Dependencies
+        if: matrix.platform == 'ubuntu-24.04'
+        run: |
+            sudo apt update
+            sudo apt install libwebkit2gtk-4.1-dev \
+              build-essential \
+              curl \
+              wget \
+              file \
+              libxdo-dev \
+              libssl-dev \
+              libayatana-appindicator3-dev \
+              librsvg2-dev
+
       - name: Set Up Rust Toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -47,11 +61,6 @@ jobs:
         with:
           workspaces: './src-tauri -> target'
 
-      # - name: Install Linux Dependencies
-      #   if: matrix.platform == 'ubuntu-24.04'
-      #   run: |
-      #     sudo apt-get update
-      #     # sudo apt-get upgrade -y
 
       - name: Install Frontend Dependencies
         run: bun install
