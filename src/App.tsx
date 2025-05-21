@@ -47,8 +47,9 @@ function App() {
 
   return (
     <NavContext.Provider value={{ activeScreen, setActiveScreen, handleLanguageChange }}>
-      <main className="bg-gray-50 grid grid-rows-[auto_1fr_auto] h-dvh">
-        <Toaster position="top-center" toastOptions={{ duration: 2000 }} containerClassName="mt-[32px]" />
+      <Toaster position="top-center" toastOptions={{ duration: 2000 }} containerClassName="mt-[32px]" />
+
+      <main className="bg-gray-50 flex flex-col h-screen">
 
         <div className="flex-1 overflow-y-hidden ">
           {activeScreen === 'home' && <div className="animate-fade-in h-full"><HomePage /></div>}
@@ -56,40 +57,40 @@ function App() {
           {activeScreen === 'settings' && <div className="animate-fade-in h-full"><SettingsPage /></div>}
         </div>
 
-        {language && (
-          <div className="dock  dock-sm  bg-gray-50 border-0">
-            <button
-              onClick={() => setActiveScreen('home')}
-              className={` ${activeScreen === 'home' ? 'text-blue-500' : ''}`}
-            >
-              <House />
-              <span className='text-xs capitalize'>{dockLang.home}</span>
-            </button>
 
-            <button
-              onClick={() => setActiveScreen('configuration')}
-              className={`${activeScreen === 'configuration' ? 'text-blue-500' : ''}`}
-            >
-              <Layers />
-              <span className='text-xs capitalize'>{dockLang.configuration}</span>
-            </button>
+        <div className="dock  dock-sm  bg-gray-50 border-0">
+          <button
+            onClick={() => setActiveScreen('home')}
+            className={` ${activeScreen === 'home' ? 'text-blue-500' : ''}`}
+          >
+            <House />
+            <span className='text-xs capitalize'>{dockLang.home}</span>
+          </button>
 
-            <button
-              onClick={() => setActiveScreen('settings')}
-              className={`${activeScreen === 'settings' ? 'text-blue-500' : ''}`}
-              onMouseEnter={() => setIsSettingsHovered(true)}
-              onMouseLeave={() => setIsSettingsHovered(false)}
+          <button
+            onClick={() => setActiveScreen('configuration')}
+            className={`${activeScreen === 'configuration' ? 'text-blue-500' : ''}`}
+          >
+            <Layers />
+            <span className='text-xs capitalize'>{dockLang.configuration}</span>
+          </button>
+
+          <button
+            onClick={() => setActiveScreen('settings')}
+            className={`${activeScreen === 'settings' ? 'text-blue-500' : ''}`}
+            onMouseEnter={() => setIsSettingsHovered(true)}
+            onMouseLeave={() => setIsSettingsHovered(false)}
+          >
+            <motion.div
+              animate={{ rotate: isSettingsHovered ? 180 : 0 }}
+              transition={{ duration: 0.3 }}
             >
-              <motion.div
-                animate={{ rotate: isSettingsHovered ? 180 : 0 }}
-                transition={{ duration: 0.3 }}
-              >
-                <GearWideConnected />
-              </motion.div>
-              <span className='text-xs capitalize'>{dockLang.settings}</span>
-            </button>
-          </div>
-        )}
+              <GearWideConnected />
+            </motion.div>
+            <span className='text-xs capitalize'>{dockLang.settings}</span>
+          </button>
+        </div>
+
       </main>
     </NavContext.Provider>
   );

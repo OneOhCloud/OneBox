@@ -1,7 +1,7 @@
 [package]
 name = "one-box"
 version = "1.0.0"
-description = "A Tauri App"
+description = "OneBox is a cross-platform GUI client based on the sing-box kernel."
 authors = ["OneOh Cloud LLC"]
 edition = "2021"
 

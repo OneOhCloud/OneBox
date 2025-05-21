@@ -182,7 +182,7 @@ export default function HomePage() {
   };
 
   return (
-    <div className="bg-gray-50 flex flex-col items-center justify-center p-6 h-full w-full">
+    <div className="bg-gray-50 flex flex-col items-center justify-center p-6  w-full">
       <AuthDialog onAuthSuccess={async () => {
         setPrivilegedDialog(false);
         setIsOnLoading(true);
