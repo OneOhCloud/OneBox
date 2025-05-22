@@ -37,7 +37,7 @@ pub fn run() {
             core::stop,
             core::is_running,
             privilege::is_privileged,
-            privilege::get_current_username,
+            privilege::save_privilege_password_to_keyring,
         ])
         .setup(|app| {
             #[cfg(desktop)]

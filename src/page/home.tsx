@@ -105,6 +105,9 @@ export default function HomePage() {
         console.log('没有超级管理员权限，弹出授权对话框');
         setPrivilegedDialog(true);
         return false;
+      } else {
+        console.log('有超级管理员权限，继续配置');
+        console.log('privileged:', privileged);
       }
       const fn = currentMode === 'global' ? setGlobalTunConfig : setTunConfig;
       await fn(identifier);

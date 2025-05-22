@@ -8,6 +8,7 @@ use tauri::Emitter;
 use tauri_plugin_shell::process::{Command, CommandChild, CommandEvent};
 use tauri_plugin_shell::ShellExt;
 
+use crate::privilege;
 use crate::vpn::helper;
 #[cfg(target_os = "linux")]
 use crate::vpn::linux as platform_impl;
@@ -53,15 +54,15 @@ pub async fn version(app: tauri::AppHandle) -> Result<String, String> {
 
 /// 启动代理进程
 #[tauri::command]
-pub async fn start(
-    app: tauri::AppHandle,
-    path: String,
-    mode: ProxyMode,
-    password: String,
-) -> Result<(), String> {
+pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Result<(), String> {
     // 启动前先停止已有进程
     let _ = stop(app.clone()).await?;
     let mode_clone = mode.clone();
+    let password = privilege::get_privilege_password_from_keyring().await;
+
+    if mode == ProxyMode::TunProxy && password.is_empty() {
+        return Err("请设置管理员密码".to_string());
+    }
 
     let sidecar_command_opt = if mode == ProxyMode::SystemProxy {
         // 普通权限执行
