@@ -1,57 +1,21 @@
-import { invoke } from "@tauri-apps/api/core";
-import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
-import { Globe, Reception4, Shield } from "react-bootstrap-icons";
-import useSWR from "swr";
+import { Shield } from "react-bootstrap-icons";
 import { useSubscriptions } from "../../hooks/useDB";
 import { Subscription } from "../../types/definition";
 import { t, vpnServiceManager } from "../../utils/helper";
+import { AppleNetworkStatus, GoogleNetworkStatus } from "./network-check";
 import SelectNode from "./select-node";
 import SelectSub from "./select-sub";
 
 const formatDate = (date: number) => new Date(date).toLocaleDateString('zh-CN');
 
-const NetworkStatus = ({ isOk, icon: Icon, tip }: { isOk: boolean; icon: typeof Globe; tip: string }) => (
-    <motion.div
-        className="tooltip tooltip-left"
-        data-tip={`${tip} ${isOk ? t("network_normal") : t("network_abnormal")}`}
-        initial={{ opacity: 0, scale: 0.8 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.3, type: "spring", stiffness: 200 }}
-        whileHover={{ scale: 1.1 }}
-    >
-        <motion.div
-            animate={{
-                rotateZ: isOk ? [0, 10, -10, 0] : 0,
-            }}
-            transition={{
-                duration: 0.5,
-                repeat: isOk ? Infinity : 0,
-                repeatDelay: 2
-            }}
-        >
-            <Icon className={`size-4 ${isOk ? 'text-gray-500' : 'text-red-500'} transition-colors duration-300`} />
-        </motion.div>
-    </motion.div>
-);
 
-const fetchNetworkStatus = async (mode: "google" | "apple") => {
-    try {
-        if (mode === "google") {
-            return await invoke<boolean>('ping_google');
-        } else {
-            return await invoke<boolean>('ping_apple_captive');
-        }
-    } catch {
-        return false;
-    }
-};
 
-export default function SettingsBody({ isRunning }: { isRunning: boolean }) {
+
+export default function VpnBody({ isRunning }: { isRunning: boolean }) {
     const [sub, setSub] = useState<Subscription>();
     const { data, isLoading } = useSubscriptions();
-    const { data: baiduStatus } = useSWR(isRunning ? 'baidu' : null, () => fetchNetworkStatus('apple'), { refreshInterval: 2000 });
-    const { data: googleStatus } = useSWR(isRunning ? 'google' : null, () => fetchNetworkStatus('google'), { refreshInterval: 2000 });
+
 
     const handleUpdate = async (identifier: string, isUpdate: boolean) => {
         try {
@@ -74,16 +38,13 @@ export default function SettingsBody({ isRunning }: { isRunning: boolean }) {
                                 t("current_subscription")
                             }
                         </div>
-                        {isRunning && (
-                            <div className="flex gap-2 px-2 items-center">
-                                <NetworkStatus isOk={baiduStatus ?? true} icon={Reception4} tip={
-                                    t("normal_network")
-                                } />
-                                <NetworkStatus isOk={googleStatus ?? true} icon={Globe} tip={
-                                    t("vpn_network")
-                                } />
-                            </div>
-                        )}
+
+                        <div className="flex gap-2 px-2 items-center">
+                            <AppleNetworkStatus isRunning={isRunning} />
+                            <GoogleNetworkStatus isRunning={isRunning} />
+                        </div>
+
+
                     </div>
                     <SelectSub onUpdate={handleUpdate} data={data} isLoading={isLoading} />
                 </div>
@@ -109,8 +70,6 @@ export default function SettingsBody({ isRunning }: { isRunning: boolean }) {
                             {formatDate(sub.expire_time)}
                         </span>
                     </div>
-
-
                 </div>
             )}
         </div>

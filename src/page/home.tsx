@@ -4,7 +4,7 @@ import { message } from '@tauri-apps/plugin-dialog';
 import { type } from '@tauri-apps/plugin-os';
 import { useContext, useEffect, useRef, useState } from "react";
 import { InfoCircle, Power } from 'react-bootstrap-icons';
-import SettingsBody from '../components/home/settings-body';
+import VpnBody from '../components/home/vpn-body';
 import AuthDialog from '../components/settings/auth-dialog';
 import setGlobalMixedConfig from '../config/global-mixed-config';
 import setGlobalTunConfig from '../config/global-tun-config';
@@ -252,7 +252,7 @@ export default function HomePage() {
         ))}
       </div>
 
-      <SettingsBody isRunning={isOn}></SettingsBody>
+      <VpnBody isRunning={isOn}></VpnBody>
 
     </div >
   )
