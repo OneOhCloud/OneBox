@@ -1,0 +1,15 @@
+{
+    "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
+    "identifier": "cloud.oneoh.onebox",
+    "bundle": {
+        "windows": {
+            "webviewInstallMode": {
+                "type": "embedBootstrapper"
+            }
+        },
+        "externalBin": [
+            "binaries/sing-box",
+            "binaries/sysproxy"
+        ]
+    }
+}

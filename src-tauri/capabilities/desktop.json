@@ -1,0 +1,51 @@
+{
+  "identifier": "desktop-capability",
+  "platforms": [
+    "macOS",
+    "windows",
+    "linux"
+  ],
+  "windows": [
+    "main"
+  ],
+  "permissions": [
+    "autostart:default",
+    "autostart:default",
+    "core:app:allow-default-window-icon",
+    "core:window:allow-destroy",
+    "core:window:allow-hide",
+    "core:window:allow-set-focus",
+    "core:window:allow-show",
+    "opener:allow-open-path",
+    "opener:allow-open-url",
+    "os:allow-arch",
+    "os:allow-exe-extension",
+    "os:allow-family",
+    "os:allow-locale",
+    "os:allow-os-type",
+    "os:allow-platform",
+    "os:allow-version",
+    "sql:allow-execute",
+    "sql:default",
+    "store:default",
+    "updater:default",
+    "window-state:default",
+    {
+      "identifier": "http:default",
+      "allow": [
+        {
+          "url": "http://*"
+        },
+        {
+          "url": "https://*"
+        },
+        {
+          "url": "http://*:*"
+        },
+        {
+          "url": "https://*:*"
+        }
+      ]
+    }
+  ]
+}

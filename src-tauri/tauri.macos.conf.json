@@ -1,0 +1,18 @@
+{
+  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
+  "identifier": "cloud.oneoh.onebox",
+  "productName": "OneBox",
+  "bundle": {
+    "targets": [
+      "app",
+      "dmg"
+    ],
+    "macOS": {
+      "frameworks": [],
+      "minimumSystemVersion": "10.15",
+      "exceptionDomain": "",
+      "signingIdentity": "Developer ID Application: OneOh Cloud LLC (GN2W3N34TM)",
+      "entitlements": "packages/macos/entitlements.plist"
+    }
+  }
+}

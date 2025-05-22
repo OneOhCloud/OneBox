@@ -1,0 +1,10 @@
+#!/usr/bin/env sh
+
+# 获取当前分支名
+current_branch=$(git rev-parse --abbrev-ref HEAD)
+
+# 检查是否是 local 分支
+if [ "$current_branch" = "local" ]; then
+    echo "\033[31m错误: 禁止推送 local 分支到远程仓库!\033[0m"
+    exit 1
+fi
