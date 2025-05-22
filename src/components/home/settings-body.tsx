@@ -35,9 +35,13 @@ const NetworkStatus = ({ isOk, icon: Icon, tip }: { isOk: boolean; icon: typeof 
     </motion.div>
 );
 
-const fetchNetworkStatus = async (url: string, proxy: boolean) => {
+const fetchNetworkStatus = async (mode: "google" | "apple") => {
     try {
-        return await invoke<boolean>('ping', { url: `https://www.${url}.com`, proxy: proxy });
+        if (mode === "google") {
+            return await invoke<boolean>('ping_google');
+        } else {
+            return await invoke<boolean>('ping_apple_captive');
+        }
     } catch {
         return false;
     }
@@ -46,8 +50,8 @@ const fetchNetworkStatus = async (url: string, proxy: boolean) => {
 export default function SettingsBody({ isRunning }: { isRunning: boolean }) {
     const [sub, setSub] = useState<Subscription>();
     const { data, isLoading } = useSubscriptions();
-    const { data: baiduStatus } = useSWR(isRunning ? 'baidu' : null, () => fetchNetworkStatus('baidu', false), { refreshInterval: 5000 });
-    const { data: googleStatus } = useSWR(isRunning ? 'google' : null, () => fetchNetworkStatus('google', true), { refreshInterval: 5000 });
+    const { data: baiduStatus } = useSWR(isRunning ? 'baidu' : null, () => fetchNetworkStatus('apple'), { refreshInterval: 2000 });
+    const { data: googleStatus } = useSWR(isRunning ? 'google' : null, () => fetchNetworkStatus('google'), { refreshInterval: 2000 });
 
     const handleUpdate = async (identifier: string, isUpdate: boolean) => {
         try {
