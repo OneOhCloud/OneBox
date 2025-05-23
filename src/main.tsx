@@ -4,12 +4,11 @@ import { listen } from '@tauri-apps/api/event';
 import { Menu } from '@tauri-apps/api/menu';
 import { TrayIcon } from '@tauri-apps/api/tray';
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import { writeText } from '@tauri-apps/plugin-clipboard-manager';
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
 import { getClashApiSecret } from './single/store';
-import { initLanguage, t, vpnServiceManager } from './utils/helper';
+import { copyEnvToClipboard, initLanguage, t, vpnServiceManager } from './utils/helper';
 
 const appWindow = getCurrentWindow();
 let trayInstance: TrayIcon | null = null;
@@ -54,13 +53,7 @@ async function createTrayMenu() {
         // text: '复制环境变量',
         text: t("menu_copy_env"),
         action: async () => {
-          const proxyConfig = 'export https_proxy=http://127.0.0.1:6789 http_proxy=http://127.0.0.1:6789 all_proxy=socks5://127.0.0.1:6789';
-          try {
-            await writeText(proxyConfig);
-            console.log('Proxy configuration copied to clipboard');
-          } catch (error) {
-            console.error('Failed to copy proxy configuration:', error);
-          }
+          await copyEnvToClipboard("127.0.0.1", "6789");
         },
       },
 

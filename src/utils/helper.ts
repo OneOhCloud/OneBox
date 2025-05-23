@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import * as path from '@tauri-apps/api/path';
+import { writeText } from '@tauri-apps/plugin-clipboard-manager';
 import { arch, locale, type, version } from '@tauri-apps/plugin-os';
 import { OsInfo, SING_BOX_VERSION } from '../types/definition';
 
@@ -49,6 +50,25 @@ export async function getOsInfo() {
         osVersion,
         osLocale,
     } as OsInfo
+}
+
+export async function copyEnvToClipboard(proxy_host: string, proxy_port: string) {
+    const osType = type()
+    let proxyConfig = "";
+
+    if (osType === 'windows') {
+        proxyConfig = `$env:HTTP_PROXY="http://${proxy_host}:${proxy_port}"; $env:HTTPS_PROXY="http://${proxy_host}:${proxy_port}"`;
+    } else {
+        proxyConfig = `export https_proxy=http://${proxy_host}:${proxy_port} \n export http_proxy=http://${proxy_host}:${proxy_port} \n export all_proxy=socks5://${proxy_host}:${proxy_port}`;
+    }
+
+    try {
+        await writeText(proxyConfig);
+        console.log('Proxy configuration copied to clipboard');
+    } catch (error) {
+        console.error('Failed to copy proxy configuration:', error);
+    }
+
 }
 
 export function formatOsInfo(osType: string, osArch: string) {
