@@ -14,12 +14,17 @@ jobs:
         include:
           - platform: "macos-latest"
             args: "--target aarch64-apple-darwin"
+            cache: "aarch64"
           - platform: "macos-latest"
             args: "--target x86_64-apple-darwin"
+            cache: "x86_64"
           - platform: "ubuntu-24.04"
             args: ""
+            cache: "x86_64"
           - platform: "windows-latest"
             args: ""
+            cache: "x86_64"
+
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -60,7 +65,7 @@ jobs:
         uses: swatinem/rust-cache@v2
         with:
           shared-key: "global-rust-cache"
-          key: "target-${{ matrix.platform}}-${{matrix.args || 'default'}}"
+          key: "target-${{ matrix.platform}}-${{matrix.cache || 'default'}}"
           workspaces: src-tauri
           cache-all-crates: true
           cache-on-failure: true
