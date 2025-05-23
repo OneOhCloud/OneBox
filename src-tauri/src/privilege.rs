@@ -10,6 +10,7 @@ const KEYRING_KEY_NAME: &str = "privilege_password";
 
 // 定义 trait 作为接口
 pub trait PrivilegeHelper {
+    #[cfg(not(target_os = "windows"))]
     fn get_current_user() -> String {
         "unknown".to_string()
     }
@@ -25,10 +26,6 @@ pub struct PlatformPrivilegeHelper;
 
 #[cfg(target_os = "windows")]
 impl PrivilegeHelper for PlatformPrivilegeHelper {
-    fn get_current_user() -> String {
-        "".to_string()
-    }
-
     async fn is_privileged(_password: Option<String>) -> bool {
         // 默认实现
         false
@@ -128,15 +125,12 @@ impl PrivilegeHelper for PlatformPrivilegeHelper {
     }
 }
 
+#[cfg(not(target_os = "windows"))]
 pub fn get_current_username() -> String {
     PlatformPrivilegeHelper::get_current_user()
 }
 
-#[tauri::command]
-pub async fn is_privileged(password: Option<String>) -> bool {
-    PlatformPrivilegeHelper::is_privileged(password).await
-}
-
+#[cfg(not(target_os = "windows"))]
 pub async fn get_privilege_password_from_keyring() -> String {
     match Entry::new(KEYRING_SERVICE, KEYRING_KEY_NAME) {
         Ok(entry) => match entry.get_password() {
@@ -145,6 +139,11 @@ pub async fn get_privilege_password_from_keyring() -> String {
         },
         Err(_) => String::new(),
     }
+}
+
+#[tauri::command]
+pub async fn is_privileged(password: Option<String>) -> bool {
+    PlatformPrivilegeHelper::is_privileged(password).await
 }
 
 #[tauri::command]

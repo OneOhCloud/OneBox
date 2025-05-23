@@ -4,10 +4,7 @@ use std::path::Path;
 use std::sync::{Arc, Mutex};
 use tauri_plugin_http::reqwest;
 
-use tauri::Emitter;
-use tauri_plugin_shell::process::{Command, CommandChild, CommandEvent};
-use tauri_plugin_shell::ShellExt;
-
+#[cfg(not(target_os = "windows"))]
 use crate::privilege;
 use crate::vpn::helper;
 #[cfg(target_os = "linux")]
@@ -16,6 +13,9 @@ use crate::vpn::linux as platform_impl;
 use crate::vpn::macos as platform_impl;
 #[cfg(target_os = "windows")]
 use crate::vpn::windows as platform_impl;
+use tauri::Emitter;
+use tauri_plugin_shell::process::{Command, CommandChild, CommandEvent};
+use tauri_plugin_shell::ShellExt;
 
 /// 代理模式
 #[derive(Default, Clone, PartialEq, Serialize, Deserialize, Debug)]
