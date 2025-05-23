@@ -59,6 +59,7 @@ jobs:
       - name: Cache Rust Dependencies
         uses: swatinem/rust-cache@v2
         with:
+          key: "target-${{ matrix.platform}}-${{matrix.args || 'default'}}"
           workspaces: './src-tauri -> target'
 
 
