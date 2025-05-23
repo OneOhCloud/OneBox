@@ -70,6 +70,7 @@ async fn get_password_for_mode(mode: &ProxyMode) -> Result<String, String> {
     #[cfg(target_os = "windows")]
     {
         // 无论是 TUN 模式还是系统代理模式，Windows 都不需要密码
+        println!("mode: {:?}", mode);
         Ok(String::new())
     }
 }
