@@ -2,6 +2,7 @@ import { useState } from "react";
 
 import { fetch } from '@tauri-apps/plugin-http';
 import useSWR from "swr";
+import { getClashApiSecret } from "../../single/store";
 import { t } from "../../utils/helper";
 import NodeOption from "./node-option";
 
@@ -26,10 +27,12 @@ export default function SelectNode(props: SelectNodeProps) {
         const response = await fetch(url, {
             method: 'GET',
             headers: {
-                'Content-Type': 'application/json',
                 'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                "Authorization": `Bearer ${await getClashApiSecret()}`,
             },
         });
+
         let res = await response.json();
         return res
     }, {
@@ -83,8 +86,9 @@ export function SelecItem(props: SelecItemProps) {
             await fetch(proxiesUrl, {
                 method: 'PUT',
                 headers: {
-                    'Content-Type': 'application/json',
                     'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                    "Authorization": `Bearer ${await getClashApiSecret()}`,
                 },
                 body: JSON.stringify({ 'name': node }),
             });

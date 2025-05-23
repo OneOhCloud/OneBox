@@ -28,7 +28,7 @@
     "@tauri-apps/plugin-updater": "^2.7.1",
     "@tauri-apps/plugin-window-state": "^2.2.2",
     "@types/bytes": "^3.1.5",
-    "@types/node": "^22.15.20",
+    "@types/node": "^22.15.21",
     "@types/unzipper": "^0.10.11",
     "bytes": "^3.1.2",
     "framer-motion": "^12.12.1",
@@ -38,14 +38,14 @@
     "react-hot-toast": "^2.5.2",
     "swr": "^2.3.3",
     "tailwindcss": "^4.1.7",
-    "zod": "^3.25.7"
+    "zod": "^3.25.20"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.5.0",
-    "@types/react": "^19.1.4",
+    "@types/react": "^19.1.5",
     "@types/react-dom": "^19.1.5",
     "@vitejs/plugin-react": "^4.4.1",
-    "daisyui": "^5.0.35",
+    "daisyui": "^5.0.37",
     "husky": "^9.1.7",
     "tar": "^7.4.3",
     "typescript": "~5.6.3",

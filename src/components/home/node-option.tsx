@@ -1,5 +1,6 @@
 import { fetch } from '@tauri-apps/plugin-http';
 import useSWR from "swr";
+import { getClashApiSecret } from '../../single/store';
 import { t } from '../../utils/helper';
 
 type NodeOptionProps = {
@@ -11,8 +12,10 @@ export default function NodeOption({ nodeName }: NodeOptionProps) {
         const response = await fetch(url, {
             method: 'GET',
             headers: {
+                "Authorization": `Bearer ${await getClashApiSecret()}`,
                 'Content-Type': 'application/json',
                 'Accept': 'application/json',
+
             },
         });
 

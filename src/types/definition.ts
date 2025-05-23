@@ -4,7 +4,6 @@ export const GITHUB_URL = 'https://github.com/OneOhCloud/OneBox'
 export const OFFICIAL_WEBSITE = 'https://sing-box.net'
 export const SING_BOX_VERSION = "v1.11.11"
 export const SSI_STORE_KEY = 'selected_subscription_identifier'
-export const PRIVILEGED_PASSWORD_STORE_KEY = 'privileged_password_key'
 
 
 // 允许局域网连接

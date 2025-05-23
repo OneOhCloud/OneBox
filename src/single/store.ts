@@ -3,6 +3,7 @@ import { LazyStore } from '@tauri-apps/plugin-store';
 import { ALLOWLAN_STORE_KEY, ENABLE_TUN_STORE_KEY } from '../types/definition';
 
 export const LANGUAGE_STORE_KEY = 'language';
+export const CLASH_API_SECRET = 'clash_api_secret_key';
 
 export const store = new LazyStore('settings.json', {
     autoSave: true
@@ -37,7 +38,26 @@ export async function setStoreValue(key: string, value: any) {
 }
 
 
-// 获取当前语言设置
+/**
+ * Retrieves or generates a Clash API secret from the store.
+ * 
+ * @returns A Promise that resolves to the Clash API secret string.
+ * If a secret exists in the store, returns that secret.
+ * If no secret exists, generates a new random secret, saves it to the store, and returns it.
+ */
+export async function getClashApiSecret(): Promise<string> {
+    const secret = await store.get(CLASH_API_SECRET);
+    if (secret) {
+        return secret as string;
+    } else {
+        const randomSecret = Math.random().toString(36).substring(2, 18);
+        await store.set(CLASH_API_SECRET, randomSecret);
+        await store.save();
+        return randomSecret;
+    }
+}
+
+
 export const getLanguage = async () => {
     const language = await getStoreValue(LANGUAGE_STORE_KEY) as string | undefined;
     if (language) {

@@ -46,6 +46,8 @@ tauri-plugin-clipboard-manager = "2"
 winapi = { version = "0.3", features = ["winbase"] }
 windows = { version = "0.56.0", features = ["Win32_Foundation", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging"] }
 webbrowser = "1.0.4"
+keyring = { version = "3", features = ["apple-native", "windows-native", "sync-secret-service"] }
+
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-autostart = "2"
@@ -53,3 +55,10 @@ tauri-plugin-single-instance = "2"
 tauri-plugin-updater = "2"
 tauri-plugin-window-state = "2"
 
+
+[dependencies.uuid]
+version = "1.16.0"
+# Lets you generate random UUIDs
+features = [
+    "v4",
+]

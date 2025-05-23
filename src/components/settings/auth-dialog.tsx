@@ -1,7 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useRef, useState } from "react";
-import { setStoreValue } from "../../single/store";
-import { PRIVILEGED_PASSWORD_STORE_KEY } from "../../types/definition";
 import { t } from "../../utils/helper";
 
 interface AuthDialogProps {
@@ -13,7 +11,6 @@ interface AuthDialogProps {
 export default function AuthDialog({ open, onClose, onAuthSuccess }: AuthDialogProps) {
     const [isLoading, setIsLoading] = useState(false);
     const [isError, setIsError] = useState(false);
-    const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
     const modalRef = useRef<HTMLDialogElement>(null);
 
@@ -22,12 +19,8 @@ export default function AuthDialog({ open, onClose, onAuthSuccess }: AuthDialogP
         if (open) {
             setPassword("");
             setIsError(false);
-            invoke<string>("get_current_username")
-                .then(username => {
-                    setUsername(username);
-                    modalRef.current?.showModal();
-                })
-                .catch(err => console.error("无法获取用户名:", err));
+            modalRef.current?.showModal();
+
         }
 
         return () => modalRef.current?.close();
@@ -35,16 +28,15 @@ export default function AuthDialog({ open, onClose, onAuthSuccess }: AuthDialogP
 
     // 验证处理
     const handleVerify = async () => {
-        if (!password) return;
 
         setIsLoading(true);
         setIsError(false);
 
         try {
-            const isPrivileged = await invoke<boolean>("is_privileged", { username, password });
+            const isPrivileged = await invoke<boolean>("is_privileged", { password: password });
 
             if (isPrivileged) {
-                setStoreValue(PRIVILEGED_PASSWORD_STORE_KEY, password);
+                await invoke("save_privilege_password_to_keyring", { password });
                 onAuthSuccess();
                 modalRef.current?.close();
             } else {

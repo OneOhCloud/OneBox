@@ -8,6 +8,7 @@ import { writeText } from '@tauri-apps/plugin-clipboard-manager';
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
+import { getClashApiSecret } from './single/store';
 import { initLanguage, t, vpnServiceManager } from './utils/helper';
 
 const appWindow = getCurrentWindow();
@@ -19,7 +20,8 @@ let trayInstance: TrayIcon | null = null;
 async function createTrayMenu() {
   // 获取当前运行状态
   await initLanguage();
-  const status = await invoke<boolean>("is_running"); // 假设 invoke 返回 boolean
+  let secret = await getClashApiSecret();
+  const status = await invoke<boolean>("is_running", { secret: secret });
 
   return await Menu.new({
     items: [

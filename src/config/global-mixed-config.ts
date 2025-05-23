@@ -1,6 +1,7 @@
 import * as path from '@tauri-apps/api/path';
 import { getSubscriptionConfig } from '../action/db';
 import { getAllowLan } from '../single/store';
+import { clashApi } from './common';
 import { updateVPNServerConfigFromDB } from './helper';
 
 const mixedConfig = {
@@ -89,9 +90,7 @@ const mixedConfig = {
         "auto_detect_interface": true,
     },
     "experimental": {
-        "clash_api": {
-            "external_controller": "127.0.0.1:9191",
-        },
+        "clash_api": clashApi,
         "cache_file": {
             "enabled": true,
             "store_fakeip": false,

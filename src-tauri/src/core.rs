@@ -8,6 +8,7 @@ use tauri::Emitter;
 use tauri_plugin_shell::process::{Command, CommandChild, CommandEvent};
 use tauri_plugin_shell::ShellExt;
 
+use crate::privilege;
 use crate::vpn::helper;
 #[cfg(target_os = "linux")]
 use crate::vpn::linux as platform_impl;
@@ -51,17 +52,34 @@ pub async fn version(app: tauri::AppHandle) -> Result<String, String> {
     String::from_utf8(output.stdout).map_err(|e| e.to_string())
 }
 
+async fn get_password_for_mode(mode: &ProxyMode) -> Result<String, String> {
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
+    {
+        if *mode == ProxyMode::TunProxy {
+            let pwd = privilege::get_privilege_password_from_keyring().await;
+            if pwd.is_empty() {
+                return Err("Password is empty".to_string());
+            }
+            Ok(pwd)
+        } else {
+            // 普通权限执行, 不需要密码
+            Ok(String::new())
+        }
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        // 无论是 TUN 模式还是系统代理模式，Windows 都不需要密码
+        Ok(String::new())
+    }
+}
 /// 启动代理进程
 #[tauri::command]
-pub async fn start(
-    app: tauri::AppHandle,
-    path: String,
-    mode: ProxyMode,
-    password: String,
-) -> Result<(), String> {
+pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Result<(), String> {
     // 启动前先停止已有进程
-    let _ = stop(app.clone()).await?;
+    stop(app.clone()).await?;
     let mode_clone = mode.clone();
+    let password = get_password_for_mode(&mode).await?;
 
     let sidecar_command_opt = if mode == ProxyMode::SystemProxy {
         // 普通权限执行
@@ -183,7 +201,7 @@ pub async fn start(
             manager.current_mode = Some(mode);
         } // MutexGuard 在这里被释放
 
-        // 睡眠 1.5s 等待进程启动
+        // 睡眠 1s 等待进程启动
         std::thread::sleep(std::time::Duration::from_millis(1000));
 
         app.emit("status-changed", ()).unwrap();
@@ -244,14 +262,16 @@ pub async fn stop(app: tauri::AppHandle) -> Result<(), String> {
 
 /// 判断代理进程是否运行中
 #[tauri::command]
-pub async fn is_running() -> bool {
+pub async fn is_running(secret: String) -> bool {
     let client = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(2))
         .no_proxy()
         .build()
         .unwrap();
 
-    let res = client.get("http://127.0.0.1:9191/version");
+    let res = client
+        .get("http://127.0.0.1:9191/version")
+        .header("Authorization", format!("Bearer {}", secret));
     let res = res.send().await;
     if let Ok(res) = res {
         if res.status() == 200 {

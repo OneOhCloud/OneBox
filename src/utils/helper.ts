@@ -1,13 +1,13 @@
 import { invoke } from '@tauri-apps/api/core';
 import * as path from '@tauri-apps/api/path';
 import { arch, locale, type, version } from '@tauri-apps/plugin-os';
-import { OsInfo, PRIVILEGED_PASSWORD_STORE_KEY, SING_BOX_VERSION } from '../types/definition';
+import { OsInfo, SING_BOX_VERSION } from '../types/definition';
 
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { message } from '@tauri-apps/plugin-dialog';
 import en from '../lang/en.json';
 import zh from '../lang/zh.json';
-import { getEnableTun, getLanguage, getStoreValue } from '../single/store';
+import { getEnableTun, getLanguage } from '../single/store';
 const appWindow = getCurrentWindow();
 const enLang = en as Record<string, string>;
 const zhLang = zh as Record<string, string>;
@@ -92,7 +92,6 @@ export const vpnServiceManager = {
         const tunMode: boolean | undefined = await getEnableTun();
         let mode: vpnServiceManagerMode = tunMode ? 'TunProxy' : 'SystemProxy';
         let osType = type();
-        let password = "";
         console.log("启动VPN服务");
         console.log("模式:", mode);
         console.log("配置文件路径:", configPath);
@@ -105,9 +104,8 @@ export const vpnServiceManager = {
                 // 一般来说不会弹出这个提示，如果弹出此提示，说明之前的交互逻辑有问题。
                 await message('致命错误：授权失败', { title: '提示', kind: 'error' });
             }
-            password = await getStoreValue(PRIVILEGED_PASSWORD_STORE_KEY);
         }
-        await invoke("start", { app: appWindow, path: configPath, mode: mode, password: password });
+        await invoke("start", { app: appWindow, path: configPath, mode: mode });
     },
     stop: async () => await invoke("stop", { app: appWindow }),
 
@@ -116,21 +114,7 @@ export const vpnServiceManager = {
 
 
 export const verifyPrivileged = async () => {
-    const username = await invoke<string>("get_current_username");
-    if (!username) {
-        return false;
-    }
-    const password = await getStoreValue(PRIVILEGED_PASSWORD_STORE_KEY);
-    if (!password) {
-        return false;
-    }
-
-    const ok = await invoke<boolean>("is_privileged", {
-        username,
-        password,
-    });
-
-    return ok;
+    return await invoke<boolean>("is_privileged");
 
 };
 

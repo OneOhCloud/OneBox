@@ -4,41 +4,41 @@
     "": {
       "name": "one-box",
       "dependencies": {
-        "@tailwindcss/vite": "^4.1.5",
-        "@tauri-apps/api": "^2.4.0",
+        "@tailwindcss/vite": "^4.1.7",
+        "@tauri-apps/api": "^2.5.0",
         "@tauri-apps/plugin-autostart": "^2.3.0",
-        "@tauri-apps/plugin-clipboard-manager": "~2",
-        "@tauri-apps/plugin-dialog": "^2.2.1",
+        "@tauri-apps/plugin-clipboard-manager": "~2.2.2",
+        "@tauri-apps/plugin-dialog": "^2.2.2",
         "@tauri-apps/plugin-fs": "~2.2.1",
-        "@tauri-apps/plugin-http": "~2.4.3",
+        "@tauri-apps/plugin-http": "~2.4.4",
         "@tauri-apps/plugin-log": "~2.3.1",
-        "@tauri-apps/plugin-opener": "~2.2.6",
+        "@tauri-apps/plugin-opener": "~2.2.7",
         "@tauri-apps/plugin-os": "~2.2.1",
         "@tauri-apps/plugin-process": "^2.2.1",
         "@tauri-apps/plugin-shell": "~2.2.1",
         "@tauri-apps/plugin-sql": "~2.2.0",
         "@tauri-apps/plugin-store": "~2.2.0",
-        "@tauri-apps/plugin-updater": "^2.7.0",
+        "@tauri-apps/plugin-updater": "^2.7.1",
         "@tauri-apps/plugin-window-state": "^2.2.2",
         "@types/bytes": "^3.1.5",
-        "@types/node": "^22.14.1",
+        "@types/node": "^22.15.21",
         "@types/unzipper": "^0.10.11",
         "bytes": "^3.1.2",
-        "framer-motion": "^12.7.2",
+        "framer-motion": "^12.12.1",
         "react": "^19.1.0",
-        "react-bootstrap-icons": "^1.11.5",
+        "react-bootstrap-icons": "^1.11.6",
         "react-dom": "^19.1.0",
         "react-hot-toast": "^2.5.2",
         "swr": "^2.3.3",
-        "tailwindcss": "^4.1.5",
-        "zod": "^3.24.4",
+        "tailwindcss": "^4.1.7",
+        "zod": "^3.25.20",
       },
       "devDependencies": {
-        "@tauri-apps/cli": "^2.4.0",
-        "@types/react": "^19.1.2",
-        "@types/react-dom": "^19.1.2",
-        "@vitejs/plugin-react": "^4.3.4",
-        "daisyui": "^5.0.35",
+        "@tauri-apps/cli": "^2.5.0",
+        "@types/react": "^19.1.5",
+        "@types/react-dom": "^19.1.5",
+        "@vitejs/plugin-react": "^4.4.1",
+        "daisyui": "^5.0.37",
         "husky": "^9.1.7",
         "tar": "^7.4.3",
         "typescript": "~5.6.3",
@@ -288,9 +288,9 @@
 
     "@types/estree": ["@types/estree@1.0.6", "", {}, "sha512-AYnb1nQyY49te+VRAVgmzfcgjYS91mY5P0TKUDCLEM+gNnA+3T6rWITXRLYCpahpqSQbN5cE+gHpnPyXjHWxcw=="],
 
-    "@types/node": ["@types/node@22.15.20", "", { "dependencies": { "undici-types": "~6.21.0" } }, "sha512-A6BohGFRGHAscJsTslDCA9JG7qSJr/DWUvrvY8yi9IgnGtMxCyat7vvQ//MFa0DnLsyuS3wYTpLdw4Hf+Q5JXw=="],
+    "@types/node": ["@types/node@22.15.21", "", { "dependencies": { "undici-types": "~6.21.0" } }, "sha512-EV/37Td6c+MgKAbkcLG6vqZ2zEYHD7bvSrzqqs2RIhbA6w3x+Dqz8MZM3sP6kGTeLrdoOgKZe+Xja7tUB2DNkQ=="],
 
-    "@types/react": ["@types/react@19.1.4", "", { "dependencies": { "csstype": "^3.0.2" } }, "sha512-EB1yiiYdvySuIITtD5lhW4yPyJ31RkJkkDw794LaQYrxCSaQV/47y5o1FMC4zF9ZyjUjzJMZwbovEnT5yHTW6g=="],
+    "@types/react": ["@types/react@19.1.5", "", { "dependencies": { "csstype": "^3.0.2" } }, "sha512-piErsCVVbpMMT2r7wbawdZsq4xMvIAhQuac2gedQHysu1TZYEigE6pnFfgZT+/jQnrRuF5r+SHzuehFjfRjr4g=="],
 
     "@types/react-dom": ["@types/react-dom@19.1.5", "", { "peerDependencies": { "@types/react": "^19.0.0" } }, "sha512-CMCjrWucUBZvohgZxkjd6S9h0nZxXjzus6yDfUb+xLxYM7VvjKNH1tQrE9GWLql1XoOP4/Ds3bwFqShHUYraGg=="],
 
@@ -328,7 +328,7 @@
 
     "csstype": ["csstype@3.1.3", "", {}, "sha512-M1uQkMl8rQK/szD0LNhtqxIPLpimGm8sOBwU7lLnCpSbTyY3yeU1Vc7l4KT5zT4s/yOxHH5O7tIuuLOCnLADRw=="],
 
-    "daisyui": ["daisyui@5.0.35", "", {}, "sha512-AWi11n/x5++mps55jcwrBf0Lmip1euWY0FYcH/05SFGmoqrU7S7/aIUWaiaeqlJ5EcmEZ/7zEY73aOxMv6hcIg=="],
+    "daisyui": ["daisyui@5.0.37", "", {}, "sha512-PLc+MhWAqTwolygEGPDi+ac+OsFqIt9nZylTIiyVlEx8loYL7Pt7hNWb8cp5pQQ9dhjYnda1ERiuM6OsJmvPGw=="],
 
     "debug": ["debug@4.4.0", "", { "dependencies": { "ms": "^2.1.3" } }, "sha512-6WTZ/IxCY/T6BALoZHaE4ctp9xm+Z5kY/pzYaCHRFeyVhojxlrm+46y68HA6hr0TcwEssoxNiDEUJQjfPZ/RYA=="],
 
@@ -536,7 +536,7 @@
 
     "yallist": ["yallist@5.0.0", "", {}, "sha512-YgvUTfwqyc7UXVMrB+SImsVYSmTS8X/tSrtdNZMImM+n7+QTriRXyXim0mBrTXNeqzVF0KWGgHPeiyViFFrNDw=="],
 
-    "zod": ["zod@3.25.7", "", {}, "sha512-YGdT1cVRmKkOg6Sq7vY7IkxdphySKnXhaUmFI4r4FcuFVNgpCb9tZfNwXbT6BPjD5oz0nubFsoo9pIqKrDcCvg=="],
+    "zod": ["zod@3.25.20", "", {}, "sha512-z03fqpTMDF1G02VLKUMt6vyACE7rNWkh3gpXVHgPTw28NPtDFRGvcpTtPwn2kMKtQ0idtYJUTxchytmnqYswcw=="],
 
     "@tailwindcss/node/lightningcss": ["lightningcss@1.30.1", "", { "dependencies": { "detect-libc": "^2.0.3" }, "optionalDependencies": { "lightningcss-darwin-arm64": "1.30.1", "lightningcss-darwin-x64": "1.30.1", "lightningcss-freebsd-x64": "1.30.1", "lightningcss-linux-arm-gnueabihf": "1.30.1", "lightningcss-linux-arm64-gnu": "1.30.1", "lightningcss-linux-arm64-musl": "1.30.1", "lightningcss-linux-x64-gnu": "1.30.1", "lightningcss-linux-x64-musl": "1.30.1", "lightningcss-win32-arm64-msvc": "1.30.1", "lightningcss-win32-x64-msvc": "1.30.1" } }, "sha512-xi6IyHML+c9+Q3W0S4fCQJOym42pyurFiJUHEcEyHS0CeKzia4yZDEsLlqOFykxOdHpNy0NmvVO31vcSqAxJCg=="],
 

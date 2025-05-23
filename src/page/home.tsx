@@ -12,7 +12,7 @@ import setMixedConfig from "../config/mixed-config";
 import setTunConfig from "../config/tun-config";
 import { useSubscriptions } from '../hooks/useDB';
 import { NavContext } from '../single/context';
-import { getEnableTun, getStoreValue, setStoreValue } from "../single/store";
+import { getClashApiSecret, getEnableTun, getStoreValue, setStoreValue } from "../single/store";
 import { RULE_MODE_STORE_KEY, SSI_STORE_KEY } from '../types/definition';
 import { t, verifyPrivileged, vpnServiceManager } from "../utils/helper";
 
@@ -36,10 +36,10 @@ export default function HomePage() {
   // 初始化检查
   useEffect(() => {
     //  检查是否正在运行
-    invoke<boolean>('is_running').then(setIsOn).catch((error) => {
-      console.error('Error checking VPN status:', error);
-      setIsOn(false);
-    });
+    getClashApiSecret().then(async (secret) => {
+      const status = await invoke<boolean>("is_running", { secret: secret });
+      setIsOn(status);
+    })
 
     // 获取当前规则模式
     getStoreValue(RULE_MODE_STORE_KEY).then((v: SelectedModeType) => {
@@ -58,7 +58,9 @@ export default function HomePage() {
   //事件监听 
   useEffect(() => {
     const unsubscribe = listen('status-changed', async (_) => {
-      setIsOn(await invoke<boolean>('is_running'));
+      let secret = await getClashApiSecret();
+
+      setIsOn(await invoke<boolean>('is_running', { secret: secret }));
     });
 
     return () => {
@@ -105,6 +107,9 @@ export default function HomePage() {
         console.log('没有超级管理员权限，弹出授权对话框');
         setPrivilegedDialog(true);
         return false;
+      } else {
+        console.log('有超级管理员权限，继续配置');
+        console.log('privileged:', privileged);
       }
       const fn = currentMode === 'global' ? setGlobalTunConfig : setTunConfig;
       await fn(identifier);
@@ -144,6 +149,7 @@ export default function HomePage() {
       await turnOff();
       await turnOn();
     } catch (error) {
+      console.error('重启服务失败:', error);
       await message(t('reconnect_failed'), { title: t('error'), kind: 'error' });
     } finally {
       setTimeout(() => setIsOnLoading(false), 1200);
@@ -161,6 +167,7 @@ export default function HomePage() {
       isOn ? await turnOff() : await turnOn();
       setIsOn(prev => !prev);
     } catch (error) {
+      console.error('连接失败:', error);
       await message(t('connect_failed'), { title: t('error'), kind: 'error' });
     } finally {
       setTimeout(() => setIsOnLoading(false), 1200);

@@ -1,58 +1,9 @@
 import { BaseDirectory, create, exists, writeFile } from '@tauri-apps/plugin-fs';
+import { getClashApiSecret } from '../single/store';
 
 
 
-export const ruleSet = [
-    {
-        "tag": "geoip-cn",
-        "type": "remote",
-        "format": "binary",
-        "url": "https://fastly.jsdelivr.net/gh/SagerNet/sing-geoip@rule-set/geoip-cn.srs",
-        "download_detour": "direct"
-    },
-    {
-        "tag": "geosite-cn",
-        "type": "remote",
-        "format": "binary",
-        "url": "https://fastly.jsdelivr.net/gh/OneOhCloud/one-geosite@rules/geosite-one-cn.srs",
-        "download_detour": "direct"
-    },
-    {
-        "tag": "geosite-apple",
-        "type": "remote",
-        "format": "binary",
-        "url": "https://fastly.jsdelivr.net/gh/SagerNet/sing-geosite@rule-set/geosite-apple.srs",
-        "download_detour": "direct"
-    },
-    {
-        "tag": "geosite-microsoft-cn",
-        "type": "remote",
-        "format": "binary",
-        "url": "https://fastly.jsdelivr.net/gh/SagerNet/sing-geosite@rule-set/geosite-microsoft@cn.srs",
-        "download_detour": "direct"
-    },
-    {
-        "tag": "geosite-samsung",
-        "type": "remote",
-        "format": "binary",
-        "url": "https://fastly.jsdelivr.net/gh/SagerNet/sing-geosite@rule-set/geosite-samsung.srs",
-        "download_detour": "direct"
-    },
-    {
-        "tag": "geosite-telegram",
-        "type": "remote",
-        "format": "binary",
-        "url": "https://fastly.jsdelivr.net/gh/SagerNet/sing-geosite@rule-set/geosite-telegram.srs",
-        "download_detour": "direct"
-    },
-    {
-        "tag": "geosite-private",
-        "type": "remote",
-        "format": "binary",
-        "url": "https://fastly.jsdelivr.net/gh/SagerNet/sing-geosite@rule-set/geosite-private.srs",
-        "download_detour": "direct"
-    }
-]
+
 
 /**
  * 将数据写入指定的配置文件
@@ -126,6 +77,9 @@ export async function updateVPNServerConfigFromDB(fileName: string, dbConfigData
     outboundsUrltest.push(...urltestNameList);
 
     outbound_groups.push(...vpnServerList);
+
+    newConfig["experimental"]["clash_api"]["secret"] = await getClashApiSecret();
+
     await writeConfigFile(fileName, new TextEncoder().encode(JSON.stringify(newConfig)));
 
 

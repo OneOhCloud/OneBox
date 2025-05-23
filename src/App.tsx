@@ -9,7 +9,7 @@ import Dev from './page/dev';
 import HomePage from './page/home';
 import SettingsPage from './page/settings';
 import { NavContext } from './single/context';
-import { t } from './utils/helper';
+import { initLanguage, t } from './utils/helper';
 
 const debug = false;
 
@@ -44,6 +44,16 @@ function App() {
   const handleLanguageChange = (lang: string) => {
     setLanguage(lang);
   }
+
+  useEffect(() => {
+    initLanguage().then(() => {
+      setDockLang({
+        home: t("home"),
+        configuration: t("configuration"),
+        settings: t("settings"),
+      })
+    })
+  }, []);
 
   return (
     <NavContext.Provider value={{ activeScreen, setActiveScreen, handleLanguageChange }}>
