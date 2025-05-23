@@ -60,7 +60,9 @@ jobs:
         uses: swatinem/rust-cache@v2
         with:
           key: "target-${{ matrix.platform}}-${{matrix.args || 'default'}}"
-          workspaces: './src-tauri -> target'
+          workspaces: src-tauri
+          cache-all-crates: true
+          cache-on-failure: true
 
 
       - name: Install Frontend Dependencies
