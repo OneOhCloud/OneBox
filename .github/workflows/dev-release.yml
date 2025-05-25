@@ -3,7 +3,7 @@ name: "Dev Build"
 on:
   push:
     paths:
-      - 'src-tauri/Cargo.toml'
+      - 'src-tauri/tauri.conf.json'
     branches:
       - dev
 
