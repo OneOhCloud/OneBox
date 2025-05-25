@@ -1,0 +1,14 @@
+{
+  "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
+  "identifier": "cloud.oneoh.onebox",
+  "productName": "OneBox",
+  "bundle": {
+    "targets": [
+      "deb",
+      "rpm"
+    ],
+    "externalBin": [
+      "binaries/sing-box"
+    ]
+  }
+}

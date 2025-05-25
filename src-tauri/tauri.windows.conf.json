@@ -3,6 +3,13 @@
     "identifier": "cloud.oneoh.onebox",
     "bundle": {
         "windows": {
+            "nsis": {
+                "displayLanguageSelector": true,
+                "languages": [
+                    "SimpChinese",
+                    "English"
+                ]
+            },
             "webviewInstallMode": {
                 "type": "embedBootstrapper"
             }

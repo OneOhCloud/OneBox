@@ -27,7 +27,6 @@ pub fn register_plugins(builder: Builder<Wry>, migrations: Vec<Migration>) -> Bu
             },
         ))
         .plugin(tauri_plugin_opener::init())
-        .plugin(tauri_plugin_updater::Builder::new().build())
 }
 
 fn show_window(app: &AppHandle) {

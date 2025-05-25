@@ -1,8 +1,11 @@
 name: "Manual Dev Build"
 
 on:
-  # 允许手动触发工作流
-  workflow_dispatch:
+  push:
+    paths:
+      - 'src-tauri/Cargo.toml'
+    branches:
+      - daily
 
 jobs:
   build-tauri:
@@ -98,10 +101,10 @@ jobs:
           APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
         with:
-          tagName: v${{ steps.tauri_version.outputs.version }}
+          tagName: "daily"
           releaseName: "v${{ steps.tauri_version.outputs.version }}"
           releaseBody: "Fix some bugs and add some new features"
-          releaseDraft: true
+          releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
 

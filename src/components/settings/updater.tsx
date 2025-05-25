@@ -3,6 +3,8 @@ import { relaunch } from '@tauri-apps/plugin-process';
 import { check } from '@tauri-apps/plugin-updater';
 import { useEffect, useState } from "react";
 import { CloudArrowDown, CloudArrowUpFill } from "react-bootstrap-icons";
+import { getStoreValue } from '../../single/store';
+import { UPDATE_STAGE_STORE_KEY } from '../../types/definition';
 import { t, vpnServiceManager } from "../../utils/helper";
 import { SettingItem } from "./common";
 
@@ -17,7 +19,6 @@ export default function UpdaterItem() {
             setDownloading(true);
             // 模拟下载开始
             console.log('开始模拟下载更新...');
-
             // 模拟下载进度
             let progress = 0;
             const interval = setInterval(() => {
@@ -44,10 +45,17 @@ export default function UpdaterItem() {
             await simulateUpdateProcess();
             return;
         }
-
+        let stage = await getStoreValue(UPDATE_STAGE_STORE_KEY, "stable");
         // 真实更新流程
         try {
-            const updateInfo = await check();
+
+            const updateInfo = await check({
+                timeout: 5000, // 设置超时时间为10秒
+                headers: {
+                    'Accept': 'application/json',
+                    'stage': stage,
+                }
+            });
             if (updateInfo) {
                 console.log(
                     `found update ${updateInfo.version} from ${updateInfo.date} with notes ${updateInfo.body}`
@@ -151,9 +159,6 @@ export default function UpdaterItem() {
                     </div>
                 </div>
             )}
-
-
-
         </>
     )
 }
