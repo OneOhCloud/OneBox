@@ -98,11 +98,9 @@ jobs:
           APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
         with:
-          tagName: v${{ steps.tauri_version.outputs.version }}
+          tagName: "manual"
           releaseName: "v${{ steps.tauri_version.outputs.version }}"
           releaseBody: "Fix some bugs and add some new features"
-          releaseDraft: true
-          prerelease: false
           args: ${{ matrix.args }}
 
       - name: Clean Up Temporary Apple AuthKey (macOS Only)

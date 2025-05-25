@@ -95,8 +95,6 @@ jobs:
           tagName: "stable"
           releaseName: "v${{ steps.tauri_version.outputs.version }}"
           releaseBody: "Fix some bugs and add some new features"
-          releaseDraft: false
-          prerelease: false
           args: ${{ matrix.args }}
 
       - name: Clean Up Temporary Apple AuthKey (macOS Only)
