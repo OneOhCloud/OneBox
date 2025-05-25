@@ -1,4 +1,4 @@
-name: "publish"
+name: "Stable Build"
 
 on:
   push:
