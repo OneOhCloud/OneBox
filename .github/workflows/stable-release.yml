@@ -92,10 +92,10 @@ jobs:
           APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
         with:
-          tagName: v${{ steps.tauri_version.outputs.version }}
+          tagName: "stable"
           releaseName: "v${{ steps.tauri_version.outputs.version }}"
-          releaseBody: "修复一些 bugs，添加一些新功能"
-          releaseDraft: true
+          releaseBody: "Fix some bugs and add some new features"
+          releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
 

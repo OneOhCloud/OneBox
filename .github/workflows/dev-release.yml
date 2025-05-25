@@ -1,0 +1,114 @@
+name: "Manual Dev Build"
+
+on:
+  push:
+    paths:
+      - 'src-tauri/Cargo.toml'
+    branches:
+      - dev
+
+jobs:
+  build-tauri:
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: "macos-latest"
+            args: "--target aarch64-apple-darwin"
+            cache: "aarch64"
+          - platform: "macos-latest"
+            args: "--target x86_64-apple-darwin"
+            cache: "x86_64"
+          - platform: "ubuntu-24.04"
+            args: ""
+            cache: "x86_64"
+          - platform: "windows-latest"
+            args: ""
+            cache: "x86_64"
+
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get Tauri Version
+        id: tauri_version
+        run: echo "version=$(node -p "require('./src-tauri/tauri.conf.json').version")" >> $GITHUB_OUTPUT
+        shell: bash
+
+      - name: Set Up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+      - name: Set Up Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install Linux Dependencies
+        if: matrix.platform == 'ubuntu-24.04'
+        run: |
+            sudo apt update
+            sudo apt install libwebkit2gtk-4.1-dev \
+              build-essential \
+              curl \
+              wget \
+              file \
+              libxdo-dev \
+              libssl-dev \
+              libayatana-appindicator3-dev \
+              librsvg2-dev
+
+      - name: Set Up Rust Toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - name: Cache Rust Dependencies
+        uses: swatinem/rust-cache@v2
+        with:
+          shared-key: "global-rust-cache"
+          key: "target-${{ matrix.platform}}-${{matrix.cache || 'default'}}"
+          workspaces: src-tauri
+          cache-all-crates: true
+          cache-on-failure: true
+
+
+      - name: Install Frontend Dependencies
+        run: bun install
+
+      - name: Download Binaries
+        run: bun run scripts/download-binaries.ts
+
+      - name: Create Temporary Apple AuthKey (macOS Only)
+        if: matrix.platform == 'macos-latest'
+        run: |
+          echo "${{ secrets.APPLE_AUTH_KEY }}" > $GITHUB_WORKSPACE/temp_auth_key.p8
+        shell: bash
+
+      - name: Build and Release with Tauri Action
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+          # 作者签名
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+          # 苹果签名
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          # 苹果公证
+          APPLE_API_KEY_PATH: ${{ github.workspace }}/temp_auth_key.p8
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+        with:
+          tagName: "dev"
+          releaseName: "v${{ steps.tauri_version.outputs.version }}"
+          releaseBody: "Fix some bugs and add some new features"
+          releaseDraft: false
+          prerelease: false
+          args: ${{ matrix.args }}
+
+      - name: Clean Up Temporary Apple AuthKey (macOS Only)
+        if: matrix.platform == 'macos-latest'
+        run: rm -f temp_auth_key.p8
+        shell: bash
