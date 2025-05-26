@@ -119,6 +119,7 @@ jobs:
           releaseName: "Dev"
           releaseBody: "Fix some bugs and add some new features"
           args: ${{ matrix.args }}
+          prerelease: true
 
       - name: Clean Up Temporary Apple AuthKey (macOS Only)
         if: matrix.platform == 'macos-latest'
