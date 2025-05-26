@@ -45,7 +45,15 @@ export default function UpdaterItem() {
             await simulateUpdateProcess();
             return;
         }
-        let stage = await getStoreValue(STAGE_VERSION_STORE_KEY, "stable");
+
+        // 获取当前阶段版本
+        let stage = await getStoreValue(STAGE_VERSION_STORE_KEY, "latest");
+
+        if (stage === "stable") {
+            stage = "latest"; // 稳定版直接使用最新版本
+        }
+
+
         // 真实更新流程
         try {
 

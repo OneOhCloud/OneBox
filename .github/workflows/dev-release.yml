@@ -116,7 +116,7 @@ jobs:
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
         with:
           tagName: "dev"
-          releaseName: "v${{ steps.tauri_version.outputs.version }}"
+          releaseName: "Dev"
           releaseBody: "Fix some bugs and add some new features"
           args: ${{ matrix.args }}
 
