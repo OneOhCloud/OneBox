@@ -78,6 +78,7 @@ jobs:
           echo "${{ secrets.APPLE_AUTH_KEY }}" > $GITHUB_WORKSPACE/temp_auth_key.p8
         shell: bash
 
+
       - name: Build and Release with Tauri Action
         uses: tauri-apps/tauri-action@v0
         env:
@@ -93,7 +94,7 @@ jobs:
           APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
         with:
-          tagName: "stable"
+          tagName: "stable-v${{ steps.tauri_version.outputs.version }}"
           releaseName: "v${{ steps.tauri_version.outputs.version }}"
           releaseBody: "Fix some bugs and add some new features"
           releaseDraft: true
