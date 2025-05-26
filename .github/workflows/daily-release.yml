@@ -5,7 +5,7 @@ on:
     paths:
       - 'src-tauri/tauri.conf.json'
     branches:
-      - daily
+      - feature/daily
 
 jobs:
   build-tauri:
