@@ -83,6 +83,18 @@ jobs:
           echo "${{ secrets.APPLE_AUTH_KEY }}" > $GITHUB_WORKSPACE/temp_auth_key.p8
         shell: bash
 
+
+      - name: Delete Old Manual Release
+        uses: dev-drprasad/delete-tag-and-release@v1.1
+        with:
+          tag_name: manual
+          delete_release: true
+          repo: ${{ github.repository }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+
       - name: Build and Release with Tauri Action
         uses: tauri-apps/tauri-action@v0
         env:
