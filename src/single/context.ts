@@ -1,8 +1,14 @@
 import { createContext } from "react";
 
+
+
+export type ActiveScreenType = 'home' | 'configuration' | 'settings' | 'developer_options';
+
+
+
 interface NavContextType {
-    activeScreen: 'home' | 'configuration' | 'settings';
-    setActiveScreen: (screen: 'home' | 'configuration' | 'settings') => void;
+    activeScreen: ActiveScreenType;
+    setActiveScreen: (screen: ActiveScreenType) => void;
     handleLanguageChange: (lang: string) => void;
 }
 

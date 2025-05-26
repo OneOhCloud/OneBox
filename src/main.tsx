@@ -7,7 +7,8 @@ import { getCurrentWindow } from '@tauri-apps/api/window';
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
-import { getClashApiSecret } from './single/store';
+import { getClashApiSecret, getStoreValue } from './single/store';
+import { DEVELOPER_TOGGLE_STORE_KEY } from './types/definition';
 import { copyEnvToClipboard, initLanguage, t, vpnServiceManager } from './utils/helper';
 
 const appWindow = getCurrentWindow();
@@ -22,7 +23,7 @@ async function createTrayMenu() {
   let secret = await getClashApiSecret();
   const status = await invoke<boolean>("is_running", { secret: secret });
 
-  return await Menu.new({
+  let baseMenu = {
     items: [
       {
         id: 'show',
@@ -57,6 +58,13 @@ async function createTrayMenu() {
         },
       },
 
+    ],
+  }
+  const developer_toggle_state: boolean = await getStoreValue(DEVELOPER_TOGGLE_STORE_KEY, false);
+
+  if (developer_toggle_state) {
+    console.log("开发者模式已启用，添加调试工具菜单项");
+    baseMenu.items.push(
       {
         id: 'devtools',
         // text: '调试工具',
@@ -65,18 +73,25 @@ async function createTrayMenu() {
           await invoke("open_devtools");
         },
       },
-      {
-        id: 'quit',
-        // text: '退出程序',
-        text: t("menu_quit"),
-        action: async () => {
-          await invoke("stop");
-          await appWindow.close();
-          await appWindow.destroy();
-        },
+    );
+
+  }
+
+  baseMenu.items.push(
+    {
+      id: 'quit',
+      // text: '退出程序',
+      text: t("menu_quit"),
+      action: async () => {
+        await invoke("stop");
+        await appWindow.close();
+        await appWindow.destroy();
       },
-    ],
-  });
+    },
+
+  )
+
+  return await Menu.new(baseMenu);
 }
 
 // 初始化托盘

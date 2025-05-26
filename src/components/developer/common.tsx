@@ -32,6 +32,7 @@ export function SettingItem({
     icon,
     title,
     badge,
+    subTitle,
     onPress = () => { },
     disabled = false
 }: SettingItemProps) {
@@ -44,7 +45,10 @@ export function SettingItem({
         >
             <div className="flex items-center">
                 <div className="mr-4">{icon}</div>
-                <span className="text-[#1C1C1E] capitalize">{title}</span>
+                <div>
+                    <div className="text-[#1C1C1E] capitalize">{title}</div>
+                    {subTitle && <div className="text-xs text-[#8E8E93]">{subTitle}</div>}
+                </div>
             </div>
             <div className="flex items-center">
                 {badge}

@@ -4,7 +4,7 @@ import { check } from '@tauri-apps/plugin-updater';
 import { useEffect, useState } from "react";
 import { CloudArrowDown, CloudArrowUpFill } from "react-bootstrap-icons";
 import { getStoreValue } from '../../single/store';
-import { UPDATE_STAGE_STORE_KEY } from '../../types/definition';
+import { STAGE_VERSION_STORE_KEY } from '../../types/definition';
 import { t, vpnServiceManager } from "../../utils/helper";
 import { SettingItem } from "./common";
 
@@ -45,7 +45,7 @@ export default function UpdaterItem() {
             await simulateUpdateProcess();
             return;
         }
-        let stage = await getStoreValue(UPDATE_STAGE_STORE_KEY, "stable");
+        let stage = await getStoreValue(STAGE_VERSION_STORE_KEY, "stable");
         // 真实更新流程
         try {
 

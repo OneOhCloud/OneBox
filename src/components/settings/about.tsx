@@ -1,19 +1,18 @@
 import { invoke } from "@tauri-apps/api/core";
 import { openUrl } from '@tauri-apps/plugin-opener';
-import { useEffect, useState } from "react";
+import { useContext, useEffect, useState } from "react";
 import { Github, Globe, InfoCircleFill, XLg } from "react-bootstrap-icons";
 import toast from 'react-hot-toast';
+import { NavContext } from "../../single/context";
 import { aboutText } from "../../types/copyright";
 import { GITHUB_URL, OFFICIAL_WEBSITE, OsInfo } from "../../types/definition";
 import { formatOsInfo, getOsInfo, getSingBoxUserAgent, t } from "../../utils/helper";
 import { SettingItem } from "./common";
 
-// 关于组件接口定义
 interface AboutProps {
     onClose: () => void;
 }
 
-// 信息项接口定义
 interface InfoItemProps {
     label: string;
     value: string;
@@ -46,6 +45,8 @@ function About({ onClose }: AboutProps) {
     const [ua, setUa] = useState<string>("");
     const [version, setVersion] = useState<string>("");
     const [coreVersion, setCoreVersion] = useState<string>("");
+    const { setActiveScreen } = useContext(NavContext);
+
     useEffect(() => {
         getOsInfo().then((info) => {
             setOsInfo(info)
@@ -173,6 +174,17 @@ function About({ onClose }: AboutProps) {
                             <pre className="text-xs text-gray-600 whitespace-pre-wrap overflow-x-auto">
                                 {aboutText}
                             </pre>
+                        </div>
+
+                        <div>
+                            <button
+                                className="mt-4 btn btn-sm btn-ghost  btn-success w-full"
+                                onClick={() => {
+                                    setActiveScreen('developer_options');
+                                }}
+                            >
+                                {t("developer_options")}
+                            </button>
                         </div>
 
                     </div>

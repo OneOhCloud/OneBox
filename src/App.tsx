@@ -5,18 +5,17 @@ import { Toaster } from 'react-hot-toast';
 import "./App.css";
 
 import ConfigurationPage from './page/config';
-import Dev from './page/dev';
+import DevPage from './page/developer';
 import HomePage from './page/home';
 import SettingsPage from './page/settings';
-import { NavContext } from './single/context';
+import { ActiveScreenType, NavContext } from './single/context';
 import { initLanguage, t } from './utils/helper';
 
-const debug = false;
 
 
 
 function App() {
-  const [activeScreen, setActiveScreen] = useState<'home' | 'configuration' | 'settings'>('home');
+  const [activeScreen, setActiveScreen] = useState<ActiveScreenType>('home');
   const [isSettingsHovered, setIsSettingsHovered] = useState(false);
   const [dockLang, setDockLang] = useState({
     home: t("home"),
@@ -26,9 +25,6 @@ function App() {
 
   const [language, setLanguage] = useState('unknown');
 
-  if (debug) {
-    return <Dev></Dev>
-  }
 
   useEffect(() => {
     const handleLanguageChange = () => {
@@ -62,11 +58,26 @@ function App() {
       <main className="bg-gray-50 flex flex-col h-screen">
 
         <div className="flex-1 overflow-y-hidden ">
-          {activeScreen === 'home' && <div className="animate-fade-in h-full"><HomePage /></div>}
-          {activeScreen === 'configuration' && <div className="animate-fade-in h-full"><ConfigurationPage /></div>}
-          {activeScreen === 'settings' && <div className="animate-fade-in h-full"><SettingsPage /></div>}
+          {activeScreen === 'home' &&
+            <div className="animate-fade-in h-full">
+              <HomePage />
+            </div>
+          }
+          {activeScreen === 'configuration' &&
+            <div className="animate-fade-in h-full">
+              <ConfigurationPage />
+            </div>
+          }
+          {activeScreen === 'settings' &&
+            <div className="animate-fade-in h-full">
+              <SettingsPage />
+            </div>
+          }
+          {activeScreen === 'developer_options' &&
+            <div className="animate-fade-in h-full">
+              <DevPage />
+            </div>}
         </div>
-
 
         <div className="dock  dock-sm  bg-gray-50 border-0">
           <button

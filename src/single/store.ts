@@ -5,6 +5,24 @@ import { ALLOWLAN_STORE_KEY, ENABLE_TUN_STORE_KEY } from '../types/definition';
 export const LANGUAGE_STORE_KEY = 'language';
 export const CLASH_API_SECRET = 'clash_api_secret_key';
 
+
+
+
+export async function getStoreValue(key: string, val?: any): Promise<any> {
+    let value = await store.get(key);
+
+    // 如果 val 存在且 value 为 undefined、null 或空字符串，则返回 val
+    if (val && (value === undefined || value === null || value === '')) {
+        return val;
+    }
+    return value;
+}
+export async function setStoreValue(key: string, value: any) {
+    await store.set(key, value);
+    await store.save();
+}
+
+
 export const store = new LazyStore('settings.json', {
     autoSave: true
 });
@@ -29,19 +47,7 @@ export async function setAllowLan(value: boolean) {
     await store.save();
 }
 
-export async function getStoreValue(key: string, val?: any): Promise<any> {
-    let value = await store.get(key);
 
-    // 如果 val 存在且 value 为 undefined、null 或空字符串，则返回 val
-    if (val && (value === undefined || value === null || value === '')) {
-        return val;
-    }
-    return value;
-}
-export async function setStoreValue(key: string, value: any) {
-    await store.set(key, value);
-    await store.save();
-}
 
 
 /**
