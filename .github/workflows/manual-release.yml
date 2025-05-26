@@ -5,7 +5,23 @@ on:
   workflow_dispatch:
 
 jobs:
+  delete-old-manual:
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete Old Manual Release
+        uses: dev-drprasad/delete-tag-and-release@v1.1
+        with:
+          tag_name: manual
+          delete_release: true
+          repo: ${{ github.repository }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   build-tauri:
+    needs: delete-old-manual
     permissions:
       contents: write
     strategy:

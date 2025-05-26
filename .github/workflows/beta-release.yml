@@ -10,7 +10,23 @@ on:
       - feature/beta
 
 jobs:
+  delete-old-beta:
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete Old Beta Release
+        uses: dev-drprasad/delete-tag-and-release@v1.1
+        with:
+          tag_name: beta
+          delete_release: true
+          repo: ${{ github.repository }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   build-tauri:
+    needs: delete-old-beta
     permissions:
       contents: write
     strategy:
@@ -87,18 +103,6 @@ jobs:
         run: |
           echo "${{ secrets.APPLE_AUTH_KEY }}" > $GITHUB_WORKSPACE/temp_auth_key.p8
         shell: bash
-
-
-      - name: Delete Old Beta Release
-        uses: dev-drprasad/delete-tag-and-release@v1.1
-        with:
-          tag_name: beta
-          delete_release: true
-          repo: ${{ github.repository }}
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
 
       - name: Build and Release with Tauri Action
         uses: tauri-apps/tauri-action@v0
