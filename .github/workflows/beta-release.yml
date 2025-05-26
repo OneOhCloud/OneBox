@@ -1,11 +1,11 @@
-name: "Daily Build"
+name: "Beta Build"
 
 on:
   push:
     paths:
       - 'src-tauri/tauri.conf.json'
     branches:
-      - feature/daily
+      - beta
 
 jobs:
   build-tauri:
@@ -101,7 +101,7 @@ jobs:
           APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
         with:
-          tagName: "daily"
+          tagName: "beta"
           releaseName: "v${{ steps.tauri_version.outputs.version }}"
           releaseBody: "Fix some bugs and add some new features"
           args: ${{ matrix.args }}
