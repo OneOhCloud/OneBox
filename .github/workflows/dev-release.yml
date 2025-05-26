@@ -1,6 +1,8 @@
 name: "Dev Build"
 
 on:
+  workflow_dispatch:
+
   push:
     paths:
       - 'src-tauri/tauri.conf.json'
@@ -104,7 +106,7 @@ jobs:
           tagName: "dev"
           releaseName: "v${{ steps.tauri_version.outputs.version }}"
           releaseBody: "Fix some bugs and add some new features"
-          releaseDraft: false
+          releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
 
