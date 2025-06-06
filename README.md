@@ -17,4 +17,4 @@ OneBox is a simple, efficient, and stable network tool developed based on the si
 
 ## Download and Installation 💻
 
-Please visit our [release page](https://github.com/username/OneBox/releases) to get the latest version.
+Please visit our [release page](https://github.com/OneOhCloud/OneBox/releases) to get the latest version.
