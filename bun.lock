@@ -4,7 +4,7 @@
     "": {
       "name": "one-box",
       "dependencies": {
-        "@tailwindcss/vite": "^4.1.7",
+        "@tailwindcss/vite": "^4.1.8",
         "@tauri-apps/api": "^2.5.0",
         "@tauri-apps/plugin-autostart": "^2.3.0",
         "@tauri-apps/plugin-clipboard-manager": "~2.2.2",
@@ -21,24 +21,24 @@
         "@tauri-apps/plugin-updater": "^2.7.1",
         "@tauri-apps/plugin-window-state": "^2.2.2",
         "@types/bytes": "^3.1.5",
-        "@types/node": "^22.15.21",
+        "@types/node": "^22.15.30",
         "@types/unzipper": "^0.10.11",
         "bytes": "^3.1.2",
-        "framer-motion": "^12.12.1",
+        "framer-motion": "^12.16.0",
         "react": "^19.1.0",
         "react-bootstrap-icons": "^1.11.6",
         "react-dom": "^19.1.0",
         "react-hot-toast": "^2.5.2",
         "swr": "^2.3.3",
-        "tailwindcss": "^4.1.7",
-        "zod": "^3.25.20",
+        "tailwindcss": "^4.1.8",
+        "zod": "^3.25.53",
       },
       "devDependencies": {
         "@tauri-apps/cli": "^2.5.0",
-        "@types/react": "^19.1.5",
-        "@types/react-dom": "^19.1.5",
-        "@vitejs/plugin-react": "^4.4.1",
-        "daisyui": "^5.0.37",
+        "@types/react": "^19.1.6",
+        "@types/react-dom": "^19.1.6",
+        "@vitejs/plugin-react": "^4.5.1",
+        "daisyui": "^5.0.43",
         "husky": "^9.1.7",
         "tar": "^7.4.3",
         "typescript": "~5.6.3",
@@ -538,7 +538,7 @@
 
     "yallist": ["yallist@5.0.0", "", {}, "sha512-YgvUTfwqyc7UXVMrB+SImsVYSmTS8X/tSrtdNZMImM+n7+QTriRXyXim0mBrTXNeqzVF0KWGgHPeiyViFFrNDw=="],
 
-    "zod": ["zod@3.25.53", "", {}, "sha512-BKOKoY3XcGUVkqaalCtFK15LhwR0G0i65AClFpWSXLN2gJNBGlTktukHgwexCTa/dAacPPp9ReryXPWyeZF4LQ=="],
+    "zod": ["zod@3.25.56", "", {}, "sha512-rd6eEF3BTNvQnR2e2wwolfTmUTnp70aUTqr0oaGbHifzC3BKJsoV+Gat8vxUMR1hwOKBs6El+qWehrHbCpW6SQ=="],
 
     "@tailwindcss/node/lightningcss": ["lightningcss@1.30.1", "", { "dependencies": { "detect-libc": "^2.0.3" }, "optionalDependencies": { "lightningcss-darwin-arm64": "1.30.1", "lightningcss-darwin-x64": "1.30.1", "lightningcss-freebsd-x64": "1.30.1", "lightningcss-linux-arm-gnueabihf": "1.30.1", "lightningcss-linux-arm64-gnu": "1.30.1", "lightningcss-linux-arm64-musl": "1.30.1", "lightningcss-linux-x64-gnu": "1.30.1", "lightningcss-linux-x64-musl": "1.30.1", "lightningcss-win32-arm64-msvc": "1.30.1", "lightningcss-win32-x64-msvc": "1.30.1" } }, "sha512-xi6IyHML+c9+Q3W0S4fCQJOym42pyurFiJUHEcEyHS0CeKzia4yZDEsLlqOFykxOdHpNy0NmvVO31vcSqAxJCg=="],
 
