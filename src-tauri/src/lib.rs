@@ -1,4 +1,4 @@
-use tauri::{AppHandle, Manager, Window, WindowEvent};
+use tauri::{AppHandle, Manager};
 mod core;
 mod database;
 mod lan;
@@ -18,6 +18,44 @@ fn open_devtools(app: AppHandle) {
     window.open_devtools();
 }
 
+#[tauri::command]
+async fn quit(app: AppHandle) {
+    // 退出应用
+    app.exit(0);
+}
+
+#[tauri::command]
+async fn create_window(app: tauri::AppHandle, label: String, window_tag: String, title: String) {
+    // 检查窗口是否已存在
+    if let Some(existing_window) = app.get_webview_window(&label) {
+        // 如果窗口已存在，则切换到该窗口
+        existing_window.show().unwrap_or_else(|e| {
+            eprintln!("Failed to show existing window: {}", e);
+        });
+        existing_window.set_focus().unwrap_or_else(|e| {
+            eprintln!("Failed to focus existing window: {}", e);
+        });
+        existing_window.unminimize().unwrap_or_else(|e| {
+            eprintln!("Failed to unminimize existing window: {}", e);
+        });
+        return;
+    }
+
+    // 如果窗口不存在，则创建新窗口
+    let _webview_window = tauri::WebviewWindowBuilder::new(
+        &app,
+        label,
+        tauri::WebviewUrl::App(format!("index.html?windowTag={}", window_tag).into()),
+    )
+    .title(title)
+    .inner_size(800.0, 600.0) // 设置窗口大小，宽度800，高度600
+    .resizable(true) // 允许用户调整窗口大小
+    .build()
+    .map_err(|e| {
+        eprintln!("Failed to create window: {}", e);
+    });
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let migrations = database::get_migrations();
@@ -29,6 +67,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             get_app_version,
             open_devtools,
+            create_window,
+            quit,
             lan::get_lan_ip,
             lan::ping_google,
             lan::ping_apple_captive,
@@ -74,26 +114,26 @@ pub fn run() {
                 println!("menu item {:?} not handled", event.id);
             }
         })
-        .on_window_event(|window: &Window, event: &WindowEvent| match event {
-            WindowEvent::CloseRequested { api, .. } => {
-                // 阻止窗口关闭
-                api.prevent_close();
-                print!("窗口关闭请求被重定向为最小化到托盘");
-                // 隐藏窗口（最小化到托盘）
-                if let Some(main_window) = window.app_handle().get_webview_window("main") {
-                    main_window.hide().unwrap();
-                }
-            }
-            WindowEvent::Resized { .. } => {
-                // 窗口大小改变
-                println!("窗口大小改变");
-            }
-            WindowEvent::Destroyed => {
-                let _ = core::stop(window.app_handle().clone());
-                println!("Destroyed");
-            }
-            _ => {}
-        })
+        // .on_window_event(|window: &Window, event: &WindowEvent| match event {
+        //     WindowEvent::CloseRequested { api, .. } => {
+        //         // 阻止窗口关闭
+        //         api.prevent_close();
+        //         print!("窗口关闭请求被重定向为最小化到托盘");
+        //         // 隐藏窗口（最小化到托盘）
+        //         if let Some(main_window) = window.app_handle().get_webview_window("main") {
+        //             main_window.hide().unwrap();
+        //         }
+        //     }
+        //     WindowEvent::Resized { .. } => {
+        //         // 窗口大小改变
+        //         println!("窗口大小改变");
+        //     }
+        //     WindowEvent::Destroyed => {
+        //         let _ = core::stop(window.app_handle().clone());
+        //         println!("Destroyed");
+        //     }
+        //     _ => {}
+        // })
         .run(tauri::generate_context!())
         .expect("error while running tauri application")
 }

@@ -22,7 +22,7 @@ export const itemVariants = {
             // 使用交错顺序动画，先宽度，后高度
             default: { duration: 0.4 },
             height: {
-                type: "spring",
+                type: "spring" as const,
                 stiffness: 400,
                 damping: 25,
                 delay: 0.05
@@ -32,17 +32,16 @@ export const itemVariants = {
                 delay: 0.1
             },
             clipPath: {
-                duration: 0.4,
-                ease: [0.22, 1, 0.36, 1] // 自定义缓动函数，类似苹果的缓动
+                duration: 0.4
             },
             scaleX: {
-                type: "spring",
+                type: "spring" as const,
                 stiffness: 500,
                 damping: 30,
                 delay: 0
             },
             scaleY: {
-                type: "spring",
+                type: "spring" as const,
                 stiffness: 400,
                 damping: 28,
                 delay: 0.05
@@ -68,8 +67,7 @@ export const itemVariants = {
                 delay: 0.05
             },
             scaleX: {
-                duration: 0.2,
-                ease: [0.3, 0, 0.8, 0.15] // 快速收缩曲线
+                duration: 0.2
             },
             scaleY: {
                 duration: 0.2,
@@ -79,8 +77,7 @@ export const itemVariants = {
                 duration: 0.15
             },
             clipPath: {
-                duration: 0.25,
-                ease: [0.3, 0, 0.8, 0.15]
+                duration: 0.25
             },
             filter: {
                 duration: 0.1

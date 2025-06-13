@@ -6,7 +6,8 @@
     "linux"
   ],
   "windows": [
-    "main"
+    "main",
+    "sing-box-log"
   ],
   "permissions": [
     "autostart:default",

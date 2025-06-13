@@ -54,14 +54,8 @@ const tunConfig = {
                 ],
                 "server": "remote"
             },
-            {
-                "clash_mode": "直连",
-                "server": "system"
-            },
-            {
-                "clash_mode": "全局",
-                "server": "remote"
-            },
+
+
             {
                 "domain_suffix": [
                     ".oneoh.cloud",
@@ -172,14 +166,6 @@ const tunConfig = {
             {
                 "protocol": "quic",
                 "action": "reject"
-            },
-            {
-                "clash_mode": "直连",
-                "outbound": "direct"
-            },
-            {
-                "clash_mode": "全局",
-                "outbound": "ExitGateway"
             },
             {
                 "ip_is_private": true,
