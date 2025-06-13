@@ -16,6 +16,7 @@ export default function WindowManger() {
       if (tag) {
         setWindowType(tag);
       } else {
+        console.warn('No windowTag found in URL, defaulting to main window');
         setWindowType('main');
       }
     };
@@ -27,13 +28,12 @@ export default function WindowManger() {
 
     <div className='rounded-xl '>
 
-      {windowType === 'main' && (
-        <App></App>
-      )}
-
-      {windowType === 'sing-box-log' && (
-        <LogPage></LogPage>
-      )}
+      <div style={{ display: windowType === 'main' ? 'block' : 'none' }}>
+        <App />
+      </div>
+      <div style={{ display: windowType === 'sing-box-log' ? 'block' : 'none' }}>
+        <LogPage />
+      </div>
     </div>
   )
 

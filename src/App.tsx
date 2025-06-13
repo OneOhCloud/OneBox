@@ -27,6 +27,7 @@ let trayInstance: TrayIcon | null = null;
 
 // 创建托盘菜单
 async function createTrayMenu() {
+
   // 获取当前运行状态
   await initLanguage();
   let secret = await getClashApiSecret();
@@ -114,6 +115,10 @@ async function createTrayMenu() {
 
 // 初始化托盘
 async function setupTrayIcon() {
+
+
+
+
   if (trayInstance) {
     return trayInstance;
   }
@@ -143,8 +148,12 @@ async function setupStatusListener() {
   });
 }
 
-setupTrayIcon();
-setupStatusListener();
+// 
+if (appWindow.label === "main") {
+  setupTrayIcon();
+  setupStatusListener();
+}
+
 
 
 function App() {
