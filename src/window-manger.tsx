@@ -23,18 +23,12 @@ export default function WindowManger() {
     getWindowType();
   }, []);
 
-
-  return (
-
-    <div className='rounded-xl '>
-
-      <div style={{ display: windowType === 'main' ? 'block' : 'none' }}>
-        <App />
-      </div>
-      <div style={{ display: windowType === 'sing-box-log' ? 'block' : 'none' }}>
-        <LogPage />
-      </div>
-    </div>
-  )
+  if (windowType === 'main') {
+    return <App />;
+  }
+  if (windowType === 'sing-box-log') {
+    return <LogPage />;
+  }
+  return <div></div>
 
 }

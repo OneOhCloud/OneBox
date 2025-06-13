@@ -11,6 +11,8 @@ export default function NodeOption({ nodeName }: NodeOptionProps) {
     const { data } = useSWR(`http://127.0.0.1:9191/proxies/${encodeURIComponent(nodeName)}`, async (url) => {
         const response = await fetch(url, {
             method: 'GET',
+            // @ts-ignore
+            timeout: 3,
             headers: {
                 "Authorization": `Bearer ${await getClashApiSecret()}`,
                 'Content-Type': 'application/json',
