@@ -2,6 +2,22 @@
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "identifier": "cloud.oneoh.onebox",
   "productName": "OneBox",
+  "app": {
+    "windows": [
+      {
+        "devtools": true,
+        "maximizable": false,
+        "decorations": true,
+        "resizable": false,
+        "title": "OneBox",
+        "width": 320,
+        "height": 600
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
   "bundle": {
     "targets": [
       "deb",
