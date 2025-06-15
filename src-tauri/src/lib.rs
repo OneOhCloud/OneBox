@@ -1,4 +1,4 @@
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Manager, Window, WindowEvent};
 mod core;
 mod database;
 mod lan;
@@ -20,7 +20,10 @@ fn open_devtools(app: AppHandle) {
 
 #[tauri::command]
 async fn quit(app: AppHandle) {
-    // 退出应用
+    // 退出应用并清理资源
+    core::reset_system_proxy(&app).await.unwrap_or_else(|e| {
+        eprintln!("Failed to reset system proxy: {}", e);
+    });
     app.exit(0);
 }
 
@@ -114,26 +117,31 @@ pub fn run() {
                 println!("menu item {:?} not handled", event.id);
             }
         })
-        // .on_window_event(|window: &Window, event: &WindowEvent| match event {
-        //     WindowEvent::CloseRequested { api, .. } => {
-        //         // 阻止窗口关闭
-        //         api.prevent_close();
-        //         print!("窗口关闭请求被重定向为最小化到托盘");
-        //         // 隐藏窗口（最小化到托盘）
-        //         if let Some(main_window) = window.app_handle().get_webview_window("main") {
-        //             main_window.hide().unwrap();
-        //         }
-        //     }
-        //     WindowEvent::Resized { .. } => {
-        //         // 窗口大小改变
-        //         println!("窗口大小改变");
-        //     }
-        //     WindowEvent::Destroyed => {
-        //         let _ = core::stop(window.app_handle().clone());
-        //         println!("Destroyed");
-        //     }
-        //     _ => {}
-        // })
+        .on_window_event(|window: &Window, event: &WindowEvent| match event {
+            WindowEvent::CloseRequested { api, .. } => {
+                // 阻止窗口关闭
+                // 只针对 main 窗口
+                if window.label() != "main" {
+                    return;
+                }
+
+                api.prevent_close();
+                println!("窗口关闭请求被重定向为最小化到托盘");
+                // 隐藏窗口（最小化到托盘）
+                if let Some(main_window) = window.app_handle().get_webview_window("main") {
+                    main_window.hide().unwrap();
+                }
+            }
+            WindowEvent::Resized { .. } => {
+                // 窗口大小改变
+                println!("窗口大小改变");
+            }
+            WindowEvent::Destroyed => {
+                let _ = core::stop(window.app_handle().clone());
+                println!("Destroyed");
+            }
+            _ => {}
+        })
         .run(tauri::generate_context!())
         .expect("error while running tauri application")
 }

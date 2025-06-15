@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import { useEffect, useState } from 'react';
-import { DashLg, GearWideConnected, House, Layers, PlusLg, XLg } from 'react-bootstrap-icons';
+import { GearWideConnected, House, Layers } from 'react-bootstrap-icons';
 import { Toaster } from 'react-hot-toast';
 import "./App.css";
 
@@ -103,7 +103,6 @@ async function createTrayMenu() {
       // text: '退出程序',
       text: t("menu_quit"),
       action: async () => {
-        await invoke("stop");
         await invoke("quit");
       },
     },
@@ -198,20 +197,9 @@ function App() {
       <Toaster position="top-center" toastOptions={{ duration: 2000 }} containerClassName="mt-[32px]" />
 
       <main className="bg-gray-50 flex flex-col h-screen">
-        <div data-tauri-drag-region className="titlebar">
-          <div className="titlebar-button" id="titlebar-close">
-            <XLg />
-          </div>
-          <div className="titlebar-button" id="titlebar-minimize">
-            <DashLg />
-          </div>
-          <div className="titlebar-button" id="titlebar-maximize">
-            <PlusLg />
-          </div>
 
-        </div>
 
-        <div className="flex-1 overflow-y-hidden mt-[30px] ">
+        <div className="flex-1 overflow-y-hidden  ">
           {activeScreen === 'home' &&
             <div className="animate-fade-in h-full">
               <HomePage />
