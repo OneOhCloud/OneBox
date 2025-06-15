@@ -211,6 +211,15 @@ pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Resu
     Ok(())
 }
 
+pub async fn reset_system_proxy(app: &tauri::AppHandle) -> Result<(), String> {
+    // 清理系统代理
+    platform_impl::unset_proxy(app)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
 /// 停止代理进程并清理代理设置
 #[tauri::command]
 pub async fn stop(app: tauri::AppHandle) -> Result<(), String> {
@@ -236,10 +245,7 @@ pub async fn stop(app: tauri::AppHandle) -> Result<(), String> {
     if let Some(mode) = &current_mode {
         match mode {
             ProxyMode::SystemProxy => {
-                // 系统代理模式，清理系统代理
-                platform_impl::unset_proxy(&app)
-                    .await
-                    .map_err(|e| e.to_string())?;
+                reset_system_proxy(&app).await.map_err(|e| e.to_string())?;
             }
             ProxyMode::TunProxy => {
                 if let Some(password) = &tun_password {

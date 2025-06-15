@@ -26,6 +26,8 @@ export default function SelectNode(props: SelectNodeProps) {
         const url = `${baseUrl}/proxies/ExitGateway`;
         const response = await fetch(url, {
             method: 'GET',
+            // @ts-ignore
+            timeout: 3,
             headers: {
                 'Accept': 'application/json',
                 'Content-Type': 'application/json',

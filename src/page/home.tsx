@@ -52,6 +52,9 @@ export default function HomePage() {
 
     }).catch((error) => {
       console.error('获取规则模式发生错误:', error);
+      setStoreValue(RULE_MODE_STORE_KEY, 'rules');
+      setSelectedMode('rules');
+
     });
   }, []);
 

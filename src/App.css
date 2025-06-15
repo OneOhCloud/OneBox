@@ -1,3 +1,67 @@
+
+
+
+/*  Window Customization CSS start
+https://v2.tauri.app/learn/window-customization/ 
+*/
+.titlebar {
+  height: 30px;
+  background: #f8f8f8;
+  user-select: none;
+  display: flex;
+  justify-content: flex-start;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  padding-left: 12px; /* 添加左侧内边距 */
+  gap: 8px; /* 按钮之间的间距 */
+}
+
+.titlebar-button {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  width: 12px;
+  height: 12px;
+  margin-top: 9px; /* 垂直居中 */
+  border-radius: 50%;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+#titlebar-close {
+  background-color: #ff5f57;
+}
+
+#titlebar-minimize {
+  background-color: #febc2e;
+}
+
+#titlebar-maximize {
+  color: #e3e3e3;
+  background: #e3e3e3;
+  background-color: #e3e3e3;
+  
+}
+
+
+
+.titlebar-button svg {
+  width: 8px;
+  height: 8px;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+
+
+.titlebar-button:hover svg {
+  opacity: 1 !important;
+}
+/* Window Customization CSS end */
+
+
 /* 完全隐藏滚动条 - 所有浏览器兼容方案 */
 /* Webkit 浏览器 (Chrome, Safari, Edge) */
 ::-webkit-scrollbar {

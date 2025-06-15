@@ -50,15 +50,6 @@ const mixedConfig = {
         "outbound": "any",
         "server": "alibaba"
       },
-
-      {
-        "clash_mode": "直连",
-        "server": "system"
-      },
-      {
-        "clash_mode": "全局",
-        "server": "dns_proxy"
-      },
       {
         "domain_suffix": [
           ".oneoh.cloud",
@@ -130,14 +121,6 @@ const mixedConfig = {
       {
         "protocol": "quic",
         "action": "reject"
-      },
-      {
-        "clash_mode": "直连",
-        "outbound": "direct"
-      },
-      {
-        "clash_mode": "全局",
-        "outbound": "ExitGateway"
       },
       {
         "ip_is_private": true,
