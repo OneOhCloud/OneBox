@@ -14,7 +14,7 @@ export default function Settings() {
 
 
   return (
-    <div className="bg-gray-50 overflow-y-auto h-[calc(100vh-80px)]">
+    <div className="bg-gray-50 overflow-y-auto h-[calc(100vh-40px)]">
       <div className="container mx-auto p-4 max-w-md  ">
         <div className="mb-6 rounded-xl overflow-hidden bg-white shadow-none">
           <div className="divide-y divide-gray-50">
