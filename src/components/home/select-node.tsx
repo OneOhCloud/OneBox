@@ -38,7 +38,7 @@ export default function SelectNode(props: SelectNodeProps) {
         let res = await response.json();
         return res
     }, {
-        refreshInterval: 3000,
+        refreshInterval: 1000,
     });
 
 

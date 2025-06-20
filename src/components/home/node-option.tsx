@@ -1,4 +1,5 @@
 import { fetch } from '@tauri-apps/plugin-http';
+import { useEffect, useState } from 'react';
 import useSWR from "swr";
 import { getClashApiSecret } from '../../single/store';
 import { t } from '../../utils/helper';
@@ -43,6 +44,7 @@ type NodeOptionProps = {
 };
 
 export default function NodeOption({ nodeName }: NodeOptionProps) {
+    const [delayText, setDelayText] = useState<string>('-');
     const { data } = useSWR<ProxyResponse>(
         nodeName ? `${BASE_URL}/proxies/${encodeURIComponent(nodeName)}` : null,
         async (url) => {
@@ -58,7 +60,7 @@ export default function NodeOption({ nodeName }: NodeOptionProps) {
             });
             return response.json();
         },
-        { refreshInterval: 5000 }
+        { refreshInterval: 1000 }
     );
 
     const delay: DelayStatus = data?.history?.[0]?.delay ?? '-';
@@ -74,9 +76,16 @@ export default function NodeOption({ nodeName }: NodeOptionProps) {
                 ${commonStyles.delayDot}
                 bg-${delayColor}-500
             `} />
-            {delay === '-' ? t("timeout") : `${delay}ms`}
+            {delay === '-' ? delayText : `${delay}ms`}
         </span>
     );
+
+
+    useEffect(() => {
+        setTimeout(() => {
+            setDelayText(t("timeout"))
+        }, 5000);
+    }, []);
 
     if (!nodeName) {
         return (
