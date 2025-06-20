@@ -49,13 +49,14 @@ const tunConfig = {
                 "server": "alibaba"
             },
             {
+                "domain_suffix": [
+                    "github.com",
+                ],
                 "rule_set": [
                     "geosite-telegram"
                 ],
                 "server": "remote"
             },
-
-
             {
                 "domain_suffix": [
                     ".oneoh.cloud",
@@ -163,6 +164,7 @@ const tunConfig = {
                 "protocol": "dns",
                 "action": "hijack-dns"
             },
+
             {
                 "protocol": "quic",
                 "action": "reject"

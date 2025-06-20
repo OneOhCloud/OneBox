@@ -52,6 +52,12 @@ const mixedConfig = {
       },
       {
         "domain_suffix": [
+          ".github.com",
+        ],
+        "server": "dns_proxy"
+      },
+      {
+        "domain_suffix": [
           ".oneoh.cloud",
           ".n2ray.dev",
           ".ksjhaoka.com",
