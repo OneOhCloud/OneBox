@@ -26,7 +26,7 @@ interface ProxyResponse {
 
 // 延迟状态判断
 const getDelayStatus = (delay: DelayStatus) => {
-    if (delay === '-') return 'red';
+    if (delay === '-') return '';
     if (delay <= DELAY_THRESHOLDS.GOOD) return 'green';
     if (delay <= DELAY_THRESHOLDS.NORMAL) return 'yellow';
     if (delay <= DELAY_THRESHOLDS.WARN) return 'orange';
