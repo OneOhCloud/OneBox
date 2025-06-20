@@ -2,6 +2,7 @@ use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
+use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
 use tauri_plugin_http::reqwest;
 
 #[cfg(not(target_os = "windows"))]
@@ -170,6 +171,16 @@ pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Resu
                 };
 
                 println!("[{:#?}]:{}", mode_clone, message);
+
+                if message.contains("FATAL") {
+                    // 如果是错误信息，弹出对话框
+                    app_clone
+                        .dialog()
+                        .message(message.clone())
+                        .kind(MessageDialogKind::Error)
+                        .title("Error")
+                        .blocking_show();
+                }
 
                 app_clone
                     .emit("core_backend", Some(message))

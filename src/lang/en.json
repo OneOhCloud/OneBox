@@ -91,6 +91,7 @@
     "subscription_not_exist": "config not exist",
     "switching": "switching...",
     "system_info": "system",
+    "timeout": "timeout",
     "tips": "tips",
     "tun_mode_desc": "all traffic through the tunnel",
     "tun_mode": "tun mode",

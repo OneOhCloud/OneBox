@@ -3,53 +3,95 @@ import useSWR from "swr";
 import { getClashApiSecret } from '../../single/store';
 import { t } from '../../utils/helper';
 
+// 常量定义
+const DELAY_THRESHOLDS = {
+    GOOD: 200,
+    NORMAL: 300,
+    WARN: 600
+} as const;
+
+const BASE_URL = 'http://127.0.0.1:9191';
+
+// 类型定义
+type DelayStatus = '-' | number;
+
+interface ProxyHistory {
+    delay: number;
+}
+
+interface ProxyResponse {
+    history: ProxyHistory[];
+}
+
+// 延迟状态判断
+const getDelayStatus = (delay: DelayStatus) => {
+    if (delay === '-') return 'red';
+    if (delay <= DELAY_THRESHOLDS.GOOD) return 'green';
+    if (delay <= DELAY_THRESHOLDS.NORMAL) return 'yellow';
+    if (delay <= DELAY_THRESHOLDS.WARN) return 'orange';
+    return 'red';
+};
+
+// 通用样式
+const commonStyles = {
+    delayText: 'ml-2 text-sm font-medium transition-all duration-300 ease',
+    delayDot: 'inline-block w-2 h-2 rounded-full transition-all duration-300 ease'
+};
+
 type NodeOptionProps = {
     nodeName: string;
 };
 
 export default function NodeOption({ nodeName }: NodeOptionProps) {
-    const { data } = useSWR(`http://127.0.0.1:9191/proxies/${encodeURIComponent(nodeName)}`, async (url) => {
-        const response = await fetch(url, {
-            method: 'GET',
-            // @ts-ignore
-            timeout: 3,
-            headers: {
-                "Authorization": `Bearer ${await getClashApiSecret()}`,
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
+    const { data } = useSWR<ProxyResponse>(
+        nodeName ? `${BASE_URL}/proxies/${encodeURIComponent(nodeName)}` : null,
+        async (url) => {
+            const response = await fetch(url, {
+                method: 'GET',
+                // @ts-ignore
+                timeout: 3,
+                headers: {
+                    "Authorization": `Bearer ${await getClashApiSecret()}`,
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                },
+            });
+            return response.json();
+        },
+        { refreshInterval: 5000 }
+    );
 
-            },
-        });
+    const delay: DelayStatus = data?.history?.[0]?.delay ?? '-';
+    const delayColor = getDelayStatus(delay);
 
-        let res = await response.json()
-        return res
-    }, {
-        refreshInterval: 5000,
-
-    });
-    const delay = data?.history?.[0]?.delay ?? '-';
+    const DelayIndicator = () => (
+        <span className={`
+            ${commonStyles.delayText}
+            text-${delayColor}-500
+            flex items-center gap-1.5
+        `}>
+            <span className={`
+                ${commonStyles.delayDot}
+                bg-${delayColor}-500
+            `} />
+            {delay === '-' ? t("timeout") : `${delay}ms`}
+        </span>
+    );
 
     if (!nodeName) {
         return (
-            <div className="select select-sm  select-ghost border-[0.8px] border-gray-200 ">
+            <div className="select select-sm select-ghost border-[0.8px] border-gray-200">
                 {t('starting')}
-            </div>
-        );
-    }
-
-    if (nodeName === 'auto') {
-        return (
-            <div className="flex justify-between items-center w-full">
-                <span className="truncate">{t("auto")}</span>
-                <span className="ml-2 text-sm">{delay !== '-' ? `${delay}ms` : delay}</span>
             </div>
         );
     }
 
     return (
         <div className="flex justify-between items-center w-full">
-            <span className="truncate">{nodeName}</span>
-            <span className="ml-2 text-sm">{delay !== '-' ? `${delay}ms` : delay}</span>
+            <span className="truncate font-medium">
+                {nodeName === 'auto' ? t("auto") : nodeName}
+            </span>
+            <DelayIndicator />
         </div>
     );
 }

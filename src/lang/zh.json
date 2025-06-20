@@ -91,6 +91,7 @@
     "subscription_not_exist": "配置文件不存在",
     "switching": "正在切换...",
     "system_info": "系统信息",
+    "timeout": "超时",
     "tips": "提示",
     "tun_mode_desc": "接管所有流量",
     "tun_mode": "Tun 模式",

@@ -51,7 +51,7 @@ export default function Avatar(props: AvatarProps) {
             onHoverEnd={() => setIsHover(false)}
             whileTap={{ scale: 0.95 }}
         >
-            <div className="w-full h-full bg-gray-200 flex items-center justify-center">
+            <div className="w-full h-full bg-gray-200 flex items-center justify-center cursor-pointer ">
                 <div className="absolute inset-0">
                     <motion.img
                         key="urlIcon"
