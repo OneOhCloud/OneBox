@@ -3,7 +3,7 @@ import { type } from '@tauri-apps/plugin-os';
 import { getSubscriptionConfig } from '../../action/db';
 import { getAllowLan } from '../../single/store';
 import { clashApi, ruleSet } from '../common';
-import { updateVPNServerConfigFromDB } from '../helper';
+import { updateVPNServerConfigFromDB } from './helper';
 
 const tunConfig = {
     "log": {

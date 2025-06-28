@@ -1,6 +1,5 @@
-import { BaseDirectory, create, exists, writeFile } from '@tauri-apps/plugin-fs';
-import { getClashApiSecret } from '../single/store';
 
+import { BaseDirectory, create, exists, writeFile } from '@tauri-apps/plugin-fs';
 
 /**
  * 将数据写入指定的配置文件
@@ -38,51 +37,6 @@ export async function writeConfigFile(fileName: string, data: Uint8Array) {
 }
 
 
-type Item = {
-    tag: string;
-    type: string;
-}
-
-
-export async function updateVPNServerConfigFromDB(fileName: string, dbConfigData: any, newConfig: any) {
-
-    const outboundsSelectorIndex = 1;
-    const outboundsUrltestIndex = 2;
-
-    const outbound_groups = newConfig["outbounds"];
-    const outboundsSelector = outbound_groups[outboundsSelectorIndex]["outbounds"];
-    const outboundsUrltest = outbound_groups[outboundsUrltestIndex]["outbounds"];
-
-
-    let vpnServerList = dbConfigData.outbounds.filter((item: Item) => {
-        // zh: 只找VPN服务器的节点配置
-        // en: Only find the node configuration of the VPN server
-        return item.type !== "selector" && item.type !== "urltest" && item.type !== "direct" && item.type !== "block";
-    });
-
-
-    for (let i = 0; i < vpnServerList.length; i++) {
-        outboundsSelector.push(vpnServerList[i].tag);
-
-    }
-
-    const urltestNameList: string[] = [];
-    vpnServerList.forEach((item: any) => {
-        urltestNameList.push(item.tag);
-    })
-
-    outboundsUrltest.push(...urltestNameList);
-
-    outbound_groups.push(...vpnServerList);
-
-    newConfig["experimental"]["clash_api"]["secret"] = await getClashApiSecret();
-
-    await writeConfigFile(fileName, new TextEncoder().encode(JSON.stringify(newConfig)));
-
-
-}
-
-
 
 
 export async function setGlobalMixedConfig(identifier: string, version: string) {
@@ -92,7 +46,6 @@ export async function setGlobalMixedConfig(identifier: string, version: string) 
     } else {
         throw new Error("Unsupported version for setGlobalMixedConfig");
     }
-
 
 }
 

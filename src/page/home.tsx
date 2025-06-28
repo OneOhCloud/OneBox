@@ -169,7 +169,7 @@ export default function HomePage() {
       setIsOn(prev => !prev);
     } catch (error) {
       console.error('连接失败:', error);
-      await message(t('connect_failed'), { title: t('error'), kind: 'error' });
+      await message(`${t('connect_failed')}: ${error}`, { title: t('error'), kind: 'error' });
     } finally {
       setTimeout(() => setIsOnLoading(false), 1200);
     }
