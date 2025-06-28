@@ -1,0 +1,1 @@
+// TODO: Adapt the global TUN configuration for sing-box v1.12 version

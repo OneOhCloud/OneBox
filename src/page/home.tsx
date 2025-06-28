@@ -6,14 +6,12 @@ import { useContext, useEffect, useRef, useState } from "react";
 import { InfoCircle, Power } from 'react-bootstrap-icons';
 import VPNBody from '../components/home/vpn-body';
 import AuthDialog from '../components/settings/auth-dialog';
-import setGlobalMixedConfig from '../config/global-mixed-config';
-import setGlobalTunConfig from '../config/global-tun-config';
-import setMixedConfig from "../config/mixed-config";
-import setTunConfig from "../config/tun-config";
+
+import { setGlobalMixedConfig, setGlobalTunConfig, setMixedConfig, setTunConfig } from '../config/helper';
 import { useSubscriptions } from '../hooks/useDB';
 import { NavContext } from '../single/context';
 import { getClashApiSecret, getEnableTun, getStoreValue, setStoreValue } from "../single/store";
-import { RULE_MODE_STORE_KEY, SSI_STORE_KEY } from '../types/definition';
+import { RULE_MODE_STORE_KEY, SING_BOX_VERSION, SSI_STORE_KEY } from '../types/definition';
 import { t, verifyPrivileged, vpnServiceManager } from "../utils/helper";
 
 type SelectedModeType = 'rules' | 'global';
@@ -115,15 +113,15 @@ export default function HomePage() {
         console.log('privileged:', privileged);
       }
       const fn = currentMode === 'global' ? setGlobalTunConfig : setTunConfig;
-      await fn(identifier);
+      await fn(identifier, SING_BOX_VERSION);
     } else if (useTun && type() == 'windows') {
       console.log('在 Windows 上使用 TUN 模式，无需密码');
       const fn = currentMode === 'global' ? setGlobalTunConfig : setTunConfig;
-      await fn(identifier);
+      await fn(identifier, SING_BOX_VERSION);
     } else {
       console.log('使用普通模式');
       const fn = currentMode === 'global' ? setGlobalMixedConfig : setMixedConfig;
-      await fn(identifier);
+      await fn(identifier, SING_BOX_VERSION);
     }
     return true;
   };

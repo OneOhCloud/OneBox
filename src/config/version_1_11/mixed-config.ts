@@ -1,8 +1,8 @@
 import * as path from '@tauri-apps/api/path';
-import { getSubscriptionConfig } from '../action/db';
-import { getAllowLan } from '../single/store';
-import { clashApi, ruleSet } from './common';
-import { updateVPNServerConfigFromDB } from './helper';
+import { getSubscriptionConfig } from '../../action/db';
+import { getAllowLan } from '../../single/store';
+import { clashApi, ruleSet } from '../common';
+import { updateVPNServerConfigFromDB } from '../helper';
 
 const mixedConfig = {
   "log": {

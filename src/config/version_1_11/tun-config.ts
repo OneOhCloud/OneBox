@@ -1,10 +1,9 @@
 import * as path from '@tauri-apps/api/path';
 import { type } from '@tauri-apps/plugin-os';
-import { getSubscriptionConfig } from '../action/db';
-import { getAllowLan } from '../single/store';
-import { clashApi, ruleSet } from './common';
-import { updateVPNServerConfigFromDB } from './helper';
-
+import { getSubscriptionConfig } from '../../action/db';
+import { getAllowLan } from '../../single/store';
+import { clashApi, ruleSet } from '../common';
+import { updateVPNServerConfigFromDB } from '../helper';
 
 const tunConfig = {
     "log": {
@@ -21,11 +20,16 @@ const tunConfig = {
                 "detour": "direct"
             },
             {
-                "tag": "dns_proxy",
-                //  只有这个 dns 在 sing-box 1.1.* 版本可用, 其余地址会导致 dns 解析失败
-                "address": "tcp://1.0.0.1",
+                "tag": "alibaba",
+                "address": "223.6.6.6",
                 "strategy": "ipv4_only",
-                "detour": "ExitGateway"
+                "detour": "direct"
+            },
+            {
+                "tag": "tencent",
+                "address": "119.29.29.29",
+                "strategy": "ipv4_only",
+                "detour": "direct"
             },
             {
                 "tag": "remote",
@@ -42,6 +46,40 @@ const tunConfig = {
             },
             {
                 "outbound": "any",
+                "server": "alibaba"
+            },
+            {
+                "domain_suffix": [
+                    "github.com",
+                ],
+                "rule_set": [
+                    "geosite-telegram"
+                ],
+                "server": "remote"
+            },
+            {
+                "domain_suffix": [
+                    ".oneoh.cloud",
+                    ".n2ray.dev",
+                    ".ksjhaoka.com",
+                    ".mixcapp.com",
+                    ".msftconnecttest.com",
+                    ".wiwide.net",
+                    "connectivitycheck.android.com",
+                    "detectportal.firefox.com",
+                    "nmcheck.gnome.org",
+                    "router.asus.com",
+                    "wiportal.wiwide.com",
+                    "www.miwifi.com"
+                ],
+                "rule_set": [
+                    "geoip-cn",
+                    "geosite-cn",
+                    "geosite-apple",
+                    "geosite-microsoft-cn",
+                    "geosite-samsung",
+                    "geosite-private"
+                ],
                 "server": "system"
             },
             {
@@ -59,7 +97,7 @@ const tunConfig = {
             "inet6_range": "fc00::/18"
         },
         "strategy": "ipv4_only",
-        "final": "dns_proxy"
+        "final": "system"
     },
     "inbounds": [
         {
@@ -100,10 +138,10 @@ const tunConfig = {
                 "ff02::/16",
                 "ff03::/16",
                 "ff04::/16",
-                "ff05::/16"
+                "ff05::/16",
+                "240e::/20",
             ]
         },
-
         {
             "tag": "mixed",
             "type": "mixed",
@@ -115,32 +153,43 @@ const tunConfig = {
     ],
     "route": {
         "rules": [
-
             {
-                "inbound": "tun",
-                "action": "sniff"
+                "inbound": [
+                    "mixed",
+                    "tun"
+                ],
+                action: "sniff"
             },
             {
                 "protocol": "dns",
                 "action": "hijack-dns"
             },
+
             {
                 "protocol": "quic",
                 "action": "reject"
             },
             {
-                "domain_suffix": [
-                    "local",
-                    "lan",
-                    "localdomain",
-                    "localhost",
-                    "bypass.local",
-                    "captive.apple.com",
-                ],
                 "ip_is_private": true,
                 "outbound": "direct"
+            },
+            {
+                "domain_suffix": [
+                    ".oneoh.cloud",
+                    ".n2ray.dev",
+                    ".ksjhaoka.com",
+                    ".mixcapp.com"
+                ],
+                "rule_set": [
+                    "geoip-cn",
+                    "geosite-cn",
+                    "geosite-apple",
+                    "geosite-microsoft-cn",
+                    "geosite-samsung",
+                    "geosite-private"
+                ],
+                "outbound": "direct",
             }
-
         ],
         "final": "ExitGateway",
         "auto_detect_interface": true,
@@ -174,31 +223,32 @@ const tunConfig = {
     ]
 }
 
-export default async function setGlobalTunConfig(identifier: string) {
-    console.log("写入[全局]TUN代理配置文件");
+export default async function setTunConfig(identifier: string) {
+    console.log("写入[规则]TUN代理配置文件");
 
     let dbConfigData = await getSubscriptionConfig(identifier);
 
     const appConfigPath = await path.appConfigDir();
-    const dbCacheFilePath = await path.join(appConfigPath, 'tun-cache-global-v1.db');
+    const dbCacheFilePath = await path.join(appConfigPath, 'tun-cache-rule-v1.db');
+
 
     //  Windows 使用 system stack 兼容性是最佳的。
     if (type() === "windows" || type() === "linux") {
         tunConfig.inbounds[0].stack = "system";
     }
+
     // 其余平台使用 gvisor stack 避免潜在问题
     // 比如在 macOS 上使用 system stack 时会导致诸多问题，需要追踪 sing-box 是否解决此问题。
-
 
     // 深拷贝配置文件
     const newConfig = JSON.parse(JSON.stringify(tunConfig));
     newConfig["experimental"]["cache_file"]["path"] = dbCacheFilePath;
-
     const allowLan = await getAllowLan();
     if (allowLan) {
         newConfig["inbounds"][1]["listen"] = "0.0.0.0";
     } else {
         newConfig["inbounds"][1]["listen"] = "127.0.0.1";
     }
+
     updateVPNServerConfigFromDB('config.json', dbConfigData, newConfig);
 }
