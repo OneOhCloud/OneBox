@@ -18,10 +18,7 @@ const LoadingStatus = ({ icon: Icon = Globe }) => (
     <motion.div
         className="tooltip tooltip-left"
         data-tip={t("loading")}
-        initial={{ opacity: 0, scale: 0.8 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.3, type: "spring", stiffness: 200 }}
-        whileHover={{ scale: 1.1 }}
+
     >
         <Icon className="size-4 text-gray-500 animate-spin" />
     </motion.div>

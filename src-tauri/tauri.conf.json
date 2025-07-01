@@ -1,12 +1,11 @@
 {
-  "$schema": "https://schema.tauri.app/config/2",
   "productName": "OneBox",
   "version": "1.0.14",
   "identifier": "cloud.oneoh.onebox",
   "build": {
     "beforeDevCommand": "bun run dev",
     "devUrl": "http://localhost:1420",
-    "beforeBuildCommand": "bun run build",
+    "beforeBuildCommand": "verisonCode=1 && bun run build",
     "frontendDist": "../dist"
   },
   "app": {
