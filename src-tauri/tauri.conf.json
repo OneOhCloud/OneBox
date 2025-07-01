@@ -1,11 +1,11 @@
 {
   "productName": "OneBox",
-  "version": "1.0.14",
+  "version": "1.0.14d1",
   "identifier": "cloud.oneoh.onebox",
   "build": {
     "beforeDevCommand": "bun run dev",
     "devUrl": "http://localhost:1420",
-    "beforeBuildCommand": "verisonCode=1 && bun run build",
+    "beforeBuildCommand": "bun run build",
     "frontendDist": "../dist"
   },
   "app": {
