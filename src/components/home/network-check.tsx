@@ -20,7 +20,7 @@ const LoadingStatus = ({ icon: Icon = Globe }) => (
         data-tip={t("loading")}
 
     >
-        <Icon className="size-4 text-gray-500 animate-spin" />
+        <Icon className="size-4 text-gray-500 " />
     </motion.div>
 );
 

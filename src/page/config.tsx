@@ -7,14 +7,14 @@ import { AddSubConfigurationModal } from "../components/configuration/modal";
 import { useSubscriptions } from "../hooks/useDB";
 import { t } from "../utils/helper";
 
-function ConfigurationNav({ onUpdateAllSubscriptions }: { onUpdateAllSubscriptions: () => Promise<void> }) {
+function ConfigurationNav({ onUpdateAllSubscriptions }: { onUpdateAllSubscriptions?: () => Promise<void> }) {
     const [isUpdating, setIsUpdating] = useState(false);
     const [isHovering, setIsHovering] = useState(false);
 
     const handleUpdateAll = async () => {
         setIsUpdating(true);
         try {
-            await onUpdateAllSubscriptions();
+            onUpdateAllSubscriptions && await onUpdateAllSubscriptions();
         } finally {
             setIsUpdating(false);
         }
@@ -26,7 +26,7 @@ function ConfigurationNav({ onUpdateAllSubscriptions }: { onUpdateAllSubscriptio
                 {t("subscription_management")}
             </h3>
             <div className="flex items-center gap-2">
-                <button
+                {onUpdateAllSubscriptions && (<button
                     className="btn btn-xs btn-ghost btn-circle border-0 transition-colors"
                     onMouseEnter={() => setIsHovering(true)}
                     onMouseLeave={() => setIsHovering(false)}
@@ -43,7 +43,8 @@ function ConfigurationNav({ onUpdateAllSubscriptions }: { onUpdateAllSubscriptio
                     >
                         <ArrowRepeat className="size-4 text-blue-600" />
                     </motion.div>
-                </button>
+                </button>)}
+
                 <AddSubConfigurationModal />
             </div>
         </div>
@@ -67,7 +68,7 @@ export default function Configuration() {
 
     return (
         <div className="h-full mb-4 w-full">
-            <ConfigurationNav onUpdateAllSubscriptions={onUpdateAllSubscriptions} />
+            <ConfigurationNav onUpdateAllSubscriptions={(data && data.length > 0) ? onUpdateAllSubscriptions : undefined} />
             <ConfigurationBody />
         </div>
     )
