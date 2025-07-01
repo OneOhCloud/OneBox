@@ -48,7 +48,6 @@ export default function UpdaterItem() {
 
         // 获取当前阶段版本
         let stage = await getStoreValue(STAGE_VERSION_STORE_KEY, "latest");
-
         if (stage === "stable") {
             stage = "latest"; // 稳定版直接使用最新版本
         }
@@ -62,6 +61,7 @@ export default function UpdaterItem() {
                 headers: {
                     'Accept': 'application/json',
                     'stage': stage,
+
                 }
             });
             if (updateInfo) {
