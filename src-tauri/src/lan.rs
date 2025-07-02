@@ -1,4 +1,8 @@
-use tauri::http::{header::LOCATION, StatusCode};
+use crate::core::stop;
+use tauri::{
+    http::{header::LOCATION, StatusCode},
+    AppHandle,
+};
 use tauri_plugin_http::reqwest::{self, redirect::Policy};
 use tokio::process::Command;
 use webbrowser;
@@ -54,7 +58,24 @@ pub async fn get_lan_ip() -> Result<String, String> {
 }
 
 #[tauri::command]
-pub async fn ping_apple_captive() -> bool {
+pub async fn open_browser(app: AppHandle, url: String) -> Result<(), String> {
+    // zh:需要网络认证，尝试停止和重置代理。
+    // en: Network authentication required, try to stop and reset the proxy.
+    stop(app).await.unwrap_or_else(|e| {
+        eprintln!("Failed to stop app: {}", e);
+    });
+
+    // 使用 webbrowser 库打开浏览器
+    // zh: 如果有重定向，则打开浏览器并返回 false
+    // en: If there is a redirect, open the browser and return false
+    match webbrowser::open(&url) {
+        Ok(_) => Ok(()),
+        Err(e) => Err(format!("Failed to open browser: {}", e)),
+    }
+}
+
+#[tauri::command]
+pub async fn ping_apple_captive() -> String {
     // 创建 HTTP 客户端，禁用自动重定向
     let builder = reqwest::ClientBuilder::new()
         .timeout(std::time::Duration::from_secs(4))
@@ -67,8 +88,9 @@ pub async fn ping_apple_captive() -> bool {
         Ok(response) => {
             let status = response.status();
             if status == StatusCode::OK {
-                // 200 正常返回 true
-                true
+                // zh: 200 网络认证成功，返回 true
+                // en: 200 Network authentication successful, return true
+                "true".to_string()
             } else if matches!(
                 status,
                 StatusCode::FOUND
@@ -76,19 +98,22 @@ pub async fn ping_apple_captive() -> bool {
                     | StatusCode::TEMPORARY_REDIRECT
                     | StatusCode::PERMANENT_REDIRECT
             ) {
-                // 重定向则打开浏览器并返回 false
                 if let Some(location) = response.headers().get(LOCATION) {
                     if let Ok(redirect_url) = location.to_str() {
-                        let _ = webbrowser::open(redirect_url);
+                        return redirect_url.to_string();
+                    } else {
+                        eprintln!("Invalid redirect URL");
                     }
                 }
-                false
+                "false".to_string()
             } else {
                 // 其他非预期状态返回 false
-                false
+                // Other unexpected status returns false
+                eprintln!("Unexpected status code: {}", status);
+                "false".to_string()
             }
         }
-        Err(_) => false,
+        Err(_) => false.to_string(), // 请求失败返回 false
     }
 }
 

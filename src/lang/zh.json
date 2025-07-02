@@ -63,6 +63,8 @@
     "name_placeholder_1": "名称自动填充（可选）",
     "name_placeholder_2": "配置文件地址： https://xxxxxxxx",
     "network_abnormal": "异常",
+    "network_need_login_title": "网络需要登录",
+    "network_need_login": "此 Wi‑Fi 网络需要通过网页登录才能访问互联网，点击 \"OK\" 打开登录页面。",
     "network_normal": "正常",
     "no_log_records": "没有日志记录",
     "no_node": "当前配置没有节点",

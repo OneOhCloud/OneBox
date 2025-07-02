@@ -68,16 +68,17 @@ pub fn run() {
     let builder = plugins::register_plugins(builder, migrations);
     builder
         .invoke_handler(tauri::generate_handler![
-            get_app_version,
+            quit,
             open_devtools,
             create_window,
-            quit,
+            get_app_version,
             lan::get_lan_ip,
             lan::ping_google,
+            lan::open_browser,
             lan::ping_apple_captive,
-            core::version,
-            core::start,
             core::stop,
+            core::start,
+            core::version,
             core::is_running,
             privilege::is_privileged,
             privilege::save_privilege_password_to_keyring,

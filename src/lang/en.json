@@ -63,6 +63,8 @@
     "name_placeholder_1": "name auto-filled from remote (optional)",
     "name_placeholder_2": "config address: https://xxxxxxxx",
     "network_abnormal": "error",
+    "network_need_login_title": "Wi‑Fi Login Required",
+    "network_need_login": "This Wi‑Fi network requires you to sign in through a web page to access the Internet. Tap “OK” to open the login page.",
     "network_normal": "normal",
     "no_log_records": "no log records",
     "no_node": "no node in current config",
