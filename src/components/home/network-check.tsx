@@ -6,7 +6,6 @@ import { useCallback, useState } from "react";
 import { Globe, Icon, Reception4 } from "react-bootstrap-icons";
 import useSWR from "swr";
 import { t } from "../../utils/helper";
-const appWindow = getCurrentWindow();
 
 type NetworkStatusProps = {
     isOk: boolean;
