@@ -8,3 +8,13 @@ if [ "$current_branch" = "local" ]; then
     echo "\033[31m错误: 禁止推送 local 分支到远程仓库!\033[0m"
     exit 1
 fi
+
+. "$(dirname "$0")/_/husky.sh"
+
+echo "运行构建检查..."
+bun run build || {
+    echo "❌ 构建失败! Push 已终止"
+    exit 1
+}
+
+echo "✅ 构建成功! 继续 push..."
