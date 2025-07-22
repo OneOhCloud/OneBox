@@ -67,6 +67,8 @@
     "network_need_login": "此 Wi‑Fi 网络需要通过网页登录才能访问互联网，点击 \"OK\" 打开登录页面。",
     "network_normal": "正常",
     "no_log_records": "没有日志记录",
+    "no_matching_logs": "没有匹配的日志记录",
+    "filter_placeholder": "过滤关键词...",
     "no_node": "当前配置没有节点",
     "no_subscription_config": "没有配置文件配置",
     "no_subscription": "没有配置文件配置",

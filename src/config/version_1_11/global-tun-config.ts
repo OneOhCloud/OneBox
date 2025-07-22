@@ -25,7 +25,9 @@ const tunConfig = {
                 //  只有这个 dns 在 sing-box 1.1.* 版本可用, 其余地址会导致 dns 解析失败
                 "address": "tcp://1.0.0.1",
                 "strategy": "ipv4_only",
-                "detour": "ExitGateway"
+                "detour": "ExitGateway",
+                "client_subnet": "114.114.114.114"
+
             },
             {
                 "tag": "remote",

@@ -1,6 +1,6 @@
 import { listen } from '@tauri-apps/api/event';
 import { useEffect, useRef, useState } from 'react';
-import { t } from "../utils/helper";
+import { initLanguage, t } from "../utils/helper";
 
 interface LogEntry {
     message: string;
@@ -11,6 +11,40 @@ export default function LogPage() {
     const [logs, setLogs] = useState<LogEntry[]>([]);
     const logContainerRef = useRef<HTMLDivElement>(null);
     const [autoScroll, setAutoScroll] = useState(true);
+    const [filter, setFilter] = useState('');
+    const [isLanguageLoading, setIsLanguageLoading] = useState(true);
+
+    // 过滤后的日志
+    const filteredLogs = filter
+        ? logs.filter(log => log.message.toLowerCase().includes(filter.toLowerCase()))
+        : logs;
+
+    // 高亮关键词的函数
+    const highlightText = (text: string, highlight: string) => {
+        if (!highlight) return text;
+
+        const parts = text.split(new RegExp(`(${highlight})`, 'gi'));
+        return parts.map((part, index) =>
+            part.toLowerCase() === highlight.toLowerCase() ? (
+                <span key={index} className="bg-yellow-200 dark:bg-yellow-600 px-1 rounded">
+                    {part}
+                </span>
+            ) : part
+        );
+    };
+
+    // await initLanguage();
+
+    useEffect(() => {
+        const fn = async () => {
+            try {
+                await initLanguage();
+            } finally {
+                setIsLanguageLoading(false);
+            }
+        }
+        fn();
+    }, []);
 
     useEffect(() => {
         const unlisten = listen('core_backend', (event) => {
@@ -49,31 +83,61 @@ export default function LogPage() {
         if (autoScroll && logContainerRef.current) {
             logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
         }
-    }, [logs, autoScroll]);
+    }, [filteredLogs, autoScroll]);
+
+    // 如果语言还在初始化中，显示loading
+    if (isLanguageLoading) {
+        return (
+            <div className="flex items-center justify-center h-screen">
+                <div className="text-center">
+                    <span className="loading loading-spinner loading-lg"></span>
+                    <div className="mt-4 text-base-content/70">Loading...</div>
+                </div>
+            </div>
+        );
+    }
 
     return (
-        <div className="flex flex-col h-full bg-white dark:bg-gray-900 p-4">
+        <div className="flex flex-col h-full p-4">
             <div className="flex items-center justify-between mb-4">
-                <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+                <h1 className="text-xl font-semibold">
                     {/* 日志查看器 */}
                     {t("log_viewer")}
                 </h1>
                 <div className="flex items-center gap-4">
-                    <label className="flex items-center space-x-2 text-sm">
+                    <div className="flex items-center space-x-2">
+                        <input
+                            type="text"
+                            value={filter}
+                            onChange={(e) => setFilter(e.target.value)}
+                            placeholder={t("filter_placeholder") || "过滤关键词..."}
+                            className="input input-bordered input-sm w-full max-w-xs"
+                        />
+                        {filter && (
+                            <button
+                                onClick={() => setFilter('')}
+                                className="btn btn-ghost btn-sm"
+                                title="清除过滤"
+                            >
+                                ✕
+                            </button>
+                        )}
+                    </div>
+                    <label className="label cursor-pointer">
                         <input
                             type="checkbox"
                             checked={autoScroll}
                             onChange={(e) => setAutoScroll(e.target.checked)}
-                            className="form-checkbox h-4 w-4"
+                            className="checkbox checkbox-sm"
                         />
-                        <span className="text-gray-700 dark:text-gray-300">
+                        <span className="label-text ml-2">
                             {/* 自动滚动 */}
                             {t("auto_scroll")}
                         </span>
                     </label>
                     <button
                         onClick={() => setLogs([])}
-                        className="px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md transition-colors duration-200"
+                        className="btn btn-ghost btn-sm"
                     >
                         {/* 清除日志 */}
                         {t("clear_log")}
@@ -83,25 +147,31 @@ export default function LogPage() {
 
             <div
                 ref={logContainerRef}
-                className="flex-1 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 font-mono max-h-[calc(100vh-6rem)] overflow-auto"
+                className="flex-1 rounded-lg border border-base-300 bg-base-200 font-mono max-h-[calc(100vh-6rem)] overflow-auto"
             >
                 <div className="p-4">
-                    {logs.length === 0 ? (
-                        <div className="text-center text-gray-500 dark:text-gray-400 py-8">
-                            {/* 暂无日志记录 */}
-                            {t("no_log_records")}
+                    {filteredLogs.length === 0 ? (
+                        <div className="text-center text-base-content/60 py-8">
+                            {filter ? (
+                                <div>
+                                    <div>{t("no_matching_logs") || "没有匹配的日志记录"}</div>
+                                    <div className="text-xs mt-2">过滤条件: "{filter}"</div>
+                                </div>
+                            ) : (
+                                t("no_log_records")
+                            )}
                         </div>
                     ) : (
-                        logs.map((log, index) => (
+                        filteredLogs.map((log, index) => (
                             <div
-                                key={index}
+                                key={`${log.timestamp}-${index}`}
                                 className="flex items-start text-xs mb-1"
                             >
-                                <span className="text-gray-500 dark:text-gray-400 flex-shrink-0 mr-3">
+                                <span className="text-base-content/60 flex-shrink-0 mr-3">
                                     {log.timestamp}
                                 </span>
-                                <span className="text-gray-700 dark:text-gray-300 whitespace-nowrap">
-                                    {log.message}
+                                <span className="text-base-content whitespace-nowrap">
+                                    {highlightText(log.message, filter)}
                                 </span>
                             </div>
                         ))

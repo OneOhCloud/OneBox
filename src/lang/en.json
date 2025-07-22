@@ -67,6 +67,8 @@
     "network_need_login": "This Wi‑Fi network requires you to sign in through a web page to access the Internet. Tap “OK” to open the login page.",
     "network_normal": "normal",
     "no_log_records": "no log records",
+    "no_matching_logs": "no matching log records",
+    "filter_placeholder": "Filter keyword...",
     "no_node": "no node in current config",
     "no_subscription_config": "no config config",
     "no_subscription": "no config config",
