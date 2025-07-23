@@ -1,4 +1,5 @@
 {
+    "install_new_update": "Install New Update",
     "about": "about",
     "add_subscription_failed": "add config failed",
     "add_subscription_success": "add config success",

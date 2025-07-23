@@ -18,6 +18,7 @@ import { listen } from '@tauri-apps/api/event';
 import { Menu } from '@tauri-apps/api/menu';
 import { TrayIcon } from '@tauri-apps/api/tray';
 import { getCurrentWindow } from '@tauri-apps/api/window';
+import UpdaterButton from './components/settings/updater-button';
 import { getClashApiSecret, getStoreValue } from './single/store';
 import { DEVELOPER_TOGGLE_STORE_KEY } from './types/definition';
 import { copyEnvToClipboard, vpnServiceManager } from './utils/helper';
@@ -196,9 +197,14 @@ function App() {
     <NavContext.Provider value={{ activeScreen, setActiveScreen, handleLanguageChange }}>
       <Toaster position="top-center" toastOptions={{ duration: 2000 }} containerClassName="mt-[32px]" />
 
-      <main className="bg-gray-50 flex flex-col h-screen">
+      <main className="relative bg-gray-50 flex flex-col h-screen">
 
 
+        {activeScreen === 'home' &&
+          <div className='absolute inset-0  z-2   max-h-max flex justify-end p-1'>
+            <UpdaterButton />
+          </div>
+        }
         <div className="flex-1 overflow-y-hidden  ">
           {activeScreen === 'home' &&
             <div className="animate-fade-in h-full">
