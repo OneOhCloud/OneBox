@@ -13,6 +13,7 @@ export default function UpdaterItem() {
     const [downloading, setDownloading] = useState(false);
     const [downloadProgress, setDownloadProgress] = useState(0);
     const [simulateUpdate, _] = useState(false);
+    const [isUpdating, setIsUpdating] = useState(false);
 
     const simulateUpdateProcess = async () => {
         try {
@@ -36,34 +37,53 @@ export default function UpdaterItem() {
         } catch (error) {
             console.error('模拟更新过程中出错:', error);
             setDownloading(false);
+        } finally {
+            setIsUpdating(false);
+        }
+    };
+
+    // 确认是否安装更新
+    const confirmInstallation = async () => {
+        const confirmed = await confirm(t("update_downloaded"), {
+            title: t("update_install"),
+            kind: 'info',
+        });
+
+        if (confirmed) {
+            await vpnServiceManager.stop()
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            await relaunch();
         }
     };
 
     const updateApp = async () => {
-        // 如果是模拟更新，则执行模拟流程
-        if (simulateUpdate) {
-            await simulateUpdateProcess();
+        if (isUpdating) {
             return;
         }
+        setIsUpdating(true);
 
-        // 获取当前阶段版本
-        let stage = await getStoreValue(STAGE_VERSION_STORE_KEY, "latest");
-        if (stage === "stable") {
-            stage = "latest"; // 稳定版直接使用最新版本
-        }
-
-
-        // 真实更新流程
         try {
+            // 如果是模拟更新，则执行模拟流程
+            if (simulateUpdate) {
+                await simulateUpdateProcess();
+                return;
+            }
 
+            // 获取当前阶段版本
+            let stage = await getStoreValue(STAGE_VERSION_STORE_KEY, "latest");
+            if (stage === "stable") {
+                stage = "latest"; // 稳定版直接使用最新版本
+            }
+
+            // 真实更新流程
             const updateInfo = await check({
                 timeout: 5000, // 设置超时时间为10秒
                 headers: {
                     'Accept': 'application/json',
                     'stage': stage,
-
                 }
             });
+
             if (updateInfo) {
                 console.log(
                     `found update ${updateInfo.version} from ${updateInfo.date} with notes ${updateInfo.body}`
@@ -94,29 +114,17 @@ export default function UpdaterItem() {
                 });
             } else {
                 await message(
-                    t('no_update_available')
-                    , {
-                        title: t('update'),
-                        kind: 'info',
-                    });
+                    t('no_update_available'), {
+                    title: t('update'),
+                    kind: 'info',
+                });
                 console.log('No updates available');
             }
         } catch (error) {
             console.error('Error during update:', error);
             setDownloading(false);
-        }
-    };
-
-    // 确认是否安装更新
-    const confirmInstallation = async () => {
-        const confirmed = await confirm(t("update_downloaded"), {
-            title: t("update_install"),
-            kind: 'info',
-        });
-
-        if (confirmed) {
-            await vpnServiceManager.stop()
-            await relaunch();
+        } finally {
+            setIsUpdating(false);
         }
     };
 
