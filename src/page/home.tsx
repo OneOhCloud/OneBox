@@ -249,14 +249,21 @@ export default function HomePage() {
         />
 
         {['rules', 'global'].map((mode) => (
-          <button
-            key={mode}
-            data-mode={mode}
-            className={`capitalize relative px-4 py-1 rounded-lg transition-colors duration-300 ${selectedMode === mode ? 'text-black' : 'text-gray-500 hover:text-gray-700'}`}
-            onClick={() => handleModeChange(mode as SelectedModeType)}
-          >
-            {t(mode)}
-          </button>
+          <div key={mode} className='tooltip text-xs' >
+            <div className="tooltip-content">
+              <div className="text-xs max-w-[220px] whitespace-normal">
+                {t(`${mode}_tip`)}
+              </div>
+            </div>
+            <button
+              data-mode={mode}
+              className={`capitalize relative px-4 py-1 rounded-lg transition-colors duration-300 ${selectedMode === mode ? 'text-black' : 'text-gray-500 hover:text-gray-700'}`}
+              onClick={() => handleModeChange(mode as SelectedModeType)}
+            >
+
+              {t(mode)}
+            </button>
+          </div>
         ))}
       </div>
 
