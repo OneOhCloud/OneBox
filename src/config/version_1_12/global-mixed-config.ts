@@ -34,7 +34,8 @@ const mixedConfig = {
             {
                 "query_type": [
                     "HTTPS",
-                    "SVCB"
+                    "SVCB",
+                    "PTR"
                 ],
                 "action": "reject"
             }

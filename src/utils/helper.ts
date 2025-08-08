@@ -108,23 +108,30 @@ type vpnServiceManagerMode = 'SystemProxy' | 'TunProxy'
 
 export const vpnServiceManager = {
     start: async () => {
-        const configPath = await getSingBoxConfigPath();
-        const tunMode: boolean | undefined = await getEnableTun();
-        let mode: vpnServiceManagerMode = tunMode ? 'TunProxy' : 'SystemProxy';
-        let osType = type();
-        console.log("启动VPN服务");
-        console.log("模式:", mode);
-        console.log("配置文件路径:", configPath);
+        try {
+            const configPath = await getSingBoxConfigPath();
+            const tunMode: boolean | undefined = await getEnableTun();
+            let mode: vpnServiceManagerMode = tunMode ? 'TunProxy' : 'SystemProxy';
+            let osType = type();
+            console.log("启动VPN服务");
+            console.log("模式:", mode);
+            console.log("配置文件路径:", configPath);
 
-        // 在 linux 和 macOS 上使用 TUN 模式时需要输入超级管理员密码
-        if (tunMode && (osType == 'linux' || osType == 'macos')) {
-            let ok = await verifyPrivileged();
-            if (!ok) {
-                // 一般来说不会弹出这个提示，如果弹出此提示，说明之前的交互逻辑有问题。
-                await message('致命错误：授权失败', { title: '提示', kind: 'error' });
+            // 在 linux 和 macOS 上使用 TUN 模式时需要输入超级管理员密码
+            if (tunMode && (osType == 'linux' || osType == 'macos')) {
+                let ok = await verifyPrivileged();
+                if (!ok) {
+                    // 一般来说不会弹出这个提示，如果弹出此提示，说明之前的交互逻辑有问题。
+                    await message('致命错误：授权失败', { title: '提示', kind: 'error' });
+                }
             }
+            await invoke("start", { app: appWindow, path: configPath, mode: mode });
+
+        } catch (error) {
+            console.error('Failed to start VPN service:', error);
+            await message('Failed to start VPN service', { title: 'error', kind: 'error' });
         }
-        await invoke("start", { app: appWindow, path: configPath, mode: mode });
+
     },
     stop: async () => await invoke("stop", { app: appWindow }),
 
