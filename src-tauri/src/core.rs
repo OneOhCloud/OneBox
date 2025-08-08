@@ -281,8 +281,23 @@ pub async fn stop(app: tauri::AppHandle) -> Result<(), String> {
 /// 判断代理进程是否运行中
 #[tauri::command]
 pub async fn is_running(secret: String) -> bool {
+    use std::time::Duration;
+    use tokio::net::TcpStream;
+    use tokio::time::timeout;
+
+    // 先快速检查端口是否开放
+    if timeout(
+        Duration::from_millis(100),
+        TcpStream::connect("127.0.0.1:9191"),
+    )
+    .await
+    .is_err()
+    {
+        return false;
+    }
+
     let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(2))
+        .timeout(Duration::from_secs(2))
         .no_proxy()
         .build()
         .unwrap();
