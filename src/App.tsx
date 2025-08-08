@@ -12,16 +12,17 @@ import { ActiveScreenType, NavContext } from './single/context';
 import { initLanguage, t } from './utils/helper';
 
 
-import { defaultWindowIcon } from '@tauri-apps/api/app';
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from '@tauri-apps/api/event';
 import { Menu } from '@tauri-apps/api/menu';
 import { TrayIcon } from '@tauri-apps/api/tray';
 import { getCurrentWindow } from '@tauri-apps/api/window';
+import { type } from '@tauri-apps/plugin-os';
 import UpdaterButton from './components/settings/updater-button';
 import { getClashApiSecret, getStoreValue } from './single/store';
 import { DEVELOPER_TOGGLE_STORE_KEY } from './types/definition';
 import { copyEnvToClipboard, vpnServiceManager } from './utils/helper';
+
 const appWindow = getCurrentWindow();
 
 let trayInstance: TrayIcon | null = null;
@@ -48,12 +49,10 @@ async function createTrayMenu() {
     items: [
       {
         id: 'show',
-        // text: '仪表盘',
         text: t("menu_dashboard"),
       },
       {
         id: "enable",
-        // text: "启用代理", // 根据状态设置文本
         text: t("menu_enable_proxy"), // 根据状态设置文本
         checked: status, // 根据状态设置选中状态
         enabled: true, // 可根据需要设置是否启用
@@ -63,7 +62,6 @@ async function createTrayMenu() {
           } else {
             vpnServiceManager.start(); // 启动服务  
           }
-          // 更新托盘菜单以反映新状态
           const newMenu = await createTrayMenu();
           if (trayInstance) {
             await trayInstance.setMenu(newMenu);
@@ -72,7 +70,6 @@ async function createTrayMenu() {
       },
       {
         id: 'copy_proxy',
-        // text: '复制环境变量',
         text: t("menu_copy_env"),
         action: async () => {
           await copyEnvToClipboard("127.0.0.1", "6789");
@@ -88,7 +85,6 @@ async function createTrayMenu() {
     baseMenu.items.push(
       {
         id: 'devtools',
-        // text: '调试工具',
         text: t("menu_devtools"),
         action: async () => {
           await invoke("open_devtools");
@@ -115,9 +111,7 @@ async function createTrayMenu() {
 
 // 初始化托盘
 async function setupTrayIcon() {
-
-
-
+  const osType = type()
 
   if (trayInstance) {
     return trayInstance;
@@ -125,16 +119,31 @@ async function setupTrayIcon() {
 
   try {
     const menu = await createTrayMenu();
-    const options = {
-      menu,
-      icon: (await defaultWindowIcon()) || 'None',
-      tooltip: "OneBox"
+    const tray_icon = await invoke<ArrayBuffer>('get_tray_icon');
 
-    };
-    trayInstance = await TrayIcon.new(options);
+    if (osType == 'macos') {
+      const options = {
+        menu,
+        icon: tray_icon,
+        tooltip: "OneBox"
+      };
+      trayInstance = await TrayIcon.new(options);
+      trayInstance && trayInstance.setIconAsTemplate(true);
+    } else {
+      const options = {
+        menu,
+        icon: tray_icon || 'None',
+        tooltip: "OneBox"
+
+      };
+      trayInstance = await TrayIcon.new(options);
+    }
+
+
     return trayInstance;
   } catch (error) {
     console.error('Error setting up tray icon:', error);
+    console.error('OS Type:', osType);
     return null;
   }
 }

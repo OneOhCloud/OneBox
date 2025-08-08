@@ -28,6 +28,18 @@ async fn quit(app: AppHandle) {
 }
 
 #[tauri::command]
+fn get_tray_icon() -> Vec<u8> {
+    #[cfg(target_os = "macos")]
+    {
+        include_bytes!("../icons/macos.png").to_vec()
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        include_bytes!("../icons/icon.png").to_vec()
+    }
+}
+
+#[tauri::command]
 async fn create_window(app: tauri::AppHandle, label: String, window_tag: String, title: String) {
     // 检查窗口是否已存在
     if let Some(existing_window) = app.get_webview_window(&label) {
@@ -72,6 +84,7 @@ pub fn run() {
             open_devtools,
             create_window,
             get_app_version,
+            get_tray_icon,
             lan::get_lan_ip,
             lan::ping_google,
             lan::open_browser,

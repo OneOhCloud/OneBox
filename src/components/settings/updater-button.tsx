@@ -19,8 +19,9 @@ export default function UpdaterButton() {
 
         if (confirmed) {
             await vpnServiceManager.stop()
-            await new Promise(resolve => setTimeout(resolve, 2000));
-            await relaunch();
+            setTimeout(async () => {
+                await relaunch();
+            }, 2000); // 延迟2秒后重启应用
         }
     };
 

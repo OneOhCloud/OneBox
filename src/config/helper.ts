@@ -43,6 +43,9 @@ export async function setGlobalMixedConfig(identifier: string, version: string) 
     if (version.startsWith("v1.11")) {
         const module = await import("./version_1_11/global-mixed-config");
         return await module.default(identifier);
+    } else if (version.startsWith("v1.12")) {
+        const module = await import("./version_1_12/global-mixed-config");
+        return await module.default(identifier);
     } else {
         throw new Error("Unsupported version for setGlobalMixedConfig");
     }
@@ -51,7 +54,12 @@ export async function setGlobalMixedConfig(identifier: string, version: string) 
 
 export async function setGlobalTunConfig(identifier: string, version: string) {
     if (version.startsWith("v1.11")) {
+        console.log("setGlobalTunConfig v1.11");
         const module = await import("./version_1_11/global-tun-config");
+        return await module.default(identifier);
+    } else if (version.startsWith("v1.12")) {
+        console.log("setGlobalTunConfig v1.12");
+        const module = await import("./version_1_12/global-tun-config");
         return await module.default(identifier);
     } else {
         throw new Error("Unsupported version for setGlobalTunConfig");
@@ -60,7 +68,12 @@ export async function setGlobalTunConfig(identifier: string, version: string) {
 
 export async function setMixedConfig(identifier: string, version: string) {
     if (version.startsWith("v1.11")) {
+        console.log("setMixedConfig v1.11");
         const module = await import("./version_1_11/mixed-config");
+        return await module.default(identifier);
+    } else if (version.startsWith("v1.12")) {
+        console.log("setMixedConfig v1.12");
+        const module = await import("./version_1_12/mixed-config");
         return await module.default(identifier);
     } else {
         throw new Error("Unsupported version for setMixedConfig");
@@ -69,7 +82,12 @@ export async function setMixedConfig(identifier: string, version: string) {
 
 export async function setTunConfig(identifier: string, version: string) {
     if (version.startsWith("v1.11")) {
+        console.log("setTunConfig v1.11");
         const module = await import("./version_1_11/tun-config");
+        return await module.default(identifier);
+    } else if (version.startsWith("v1.12")) {
+        console.log("setTunConfig v1.12");
+        const module = await import("./version_1_12/tun-config");
         return await module.default(identifier);
     } else {
         throw new Error("Unsupported version for setTunConfig");

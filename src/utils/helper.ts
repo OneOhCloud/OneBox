@@ -116,7 +116,6 @@ export const vpnServiceManager = {
         console.log("模式:", mode);
         console.log("配置文件路径:", configPath);
 
-
         // 在 linux 和 macOS 上使用 TUN 模式时需要输入超级管理员密码
         if (tunMode && (osType == 'linux' || osType == 'macos')) {
             let ok = await verifyPrivileged();
