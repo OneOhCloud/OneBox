@@ -8,12 +8,15 @@ import { STAGE_VERSION_STORE_KEY } from '../../types/definition';
 import { t, vpnServiceManager } from "../../utils/helper";
 import { SettingItem } from "./common";
 
+import { type Update } from '@tauri-apps/plugin-updater';
+
 export default function UpdaterItem() {
     const [updateAvailable, setUpdateAvailable] = useState(false);
     const [downloading, setDownloading] = useState(false);
     const [downloadProgress, setDownloadProgress] = useState(0);
     const [simulateUpdate, _] = useState(false);
     const [isUpdating, setIsUpdating] = useState(false);
+    const [updateInfo, setUpdateInfo] = useState<Update | null>(null);
 
     const simulateUpdateProcess = async () => {
         try {
@@ -44,15 +47,27 @@ export default function UpdaterItem() {
 
     // 确认是否安装更新
     const confirmInstallation = async () => {
+        if (!updateInfo) return;
+
         const confirmed = await confirm(t("update_downloaded"), {
             title: t("update_install"),
             kind: 'info',
         });
 
         if (confirmed) {
-            await vpnServiceManager.stop()
-            await new Promise(resolve => setTimeout(resolve, 2000));
-            await relaunch();
+            try {
+                // 安装更新
+                await vpnServiceManager.stop();
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                await updateInfo.install();
+                await relaunch();
+            } catch (error) {
+                console.error('Installation error:', error);
+                await message(t('update_install_failed'), {
+                    title: t('error'),
+                    kind: 'error'
+                });
+            }
         }
     };
 
@@ -76,7 +91,7 @@ export default function UpdaterItem() {
             }
 
             // 真实更新流程
-            const updateInfo = await check({
+            const checkResult = await check({
                 timeout: 5000, // 设置超时时间为10秒
                 headers: {
                     'Accept': 'application/json',
@@ -84,15 +99,17 @@ export default function UpdaterItem() {
                 }
             });
 
-            if (updateInfo) {
+            if (checkResult) {
+                setUpdateInfo(checkResult);
                 console.log(
-                    `found update ${updateInfo.version} from ${updateInfo.date} with notes ${updateInfo.body}`
+                    `found update ${checkResult.version} from ${checkResult.date} with notes ${checkResult.body}`
                 );
 
                 setDownloading(true);
                 let downloaded = 0;
                 let contentLength = 0;
-                await updateInfo.downloadAndInstall((event) => {
+                // 只下载，不安装
+                await checkResult.download((event) => {
                     switch (event.event) {
                         case 'Started':
                             // @ts-ignore
@@ -108,6 +125,7 @@ export default function UpdaterItem() {
                         case 'Finished':
                             setDownloading(false);
                             console.log('download finished');
+                            // 下载完成后提示安装
                             confirmInstallation();
                             break;
                     }
