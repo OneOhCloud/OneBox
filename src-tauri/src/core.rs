@@ -71,7 +71,7 @@ async fn get_password_for_mode(mode: &ProxyMode) -> Result<String, String> {
     #[cfg(target_os = "windows")]
     {
         // 无论是 TUN 模式还是系统代理模式，Windows 都不需要密码
-        println!("mode: {:?}", mode);
+        log::info!("mode: {:?}", mode);
         Ok(String::new())
     }
 }
@@ -170,7 +170,7 @@ pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Resu
                     _ => return Ok(()),
                 };
 
-                println!("[{:#?}]:{}", mode_clone, message);
+                log::debug!("[{:#?}]:{}", mode_clone, message);
 
                 if message.contains("FATAL") {
                     // 如果是错误信息，弹出对话框
@@ -189,7 +189,7 @@ pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Resu
 
             while let Some(event) = rx.recv().await {
                 if let Err(e) = handle_event(event) {
-                    eprintln!("Event handling error: {}", e);
+                    log::error!("Event handling error: {}", e);
                     app_clone
                         .emit("core_backend", Some(format!("Event handling error: {}", e)))
                         .unwrap();

@@ -62,7 +62,7 @@ pub async fn open_browser(app: AppHandle, url: String) -> Result<(), String> {
     // zh:需要网络认证，尝试停止和重置代理。
     // en: Network authentication required, try to stop and reset the proxy.
     stop(app).await.unwrap_or_else(|e| {
-        eprintln!("Failed to stop app: {}", e);
+        log::error!("Failed to stop app: {}", e);
     });
 
     // 使用 webbrowser 库打开浏览器
@@ -102,14 +102,14 @@ pub async fn ping_apple_captive() -> String {
                     if let Ok(redirect_url) = location.to_str() {
                         return redirect_url.to_string();
                     } else {
-                        eprintln!("Invalid redirect URL");
+                        log::error!("Invalid redirect URL");
                     }
                 }
                 "false".to_string()
             } else {
                 // 其他非预期状态返回 false
                 // Other unexpected status returns false
-                eprintln!("Unexpected status code: {}", status);
+                log::error!("Unexpected status code: {}", status);
                 "false".to_string()
             }
         }
@@ -122,7 +122,7 @@ pub async fn ping_google() -> bool {
     let proxy = format!("http://{}:{}", "127.0.0.1", 6789);
     let client = reqwest::ClientBuilder::new()
         .proxy(reqwest::Proxy::all(&proxy).unwrap())
-        .timeout(std::time::Duration::from_secs(3))
+        .timeout(std::time::Duration::from_secs(5))
         .build()
         .unwrap();
 

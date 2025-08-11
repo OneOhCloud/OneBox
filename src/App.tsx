@@ -1,16 +1,11 @@
-import { motion } from 'framer-motion';
-import { useEffect, useState } from 'react';
-import { GearWideConnected, House, Layers } from 'react-bootstrap-icons';
-import { Toaster } from 'react-hot-toast';
 import "./App.css";
 
-import ConfigurationPage from './page/config';
-import DevPage from './page/developer';
+import clsx from 'clsx';
+import { motion } from 'framer-motion';
+import { Suspense, useEffect, useState } from 'react';
+import { GearWideConnected, House, Layers } from 'react-bootstrap-icons';
+import { Toaster } from 'react-hot-toast';
 import HomePage from './page/home';
-import SettingsPage from './page/settings';
-import { ActiveScreenType, NavContext } from './single/context';
-import { initLanguage, t } from './utils/helper';
-
 
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from '@tauri-apps/api/event';
@@ -18,10 +13,18 @@ import { Menu } from '@tauri-apps/api/menu';
 import { TrayIcon } from '@tauri-apps/api/tray';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { type } from '@tauri-apps/plugin-os';
-import UpdaterButton from './components/settings/updater-button';
+import React from 'react';
+import { ActiveScreenType, NavContext } from './single/context';
 import { getClashApiSecret, getStoreValue } from './single/store';
 import { DEVELOPER_TOGGLE_STORE_KEY } from './types/definition';
-import { copyEnvToClipboard, vpnServiceManager } from './utils/helper';
+import { copyEnvToClipboard, initLanguage, t, vpnServiceManager } from './utils/helper';
+
+
+
+const ConfigurationPage = React.lazy(() => import('./page/config'));
+const DevPage = React.lazy(() => import('./page/developer'));
+const SettingsPage = React.lazy(() => import('./page/settings'));
+const UpdaterButton = React.lazy(() => import('./components/settings/updater-button'));
 
 const appWindow = getCurrentWindow();
 
@@ -204,6 +207,8 @@ function App() {
     })
   }, []);
 
+
+
   return (
     <NavContext.Provider value={{ activeScreen, setActiveScreen, handleLanguageChange }}>
       <Toaster position="top-center" toastOptions={{ duration: 2000 }} containerClassName="mt-[32px]" />
@@ -213,29 +218,60 @@ function App() {
 
         {activeScreen === 'home' &&
           <div className='absolute inset-0  z-2   max-h-max flex justify-end p-1'>
-            <UpdaterButton />
+            <Suspense >
+              <UpdaterButton />
+            </Suspense>
           </div>
         }
         <div className="flex-1 overflow-y-hidden  ">
-          {activeScreen === 'home' &&
-            <div className="animate-fade-in h-full">
-              <HomePage />
-            </div>
-          }
-          {activeScreen === 'configuration' &&
-            <div className="animate-fade-in h-full">
+
+          <div className={
+            clsx("animate-fade-in h-full overflow-y-auto",
+              activeScreen === 'home' ? 'block' : 'hidden'
+            )
+          }>
+
+            <HomePage />
+          </div>
+
+          <div
+            className={
+              clsx("animate-fade-in h-full overflow-y-auto",
+                activeScreen === 'configuration' ? 'block' : 'hidden'
+              )
+            }
+          >
+            <Suspense >
               <ConfigurationPage />
-            </div>
-          }
-          {activeScreen === 'settings' &&
-            <div className="animate-fade-in h-full">
+            </Suspense>
+
+          </div>
+
+
+          <div
+            className={
+              clsx("animate-fade-in h-full overflow-y-auto",
+                activeScreen === 'settings' ? 'block' : 'hidden'
+              )
+            }
+          >
+            <Suspense>
               <SettingsPage />
-            </div>
-          }
-          {activeScreen === 'developer_options' &&
-            <div className="animate-fade-in h-full">
+            </Suspense>
+          </div>
+
+
+          <div
+            className={
+              clsx("animate-fade-in h-full overflow-y-auto",
+                activeScreen === 'developer_options' ? 'block' : 'hidden'
+              )
+            }
+          >
+            <Suspense>
               <DevPage />
-            </div>}
+            </Suspense>
+          </div>
         </div>
 
         <div className="dock  dock-sm  bg-gray-50 border-0">

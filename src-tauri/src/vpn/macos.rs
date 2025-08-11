@@ -32,11 +32,12 @@ pub async fn set_proxy(_app: &AppHandle) -> anyhow::Result<()> {
     let config = ProxyConfig::default();
     let sys = Sysproxy {
         enable: true,
-        host: config.host,
-        port: config.port,
+        host: config.host.clone(),
+        port: config.port.clone(),
         bypass: config.bypass,
     };
-    sys.set_system_proxy()?;
+    sys.set_system_proxy().map_err(|e| anyhow::anyhow!(e))?;
+    log::info!("Proxy set to {}:{}", config.host, config.port);
     Ok(())
 }
 
@@ -46,10 +47,8 @@ pub async fn unset_proxy(_app: &AppHandle) -> anyhow::Result<()> {
     let mut sysproxy = Sysproxy::get_system_proxy().map_err(|e| anyhow::anyhow!(e))?;
     sysproxy.enable = false;
 
-    sysproxy
-        .set_system_proxy()
-        .map_err(|e| anyhow::anyhow!(e))?;
-    println!("Proxy unset");
+    sysproxy.set_system_proxy()?;
+    log::info!("Proxy unset");
     Ok(())
 }
 
@@ -66,13 +65,20 @@ pub fn create_privileged_command(
         sidecar_path.escape_default(),
         path.escape_default()
     );
+    log::info!(
+        "Enable tun mode with command: {}",
+        command.replace(password.as_str(), "******")
+    );
     Some(app.shell().command("sh").args(vec!["-c", &command]))
 }
 
 /// 停止TUN模式下的进程
 pub fn stop_tun_process(password: &str) -> Result<(), String> {
     let command = format!("echo '{}' | sudo -S pkill -9 -f sing-box", password);
-    println!("Executing command: {}", command);
+    log::info!(
+        "Stop tun mode with command : {}",
+        command.replace(password, "******")
+    );
     Command::new("sh")
         .arg("-c")
         .arg(command)

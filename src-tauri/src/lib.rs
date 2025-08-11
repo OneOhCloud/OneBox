@@ -24,9 +24,10 @@ fn open_devtools(app: AppHandle) {
 #[tauri::command]
 async fn quit(app: AppHandle) {
     // 退出应用并清理资源
+    log::info!("Quitting application...");
 
     core::stop(app.clone()).await.unwrap_or_else(|e| {
-        eprintln!("Failed to stop proxy: {}", e);
+        log::error!("Failed to stop proxy: {}", e);
     });
 
     app.exit(0);
@@ -36,7 +37,7 @@ async fn quit(app: AppHandle) {
 fn get_tray_icon(app: AppHandle) -> Vec<u8> {
     #[cfg(target_os = "macos")]
     {
-        println!("macos tray icon for app: {:?}", app.package_info().name);
+        log::info!("macos tray icon for app: {:?}", app.package_info().name);
         include_bytes!("../icons/macos.png").to_vec()
     }
     #[cfg(not(target_os = "macos"))]
@@ -64,13 +65,13 @@ async fn create_window(app: tauri::AppHandle, label: String, window_tag: String,
     if let Some(existing_window) = app.get_webview_window(&label) {
         // 如果窗口已存在，则切换到该窗口
         existing_window.show().unwrap_or_else(|e| {
-            eprintln!("Failed to show existing window: {}", e);
+            log::error!("Failed to show existing window: {}", e);
         });
         existing_window.set_focus().unwrap_or_else(|e| {
-            eprintln!("Failed to focus existing window: {}", e);
+            log::error!("Failed to focus existing window: {}", e);
         });
         existing_window.unminimize().unwrap_or_else(|e| {
-            eprintln!("Failed to unminimize existing window: {}", e);
+            log::error!("Failed to unminimize existing window: {}", e);
         });
         return;
     }
@@ -86,7 +87,7 @@ async fn create_window(app: tauri::AppHandle, label: String, window_tag: String,
     .resizable(true) // 允许用户调整窗口大小
     .build()
     .map_err(|e| {
-        eprintln!("Failed to create window: {}", e);
+        log::error!("Failed to create window: {}", e);
     });
 }
 
@@ -122,11 +123,11 @@ pub fn run() {
                 app.handle()
                     .plugin(tauri_plugin_updater::Builder::new().build())?;
             }
-            println!("app log path: {:?}", app.path().app_log_dir());
-            println!("app data path: {:?}", app.path().app_data_dir());
-            println!("app cache path: {:?}", app.path().app_cache_dir());
-            println!("app config path: {:?}", app.path().app_config_dir());
-            println!("app local data path: {:?}", app.path().app_local_data_dir());
+            log::info!("app log path: {:?}", app.path().app_log_dir());
+            log::info!("app data path: {:?}", app.path().app_data_dir());
+            log::info!("app cache path: {:?}", app.path().app_cache_dir());
+            log::info!("app config path: {:?}", app.path().app_config_dir());
+            log::info!("app local data path: {:?}", app.path().app_local_data_dir());
 
             #[cfg(target_os = "macos")]
             {
@@ -148,7 +149,7 @@ pub fn run() {
                 }
             }
             _ => {
-                println!("menu item {:?} not handled", event.id);
+                log::info!("menu item {:?} not handled", event.id);
             }
         })
         .on_window_event(|window: &Window, event: &WindowEvent| match event {
@@ -160,7 +161,7 @@ pub fn run() {
                 }
 
                 api.prevent_close();
-                println!("窗口关闭请求被重定向为最小化到托盘");
+                log::info!("窗口关闭请求被重定向为最小化到托盘");
                 // 隐藏窗口（最小化到托盘）
                 if let Some(main_window) = window.app_handle().get_webview_window("main") {
                     main_window.hide().unwrap();
@@ -168,11 +169,11 @@ pub fn run() {
             }
             WindowEvent::Resized { .. } => {
                 // 窗口大小改变
-                println!("窗口大小改变");
+                log::info!("窗口大小改变");
             }
             WindowEvent::Destroyed => {
                 let _ = core::stop(window.app_handle().clone());
-                println!("Destroyed");
+                log::info!("Destroyed");
             }
             _ => {}
         })
