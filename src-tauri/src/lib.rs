@@ -8,6 +8,7 @@ mod vpn;
 
 #[cfg(target_os = "windows")]
 use png;
+use tokio::io::AsyncBufRead;
 
 #[tauri::command]
 fn get_app_version(app: AppHandle) -> String {
@@ -148,8 +149,14 @@ pub fn run() {
                     main_window.set_focus().unwrap();
                 }
             }
+            "quit" => {
+                let app_clone = app.clone();
+                tauri::async_runtime::spawn(async move {
+                    core::stop(app_clone).await;
+                });
+            }
             _ => {
-                log::info!("menu item {:?} not handled", event.id);
+                log::warn!("menu item {:?} not handled", event.id);
             }
         })
         .on_window_event(|window: &Window, event: &WindowEvent| match event {
