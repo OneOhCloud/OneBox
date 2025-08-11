@@ -1,7 +1,8 @@
 import * as path from '@tauri-apps/api/path';
 import { type } from '@tauri-apps/plugin-os';
 import { getSubscriptionConfig } from '../../action/db';
-import { getAllowLan } from '../../single/store';
+import { getAllowLan, getStoreValue } from '../../single/store';
+import { TUN_STACK_STORE_KEY } from '../../types/definition';
 import { clashApi, ruleSet } from '../common';
 import { updateVPNServerConfigFromDB } from './helper';
 
@@ -194,8 +195,15 @@ export default async function setTunConfig(identifier: string) {
         tunConfig.inbounds[0].stack = "system";
     }
 
-    // 其余平台使用 gvisor stack 避免潜在问题
-    // 比如在 macOS 上使用 system stack 时会导致诸多问题，需要追踪 sing-box 是否解决此问题。
+    // 如果用户在设置中选择了 TUN Stack，则使用用户选择的 stack
+    // 苹果系统默认使用 gvisor stack
+    if (type() !== "macos" && await getStoreValue(TUN_STACK_STORE_KEY)) {
+        tunConfig.inbounds[0].stack = await getStoreValue(TUN_STACK_STORE_KEY);
+    }
+
+    console.log("当前 TUN Stack:", tunConfig.inbounds[0].stack);
+
+
 
     // 深拷贝配置文件
     const newConfig = JSON.parse(JSON.stringify(tunConfig));

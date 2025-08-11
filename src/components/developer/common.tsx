@@ -38,7 +38,9 @@ export function SettingItem({
 }: SettingItemProps) {
     return (
         <div
-            className="flex items-center justify-between p-4 hover:bg-gray-100 active:bg-gray-100 cursor-pointer transition-colors"
+            className={
+                `flex items-center justify-between p-4 cursor-pointer transition-colors ${disabled ? 'cursor-not-allowed opacity-50' : 'hover:bg-gray-100 dark:hover:bg-[#3A3A3C]'}`
+            }
             onClick={() => {
                 !disabled && onPress()
             }}

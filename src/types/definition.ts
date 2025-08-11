@@ -6,6 +6,7 @@ export const SING_BOX_VERSION = "v1.12.1"
 export const SSI_STORE_KEY = 'selected_subscription_identifier'
 export const DEVELOPER_TOGGLE_STORE_KEY = 'developer_toggle_key'
 export const STAGE_VERSION_STORE_KEY = 'stage_version_key'
+export const TUN_STACK_STORE_KEY = 'tun_stack_key'
 
 
 
