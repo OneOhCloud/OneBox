@@ -28,13 +28,16 @@ export default function VPNBody({ isRunning }: { isRunning: boolean }) {
     };
 
     useEffect(() => {
+        let timer: any;
         // 如果正在运行，则延迟1秒显示网络状态，否则不显示
-        let timer: NodeJS.Timeout;
         if (isRunning) {
             timer = setTimeout(() => setShowNetworkStatus(true), 2000);
         } else {
             setShowNetworkStatus(false);
         }
+        return () => {
+            timer && clearTimeout(timer);
+        };
 
     }, [isRunning, isLoading]);
 
