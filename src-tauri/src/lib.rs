@@ -1,3 +1,5 @@
+#[cfg(target_os = "windows")]
+use png;
 use tauri::{AppHandle, Manager, Window, WindowEvent};
 mod core;
 mod database;
@@ -5,10 +7,6 @@ mod lan;
 mod plugins;
 mod privilege;
 mod vpn;
-
-#[cfg(target_os = "windows")]
-use png;
-use tokio::io::AsyncBufRead;
 
 #[tauri::command]
 fn get_app_version(app: AppHandle) -> String {
@@ -152,7 +150,7 @@ pub fn run() {
             "quit" => {
                 let app_clone = app.clone();
                 tauri::async_runtime::spawn(async move {
-                    core::stop(app_clone).await;
+                    let _ = core::stop(app_clone).await;
                 });
             }
             _ => {
@@ -179,7 +177,10 @@ pub fn run() {
                 log::info!("窗口大小改变");
             }
             WindowEvent::Destroyed => {
-                let _ = core::stop(window.app_handle().clone());
+                let app_clone = window.app_handle().clone();
+                tauri::async_runtime::spawn(async move {
+                    let _ = core::stop(app_clone).await;
+                });
                 log::info!("Destroyed");
             }
             _ => {}
