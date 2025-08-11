@@ -15,6 +15,7 @@ const formatDate = (date: number) => new Date(date).toLocaleDateString('zh-CN');
 export default function VPNBody({ isRunning }: { isRunning: boolean }) {
     const [sub, setSub] = useState<Subscription>();
     const { data, isLoading } = useSubscriptions();
+    const [showNetworkStatus, setShowNetworkStatus] = useState(false);
 
 
     const handleUpdate = async (identifier: string, isUpdate: boolean) => {
@@ -26,7 +27,16 @@ export default function VPNBody({ isRunning }: { isRunning: boolean }) {
         }
     };
 
-    useEffect(() => { }, [isRunning, isLoading]);
+    useEffect(() => {
+        // 如果正在运行，则延迟1秒显示网络状态，否则不显示
+        let timer: NodeJS.Timeout;
+        if (isRunning) {
+            timer = setTimeout(() => setShowNetworkStatus(true), 2000);
+        } else {
+            setShowNetworkStatus(false);
+        }
+
+    }, [isRunning, isLoading]);
 
     return (
         <div className='w-full'>
@@ -40,8 +50,12 @@ export default function VPNBody({ isRunning }: { isRunning: boolean }) {
                         </div>
 
                         <div className="flex gap-2 px-2 items-center">
-                            <AppleNetworkStatus isRunning={isRunning} />
-                            <GoogleNetworkStatus isRunning={isRunning} />
+                            {showNetworkStatus && (
+                                <>
+                                    <AppleNetworkStatus isRunning={isRunning} />
+                                    <GoogleNetworkStatus isRunning={isRunning} />
+                                </>
+                            )}
                         </div>
 
 

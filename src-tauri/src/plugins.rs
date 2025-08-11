@@ -1,10 +1,15 @@
+use log::LevelFilter;
 use tauri::{AppHandle, Builder, Manager, Wry};
 use tauri_plugin_autostart::MacosLauncher;
 use tauri_plugin_sql::Migration;
 
 pub fn register_plugins(builder: Builder<Wry>, migrations: Vec<Migration>) -> Builder<Wry> {
     builder
-        .plugin(tauri_plugin_log::Builder::new().build())
+        .plugin(
+            tauri_plugin_log::Builder::new()
+                .level(LevelFilter::Info)
+                .build(),
+        )
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_shell::init())

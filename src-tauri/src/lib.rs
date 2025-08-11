@@ -6,6 +6,9 @@ mod plugins;
 mod privilege;
 mod vpn;
 
+#[cfg(target_os = "windows")]
+use png;
+
 #[tauri::command]
 fn get_app_version(app: AppHandle) -> String {
     let package_info = app.package_info();
@@ -22,30 +25,36 @@ fn open_devtools(app: AppHandle) {
 async fn quit(app: AppHandle) {
     // 退出应用并清理资源
 
-    #[cfg(target_os = "windows")]
-    {
-        // windows 下需要先停止代理进程
-        core::stop(app).await.unwrap_or_else(|e| {
-            eprintln!("Failed to stop proxy: {}", e);
-        });
-    }
-
-    core::reset_system_proxy(&app).await.unwrap_or_else(|e| {
-        eprintln!("Failed to reset system proxy: {}", e);
+    core::stop(app.clone()).await.unwrap_or_else(|e| {
+        eprintln!("Failed to stop proxy: {}", e);
     });
 
     app.exit(0);
 }
 
 #[tauri::command]
-fn get_tray_icon() -> Vec<u8> {
+fn get_tray_icon(app: AppHandle) -> Vec<u8> {
     #[cfg(target_os = "macos")]
     {
+        println!("macos tray icon for app: {:?}", app.package_info().name);
         include_bytes!("../icons/macos.png").to_vec()
     }
     #[cfg(not(target_os = "macos"))]
     {
-        include_bytes!("../icons/icon.png").to_vec()
+        let icon = app.default_window_icon().unwrap();
+        let rgba = icon.rgba();
+        let width = icon.width();
+        let height = icon.height();
+        // 将 RGBA 数据转换为 PNG 格式
+        let mut png_data = Vec::new();
+        {
+            let mut encoder = png::Encoder::new(&mut png_data, width as u32, height as u32);
+            encoder.set_color(png::ColorType::Rgba);
+            encoder.set_depth(png::BitDepth::Eight);
+            let mut writer = encoder.write_header().unwrap();
+            writer.write_image_data(rgba).unwrap();
+        }
+        png_data
     }
 }
 
@@ -85,6 +94,7 @@ async fn create_window(app: tauri::AppHandle, label: String, window_tag: String,
 pub fn run() {
     let migrations = database::get_migrations();
     let builder = tauri::Builder::default()
+        .plugin(tauri_plugin_log::Builder::new().build())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_http::init());
     let builder = plugins::register_plugins(builder, migrations);

@@ -119,7 +119,9 @@ async function setupTrayIcon() {
 
   try {
     const menu = await createTrayMenu();
-    const tray_icon = await invoke<ArrayBuffer>('get_tray_icon');
+    const tray_icon = await invoke<ArrayBuffer>('get_tray_icon', {
+      app: appWindow
+    });
 
     if (osType == 'macos') {
       const options = {
