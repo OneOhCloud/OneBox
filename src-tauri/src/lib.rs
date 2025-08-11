@@ -21,9 +21,19 @@ fn open_devtools(app: AppHandle) {
 #[tauri::command]
 async fn quit(app: AppHandle) {
     // 退出应用并清理资源
+
+    #[cfg(target_os = "windows")]
+    {
+        // windows 下需要先停止代理进程
+        core::stop(app).await.unwrap_or_else(|e| {
+            eprintln!("Failed to stop proxy: {}", e);
+        });
+    }
+
     core::reset_system_proxy(&app).await.unwrap_or_else(|e| {
         eprintln!("Failed to reset system proxy: {}", e);
     });
+
     app.exit(0);
 }
 
