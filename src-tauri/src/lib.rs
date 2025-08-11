@@ -108,7 +108,7 @@ pub fn run() {
             lan::get_lan_ip,
             lan::ping_google,
             lan::open_browser,
-            lan::ping_apple_captive,
+            lan::ping_captive,
             core::stop,
             core::start,
             core::version,

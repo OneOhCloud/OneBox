@@ -60,7 +60,7 @@ export function useNetworkCheck(key: string, checkFn: () => Promise<NetworkRespo
 
 export function useAppleNetworkCheck() {
     async function checkAppleNetwork() {
-        const res = await invoke<string>('ping_apple_captive');
+        const res = await invoke<string>('ping_captive');
         console.log("Apple network check result:", res);
         return {
             status: res === "true",
