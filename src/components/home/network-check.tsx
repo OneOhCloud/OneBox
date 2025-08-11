@@ -34,8 +34,8 @@ const NetworkStatus = ({ isOk, icon: Icon, tip }: NetworkStatusProps) => (
 export function AppleNetworkStatus({ isRunning }: NetworkCheckProps) {
     const { data, isLoading, error } = useAppleNetworkCheck(isRunning);
 
-    if (isLoading) return <LoadingStatus icon={Reception4} />;
-    if (error || !data) {
+    if (isLoading || !data) return <LoadingStatus icon={Reception4} />;
+    if (error) {
         return <NetworkStatus
             isOk={false}
             icon={Reception4}

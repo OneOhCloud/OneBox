@@ -78,7 +78,7 @@ pub async fn open_browser(app: AppHandle, url: String) -> Result<(), String> {
 pub async fn ping_apple_captive() -> String {
     // 创建 HTTP 客户端，禁用自动重定向
     let builder = reqwest::ClientBuilder::new()
-        .timeout(std::time::Duration::from_secs(4))
+        .timeout(std::time::Duration::from_secs(5))
         .redirect(Policy::none())
         .no_proxy();
 
