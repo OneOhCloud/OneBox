@@ -101,10 +101,7 @@ async function createTrayMenu() {
     {
       id: 'quit',
       // text: '退出程序',
-      text: t("menu_quit"),
-      action: async () => {
-        await invoke("quit");
-      },
+      text: t("menu_quit")
     },
 
   )

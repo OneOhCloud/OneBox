@@ -87,7 +87,7 @@ pub async fn ping_captive() -> String {
         url = "http://captive.apple.com";
     }
 
-    log::info!("Pinging URL: {}", url);
+    log::debug!("Pinging URL: {}", url);
 
     // 创建 HTTP 客户端，禁用自动重定向
     let builder = reqwest::ClientBuilder::new()

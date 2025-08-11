@@ -24,12 +24,17 @@ fn open_devtools(app: AppHandle) {
 async fn quit(app: AppHandle) {
     // 退出应用并清理资源
     log::info!("Quitting application...");
-
-    core::stop(app.clone()).await.unwrap_or_else(|e| {
+    if let Err(e) = core::stop(app.clone()).await {
         log::error!("Failed to stop proxy: {}", e);
-    });
+    } else {
+        log::info!("Application stopped successfully.");
+        app.exit(0);
+    }
+}
 
-    app.exit(0);
+fn sync_quit(app: AppHandle) {
+    // 同步退出应用
+    tauri::async_runtime::block_on(quit(app));
 }
 
 #[tauri::command]
@@ -148,10 +153,7 @@ pub fn run() {
                 }
             }
             "quit" => {
-                let app_clone = app.clone();
-                tauri::async_runtime::spawn(async move {
-                    let _ = core::stop(app_clone).await;
-                });
+                sync_quit(app.clone());
             }
             _ => {
                 log::warn!("menu item {:?} not handled", event.id);
@@ -178,9 +180,7 @@ pub fn run() {
             }
             WindowEvent::Destroyed => {
                 let app_clone = window.app_handle().clone();
-                tauri::async_runtime::spawn(async move {
-                    let _ = core::stop(app_clone).await;
-                });
+                sync_quit(app_clone);
                 log::info!("Destroyed");
             }
             _ => {}

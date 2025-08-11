@@ -19,7 +19,6 @@ pub static DEFAULT_BYPASS: &str = "localhost;127.*;192.168.*;10.*;172.16.*;172.1
 pub struct ProxyConfig {
     pub host: String,
     pub port: u16,
-    pub bypass: String,
 }
 
 impl Default for ProxyConfig {
@@ -27,7 +26,6 @@ impl Default for ProxyConfig {
         Self {
             host: "127.0.0.1".to_string(),
             port: 6789,
-            bypass: DEFAULT_BYPASS.to_string(),
         }
     }
 }
@@ -85,21 +83,33 @@ pub fn create_privileged_command(
     path: String,
     _password: String,
 ) -> Option<TauriCommand> {
-    let args = format!("run -c {} --disable-color", path);
-    let sidecar_wide: Vec<u16> = OsStr::new(&sidecar_path)
+    // 构造 PowerShell 命令
+    let kill_cmd = "Stop-Process -Name 'sing-box' -Force -ErrorAction SilentlyContinue;";
+    let run_cmd = format!(
+        "& '{0}' run -c '{1}' --disable-color",
+        sidecar_path.replace("'", "''"),
+        path.replace("'", "''")
+    );
+    let combined_cmd = format!("-Command \"{kill_cmd} {run_cmd}\"");
+
+    let args_wide: Vec<u16> = OsStr::new(&combined_cmd)
         .encode_wide()
         .chain(Some(0))
         .collect();
-    let args_wide: Vec<u16> = OsStr::new(&args).encode_wide().chain(Some(0)).collect();
+    let powershell_wide: Vec<u16> = OsStr::new("powershell.exe")
+        .encode_wide()
+        .chain(Some(0))
+        .collect();
     let verb = OsStr::new("runas")
         .encode_wide()
         .chain(Some(0))
         .collect::<Vec<u16>>();
+
     let res = unsafe {
         ShellExecuteW(
             HWND(0),
             PCWSTR(verb.as_ptr()),
-            PCWSTR(sidecar_wide.as_ptr()),
+            PCWSTR(powershell_wide.as_ptr()),
             PCWSTR(args_wide.as_ptr()),
             PCWSTR(std::ptr::null()),
             windows::Win32::UI::WindowsAndMessaging::SHOW_WINDOW_CMD(0),
@@ -108,10 +118,13 @@ pub fn create_privileged_command(
     if res.0 as usize <= 32 {
         panic!("ShellExecuteW failed: code {}", res.0 as usize);
     }
-    log::info!("Enable tun mode with command: {} {}", sidecar_path, args);
+    log::info!(
+        "Running command with elevated privileges: {}{}",
+        kill_cmd,
+        run_cmd
+    );
     None
 }
-
 /// 停止TUN模式下的进程（使用 Windows ShellExecuteW UAC 提权）
 #[cfg(target_os = "windows")]
 pub fn stop_tun_process(_password: &str) -> Result<(), String> {
@@ -140,6 +153,7 @@ pub fn stop_tun_process(_password: &str) -> Result<(), String> {
     if res.0 as usize <= 32 {
         return Err(format!("ShellExecuteW failed: code {}", res.0 as usize));
     }
+
     log::info!("Stop tun mode with command: taskkill /F /IM sing-box.exe");
     Ok(())
 }
