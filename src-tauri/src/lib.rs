@@ -27,6 +27,7 @@ async fn quit(app: AppHandle) {
     if let Err(e) = core::stop(app.clone()).await {
         log::error!("Failed to stop proxy: {}", e);
     } else {
+        log::info!("Proxy stopped successfully.");
         log::info!("Application stopped successfully.");
         app.exit(0);
     }
@@ -163,15 +164,13 @@ pub fn run() {
             WindowEvent::CloseRequested { api, .. } => {
                 // 阻止窗口关闭
                 // 只针对 main 窗口
-                if window.label() != "main" {
-                    return;
-                }
-
-                api.prevent_close();
-                log::info!("窗口关闭请求被重定向为最小化到托盘");
-                // 隐藏窗口（最小化到托盘）
-                if let Some(main_window) = window.app_handle().get_webview_window("main") {
-                    main_window.hide().unwrap();
+                if window.label() == "main" {
+                    api.prevent_close();
+                    log::info!("窗口关闭请求被重定向为最小化到托盘");
+                    // 隐藏窗口（最小化到托盘）
+                    if let Some(main_window) = window.app_handle().get_webview_window("main") {
+                        main_window.hide().unwrap();
+                    }
                 }
             }
             WindowEvent::Resized { .. } => {
@@ -179,8 +178,13 @@ pub fn run() {
                 log::info!("窗口大小改变");
             }
             WindowEvent::Destroyed => {
-                let app_clone = window.app_handle().clone();
-                sync_quit(app_clone);
+                // 只针对 main 窗口
+                if window.label() == "main" {
+                    log::info!("主窗口被销毁，应用将退出");
+                    let app_clone = window.app_handle().clone();
+                    sync_quit(app_clone);
+                }
+
                 log::info!("Destroyed");
             }
             _ => {}

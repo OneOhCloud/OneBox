@@ -83,33 +83,21 @@ pub fn create_privileged_command(
     path: String,
     _password: String,
 ) -> Option<TauriCommand> {
-    // 构造 PowerShell 命令
-    let kill_cmd = "Stop-Process -Name 'sing-box' -Force -ErrorAction SilentlyContinue;";
-    let run_cmd = format!(
-        "& '{0}' run -c '{1}' --disable-color",
-        sidecar_path.replace("'", "''"),
-        path.replace("'", "''")
-    );
-    let combined_cmd = format!("-Command \"{kill_cmd} {run_cmd}\"");
-
-    let args_wide: Vec<u16> = OsStr::new(&combined_cmd)
+    let args = format!("run -c {} --disable-color", path);
+    let sidecar_wide: Vec<u16> = OsStr::new(&sidecar_path)
         .encode_wide()
         .chain(Some(0))
         .collect();
-    let powershell_wide: Vec<u16> = OsStr::new("powershell.exe")
-        .encode_wide()
-        .chain(Some(0))
-        .collect();
+    let args_wide: Vec<u16> = OsStr::new(&args).encode_wide().chain(Some(0)).collect();
     let verb = OsStr::new("runas")
         .encode_wide()
         .chain(Some(0))
         .collect::<Vec<u16>>();
-
     let res = unsafe {
         ShellExecuteW(
             HWND(0),
             PCWSTR(verb.as_ptr()),
-            PCWSTR(powershell_wide.as_ptr()),
+            PCWSTR(sidecar_wide.as_ptr()),
             PCWSTR(args_wide.as_ptr()),
             PCWSTR(std::ptr::null()),
             windows::Win32::UI::WindowsAndMessaging::SHOW_WINDOW_CMD(0),
@@ -118,13 +106,10 @@ pub fn create_privileged_command(
     if res.0 as usize <= 32 {
         panic!("ShellExecuteW failed: code {}", res.0 as usize);
     }
-    log::info!(
-        "Running command with elevated privileges: {}{}",
-        kill_cmd,
-        run_cmd
-    );
+    log::info!("Enable tun mode with command: {} {}", sidecar_path, args);
     None
 }
+
 /// 停止TUN模式下的进程（使用 Windows ShellExecuteW UAC 提权）
 #[cfg(target_os = "windows")]
 pub fn stop_tun_process(_password: &str) -> Result<(), String> {
