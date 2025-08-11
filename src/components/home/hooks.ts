@@ -11,7 +11,7 @@ type NetworkResponse = {
     loginUrl?: string;
 };
 
-export function useNetworkCheck(key: string, checkFn: () => Promise<NetworkResponse>, interval: number) {
+export function useNetworkCheck(key: string, checkFn: () => Promise<NetworkResponse>) {
     const [shouldRefresh, setShouldRefresh] = useState(true);
     const [confirmShown, setConfirmShown] = useState(false);
 
@@ -54,14 +54,14 @@ export function useNetworkCheck(key: string, checkFn: () => Promise<NetworkRespo
     }
 
     return useSWR(key, handleNetworkCheck, {
-        refreshInterval: shouldRefresh ? interval : 0,
-        errorRetryCount: 3
+        refreshInterval: 1000
     });
 }
 
-export function useAppleNetworkCheck(isRunning: boolean) {
+export function useAppleNetworkCheck() {
     async function checkAppleNetwork() {
         const res = await invoke<string>('ping_apple_captive');
+        console.log("Apple network check result:", res);
         return {
             status: res === "true",
             needsLogin: res.startsWith("http"),
@@ -70,16 +70,15 @@ export function useAppleNetworkCheck(isRunning: boolean) {
     }
 
     return useNetworkCheck(
-        `apple-network-${isRunning}`,
-        checkAppleNetwork,
-        1000
+        `apple-network-check`,
+        checkAppleNetwork
     );
 }
 
-export function useGoogleNetworkCheck(isRunning: boolean) {
+export function useGoogleNetworkCheck() {
 
     return useSWR(
-        `swr-google-${isRunning}`,
+        `swr-google-check`,
         async () => {
             return invoke<boolean>('ping_google');
         },

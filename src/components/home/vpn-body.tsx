@@ -38,7 +38,7 @@ export default function VPNBody({ isRunning }: { isRunning: boolean }) {
 
                         <div className="flex gap-2 px-2 items-center">
 
-                            <AppleNetworkStatus isRunning={isRunning} />
+                            <AppleNetworkStatus />
                             <GoogleNetworkStatus isRunning={isRunning} />
                         </div>
 

@@ -105,6 +105,7 @@ pub async fn ping_apple_captive() -> String {
                         log::error!("Invalid redirect URL");
                     }
                 }
+                log::error!("Redirect without location header");
                 "false".to_string()
             } else {
                 // 其他非预期状态返回 false

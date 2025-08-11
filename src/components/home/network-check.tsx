@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
 import { Globe, Icon, Reception4 } from "react-bootstrap-icons";
 import { t } from "../../utils/helper";
-import { useAppleNetworkCheck, useGoogleNetworkCheck } from "./hook";
+import { useAppleNetworkCheck, useGoogleNetworkCheck } from "./hooks";
 
 type NetworkStatusProps = {
     isOk: boolean;
@@ -31,11 +31,12 @@ const NetworkStatus = ({ isOk, icon: Icon, tip }: NetworkStatusProps) => (
     </div>
 );
 
-export function AppleNetworkStatus({ isRunning }: NetworkCheckProps) {
-    const { data, isLoading, error } = useAppleNetworkCheck(isRunning);
+export function AppleNetworkStatus() {
+    const { data, isLoading, error } = useAppleNetworkCheck();
 
     if (isLoading || !data) return <LoadingStatus icon={Reception4} />;
     if (error) {
+        console.error("Network check error:", error);
         return <NetworkStatus
             isOk={false}
             icon={Reception4}
@@ -51,7 +52,7 @@ export function AppleNetworkStatus({ isRunning }: NetworkCheckProps) {
 }
 
 export function GoogleNetworkStatus({ isRunning }: NetworkCheckProps) {
-    const { data, isLoading, error } = useGoogleNetworkCheck(isRunning);
+    const { data, isLoading, error } = useGoogleNetworkCheck();
 
     if (!isRunning) return <Globe className="size-4 text-gray-100 " />;
     if (isLoading || !data) return <LoadingStatus />;
