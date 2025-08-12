@@ -25,11 +25,17 @@ export async function updateVPNServerConfigFromDB(fileName: string, dbConfigData
     let vpnServerList = dbConfigData.outbounds.filter((item: Item) => {
         // zh: 只找VPN服务器的节点配置
         // en: Only find the node configuration of the VPN server
-        return item.type !== "selector" && item.type !== "urltest" && item.type !== "direct" && item.type !== "block";
+        let flag = item.type !== "selector" && item.type !== "urltest" && item.type !== "direct" && item.type !== "block";
+
+        // zh: sing-box 1.12 版本开始，dns 类型的节点不再需要
+        // en: From sing-box version 1.12, dns type nodes are no longer
+        flag = flag && item.type !== "dns";
+        return flag;
     });
 
 
     for (let i = 0; i < vpnServerList.length; i++) {
+        vpnServerList[i]["domain_resolver"] = "system";
         outboundsSelector.push(vpnServerList[i].tag);
 
     }

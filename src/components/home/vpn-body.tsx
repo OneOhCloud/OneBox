@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Shield } from "react-bootstrap-icons";
 import { useSubscriptions } from "../../hooks/useDB";
 import { Subscription } from "../../types/definition";
@@ -8,9 +8,6 @@ import SelectNode from "./select-node";
 import SelectSub from "./select-sub";
 
 const formatDate = (date: number) => new Date(date).toLocaleDateString('zh-CN');
-
-
-
 
 export default function VPNBody({ isRunning }: { isRunning: boolean }) {
     const [sub, setSub] = useState<Subscription>();
@@ -26,7 +23,7 @@ export default function VPNBody({ isRunning }: { isRunning: boolean }) {
         }
     };
 
-    useEffect(() => { }, [isRunning, isLoading]);
+
 
     return (
         <div className='w-full'>
@@ -40,7 +37,8 @@ export default function VPNBody({ isRunning }: { isRunning: boolean }) {
                         </div>
 
                         <div className="flex gap-2 px-2 items-center">
-                            <AppleNetworkStatus isRunning={isRunning} />
+
+                            <AppleNetworkStatus />
                             <GoogleNetworkStatus isRunning={isRunning} />
                         </div>
 

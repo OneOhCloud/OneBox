@@ -181,6 +181,8 @@ function About({ onClose }: AboutProps) {
                                 className="mt-4 btn btn-sm btn-ghost  btn-success w-full"
                                 onClick={() => {
                                     setActiveScreen('developer_options');
+                                    onClose();
+
                                 }}
                             >
                                 {t("developer_options")}

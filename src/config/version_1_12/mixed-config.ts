@@ -13,44 +13,40 @@ const mixedConfig = {
   "dns": {
     "servers": [
       {
-        "tag": "alibaba",
-        "address": "223.6.6.6",
-        "strategy": "ipv4_only",
-        "detour": "direct"
+        "tag": "dns_proxy",
+        "type": "tcp",
+        "server": "1.0.0.1",
+        "server_port": 53,
+        "detour": "ExitGateway",
       },
       {
-        "tag": "dns_proxy",
-        //  只有这个 dns 在 sing-box 1.1.* 版本可用, 其余地址会导致 dns 解析失败
-        "address": "tcp://1.0.0.1",
-        "strategy": "ipv4_only",
-        "detour": "ExitGateway",
-        "client_subnet": "114.114.114.114"
+        "tag": "alibaba",
+        "type": "udp",
+        "server": "223.6.6.6",
+        "server_port": 53,
       },
+
       {
         "tag": "system",
-        "address": "local",
-        "strategy": "ipv4_only",
-        "detour": "direct"
+        "type": "local",
       },
       {
         "tag": "tencent",
-        "address": "119.29.29.29",
-        "strategy": "ipv4_only",
-        "detour": "direct"
+        "type": "udp",
+        "server": "119.29.29.29",
+        "server_port": 53,
       }
     ],
     "rules": [
       {
         "query_type": [
           "HTTPS",
-          "SVCB"
+          "SVCB",
+          "PTR"
         ],
         "action": "reject"
       },
-      {
-        "outbound": "any",
-        "server": "alibaba"
-      },
+
       {
         "domain_suffix": [
           ".github.com",
@@ -112,19 +108,25 @@ const mixedConfig = {
   ],
 
   "route": {
+
     "rules": [
       {
-        "inbound": "mixed",
-        "action": "resolve"
-      },
-      {
-        "inbound": "mixed",
         "action": "sniff"
       },
       {
-        "protocol": "dns",
+        "type": "logical",
+        "mode": "or",
+        "rules": [
+          {
+            "protocol": "dns"
+          },
+          {
+            "port": 53
+          }
+        ],
         "action": "hijack-dns"
       },
+
       {
         "protocol": "quic",
         "action": "reject"
@@ -153,8 +155,7 @@ const mixedConfig = {
     ],
     "final": "ExitGateway",
     "auto_detect_interface": true,
-    "rule_set": ruleSet
-
+    "rule_set": ruleSet,
   },
   "experimental": {
     "clash_api": clashApi,
@@ -182,8 +183,6 @@ const mixedConfig = {
     }
   ]
 }
-
-
 
 
 

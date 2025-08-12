@@ -1,7 +1,8 @@
 import * as path from '@tauri-apps/api/path';
 import { type } from '@tauri-apps/plugin-os';
 import { getSubscriptionConfig } from '../../action/db';
-import { getAllowLan } from '../../single/store';
+import { getAllowLan, getStoreValue } from '../../single/store';
+import { TUN_STACK_STORE_KEY } from '../../types/definition';
 import { clashApi, ruleSet } from '../common';
 import { updateVPNServerConfigFromDB } from './helper';
 
@@ -15,63 +16,31 @@ const tunConfig = {
         "servers": [
             {
                 "tag": "system",
-                "address": "local",
-                "strategy": "ipv4_only",
-                "detour": "direct"
+                "type": "local"
             },
             {
-                "tag": "alibaba",
-                "address": "223.6.6.6",
-                "strategy": "ipv4_only",
-                "detour": "direct"
-            },
-            {
-                "tag": "tencent",
-                "address": "119.29.29.29",
-                "strategy": "ipv4_only",
-                "detour": "direct"
+                "tag": "dns_proxy",
+                "type": "tcp",
+                "server": "1.0.0.1",
+                "detour": "ExitGateway"
             },
             {
                 "tag": "remote",
-                "address": "fakeip"
+                "type": "fakeip",
+                "inet4_range": "198.18.0.0/15",
+                "inet6_range": "fc00::/18"
             }
         ],
         "rules": [
             {
                 "query_type": [
                     "HTTPS",
-                    "SVCB"
+                    "SVCB",
+                    "PTR"
                 ],
                 "action": "reject"
             },
             {
-                "outbound": "any",
-                "server": "alibaba"
-            },
-            {
-                "domain_suffix": [
-                    "github.com",
-                ],
-                "rule_set": [
-                    "geosite-telegram"
-                ],
-                "server": "remote"
-            },
-            {
-                "domain_suffix": [
-                    ".oneoh.cloud",
-                    ".n2ray.dev",
-                    ".ksjhaoka.com",
-                    ".mixcapp.com",
-                    ".msftconnecttest.com",
-                    ".wiwide.net",
-                    "connectivitycheck.android.com",
-                    "detectportal.firefox.com",
-                    "nmcheck.gnome.org",
-                    "router.asus.com",
-                    "wiportal.wiwide.com",
-                    "www.miwifi.com"
-                ],
                 "rule_set": [
                     "geoip-cn",
                     "geosite-cn",
@@ -91,13 +60,7 @@ const tunConfig = {
                 "server": "remote"
             }
         ],
-        "fakeip": {
-            "enabled": true,
-            "inet4_range": "198.18.0.0/15",
-            "inet6_range": "fc00::/18"
-        },
-        "strategy": "ipv4_only",
-        "final": "system"
+        "final": "dns_proxy"
     },
     "inbounds": [
         {
@@ -154,31 +117,25 @@ const tunConfig = {
     "route": {
         "rules": [
             {
-                "inbound": [
-                    "mixed",
-                    "tun"
-                ],
-                action: "sniff"
+                "inbound": "tun",
+                "action": "sniff"
             },
             {
                 "protocol": "dns",
                 "action": "hijack-dns"
             },
-
             {
                 "protocol": "quic",
                 "action": "reject"
             },
             {
-                "ip_is_private": true,
-                "outbound": "direct"
-            },
-            {
                 "domain_suffix": [
-                    ".oneoh.cloud",
-                    ".n2ray.dev",
-                    ".ksjhaoka.com",
-                    ".mixcapp.com"
+                    "local",
+                    "lan",
+                    "localdomain",
+                    "localhost",
+                    "bypass.local",
+                    "captive.apple.com"
                 ],
                 "rule_set": [
                     "geoip-cn",
@@ -188,12 +145,13 @@ const tunConfig = {
                     "geosite-samsung",
                     "geosite-private"
                 ],
-                "outbound": "direct",
+                "ip_is_private": true,
+                "outbound": "direct"
             }
         ],
         "final": "ExitGateway",
-        "auto_detect_interface": true,
-        "rule_set": ruleSet
+        "rule_set": ruleSet,
+        "auto_detect_interface": true
 
     },
     "experimental": {
@@ -237,8 +195,15 @@ export default async function setTunConfig(identifier: string) {
         tunConfig.inbounds[0].stack = "system";
     }
 
-    // 其余平台使用 gvisor stack 避免潜在问题
-    // 比如在 macOS 上使用 system stack 时会导致诸多问题，需要追踪 sing-box 是否解决此问题。
+    // 如果用户在设置中选择了 TUN Stack，则使用用户选择的 stack
+    // 苹果系统默认使用 gvisor stack
+    if (type() !== "macos" && await getStoreValue(TUN_STACK_STORE_KEY)) {
+        tunConfig.inbounds[0].stack = await getStoreValue(TUN_STACK_STORE_KEY);
+    }
+
+    console.log("当前 TUN Stack:", tunConfig.inbounds[0].stack);
+
+
 
     // 深拷贝配置文件
     const newConfig = JSON.parse(JSON.stringify(tunConfig));

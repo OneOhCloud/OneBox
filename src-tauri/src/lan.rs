@@ -62,7 +62,7 @@ pub async fn open_browser(app: AppHandle, url: String) -> Result<(), String> {
     // zh:需要网络认证，尝试停止和重置代理。
     // en: Network authentication required, try to stop and reset the proxy.
     stop(app).await.unwrap_or_else(|e| {
-        eprintln!("Failed to stop app: {}", e);
+        log::error!("Failed to stop app: {}", e);
     });
 
     // 使用 webbrowser 库打开浏览器
@@ -75,16 +75,29 @@ pub async fn open_browser(app: AppHandle, url: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub async fn ping_apple_captive() -> String {
+pub async fn ping_captive() -> String {
+    let platform = tauri_plugin_os::platform();
+    let mut url = "http://captive.apple.com";
+
+    if platform == "windows" {
+        url = "http://www.msftconnecttest.com/connecttest.txt";
+    } else if platform == "linux" {
+        url = "http://nmcheck.gnome.org/check_network_status.txt";
+    } else if platform == "macos" {
+        url = "http://captive.apple.com";
+    }
+
+    log::debug!("Pinging URL: {}", url);
+
     // 创建 HTTP 客户端，禁用自动重定向
     let builder = reqwest::ClientBuilder::new()
-        .timeout(std::time::Duration::from_secs(4))
+        .timeout(std::time::Duration::from_secs(10))
         .redirect(Policy::none())
         .no_proxy();
 
     let client = builder.build().unwrap();
 
-    match client.get("http://captive.apple.com").send().await {
+    match client.get(url).send().await {
         Ok(response) => {
             let status = response.status();
             if status == StatusCode::OK {
@@ -102,14 +115,15 @@ pub async fn ping_apple_captive() -> String {
                     if let Ok(redirect_url) = location.to_str() {
                         return redirect_url.to_string();
                     } else {
-                        eprintln!("Invalid redirect URL");
+                        log::error!("Invalid redirect URL");
                     }
                 }
+                log::error!("Redirect without location header");
                 "false".to_string()
             } else {
                 // 其他非预期状态返回 false
                 // Other unexpected status returns false
-                eprintln!("Unexpected status code: {}", status);
+                log::error!("Unexpected status code: {}", status);
                 "false".to_string()
             }
         }
@@ -122,7 +136,7 @@ pub async fn ping_google() -> bool {
     let proxy = format!("http://{}:{}", "127.0.0.1", 6789);
     let client = reqwest::ClientBuilder::new()
         .proxy(reqwest::Proxy::all(&proxy).unwrap())
-        .timeout(std::time::Duration::from_secs(3))
+        .timeout(std::time::Duration::from_secs(10))
         .build()
         .unwrap();
 

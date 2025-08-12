@@ -14,23 +14,19 @@ const mixedConfig = {
         "servers": [
             {
                 "tag": "alibaba",
-                "address": "223.6.6.6",
-                "strategy": "ipv4_only",
-                "detour": "direct"
+                "type": "udp",
+                "server": "223.6.6.6",
+                "server_port": 53,
             },
             {
                 "tag": "dns_proxy",
-                //  只有这个 dns 在 sing-box 1.1.* 版本可用, 其余地址会导致 dns 解析失败
-                "address": "tcp://1.0.0.1",
-                "strategy": "ipv4_only",
+                "type": "tcp",
+                "server": "1.0.0.1",
                 "detour": "ExitGateway",
-                "client_subnet": "114.114.114.114"
             },
             {
                 "tag": "system",
-                "address": "local",
-                "strategy": "ipv4_only",
-                "detour": "direct"
+                "type": "local",
             },
 
         ],
@@ -38,17 +34,13 @@ const mixedConfig = {
             {
                 "query_type": [
                     "HTTPS",
-                    "SVCB"
+                    "SVCB",
+                    "PTR"
                 ],
                 "action": "reject"
-            },
-            {
-                "outbound": "any",
-                "server": "alibaba"
-            },
+            }
 
         ],
-        "strategy": "ipv4_only",
         "final": "dns_proxy"
     },
 

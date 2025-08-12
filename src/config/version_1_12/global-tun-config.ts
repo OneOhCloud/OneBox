@@ -1,7 +1,8 @@
 import * as path from '@tauri-apps/api/path';
 import { type } from '@tauri-apps/plugin-os';
 import { getSubscriptionConfig } from '../../action/db';
-import { getAllowLan } from '../../single/store';
+import { getAllowLan, getStoreValue } from '../../single/store';
+import { TUN_STACK_STORE_KEY } from '../../types/definition';
 import { clashApi, ruleSet } from '../common';
 import { updateVPNServerConfigFromDB } from './helper';
 
@@ -16,35 +17,31 @@ const tunConfig = {
         "servers": [
             {
                 "tag": "system",
-                "address": "local",
-                "strategy": "ipv4_only",
-                "detour": "direct"
+                "type": "local",
             },
             {
                 "tag": "dns_proxy",
                 //  只有这个 dns 在 sing-box 1.1.* 版本可用, 其余地址会导致 dns 解析失败
-                "address": "tcp://1.0.0.1",
-                "strategy": "ipv4_only",
+                "type": "tcp",
+                "server": "1.0.0.1",
                 "detour": "ExitGateway",
-                "client_subnet": "114.114.114.114"
 
             },
             {
                 "tag": "remote",
-                "address": "fakeip"
+                "type": "fakeip",
+                "inet4_range": "198.18.0.0/15",
+                "inet6_range": "fc00::/18"
             }
         ],
         "rules": [
             {
                 "query_type": [
                     "HTTPS",
-                    "SVCB"
+                    "SVCB",
+                    "PTR"
                 ],
                 "action": "reject"
-            },
-            {
-                "outbound": "any",
-                "server": "system"
             },
             {
                 "query_type": [
@@ -55,12 +52,6 @@ const tunConfig = {
                 "server": "remote"
             }
         ],
-        "fakeip": {
-            "enabled": true,
-            "inet4_range": "198.18.0.0/15",
-            "inet6_range": "fc00::/18"
-        },
-        "strategy": "ipv4_only",
         "final": "dns_proxy"
     },
     "inbounds": [
@@ -188,8 +179,13 @@ export default async function setGlobalTunConfig(identifier: string) {
     if (type() === "windows" || type() === "linux") {
         tunConfig.inbounds[0].stack = "system";
     }
-    // 其余平台使用 gvisor stack 避免潜在问题
-    // 比如在 macOS 上使用 system stack 时会导致诸多问题，需要追踪 sing-box 是否解决此问题。
+    // 如果用户在设置中选择了 TUN Stack，则使用用户选择的 stack
+    // 苹果系统默认使用 gvisor stack
+    if (type() !== "macos" && await getStoreValue(TUN_STACK_STORE_KEY)) {
+        tunConfig.inbounds[0].stack = await getStoreValue(TUN_STACK_STORE_KEY);
+    }
+
+    console.log("当前 TUN Stack:", tunConfig.inbounds[0].stack);
 
 
     // 深拷贝配置文件

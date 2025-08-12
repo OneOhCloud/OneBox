@@ -19,7 +19,6 @@ pub static DEFAULT_BYPASS: &str = "localhost;127.*;192.168.*;10.*;172.16.*;172.1
 pub struct ProxyConfig {
     pub host: String,
     pub port: u16,
-    pub bypass: String,
 }
 
 impl Default for ProxyConfig {
@@ -27,7 +26,6 @@ impl Default for ProxyConfig {
         Self {
             host: "127.0.0.1".to_string(),
             port: 6789,
-            bypass: DEFAULT_BYPASS.to_string(),
         }
     }
 }
@@ -53,8 +51,7 @@ pub async fn set_proxy(app: &AppHandle) -> anyhow::Result<()> {
             String::from_utf8_lossy(&output.stderr)
         ));
     }
-    println!("Proxy set to {}:{}", config.host, config.port);
-    println!("Bypass list: {}", config.bypass);
+    log::info!("Proxy set to {}:{}", config.host, config.port);
     Ok(())
 }
 
@@ -74,7 +71,7 @@ pub async fn unset_proxy(app: &AppHandle) -> anyhow::Result<()> {
             String::from_utf8_lossy(&output.stderr)
         ));
     }
-    println!("Proxy unset");
+    log::info!("Proxy unset");
     Ok(())
 }
 
@@ -109,6 +106,7 @@ pub fn create_privileged_command(
     if res.0 as usize <= 32 {
         panic!("ShellExecuteW failed: code {}", res.0 as usize);
     }
+    log::info!("Enable tun mode with command: {} {}", sidecar_path, args);
     None
 }
 
@@ -140,5 +138,7 @@ pub fn stop_tun_process(_password: &str) -> Result<(), String> {
     if res.0 as usize <= 32 {
         return Err(format!("ShellExecuteW failed: code {}", res.0 as usize));
     }
+
+    log::info!("Stop tun mode with command: taskkill /F /IM sing-box.exe");
     Ok(())
 }

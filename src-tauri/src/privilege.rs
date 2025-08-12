@@ -98,7 +98,7 @@ impl PrivilegeHelper for PlatformPrivilegeHelper {
         };
 
         if password.is_empty() {
-            println!("Password is empty");
+            log::info!("Password is empty");
             return false;
         }
 
@@ -114,11 +114,11 @@ impl PrivilegeHelper for PlatformPrivilegeHelper {
             Ok(output) if output.status.success() => true,
             Ok(output) => {
                 let error_message = String::from_utf8_lossy(&output.stderr);
-                println!("Error: {}", error_message);
+                log::info!("Error: {}", error_message);
                 false
             }
             Err(e) => {
-                println!("Failed to execute command: {}", e);
+                log::info!("Failed to execute command: {}", e);
                 false
             }
         }

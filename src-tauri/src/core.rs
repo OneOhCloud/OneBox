@@ -71,7 +71,7 @@ async fn get_password_for_mode(mode: &ProxyMode) -> Result<String, String> {
     #[cfg(target_os = "windows")]
     {
         // 无论是 TUN 模式还是系统代理模式，Windows 都不需要密码
-        println!("mode: {:?}", mode);
+        log::info!("mode: {:?}", mode);
         Ok(String::new())
     }
 }
@@ -170,7 +170,7 @@ pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Resu
                     _ => return Ok(()),
                 };
 
-                println!("[{:#?}]:{}", mode_clone, message);
+                log::debug!("[{:#?}]:{}", mode_clone, message);
 
                 if message.contains("FATAL") {
                     // 如果是错误信息，弹出对话框
@@ -189,7 +189,7 @@ pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Resu
 
             while let Some(event) = rx.recv().await {
                 if let Err(e) = handle_event(event) {
-                    eprintln!("Event handling error: {}", e);
+                    log::error!("Event handling error: {}", e);
                     app_clone
                         .emit("core_backend", Some(format!("Event handling error: {}", e)))
                         .unwrap();
@@ -281,8 +281,23 @@ pub async fn stop(app: tauri::AppHandle) -> Result<(), String> {
 /// 判断代理进程是否运行中
 #[tauri::command]
 pub async fn is_running(secret: String) -> bool {
+    use std::time::Duration;
+    use tokio::net::TcpStream;
+    use tokio::time::timeout;
+
+    // 先快速检查端口是否开放
+    if timeout(
+        Duration::from_millis(100),
+        TcpStream::connect("127.0.0.1:9191"),
+    )
+    .await
+    .is_err()
+    {
+        return false;
+    }
+
     let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(2))
+        .timeout(Duration::from_secs(2))
         .no_proxy()
         .build()
         .unwrap();

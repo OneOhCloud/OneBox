@@ -4,6 +4,7 @@ import { JournalText } from "react-bootstrap-icons";
 import { SettingItem } from "../components/developer/common";
 import ToggleDev from "../components/developer/dev-toggle";
 import StageSetting from "../components/developer/stage";
+import TunStackSetting from "../components/developer/tun-stack";
 import { t } from "../utils/helper";
 
 const appWindow = getCurrentWindow();
@@ -21,6 +22,7 @@ export default function Page() {
                 <div className="rounded-xl overflow-hidden bg-white shadow-none ">
                     <div className="divide-y divide-gray-50">
                         <StageSetting />
+                        <TunStackSetting />
 
                         <SettingItem
                             icon={<JournalText className="w-5 h-5 text-gray-500" />}
