@@ -52,12 +52,14 @@ const mixedConfig = {
         ],
         "action": "reject"
       },
-
       {
-        "domain_suffix": [
-          ".github.com",
+        "domain": [
+          "captive.apple.com",
+          "nmcheck.gnome.org",
+          "www.msftconnecttest.com"
         ],
-        "server": "dns_proxy"
+        "server": "system",
+        "strategy": "ipv4_only"
       },
       {
         "domain_suffix": [
@@ -96,7 +98,9 @@ const mixedConfig = {
           "geosite-private"
         ],
         "invert": true,
-        "server": "dns_proxy"
+        "server": "dns_proxy",
+        "client_subnet": "114.114.114.114",
+
       }
     ],
     "strategy": "prefer_ipv4",

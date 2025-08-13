@@ -39,7 +39,15 @@ const mixedConfig = {
 
         ],
         "rules": [
-
+            {
+                "domain": [
+                    "captive.apple.com",
+                    "nmcheck.gnome.org",
+                    "www.msftconnecttest.com"
+                ],
+                "server": "system",
+                "strategy": "ipv4_only"
+            },
             {
                 "query_type": [
                     "HTTPS",

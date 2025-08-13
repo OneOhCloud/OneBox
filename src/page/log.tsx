@@ -1,5 +1,6 @@
 import { listen } from '@tauri-apps/api/event';
 import { useEffect, useRef, useState } from 'react';
+import ConfigViewer from '../components/config-viewer/config-viewer';
 import { initLanguage, t } from "../utils/helper";
 
 interface LogEntry {
@@ -13,6 +14,7 @@ export default function LogPage() {
     const [autoScroll, setAutoScroll] = useState(true);
     const [filter, setFilter] = useState('');
     const [isLanguageLoading, setIsLanguageLoading] = useState(true);
+    const [activeTab, setActiveTab] = useState<'logs' | 'config'>('logs');
 
     // 过滤后的日志
     const filteredLogs = filter
@@ -98,13 +100,27 @@ export default function LogPage() {
     }
 
     return (
-        <div className="flex flex-col h-full p-4">
-            <div className="flex items-center justify-between mb-4">
-                <h1 className="text-xl font-semibold">
-                    {/* 日志查看器 */}
-                    {t("log_viewer")}
-                </h1>
-                <div className="flex items-center gap-4">
+        <div className="flex flex-col h-full">
+            <div className="sticky top-0 z-10 bg-base-100 px-2">
+                <div className="tabs tabs-bordered">
+                    <a
+                        className={`tab ${activeTab === 'logs' ? 'tab-active' : ''}`}
+                        onClick={() => setActiveTab('logs')}
+                    >
+                        {t("log_viewer")}
+                    </a>
+                    <a
+                        className={`tab ${activeTab === 'config' ? 'tab-active' : ''}`}
+                        onClick={() => setActiveTab('config')}
+                    >
+                        {t("config_viewer") || "配置查看器"}
+                    </a>
+                </div>
+            </div>
+
+            {/* 日志标签页内容 */}
+            <div className={`flex-1 flex flex-col  ${activeTab === 'logs' ? '' : 'hidden'}`} role="tabpanel">
+                <div className="flex items-center justify-end mb-4 space-x-4">
                     <div className="flex items-center space-x-2">
                         <input
                             type="text"
@@ -117,7 +133,7 @@ export default function LogPage() {
                             <button
                                 onClick={() => setFilter('')}
                                 className="btn btn-ghost btn-sm"
-                                title="清除过滤"
+                                title={t("clear_filter") || "清除过滤"}
                             >
                                 ✕
                             </button>
@@ -130,53 +146,54 @@ export default function LogPage() {
                             onChange={(e) => setAutoScroll(e.target.checked)}
                             className="checkbox checkbox-sm"
                         />
-                        <span className="label-text ml-2">
-                            {/* 自动滚动 */}
-                            {t("auto_scroll")}
-                        </span>
+                        <span className="label-text ml-2">{t("auto_scroll")}</span>
                     </label>
                     <button
                         onClick={() => setLogs([])}
                         className="btn btn-ghost btn-sm"
                     >
-                        {/* 清除日志 */}
                         {t("clear_log")}
                     </button>
                 </div>
+
+                <div
+                    ref={logContainerRef}
+                    className="flex-1 rounded-lg border border-base-300 bg-base-200 font-mono overflow-auto"
+                >
+                    <div className="p-4">
+                        {filteredLogs.length === 0 ? (
+                            <div className="text-center text-base-content/60 py-8">
+                                {filter ? (
+                                    <div>
+                                        <div>{t("no_matching_logs") || "没有匹配的日志记录"}</div>
+                                        <div className="text-xs mt-2">过滤条件: "{filter}"</div>
+                                    </div>
+                                ) : (
+                                    t("no_log_records")
+                                )}
+                            </div>
+                        ) : (
+                            filteredLogs.map((log, index) => (
+                                <div
+                                    key={`${log.timestamp}-${index}`}
+                                    className="flex items-start text-xs mb-1"
+                                >
+                                    <span className="text-base-content/60 flex-shrink-0 mr-3">
+                                        {log.timestamp}
+                                    </span>
+                                    <span className="text-base-content whitespace-pre-wrap">
+                                        {highlightText(log.message, filter)}
+                                    </span>
+                                </div>
+                            ))
+                        )}
+                    </div>
+                </div>
             </div>
 
-            <div
-                ref={logContainerRef}
-                className="flex-1 rounded-lg border border-base-300 bg-base-200 font-mono max-h-[calc(100vh-6rem)] overflow-auto"
-            >
-                <div className="p-4">
-                    {filteredLogs.length === 0 ? (
-                        <div className="text-center text-base-content/60 py-8">
-                            {filter ? (
-                                <div>
-                                    <div>{t("no_matching_logs") || "没有匹配的日志记录"}</div>
-                                    <div className="text-xs mt-2">过滤条件: "{filter}"</div>
-                                </div>
-                            ) : (
-                                t("no_log_records")
-                            )}
-                        </div>
-                    ) : (
-                        filteredLogs.map((log, index) => (
-                            <div
-                                key={`${log.timestamp}-${index}`}
-                                className="flex items-start text-xs mb-1"
-                            >
-                                <span className="text-base-content/60 flex-shrink-0 mr-3">
-                                    {log.timestamp}
-                                </span>
-                                <span className="text-base-content whitespace-nowrap">
-                                    {highlightText(log.message, filter)}
-                                </span>
-                            </div>
-                        ))
-                    )}
-                </div>
+            {/* 配置标签页内容 */}
+            <div className={`flex-1 ${activeTab === 'config' ? '' : 'hidden'}`} role="tabpanel">
+                <ConfigViewer />
             </div>
         </div>
     );
