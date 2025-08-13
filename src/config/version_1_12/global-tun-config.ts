@@ -20,6 +20,12 @@ const tunConfig = {
                 "type": "local",
             },
             {
+                "type": "quic",
+                "tag": "alibaba_quic_dns",
+                "server": "223.6.6.6",
+                "server_port": 853,
+            },
+            {
                 "tag": "dns_proxy",
                 //  只有这个 dns 在 sing-box 1.1.* 版本可用, 其余地址会导致 dns 解析失败
                 "type": "tcp",
@@ -52,6 +58,7 @@ const tunConfig = {
                 "server": "remote"
             }
         ],
+        "strategy": "prefer_ipv4",
         "final": "dns_proxy"
     },
     "inbounds": [
@@ -103,6 +110,8 @@ const tunConfig = {
             "listen": "127.0.0.1",
             "listen_port": 6789,
             "sniff": true,
+            "reuse_addr": true,
+            "tcp_fast_open": true,
             "set_system_proxy": false
         }
     ],

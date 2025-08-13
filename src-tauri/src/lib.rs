@@ -156,6 +156,10 @@ pub fn run() {
             "quit" => {
                 sync_quit(app.clone());
             }
+
+            "enable" => {
+                // 已在前端处理，此处略过或者未来添加其他逻辑
+            }
             _ => {
                 log::warn!("menu item {:?} not handled", event.id);
             }

@@ -25,6 +25,12 @@ const mixedConfig = {
         "server": "223.6.6.6",
         "server_port": 53,
       },
+      {
+        "type": "quic",
+        "tag": "alibaba_quic_dns",
+        "server": "223.6.6.6",
+        "server_port": 853,
+      },
 
       {
         "tag": "system",
@@ -76,6 +82,7 @@ const mixedConfig = {
           "geosite-samsung",
           "geosite-private"
         ],
+        "strategy": "prefer_ipv4",
         "server": "system"
       },
 
@@ -92,7 +99,7 @@ const mixedConfig = {
         "server": "dns_proxy"
       }
     ],
-    "strategy": "ipv4_only",
+    "strategy": "prefer_ipv4",
     "final": "system"
   },
 
@@ -103,7 +110,9 @@ const mixedConfig = {
       "listen": "127.0.0.1",
       "listen_port": 6789,
       "sniff": true,
-      "set_system_proxy": false
+      "reuse_addr": true,
+      "tcp_fast_open": true,
+      "set_system_proxy": false,
     }
   ],
 
