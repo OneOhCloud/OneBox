@@ -13,10 +13,21 @@ const mixedConfig = {
     "dns": {
         "servers": [
             {
+                "tag": "system",
+                "type": "local",
+            },
+
+            {
                 "tag": "alibaba",
                 "type": "udp",
                 "server": "223.6.6.6",
                 "server_port": 53,
+            },
+            {
+                "type": "quic",
+                "tag": "alibaba_quic_dns",
+                "server": "223.6.6.6",
+                "server_port": 853,
             },
             {
                 "tag": "dns_proxy",
@@ -24,13 +35,19 @@ const mixedConfig = {
                 "server": "1.0.0.1",
                 "detour": "ExitGateway",
             },
-            {
-                "tag": "system",
-                "type": "local",
-            },
+
 
         ],
         "rules": [
+            {
+                "domain": [
+                    "captive.apple.com",
+                    "nmcheck.gnome.org",
+                    "www.msftconnecttest.com"
+                ],
+                "server": "system",
+                "strategy": "ipv4_only"
+            },
             {
                 "query_type": [
                     "HTTPS",
@@ -41,6 +58,7 @@ const mixedConfig = {
             }
 
         ],
+        "strategy": "prefer_ipv4",
         "final": "dns_proxy"
     },
 
@@ -51,6 +69,8 @@ const mixedConfig = {
             "listen": "127.0.0.1",
             "listen_port": 6789,
             "sniff": true,
+            "reuse_addr": true,
+            "tcp_fast_open": true,
             "set_system_proxy": false
         }
     ],

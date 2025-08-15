@@ -25,6 +25,12 @@ const tunConfig = {
                 "detour": "ExitGateway"
             },
             {
+                "type": "quic",
+                "tag": "alibaba_quic_dns",
+                "server": "223.6.6.6",
+                "server_port": 853,
+            },
+            {
                 "tag": "remote",
                 "type": "fakeip",
                 "inet4_range": "198.18.0.0/15",
@@ -32,6 +38,15 @@ const tunConfig = {
             }
         ],
         "rules": [
+            {
+                "domain": [
+                    "captive.apple.com",
+                    "nmcheck.gnome.org",
+                    "www.msftconnecttest.com"
+                ],
+                "server": "system",
+                "strategy": "ipv4_only"
+            },
             {
                 "query_type": [
                     "HTTPS",
@@ -49,7 +64,9 @@ const tunConfig = {
                     "geosite-samsung",
                     "geosite-private"
                 ],
+                "strategy": "prefer_ipv4",
                 "server": "system"
+
             },
             {
                 "query_type": [
@@ -57,10 +74,13 @@ const tunConfig = {
                     "AAAA",
                     "CNAME"
                 ],
+                "client_subnet": "114.114.114.114",
                 "server": "remote"
             }
         ],
-        "final": "dns_proxy"
+        "final": "dns_proxy",
+        "strategy": "prefer_ipv4"
+
     },
     "inbounds": [
         {
@@ -111,7 +131,9 @@ const tunConfig = {
             "listen": "127.0.0.1",
             "listen_port": 6789,
             "sniff": true,
-            "set_system_proxy": false
+            "reuse_addr": true,
+            "tcp_fast_open": true,
+            "set_system_proxy": false,
         }
     ],
     "route": {
