@@ -1,4 +1,5 @@
 import { fetch } from '@tauri-apps/plugin-http';
+import clsx from 'clsx';
 import { useEffect, useState } from 'react';
 import useSWR from "swr";
 import { getClashApiSecret } from '../../single/store';
@@ -41,9 +42,11 @@ const commonStyles = {
 
 type NodeOptionProps = {
     nodeName: string;
+    showDelay: boolean;
+
 };
 
-export default function NodeOption({ nodeName }: NodeOptionProps) {
+export default function NodeOption({ nodeName, showDelay }: NodeOptionProps) {
     const [delayText, setDelayText] = useState<string>('-');
     const { data } = useSWR<ProxyResponse>(
         nodeName ? `${BASE_URL}/proxies/${encodeURIComponent(nodeName)}` : null,
@@ -66,19 +69,25 @@ export default function NodeOption({ nodeName }: NodeOptionProps) {
     const delay: DelayStatus = data?.history?.[0]?.delay ?? '-';
     const delayColor = getDelayStatus(delay);
 
-    const DelayIndicator = () => (
-        <span className={`
-            ${commonStyles.delayText}
-            text-${delayColor}-500
-            flex items-center gap-1.5
-        `}>
-            <span className={`
-                ${commonStyles.delayDot}
-                bg-${delayColor}-500
-            `} />
-            {delay === '-' ? delayText : `${delay}ms`}
-        </span>
-    );
+    const DelayIndicator = () => {
+        if (showDelay) {
+            return (
+                <div className={clsx(
+                    commonStyles.delayText,
+                    `text-${delayColor}-500`,
+                    'flex items-center gap-1.5'
+                )}>
+                    <span className={clsx(
+                        commonStyles.delayDot,
+                        `bg-${delayColor}-500`
+                    )} />
+                    {delay === '-' ? delayText : `${delay}ms`}
+                </div>
+            );
+        } else {
+            return <span className="loading loading-dots loading-xs"></span>
+        }
+    };
 
 
     useEffect(() => {

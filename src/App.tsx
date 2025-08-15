@@ -1,11 +1,9 @@
 import "./App.css";
 
-import clsx from 'clsx';
 import { motion } from 'framer-motion';
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
 import { GearWideConnected, House, Layers } from 'react-bootstrap-icons';
 import { Toaster } from 'react-hot-toast';
-import HomePage from './page/home';
 
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from '@tauri-apps/api/event';
@@ -21,6 +19,7 @@ import { copyEnvToClipboard, initLanguage, t, vpnServiceManager } from './utils/
 
 
 
+const HomePage = React.lazy(() => import('./page/home'));
 const ConfigurationPage = React.lazy(() => import('./page/config'));
 const DevPage = React.lazy(() => import('./page/developer'));
 const SettingsPage = React.lazy(() => import('./page/settings'));
@@ -166,6 +165,69 @@ if (appWindow.label === "main") {
 }
 
 
+type BodyProps = {
+  lang: string;
+  activeScreen: ActiveScreenType;
+}
+
+// 加载中的组件
+const LoadingFallback = () => (
+  <div className="flex flex-col items-center justify-center h-full space-y-4">
+    <span className="loading loading-infinity loading-xl"></span>
+
+  </div>
+);
+
+function Body({ lang, activeScreen }: BodyProps) {
+  // 使用 useMemo 来缓存组件渲染，只有当 activeScreen 改变时才重新渲染
+  const activeComponent = useMemo(() => {
+    switch (activeScreen) {
+      case 'home':
+        return (
+          <Suspense fallback={<LoadingFallback />}>
+            <HomePage />
+          </Suspense>
+        );
+
+      case 'configuration':
+        return (
+          <Suspense fallback={<LoadingFallback />}>
+            <ConfigurationPage />
+          </Suspense>
+        );
+
+      case 'settings':
+        return (
+          <Suspense fallback={<LoadingFallback />}>
+            <SettingsPage />
+          </Suspense>
+        );
+
+      case 'developer_options':
+        return (
+          <Suspense fallback={<LoadingFallback />}>
+            <DevPage />
+          </Suspense>
+        );
+
+      default:
+        return (
+          <Suspense fallback={<LoadingFallback />}>
+            <HomePage />
+          </Suspense>
+        );
+    }
+  }, [activeScreen]); // 依赖 activeScreen，当它改变时重新渲染
+
+  return (
+    <div className="flex-1 overflow-y-hidden">
+      <div className="animate-fade-in h-full overflow-y-auto" key={`${activeScreen}-${lang}`}>
+        {activeComponent}
+      </div>
+    </div>
+  );
+}
+
 
 function App() {
   const [activeScreen, setActiveScreen] = useState<ActiveScreenType>('home');
@@ -211,8 +273,6 @@ function App() {
       <Toaster position="top-center" toastOptions={{ duration: 2000 }} containerClassName="mt-[32px]" />
 
       <main className="relative bg-gray-50 flex flex-col h-screen">
-
-
         {activeScreen === 'home' &&
           <div className='absolute inset-0  z-2   max-h-max flex justify-end p-1'>
             <Suspense >
@@ -220,56 +280,7 @@ function App() {
             </Suspense>
           </div>
         }
-        <div className="flex-1 overflow-y-hidden  ">
-
-          <div className={
-            clsx("animate-fade-in h-full overflow-y-auto",
-              activeScreen === 'home' ? 'block' : 'hidden'
-            )
-          }>
-
-            <HomePage />
-          </div>
-
-          <div
-            className={
-              clsx("animate-fade-in h-full overflow-y-auto",
-                activeScreen === 'configuration' ? 'block' : 'hidden'
-              )
-            }
-          >
-            <Suspense >
-              <ConfigurationPage />
-            </Suspense>
-
-          </div>
-
-
-          <div
-            className={
-              clsx("animate-fade-in h-full overflow-y-auto",
-                activeScreen === 'settings' ? 'block' : 'hidden'
-              )
-            }
-          >
-            <Suspense>
-              <SettingsPage />
-            </Suspense>
-          </div>
-
-
-          <div
-            className={
-              clsx("animate-fade-in h-full overflow-y-auto",
-                activeScreen === 'developer_options' ? 'block' : 'hidden'
-              )
-            }
-          >
-            <Suspense>
-              <DevPage />
-            </Suspense>
-          </div>
-        </div>
+        <Body activeScreen={activeScreen} lang={language} />
 
         <div className="dock  dock-sm  bg-gray-50 border-0">
           <button

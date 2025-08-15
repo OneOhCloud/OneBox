@@ -50,7 +50,7 @@ export default function VPNBody({ isRunning }: { isRunning: boolean }) {
                     <div className="fieldset-legend min-w-[270px] capitalize">
                         {t("node_selection")}
                     </div>
-                    <SelectNode disabled={!isRunning} />
+                    <SelectNode isRunning={isRunning} />
                 </div>
             </div>
             {sub && (
