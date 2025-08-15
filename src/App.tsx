@@ -12,6 +12,7 @@ import { TrayIcon } from '@tauri-apps/api/tray';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { type } from '@tauri-apps/plugin-os';
 import React from 'react';
+import HomePage from './page/home';
 import { ActiveScreenType, NavContext } from './single/context';
 import { getClashApiSecret, getStoreValue } from './single/store';
 import { DEVELOPER_TOGGLE_STORE_KEY } from './types/definition';
@@ -19,7 +20,6 @@ import { copyEnvToClipboard, initLanguage, t, vpnServiceManager } from './utils/
 
 
 
-const HomePage = React.lazy(() => import('./page/home'));
 const ConfigurationPage = React.lazy(() => import('./page/config'));
 const DevPage = React.lazy(() => import('./page/developer'));
 const SettingsPage = React.lazy(() => import('./page/settings'));
@@ -179,16 +179,12 @@ const LoadingFallback = () => (
 );
 
 function Body({ lang, activeScreen }: BodyProps) {
-  // 使用 useMemo 来缓存组件渲染，只有当 activeScreen 改变时才重新渲染
-  const activeComponent = useMemo(() => {
-    switch (activeScreen) {
-      case 'home':
-        return (
-          <Suspense fallback={<LoadingFallback />}>
-            <HomePage />
-          </Suspense>
-        );
+  // Home 组件保活，只渲染一次
+  const homeComponent = useMemo(() => <HomePage />, []); // 空依赖数组，只渲染一次
 
+  // 其他组件的懒加载渲染
+  const lazyComponent = useMemo(() => {
+    switch (activeScreen) {
       case 'configuration':
         return (
           <Suspense fallback={<LoadingFallback />}>
@@ -211,19 +207,25 @@ function Body({ lang, activeScreen }: BodyProps) {
         );
 
       default:
-        return (
-          <Suspense fallback={<LoadingFallback />}>
-            <HomePage />
-          </Suspense>
-        );
+        return null;
     }
-  }, [activeScreen]); // 依赖 activeScreen，当它改变时重新渲染
+  }, [activeScreen]);
 
   return (
     <div className="flex-1 overflow-y-hidden">
-      <div className="animate-fade-in h-full overflow-y-auto" key={`${activeScreen}-${lang}`}>
-        {activeComponent}
+      {/* Home 组件始终保持挂载，通过显示/隐藏控制 */}
+      <div
+        className={`h-full overflow-y-auto ${activeScreen === 'home' ? 'block' : 'hidden'}`}
+      >
+        {homeComponent}
       </div>
+
+      {/* 其他组件的渲染 */}
+      {activeScreen !== 'home' && (
+        <div className="animate-fade-in h-full overflow-y-auto" key={`${activeScreen}-${lang}`}>
+          {lazyComponent}
+        </div>
+      )}
     </div>
   );
 }

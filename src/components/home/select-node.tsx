@@ -1,13 +1,17 @@
 import { useEffect, useState } from "react";
 
 import { fetch } from '@tauri-apps/plugin-http';
+import { type } from "@tauri-apps/plugin-os";
 import useSWR from "swr";
 import { getClashApiSecret } from "../../single/store";
 import { t } from "../../utils/helper";
 import NodeOption from "./node-option";
 
+const osType = type();
 const baseUrl = "http://127.0.0.1:9191";
 const proxiesUrl = `${baseUrl}/proxies/ExitGateway`;
+const sleepTime = osType === 'windows' ? 10000 : 5000;
+
 
 type SelectNodeProps = {
     isRunning: boolean;
@@ -23,6 +27,7 @@ export default function SelectNode(props: SelectNodeProps) {
                 now: "",
             }
         }
+        console.log("Fetching proxy delay...");
         const url = `${baseUrl}/proxies/ExitGateway`;
         const response = await fetch(url, {
             method: 'GET',
@@ -34,11 +39,11 @@ export default function SelectNode(props: SelectNodeProps) {
                 "Authorization": `Bearer ${await getClashApiSecret()}`,
             },
         });
+        console.log(`Bearer ${await getClashApiSecret()}`)
 
         let res = await response.json();
+        console.log("Fetched proxy delay:", res);
         return res
-    }, {
-        refreshInterval: 800,
     });
 
 
@@ -85,12 +90,13 @@ export function SelecItem(props: SelecItemProps) {
     const [showDelay, setShowDelay] = useState(false);
     const [lastRunning, setLastRunning] = useState(false);
 
+
     useEffect(() => {
         if (isRunning && !lastRunning) {
             setLastRunning(isRunning);
             setTimeout(() => {
                 setShowDelay(true);
-            }, 5000);
+            }, sleepTime);
         } else {
             setShowDelay(false);
             setLastRunning(isRunning);
