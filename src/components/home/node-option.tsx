@@ -12,6 +12,8 @@ const API_CONFIG = {
     TIMEOUT_DELAY: 5000
 } as const;
 
+const DelayTestUrl = "https://www.google.com/generate_204"
+
 // 类型定义
 type DelayStatus = '-' | number;
 
@@ -62,7 +64,7 @@ const useProxyDelay = (nodeName: string) => {
         }
     }, [nodeName]);
 
-    const swrKey = nodeName ? `${API_CONFIG.BASE_URL}/proxies/${encodeURIComponent(nodeName)}/delay?url=${encodeURIComponent("https://www.google.com")}&timeout=5000` : null;
+    const swrKey = nodeName ? `${API_CONFIG.BASE_URL}/proxies/${encodeURIComponent(nodeName)}/delay?url=${encodeURIComponent(DelayTestUrl)}&timeout=5000` : null;
 
     const { data, error, isLoading } = useSWR<ProxyResponse>(
         swrKey,
