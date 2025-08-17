@@ -91,7 +91,28 @@ export default function UpdaterItem() {
                     `found update ${checkResult.version} from ${checkResult.date} with notes ${checkResult.body}`
                 );
                 setDownloading(true);
-                await checkResult.download();
+
+
+                let downloaded = 0;
+                let contentLength = 0;
+                await checkResult.download((event) => {
+                    switch (event.event) {
+                        case 'Started':
+                            // @ts-ignore
+                            contentLength = event.data.contentLength;
+                            break;
+                        case 'Progress':
+                            downloaded += event.data.chunkLength;
+                            const progress = Math.round((downloaded / contentLength) * 100);
+                            setDownloadProgress(progress);
+                            break;
+                        case 'Finished':
+                            console.log('download finished');
+                            break;
+                    }
+                });
+
+
                 setDownloading(false);
                 await confirmInstallation(checkResult);
 
