@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
+import { invoke } from "@tauri-apps/api/core";
 import { fetch } from '@tauri-apps/plugin-http';
 import useSWR from "swr";
 import { getClashApiSecret } from "../../single/store";
@@ -9,15 +10,16 @@ import NodeOption from "./node-option";
 const baseUrl = "http://127.0.0.1:9191";
 const proxiesUrl = `${baseUrl}/proxies/ExitGateway`;
 
+
 type SelectNodeProps = {
-    disabled: boolean;
+    isRunning: boolean;
 }
 
 export default function SelectNode(props: SelectNodeProps) {
 
-    const { disabled } = props;
-    const { data, isLoading, error, mutate } = useSWR(`swr-${baseUrl}/proxies/ExitGateway-${props.disabled}`, async () => {
-        if (disabled) {
+    const { isRunning } = props;
+    const { data, isLoading, error, mutate } = useSWR(`swr-${baseUrl}/proxies/ExitGateway-${props.isRunning}`, async () => {
+        if (!isRunning) {
             return {
                 all: [],
                 now: "",
@@ -34,17 +36,14 @@ export default function SelectNode(props: SelectNodeProps) {
                 "Authorization": `Bearer ${await getClashApiSecret()}`,
             },
         });
-
         let res = await response.json();
         return res
-    }, {
-        refreshInterval: 1000,
     });
 
 
 
 
-    if (disabled) {
+    if (!isRunning) {
         return <>
             <div className="select select-sm  select-ghost border-[0.8px] border-gray-200  opacity-50 cursor-not-allowed">
                 {
@@ -65,7 +64,7 @@ export default function SelectNode(props: SelectNodeProps) {
         </div>
     }
 
-    return <SelecItem nodeList={data.all} currentNode={data.now} onUpdate={() => {
+    return <SelecItem isRunning={isRunning} nodeList={data.all} currentNode={data.now} onUpdate={() => {
         mutate()
     }} />
 
@@ -74,12 +73,47 @@ export default function SelectNode(props: SelectNodeProps) {
 type SelecItemProps = {
     currentNode: string;
     nodeList: string[]
+    isRunning: boolean;
     onUpdate: () => void;
 }
 
 export function SelecItem(props: SelecItemProps) {
-    const { currentNode, nodeList, onUpdate } = props;
+
+    const { currentNode, nodeList, onUpdate, isRunning } = props;
     const [isOpen, setIsOpen] = useState(false);
+    const [showDelay, setShowDelay] = useState(false);
+    const [lastRunning, setLastRunning] = useState(false);
+
+
+    useEffect(() => {
+
+        const checkConnection = async () => {
+            for (let i = 0; i < 10; i++) {
+                const connected = await invoke<boolean>('ping_google');
+                if (connected) {
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    setShowDelay(true);
+                    break; // 如果连接成功，退出循环
+                }
+
+                // 连接失败，等待一段时间后重试
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+        }
+
+
+        if (isRunning && !lastRunning) {
+            setLastRunning(isRunning);
+            checkConnection();
+
+        } else {
+            setShowDelay(false);
+            setLastRunning(isRunning);
+        }
+
+
+    }, [isRunning, lastRunning]);
+
 
 
 
@@ -120,7 +154,7 @@ export function SelecItem(props: SelecItemProps) {
                 className={`select select-sm  select-ghost border-[0.8px] border-gray-200  cursor-pointer `}
                 onClick={() => setIsOpen(!isOpen)}
             >
-                <NodeOption nodeName={currentNode} />
+                <NodeOption nodeName={currentNode} showDelay={showDelay} />
             </div>
 
 
@@ -132,7 +166,7 @@ export function SelecItem(props: SelecItemProps) {
                             className="px-4 py-2 hover:bg-base-200 cursor-pointer"
                             onClick={() => handleNodeChange(item)}
                         >
-                            <NodeOption nodeName={item} />
+                            <NodeOption nodeName={item} showDelay={showDelay} />
                         </div>
                     ))}
                 </div>

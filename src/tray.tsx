@@ -1,0 +1,153 @@
+import { invoke } from "@tauri-apps/api/core";
+import { listen } from '@tauri-apps/api/event';
+import { Menu, MenuOptions } from '@tauri-apps/api/menu';
+import { TrayIcon } from '@tauri-apps/api/tray';
+import { getCurrentWindow } from '@tauri-apps/api/window';
+import { type } from '@tauri-apps/plugin-os';
+import { getClashApiSecret, getStoreValue } from './single/store';
+import { DEVELOPER_TOGGLE_STORE_KEY } from './types/definition';
+import { copyEnvToClipboard, initLanguage, t, vpnServiceManager } from './utils/helper';
+
+const appWindow = getCurrentWindow();
+
+let trayInstance: TrayIcon | null = null;
+
+// 创建托盘菜单
+async function createTrayMenu() {
+    // 获取当前运行状态
+    await initLanguage();
+    let secret = await getClashApiSecret();
+    const status = await invoke<boolean>("is_running", { secret: secret });
+
+    document
+        .getElementById('titlebar-minimize')
+        ?.addEventListener('click', () => appWindow.minimize());
+    document
+        .getElementById('titlebar-maximize')
+        ?.addEventListener('click', () => appWindow.toggleMaximize());
+    document
+        .getElementById('titlebar-close')
+        ?.addEventListener('click', () => appWindow.hide());
+
+    let baseMenu: MenuOptions = {
+        items: [
+            {
+                id: 'show',
+                text: t("menu_dashboard"),
+            },
+            {
+                id: "enable",
+                text: t("menu_enable_proxy"),
+                checked: status,
+                enabled: true,
+                action: async () => {
+                    if (status) {
+                        vpnServiceManager.stop();
+                    } else {
+                        vpnServiceManager.start();
+                    }
+                    const newMenu = await createTrayMenu();
+                    if (trayInstance) {
+                        await trayInstance.setMenu(newMenu);
+                    }
+                },
+            },
+
+        ],
+    }
+
+
+    const developer_toggle_state: boolean = await getStoreValue(DEVELOPER_TOGGLE_STORE_KEY, false);
+
+    if (developer_toggle_state) {
+        console.log("开发者模式已启用，添加调试工具菜单项");
+        baseMenu.items?.push(
+            {
+                id: 'open_log',
+                text: t("menu_open_log"),
+                action: async () => {
+                    await invoke('create_window', {
+                        app: appWindow,
+                        title: "Log",
+                        label: "sing-box-log",
+                        windowTag: "sing-box-log",
+                    })
+                },
+            },
+
+            {
+                id: 'devtools',
+                text: t("menu_devtools"),
+                action: async () => {
+                    await invoke("open_devtools");
+                },
+            },
+
+
+        );
+    }
+
+    baseMenu.items?.push(
+        {
+            id: 'copy_proxy',
+            text: t("menu_copy_env"),
+            action: async () => {
+                await copyEnvToClipboard("127.0.0.1", "6789");
+            },
+        },
+        {
+            id: 'quit',
+            text: t("menu_quit")
+        },
+    )
+
+    return await Menu.new(baseMenu);
+}
+
+// 初始化托盘
+export async function setupTrayIcon() {
+    const osType = type()
+
+    if (trayInstance) {
+        return trayInstance;
+    }
+
+    try {
+        const menu = await createTrayMenu();
+        const tray_icon = await invoke<ArrayBuffer>('get_tray_icon', {
+            app: appWindow
+        });
+
+        if (osType == 'macos') {
+            const options = {
+                menu,
+                icon: tray_icon,
+                tooltip: "OneBox"
+            };
+            trayInstance = await TrayIcon.new(options);
+            trayInstance && trayInstance.setIconAsTemplate(true);
+        } else {
+            const options = {
+                menu,
+                icon: tray_icon || 'None',
+                tooltip: "OneBox"
+            };
+            trayInstance = await TrayIcon.new(options);
+        }
+
+        return trayInstance;
+    } catch (error) {
+        console.error('Error setting up tray icon:', error);
+        console.error('OS Type:', osType);
+        return null;
+    }
+}
+
+export async function setupStatusListener() {
+    await listen('status-changed', async () => {
+        const newMenu = await createTrayMenu();
+        if (trayInstance) {
+            await trayInstance.setMenu(newMenu);
+        }
+    });
+}
