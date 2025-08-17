@@ -25,6 +25,12 @@ const mixedConfig = {
         "server": "223.6.6.6",
         "server_port": 53,
       },
+      {
+        "type": "quic",
+        "tag": "alibaba_quic_dns",
+        "server": "223.6.6.6",
+        "server_port": 853,
+      },
 
       {
         "tag": "system",
@@ -46,12 +52,14 @@ const mixedConfig = {
         ],
         "action": "reject"
       },
-
       {
-        "domain_suffix": [
-          ".github.com",
+        "domain": [
+          "captive.apple.com",
+          "nmcheck.gnome.org",
+          "www.msftconnecttest.com"
         ],
-        "server": "dns_proxy"
+        "server": "system",
+        "strategy": "ipv4_only"
       },
       {
         "domain_suffix": [
@@ -76,6 +84,7 @@ const mixedConfig = {
           "geosite-samsung",
           "geosite-private"
         ],
+        "strategy": "prefer_ipv4",
         "server": "system"
       },
 
@@ -89,10 +98,12 @@ const mixedConfig = {
           "geosite-private"
         ],
         "invert": true,
-        "server": "dns_proxy"
+        "server": "dns_proxy",
+        "client_subnet": "114.114.114.114",
+
       }
     ],
-    "strategy": "ipv4_only",
+    "strategy": "prefer_ipv4",
     "final": "system"
   },
 
@@ -103,7 +114,9 @@ const mixedConfig = {
       "listen": "127.0.0.1",
       "listen_port": 6789,
       "sniff": true,
-      "set_system_proxy": false
+      "reuse_addr": true,
+      "tcp_fast_open": true,
+      "set_system_proxy": false,
     }
   ],
 

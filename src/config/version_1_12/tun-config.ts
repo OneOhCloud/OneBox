@@ -25,6 +25,12 @@ const tunConfig = {
                 "detour": "ExitGateway"
             },
             {
+                "type": "quic",
+                "tag": "alibaba_quic_dns",
+                "server": "223.6.6.6",
+                "server_port": 853,
+            },
+            {
                 "tag": "remote",
                 "type": "fakeip",
                 "inet4_range": "198.18.0.0/15",
@@ -32,6 +38,15 @@ const tunConfig = {
             }
         ],
         "rules": [
+            {
+                "domain": [
+                    "captive.apple.com",
+                    "nmcheck.gnome.org",
+                    "www.msftconnecttest.com"
+                ],
+                "server": "system",
+                "strategy": "ipv4_only"
+            },
             {
                 "query_type": [
                     "HTTPS",
@@ -49,7 +64,9 @@ const tunConfig = {
                     "geosite-samsung",
                     "geosite-private"
                 ],
+                "strategy": "prefer_ipv4",
                 "server": "system"
+
             },
             {
                 "query_type": [
@@ -57,10 +74,13 @@ const tunConfig = {
                     "AAAA",
                     "CNAME"
                 ],
+                "client_subnet": "114.114.114.114",
                 "server": "remote"
             }
         ],
-        "final": "dns_proxy"
+        "final": "dns_proxy",
+        "strategy": "prefer_ipv4"
+
     },
     "inbounds": [
         {
@@ -111,7 +131,9 @@ const tunConfig = {
             "listen": "127.0.0.1",
             "listen_port": 6789,
             "sniff": true,
-            "set_system_proxy": false
+            "reuse_addr": true,
+            "tcp_fast_open": true,
+            "set_system_proxy": false,
         }
     ],
     "route": {
@@ -190,13 +212,25 @@ export default async function setTunConfig(identifier: string) {
     const dbCacheFilePath = await path.join(appConfigPath, 'tun-cache-rule-v1.db');
 
 
-    //  Windows 使用 system stack 兼容性是最佳的。
-    if (type() === "windows" || type() === "linux") {
+
+
+    // Windows 使用 system stack 兼容性是最佳的。（弃用！！！）
+    // if (type() === "windows" || type() === "linux") {
+    //     tunConfig.inbounds[0].stack = "system";
+    // }
+
+    // 2025年8月17日经过测试，
+    // 在 sing-box 1.12.1 内核中
+    // 使用 system 栈节点延迟比 gvisor 高
+    // 所以使用在 macOS 和 Windows 系统中使用默认值（gVisor），
+    // linux 中默认使用 system 栈，除非有实际证据表明性能也不如 gVisor。
+
+    if (type() === "linux") {
         tunConfig.inbounds[0].stack = "system";
     }
 
     // 如果用户在设置中选择了 TUN Stack，则使用用户选择的 stack
-    // 苹果系统默认使用 gvisor stack
+    // macOS 强制默认使用 gvisor stack，因为经过测试 system stack 无法正常运作。
     if (type() !== "macos" && await getStoreValue(TUN_STACK_STORE_KEY)) {
         tunConfig.inbounds[0].stack = await getStoreValue(TUN_STACK_STORE_KEY);
     }

@@ -61,7 +61,7 @@ export function useNetworkCheck(key: string, checkFn: () => Promise<NetworkRespo
 export function useAppleNetworkCheck() {
     async function checkAppleNetwork() {
         const res = await invoke<string>('ping_captive');
-        console.log("Apple network check result:", res);
+        console.log("Network check result:", res);
         return {
             status: res === "true",
             needsLogin: res.startsWith("http"),

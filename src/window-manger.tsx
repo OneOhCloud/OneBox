@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import App from './App';
-import LogPage from './page/log-page';
+import LogPage from './page/log';
 
 
 
