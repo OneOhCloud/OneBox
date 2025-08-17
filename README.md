@@ -1,4 +1,6 @@
-# OneBox
+# OneBox ｜ [简体中文](./README_CN.md)
+
+
 
 A cross-platform GUI client based on sing-box kernel.
 
