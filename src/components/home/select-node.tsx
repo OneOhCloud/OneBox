@@ -27,7 +27,6 @@ export default function SelectNode(props: SelectNodeProps) {
                 now: "",
             }
         }
-        console.log("Fetching proxy delay...");
         const url = `${baseUrl}/proxies/ExitGateway`;
         const response = await fetch(url, {
             method: 'GET',
@@ -39,10 +38,7 @@ export default function SelectNode(props: SelectNodeProps) {
                 "Authorization": `Bearer ${await getClashApiSecret()}`,
             },
         });
-        console.log(`Bearer ${await getClashApiSecret()}`)
-
         let res = await response.json();
-        console.log("Fetched proxy delay:", res);
         return res
     });
 

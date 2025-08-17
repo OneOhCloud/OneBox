@@ -15,6 +15,11 @@ OneBox is a simple, efficient, and stable network tool developed based on the si
 - Efficient and stable: Based on the mature sing-box core
 - Ready to use: Minimal configuration, quick start
 
+## Screenshots 📸
+
+|![Home](./docs/image/en/Home.png)|![Configuration](./docs/image/en/Config.png)|![Settings](./docs/image/en/Settings.png)|
+|:---:|:---:|:---:|
+
 ## Download and Installation 💻
 
 Please visit our [release page](https://github.com/OneOhCloud/OneBox/releases) to get the latest version.

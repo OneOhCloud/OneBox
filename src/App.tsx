@@ -5,164 +5,16 @@ import { Suspense, useEffect, useMemo, useState } from 'react';
 import { GearWideConnected, House, Layers } from 'react-bootstrap-icons';
 import { Toaster } from 'react-hot-toast';
 
-import { invoke } from "@tauri-apps/api/core";
-import { listen } from '@tauri-apps/api/event';
-import { Menu } from '@tauri-apps/api/menu';
-import { TrayIcon } from '@tauri-apps/api/tray';
-import { getCurrentWindow } from '@tauri-apps/api/window';
-import { type } from '@tauri-apps/plugin-os';
 import React from 'react';
 import HomePage from './page/home';
 import { ActiveScreenType, NavContext } from './single/context';
-import { getClashApiSecret, getStoreValue } from './single/store';
-import { DEVELOPER_TOGGLE_STORE_KEY } from './types/definition';
-import { copyEnvToClipboard, initLanguage, t, vpnServiceManager } from './utils/helper';
-
+import { initLanguage, t } from './utils/helper';
 
 
 const ConfigurationPage = React.lazy(() => import('./page/config'));
 const DevPage = React.lazy(() => import('./page/developer'));
 const SettingsPage = React.lazy(() => import('./page/settings'));
 const UpdaterButton = React.lazy(() => import('./components/settings/updater-button'));
-
-const appWindow = getCurrentWindow();
-
-let trayInstance: TrayIcon | null = null;
-
-// 创建托盘菜单
-async function createTrayMenu() {
-
-  // 获取当前运行状态
-  await initLanguage();
-  let secret = await getClashApiSecret();
-  const status = await invoke<boolean>("is_running", { secret: secret });
-
-  document
-    .getElementById('titlebar-minimize')
-    ?.addEventListener('click', () => appWindow.minimize());
-  document
-    .getElementById('titlebar-maximize')
-    ?.addEventListener('click', () => appWindow.toggleMaximize());
-  document
-    .getElementById('titlebar-close')
-    ?.addEventListener('click', () => appWindow.hide());
-
-  let baseMenu = {
-    items: [
-      {
-        id: 'show',
-        text: t("menu_dashboard"),
-      },
-      {
-        id: "enable",
-        text: t("menu_enable_proxy"), // 根据状态设置文本
-        checked: status, // 根据状态设置选中状态
-        enabled: true, // 可根据需要设置是否启用
-        action: async () => {
-          if (status) {
-            vpnServiceManager.stop(); // 停止服务
-          } else {
-            vpnServiceManager.start(); // 启动服务  
-          }
-          const newMenu = await createTrayMenu();
-          if (trayInstance) {
-            await trayInstance.setMenu(newMenu);
-          }
-        },
-      },
-      {
-        id: 'copy_proxy',
-        text: t("menu_copy_env"),
-        action: async () => {
-          await copyEnvToClipboard("127.0.0.1", "6789");
-        },
-      },
-
-    ],
-  }
-  const developer_toggle_state: boolean = await getStoreValue(DEVELOPER_TOGGLE_STORE_KEY, false);
-
-  if (developer_toggle_state) {
-    console.log("开发者模式已启用，添加调试工具菜单项");
-    baseMenu.items.push(
-      {
-        id: 'devtools',
-        text: t("menu_devtools"),
-        action: async () => {
-          await invoke("open_devtools");
-        },
-      },
-    );
-
-  }
-
-  baseMenu.items.push(
-    {
-      id: 'quit',
-      // text: '退出程序',
-      text: t("menu_quit")
-    },
-
-  )
-
-  return await Menu.new(baseMenu);
-}
-
-// 初始化托盘
-async function setupTrayIcon() {
-  const osType = type()
-
-  if (trayInstance) {
-    return trayInstance;
-  }
-
-  try {
-    const menu = await createTrayMenu();
-    const tray_icon = await invoke<ArrayBuffer>('get_tray_icon', {
-      app: appWindow
-    });
-
-    if (osType == 'macos') {
-      const options = {
-        menu,
-        icon: tray_icon,
-        tooltip: "OneBox"
-      };
-      trayInstance = await TrayIcon.new(options);
-      trayInstance && trayInstance.setIconAsTemplate(true);
-    } else {
-      const options = {
-        menu,
-        icon: tray_icon || 'None',
-        tooltip: "OneBox"
-
-      };
-      trayInstance = await TrayIcon.new(options);
-    }
-
-
-    return trayInstance;
-  } catch (error) {
-    console.error('Error setting up tray icon:', error);
-    console.error('OS Type:', osType);
-    return null;
-  }
-}
-
-async function setupStatusListener() {
-  await listen('status-changed', async () => {
-    const newMenu = await createTrayMenu();
-    if (trayInstance) {
-      await trayInstance.setMenu(newMenu);
-    }
-  });
-}
-
-// 
-if (appWindow.label === "main") {
-  setupTrayIcon();
-  setupStatusListener();
-}
 
 
 type BodyProps = {

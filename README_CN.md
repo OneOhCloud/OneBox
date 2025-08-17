@@ -13,6 +13,11 @@ OneBox 是一个简单高效稳定的网络工具，基于 sing-box 内核开发
 - 高效稳定：基于成熟的 sing-box 内核
 - 开箱即用：最小化配置，快速上手
 
+## 软件截图 📸
+
+|![主页](./docs/image/zh/Home.png)|![配置](./docs/image/zh/Config.png)|![设置](./docs/image/zh/Settings.png)|
+|:---:|:---:|:---:|
+
 ## 下载安装 💻
 
 请访问我们的[发布页面](https://github.com/OneOhCloud/OneBox/releases)获取最新版本。
