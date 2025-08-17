@@ -2,13 +2,11 @@
 
 import { confirm } from '@tauri-apps/plugin-dialog';
 import { relaunch } from '@tauri-apps/plugin-process';
-import { check } from '@tauri-apps/plugin-updater';
 import { useEffect, useState } from "react";
-import { getStoreValue } from '../../single/store';
-import { STAGE_VERSION_STORE_KEY } from '../../types/definition';
 import { t, vpnServiceManager } from "../../utils/helper";
 
 import { type Update } from '@tauri-apps/plugin-updater';
+import { checkUpdate } from '../../utils/update';
 
 export default function UpdaterButton() {
     const [downloadComplete, setDownloadComplete] = useState(false);
@@ -44,27 +42,14 @@ export default function UpdaterButton() {
     useEffect(() => {
         const checkAndDownload = async () => {
             try {
-                // 获取当前阶段版本
-                let stage = await getStoreValue(STAGE_VERSION_STORE_KEY, "latest");
-                if (stage === "stable") {
-                    stage = "latest"; // 稳定版直接使用最新版本
-                }
-                const checkResult = await check({
-                    timeout: 5000, // 设置超时时间为10秒
-                    headers: {
-                        'Accept': 'application/json',
-                        'stage': stage,
-                    }
-                });
+
+                const checkResult = await checkUpdate();
                 if (checkResult) {
                     try {
                         // 保存更新信息
                         setUpdateInfo(checkResult);
                         // 先下载更新
-                        await checkResult.download((event) => {
-                            // 这里可以添加下载进度的处理
-                            console.log('Download progress:', event);
-                        });
+                        await checkResult.download();
                         // 下载完成后设置状态
                         setDownloadComplete(true);
                     } catch (error) {

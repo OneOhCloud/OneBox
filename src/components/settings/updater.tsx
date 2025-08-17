@@ -1,11 +1,10 @@
 import { confirm, message } from '@tauri-apps/plugin-dialog';
 import { relaunch } from '@tauri-apps/plugin-process';
-import { check, type Update } from '@tauri-apps/plugin-updater';
+import { type Update } from '@tauri-apps/plugin-updater';
 import { useEffect, useState } from "react";
 import { CloudArrowDown, CloudArrowUpFill } from "react-bootstrap-icons";
-import { getStoreValue } from '../../single/store';
-import { STAGE_VERSION_STORE_KEY } from '../../types/definition';
 import { t, vpnServiceManager } from "../../utils/helper";
+import { checkUpdate } from '../../utils/update';
 import { SettingItem } from "./common";
 
 const simulateUpdate = false;
@@ -15,7 +14,7 @@ export default function UpdaterItem() {
     const [downloading, setDownloading] = useState(false);
     const [downloadProgress, setDownloadProgress] = useState(0);
     const [isUpdating, setIsUpdating] = useState(false);
-    const [updateInfo, setUpdateInfo] = useState<Update | null>(null);
+
 
     const simulateUpdateProcess = async () => {
         try {
@@ -32,7 +31,6 @@ export default function UpdaterItem() {
                     clearInterval(interval);
                     setDownloading(false);
                     console.log('模拟下载完成');
-                    confirmInstallation();
                 }
             }, 500);
 
@@ -45,10 +43,7 @@ export default function UpdaterItem() {
     };
 
     // 确认是否安装更新
-    const confirmInstallation = async () => {
-        if (!updateInfo) {
-            return;
-        }
+    const confirmInstallation = async (updateInfo: Update) => {
 
         const confirmed = await confirm(t("update_downloaded"), {
             title: t("update_install"),
@@ -88,50 +83,17 @@ export default function UpdaterItem() {
             }
 
             // 获取当前阶段版本
-            let stage = await getStoreValue(STAGE_VERSION_STORE_KEY, "latest");
-            if (stage === "stable") {
-                stage = "latest"; // 稳定版直接使用最新版本
-            }
+            const checkResult = await checkUpdate();
 
-            // 真实更新流程
-            const checkResult = await check({
-                timeout: 5000, // 设置超时时间为5秒
-                headers: {
-                    'Accept': 'application/json',
-                    'stage': stage,
-                }
-            });
 
             if (checkResult) {
                 console.log(
                     `found update ${checkResult.version} from ${checkResult.date} with notes ${checkResult.body}`
                 );
                 setDownloading(true);
-                let downloaded = 0;
-                let contentLength = 0;
-                // 只下载，不安装
-                await checkResult.download((event) => {
-                    switch (event.event) {
-                        case 'Started':
-                            // @ts-ignore
-                            contentLength = event.data.contentLength;
-                            console.log(`started downloading ${event.data.contentLength} bytes`);
-                            break;
-                        case 'Progress':
-                            downloaded += event.data.chunkLength;
-                            const progress = Math.round((downloaded / contentLength) * 100);
-                            setDownloadProgress(progress);
-                            console.log(`downloaded ${downloaded} from ${contentLength}`);
-                            break;
-                        case 'Finished':
-                            setDownloading(false);
-                            console.log('download finished');
-                            // 下载完成后提示安装
-                            confirmInstallation();
-                            break;
-                    }
-                });
-                setUpdateInfo(checkResult);
+                await checkResult.download();
+                setDownloading(false);
+                await confirmInstallation(checkResult);
 
             } else {
                 await message(
@@ -139,7 +101,6 @@ export default function UpdaterItem() {
                     title: t('update'),
                     kind: 'info',
                 });
-                console.log('No updates available');
             }
         } catch (error) {
             console.error('Error during update:', error);
@@ -152,14 +113,13 @@ export default function UpdaterItem() {
     useEffect(() => {
         // 检查更新
         const checkForUpdates = async () => {
-            // 如果是模拟模式，直接设置有更新可用
             if (simulateUpdate) {
                 setUpdateAvailable(true);
                 return;
             }
 
             try {
-                const update = await check();
+                const update = await checkUpdate();
                 if (update) {
                     setUpdateAvailable(true);
                 }
@@ -169,7 +129,9 @@ export default function UpdaterItem() {
         };
 
         checkForUpdates();
-    }, [simulateUpdate]); // 添加simulateUpdate作为依赖项
+
+
+    }, [simulateUpdate]);
 
     return (
         <>
