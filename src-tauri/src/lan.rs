@@ -140,7 +140,11 @@ pub async fn ping_google() -> bool {
         .build()
         .unwrap();
 
-    match client.get("https://www.google.com").send().await {
+    match client
+        .get("https://www.google.com/generate_204")
+        .send()
+        .await
+    {
         Ok(res) => res.status().is_success(),
         Err(_) => false,
     }
