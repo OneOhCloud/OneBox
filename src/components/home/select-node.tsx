@@ -1,16 +1,14 @@
 import { useEffect, useState } from "react";
 
+import { invoke } from "@tauri-apps/api/core";
 import { fetch } from '@tauri-apps/plugin-http';
-import { type } from "@tauri-apps/plugin-os";
 import useSWR from "swr";
 import { getClashApiSecret } from "../../single/store";
 import { t } from "../../utils/helper";
 import NodeOption from "./node-option";
 
-const osType = type();
 const baseUrl = "http://127.0.0.1:9191";
 const proxiesUrl = `${baseUrl}/proxies/ExitGateway`;
-const sleepTime = osType === 'windows' ? 10000 : 5000;
 
 
 type SelectNodeProps = {
@@ -88,17 +86,33 @@ export function SelecItem(props: SelecItemProps) {
 
 
     useEffect(() => {
+
+        const checkConnection = async () => {
+            for (let i = 0; i < 10; i++) {
+                const connected = await invoke<boolean>('ping_google');
+                if (connected) {
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    setShowDelay(true);
+                    break; // 如果连接成功，退出循环
+                }
+
+                // 连接失败，等待一段时间后重试
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+        }
+
+
         if (isRunning && !lastRunning) {
             setLastRunning(isRunning);
-            setTimeout(() => {
-                setShowDelay(true);
-            }, sleepTime);
+            checkConnection();
+
         } else {
             setShowDelay(false);
             setLastRunning(isRunning);
         }
-    }, [isRunning, lastRunning]);
 
+
+    }, [isRunning, lastRunning]);
 
 
 
