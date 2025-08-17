@@ -41,6 +41,9 @@
   },
   "plugins": {
     "updater": {
+      "windows": {
+        "installMode": "basicUi"
+      },
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDNERkM4MTE4RENFRUU4NDgKUldSSTZPN2NHSUg4UGFBOHU1UlFlMXE0eXh4b3hRaW1lb0FlYms1OWhxWnhJRURGN2FxcUZneEoK",
       "endpoints": [
         "https://onebox-updater.oneoh.cloud/latest",
