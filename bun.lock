@@ -4,14 +4,14 @@
     "": {
       "name": "one-box",
       "dependencies": {
-        "@tailwindcss/vite": "^4.1.11",
+        "@tailwindcss/vite": "^4.1.12",
         "@tauri-apps/api": "^2.7.0",
         "@tauri-apps/plugin-autostart": "^2.5.0",
         "@tauri-apps/plugin-clipboard-manager": "~2.2.3",
         "@tauri-apps/plugin-dialog": "^2.3.2",
         "@tauri-apps/plugin-fs": "~2.2.1",
         "@tauri-apps/plugin-http": "~2.4.4",
-        "@tauri-apps/plugin-log": "~2",
+        "@tauri-apps/plugin-log": "~2.6.0",
         "@tauri-apps/plugin-opener": "~2.2.7",
         "@tauri-apps/plugin-os": "~2.2.2",
         "@tauri-apps/plugin-process": "^2.3.0",
@@ -21,7 +21,7 @@
         "@tauri-apps/plugin-updater": "^2.9.0",
         "@tauri-apps/plugin-window-state": "^2.4.0",
         "@types/bytes": "^3.1.5",
-        "@types/node": "^22.17.0",
+        "@types/node": "^22.17.2",
         "@types/unzipper": "^0.10.11",
         "bytes": "^3.1.2",
         "clsx": "^2.1.1",
@@ -29,14 +29,14 @@
         "react": "^19.1.1",
         "react-bootstrap-icons": "^1.11.6",
         "react-dom": "^19.1.1",
-        "react-hot-toast": "^2.5.2",
-        "swr": "^2.3.4",
-        "tailwindcss": "^4.1.11",
+        "sonner": "^2.0.7",
+        "swr": "^2.3.6",
+        "tailwindcss": "^4.1.12",
         "zod": "^3.25.76",
       },
       "devDependencies": {
         "@tauri-apps/cli": "^2.7.1",
-        "@types/react": "^19.1.9",
+        "@types/react": "^19.1.10",
         "@types/react-dom": "^19.1.7",
         "@vitejs/plugin-react": "^4.7.0",
         "daisyui": "^5.0.50",
@@ -375,8 +375,6 @@
 
     "globals": ["globals@11.12.0", "", {}, "sha512-WOBp/EEGUiIsJSp7wcv/y6MO+lV9UoncWqxuFfm8eBwzWNgyfBd6Gz+IeKQ9jCmyhoH99g15M3T+QaVHFjizVA=="],
 
-    "goober": ["goober@2.1.16", "", { "peerDependencies": { "csstype": "^3.0.10" } }, "sha512-erjk19y1U33+XAMe1VTvIONHYoSqE4iS7BYUZfHaqeohLmnC0FdxEh7rQU+6MZ4OajItzjZFSRtVANrQwNq6/g=="],
-
     "graceful-fs": ["graceful-fs@4.2.11", "", {}, "sha512-RbJ5/jmFcNNCcDV5o9eTnBLJ/HszWV0P73bc+Ff4nS/rJj+YaS6IGyiOL0VoBYX+l1Wrl3k63h/KrH+nhJ0XvQ=="],
 
     "husky": ["husky@9.1.7", "", { "bin": { "husky": "bin.js" } }, "sha512-5gs5ytaNjBrh5Ow3zrvdUUY+0VxIuWVL4i9irt6friV+BqdCfmV11CQTWMiBYWHbXhco+J1kHfTOUkePhCDvMA=="],
@@ -473,8 +471,6 @@
 
     "react-dom": ["react-dom@19.1.1", "", { "dependencies": { "scheduler": "^0.26.0" }, "peerDependencies": { "react": "^19.1.1" } }, "sha512-Dlq/5LAZgF0Gaz6yiqZCf6VCcZs1ghAJyrsu84Q/GT0gV+mCxbfmKNoGRKBYMJ8IEdGPqu49YWXD02GCknEDkw=="],
 
-    "react-hot-toast": ["react-hot-toast@2.6.0", "", { "dependencies": { "csstype": "^3.1.3", "goober": "^2.1.16" }, "peerDependencies": { "react": ">=16", "react-dom": ">=16" } }, "sha512-bH+2EBMZ4sdyou/DPrfgIouFpcRLCJ+HoCA32UoAYHn6T3Ur5yfcDCeSr5mwldl6pFOsiocmrXMuoCJ1vV8bWg=="],
-
     "react-is": ["react-is@16.13.1", "", {}, "sha512-24e6ynE2H+OKt4kqsOvNd8kBpV65zoxbA4BVsEOB3ARVWQki/DHzaUoC5KuON/BiccDaCCTZBuOcfZs70kR8bQ=="],
 
     "react-refresh": ["react-refresh@0.17.0", "", {}, "sha512-z6F7K9bV85EfseRCp2bzrpyQ0Gkw1uLoCel9XBVWPg/TjRj94SkJzUTGfOa4bs7iJvBWtQG0Wq7wnI0syw3EBQ=="],
@@ -496,6 +492,8 @@
     "shebang-regex": ["shebang-regex@3.0.0", "", {}, "sha512-7++dFhtcx3353uBaq8DDR4NuxBetBzC7ZQOhmTQInHEd6bSrXdiEyzCvG07Z44UYdLShWUyXt5M/yhz8ekcb1A=="],
 
     "signal-exit": ["signal-exit@4.1.0", "", {}, "sha512-bzyZ1e88w9O1iNJbKnOlvYTrWPDl46O1bG0D3XInv+9tkPrxrN8jUUTiFlDkkmKWgn1M6CfIA13SuGqOa9Korw=="],
+
+    "sonner": ["sonner@2.0.7", "", { "peerDependencies": { "react": "^18.0.0 || ^19.0.0 || ^19.0.0-rc", "react-dom": "^18.0.0 || ^19.0.0 || ^19.0.0-rc" } }, "sha512-W6ZN4p58k8aDKA4XPcx2hpIQXBRAgyiWVkYhT7CvK6D3iAu7xjvVyhQHg2/iaKJZ1XVJ4r7XuwGL+WGEK37i9w=="],
 
     "source-map-js": ["source-map-js@1.2.1", "", {}, "sha512-UXWMKhLOwVKb728IUtQPXxfYU+usdybtUrK/8uGE8CQMvrhOpwvzDBwj0QhSL7MQc7vIsISBG8VQ8+IDQxpfQA=="],
 

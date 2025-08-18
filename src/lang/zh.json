@@ -1,6 +1,6 @@
 {
     "about": "关于",
-    "add_subscription_failed": "添加配置文件失败",
+    "add_subscription_failed": "添加配置文件失败，请粘贴正确的 URL",
     "add_subscription_success": "添加配置文件成功",
     "add_subscription": "添加配置文件",
     "add": "添加",
@@ -128,5 +128,6 @@
     "url_cannot_empty": "URL不能为空",
     "version": "版本",
     "vpn_network": "外网",
+    "subscription_invalid_expired": "该订阅链接无效或者过期",
     "zzzzzeof": "zzzzzeof"
 }

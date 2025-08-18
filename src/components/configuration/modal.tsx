@@ -2,7 +2,7 @@ import { motion } from "framer-motion";
 import { useState } from "react";
 import { Plus } from "react-bootstrap-icons";
 import { mutate } from "swr";
-import { z } from "zod"; // 导入 zod
+import { z } from "zod";
 import { addSubscription } from "../../action/db";
 import { GET_SUBSCRIPTIONS_LIST_SWR_KEY } from "../../types/definition";
 import { t } from "../../utils/helper";
@@ -59,9 +59,10 @@ export function AddSubConfigurationModal() {
 
     const handleAdd = async () => {
         if (validateForm()) {
+            handleClose();
             await addSubscription(url, name);
             mutate(GET_SUBSCRIPTIONS_LIST_SWR_KEY);
-            handleClose();
+
         }
     }
 
@@ -80,7 +81,7 @@ export function AddSubConfigurationModal() {
                     <Plus className="size-6 text-blue-600" />
                 </motion.div>
             </button>
-            <dialog id="addSubConfigurationModal" className="modal">
+            <dialog id="addSubConfigurationModal" className="modal z-1">
                 <div className="modal-box bg-white">
                     <h3 className="font-bold text-lg">
                         {/* 添加订阅 */

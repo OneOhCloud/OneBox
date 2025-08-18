@@ -2,7 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { openUrl } from '@tauri-apps/plugin-opener';
 import { useContext, useEffect, useState } from "react";
 import { Github, Globe, InfoCircleFill, XLg } from "react-bootstrap-icons";
-import toast from 'react-hot-toast';
+import { toast } from 'sonner';
 import { NavContext } from "../../single/context";
 import { aboutText } from "../../types/copyright";
 import { GITHUB_URL, OFFICIAL_WEBSITE, OsInfo } from "../../types/definition";
