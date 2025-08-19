@@ -3,7 +3,7 @@ import "./App.css";
 import { motion } from 'framer-motion';
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import { GearWideConnected, House, Layers } from 'react-bootstrap-icons';
-import { Toaster } from 'react-hot-toast';
+import { Toaster } from 'sonner';
 
 import React from 'react';
 import HomePage from './page/home';
@@ -124,7 +124,7 @@ function App() {
 
   return (
     <NavContext.Provider value={{ activeScreen, setActiveScreen, handleLanguageChange }}>
-      <Toaster position="top-center" toastOptions={{ duration: 2000 }} containerClassName="mt-[32px]" />
+      <Toaster position="top-center" toastOptions={{ duration: 2000 }} />
 
       <main className="relative bg-gray-50 flex flex-col h-screen">
         {activeScreen === 'home' &&

@@ -3,7 +3,7 @@ import { ToggleSetting } from "./common";
 import { disable, enable, isEnabled } from '@tauri-apps/plugin-autostart';
 import { useEffect, useState } from 'react';
 import { Power } from "react-bootstrap-icons";
-import toast from 'react-hot-toast';
+import { toast } from 'sonner';
 import { t } from "../../utils/helper";
 
 export default function ToggleAutoStart() {

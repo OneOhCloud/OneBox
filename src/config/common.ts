@@ -4,8 +4,20 @@ export const ruleSet = [
         "tag": "geoip-cn",
         "type": "remote",
         "format": "binary",
-        "url": "https://fastly.jsdelivr.net/gh/SagerNet/sing-geoip@rule-set/geoip-cn.srs",
+        "url": "https://fastly.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@sing/geo/geoip/cn.srs",
         "download_detour": "direct"
+    },
+    {
+        "type": "remote",
+        "tag": "geosite-geolocation-cn",
+        "format": "source",
+        "url": "https://fastly.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@sing/geo/geosite/geolocation-cn.json"
+    },
+    {
+        "type": "remote",
+        "tag": "geosite-geolocation-!cn",
+        "format": "source",
+        "url": "https://fastly.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@sing/geo/geosite/geolocation-!cn.json"
     },
     {
         "tag": "geosite-cn",
