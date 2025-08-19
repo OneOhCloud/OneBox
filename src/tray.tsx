@@ -1,3 +1,4 @@
+import { defaultWindowIcon } from '@tauri-apps/api/app';
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from '@tauri-apps/api/event';
 import { Menu, MenuOptions } from '@tauri-apps/api/menu';
@@ -7,6 +8,7 @@ import { type } from '@tauri-apps/plugin-os';
 import { getClashApiSecret, getStoreValue } from './single/store';
 import { DEVELOPER_TOGGLE_STORE_KEY } from './types/definition';
 import { copyEnvToClipboard, initLanguage, t, vpnServiceManager } from './utils/helper';
+
 
 const appWindow = getCurrentWindow();
 
@@ -117,19 +119,21 @@ export async function setupTrayIcon() {
         const tray_icon = await invoke<ArrayBuffer>('get_tray_icon', {
             app: appWindow
         });
+        const defaultIcon = await defaultWindowIcon();
 
         if (osType == 'macos') {
             const options = {
                 menu,
-                icon: tray_icon,
+                icon: tray_icon || defaultIcon,
                 tooltip: "OneBox"
             };
             trayInstance = await TrayIcon.new(options);
             trayInstance && trayInstance.setIconAsTemplate(true);
+
         } else {
             const options = {
                 menu,
-                icon: tray_icon || 'None',
+                icon: tray_icon || defaultIcon,
                 tooltip: "OneBox"
             };
             trayInstance = await TrayIcon.new(options);

@@ -1,6 +1,6 @@
 
 import { fetch } from '@tauri-apps/plugin-http';
-import toast from 'react-hot-toast';
+import { toast } from 'sonner';
 import { getDataBaseInstance } from '../single/db';
 import { Subscription, SubscriptionConfig } from '../types/definition';
 import { getSingBoxUserAgent, t } from '../utils/helper';
@@ -29,7 +29,7 @@ function getRemoteInfoBySubscriptionUserinfo(subscriptionUserinfo: string) {
         return {
             upload: info.upload || '0',
             download: info.download || '0',
-            total: info.total || '0',
+            total: info.total || '1',
             expire: info.expire || '0',
         };
     } catch (error) {
@@ -37,7 +37,7 @@ function getRemoteInfoBySubscriptionUserinfo(subscriptionUserinfo: string) {
         return {
             upload: '0',
             download: '0',
-            total: '0',
+            total: '1',
             expire: '0',
         };
     }
@@ -88,7 +88,7 @@ export async function updateSubscription(identifier: string) {
 
 
 export async function addSubscription(url: string, name: string | undefined) {
-    toast.loading(t('adding_subscription'))
+    const toastId = toast.loading(t('adding_subscription'))
     try {
         const response = await fetch(url, {
             method: 'GET',
@@ -98,6 +98,14 @@ export async function addSubscription(url: string, name: string | undefined) {
                 'User-Agent': await getSingBoxUserAgent(),
             }
         });
+
+        if (response.status !== 200) {
+            toast.error(t('subscription_invalid_expired'), {
+                id: toastId,
+                duration: 5000
+            })
+            return
+        }
 
         const officialWebsite = response.headers.get('official-website') || 'https://sing-box.net'
         const subJson = await response.json()
@@ -118,13 +126,16 @@ export async function addSubscription(url: string, name: string | undefined) {
         await db.execute('INSERT INTO subscriptions (identifier, name, subscription_url, official_website, used_traffic, total_traffic, expire_time, last_update_time) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
             [identifier, name, url, officialWebsite, used_traffic, total_traffic, expire_time, last_update_time])
         await db.execute('INSERT INTO subscription_configs (identifier, config_content) VALUES (?, ?)', [identifier, JSON.stringify(subJson)])
-        // toast.success('添加订阅成功')
-        toast.success(t('add_subscription_success'))
+        toast.success(t('add_subscription_success'), {
+            id: toastId
+        })
 
     } catch (error) {
         console.error('Error adding subscription:', error)
-        // toast.error('添加订阅失败')
-        toast.error(t('add_subscription_failed'))
+        toast.error(t('add_subscription_failed'), {
+            id: toastId,
+            duration: 5000
+        })
     }
 }
 
