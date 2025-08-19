@@ -29,7 +29,7 @@ function getRemoteInfoBySubscriptionUserinfo(subscriptionUserinfo: string) {
         return {
             upload: info.upload || '0',
             download: info.download || '0',
-            total: info.total || '0',
+            total: info.total || '1',
             expire: info.expire || '0',
         };
     } catch (error) {
@@ -37,7 +37,7 @@ function getRemoteInfoBySubscriptionUserinfo(subscriptionUserinfo: string) {
         return {
             upload: '0',
             download: '0',
-            total: '0',
+            total: '1',
             expire: '0',
         };
     }
