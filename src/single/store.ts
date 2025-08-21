@@ -24,6 +24,7 @@ export async function setStoreValue(key: string, value: any) {
 
 
 export const store = new LazyStore('settings.json', {
+    defaults: {},
     autoSave: true
 });
 
