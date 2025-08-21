@@ -6,10 +6,10 @@ import { GearWideConnected, House, Layers } from 'react-bootstrap-icons';
 import { Toaster } from 'sonner';
 
 import React from 'react';
+import HomePage from "./page/home";
 import { ActiveScreenType, NavContext } from './single/context';
 import { initLanguage, t } from './utils/helper';
 
-const HomePage = React.lazy(() => import('./page/home'));
 const ConfigurationPage = React.lazy(() => import('./page/config'));
 const DevPage = React.lazy(() => import('./page/developer'));
 const SettingsPage = React.lazy(() => import('./page/settings'));
@@ -35,9 +35,7 @@ function Body({ lang, activeScreen }: BodyProps) {
     switch (activeScreen) {
       case 'home':
         return (
-          <Suspense fallback={<LoadingFallback />}>
-            <HomePage />
-          </Suspense>
+          <HomePage />
         );
       case 'configuration':
         return (

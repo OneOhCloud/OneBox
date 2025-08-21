@@ -112,7 +112,8 @@ const mixedConfig = {
     "outbounds": [
         {
             "tag": "direct",
-            "type": "direct"
+            "type": "direct",
+            "domain_resolver": "system"
         },
         {
             "tag": "ExitGateway",
