@@ -6,10 +6,9 @@ import { GearWideConnected, House, Layers } from 'react-bootstrap-icons';
 import { Toaster } from 'sonner';
 
 import React from 'react';
-import HomePage from './page/home';
+import HomePage from "./page/home";
 import { ActiveScreenType, NavContext } from './single/context';
 import { initLanguage, t } from './utils/helper';
-
 
 const ConfigurationPage = React.lazy(() => import('./page/config'));
 const DevPage = React.lazy(() => import('./page/developer'));
@@ -31,12 +30,13 @@ const LoadingFallback = () => (
 );
 
 function Body({ lang, activeScreen }: BodyProps) {
-  // Home 组件保活，只渲染一次
-  const homeComponent = useMemo(() => <HomePage />, []); // 空依赖数组，只渲染一次
 
-  // 其他组件的懒加载渲染
   const lazyComponent = useMemo(() => {
     switch (activeScreen) {
+      case 'home':
+        return (
+          <HomePage />
+        );
       case 'configuration':
         return (
           <Suspense fallback={<LoadingFallback />}>
@@ -65,15 +65,7 @@ function Body({ lang, activeScreen }: BodyProps) {
 
   return (
     <div className="flex-1 overflow-y-hidden">
-      {/* Home 组件始终保持挂载，通过显示/隐藏控制 */}
-      <div
-        className={`h-full overflow-y-auto ${activeScreen === 'home' ? 'block' : 'hidden'}`}
-      >
-        {homeComponent}
-      </div>
-
-      {/* 其他组件的渲染 */}
-      {activeScreen !== 'home' && (
+      {activeScreen && (
         <div className="animate-fade-in h-full overflow-y-auto" key={`${activeScreen}-${lang}`}>
           {lazyComponent}
         </div>

@@ -2,7 +2,7 @@ import * as path from '@tauri-apps/api/path';
 import { getSubscriptionConfig } from '../../action/db';
 import { getAllowLan } from '../../single/store';
 import { clashApi } from '../common';
-import { updateVPNServerConfigFromDB } from './helper';
+import { DEFAULT_DOMAIN_RESOLVER_TAG, updateVPNServerConfigFromDB } from './helper';
 
 const mixedConfig = {
     "log": {
@@ -16,7 +16,6 @@ const mixedConfig = {
                 "tag": "system",
                 "type": "local",
             },
-
             {
                 "tag": "alibaba",
                 "type": "udp",
@@ -24,10 +23,10 @@ const mixedConfig = {
                 "server_port": 53,
             },
             {
-                "type": "quic",
-                "tag": "alibaba_quic_dns",
-                "server": "223.6.6.6",
-                "server_port": 853,
+                "tag": DEFAULT_DOMAIN_RESOLVER_TAG,
+                "type": "udp",
+                "server": "223.5.5.5",
+                "server_port": 53,
             },
             {
                 "tag": "dns_proxy",
@@ -113,7 +112,8 @@ const mixedConfig = {
     "outbounds": [
         {
             "tag": "direct",
-            "type": "direct"
+            "type": "direct",
+            "domain_resolver": "system"
         },
         {
             "tag": "ExitGateway",

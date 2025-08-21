@@ -91,7 +91,7 @@ export function SelecItem(props: SelecItemProps) {
             for (let i = 0; i < 10; i++) {
                 const connected = await invoke<boolean>('ping_google');
                 if (connected) {
-                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    await new Promise(resolve => setTimeout(resolve, 500));
                     setShowDelay(true);
                     break; // 如果连接成功，退出循环
                 }

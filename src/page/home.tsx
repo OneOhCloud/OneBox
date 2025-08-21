@@ -60,14 +60,14 @@ export default function HomePage() {
   useEffect(() => {
     const unsubscribe = listen('status-changed', async (_) => {
       let secret = await getClashApiSecret();
-
       setIsOn(await invoke<boolean>('is_running', { secret: secret }));
+
     });
 
     return () => {
       unsubscribe.then(fn => fn());
     };
-  }, []);
+  }, [isOn]);
 
   // 订阅数据监听
   useEffect(() => {
