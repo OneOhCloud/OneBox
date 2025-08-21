@@ -44,9 +44,10 @@ async function createTrayMenu() {
                 enabled: true,
                 action: async () => {
                     if (status) {
-                        vpnServiceManager.stop();
+                        await vpnServiceManager.stop();
                     } else {
-                        vpnServiceManager.start();
+                        await vpnServiceManager.syncConfig({});
+                        await vpnServiceManager.start();
                     }
                     const newMenu = await createTrayMenu();
                     if (trayInstance) {
@@ -57,12 +58,8 @@ async function createTrayMenu() {
 
         ],
     }
-
-
     const developer_toggle_state: boolean = await getStoreValue(DEVELOPER_TOGGLE_STORE_KEY, false);
-
     if (developer_toggle_state) {
-        console.log("开发者模式已启用，添加调试工具菜单项");
         baseMenu.items?.push(
             {
                 id: 'open_log',

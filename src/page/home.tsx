@@ -1,18 +1,15 @@
-import { invoke } from '@tauri-apps/api/core';
-import { listen } from '@tauri-apps/api/event';
 import { message } from '@tauri-apps/plugin-dialog';
-import { type } from '@tauri-apps/plugin-os';
 import { useContext, useEffect, useRef, useState } from "react";
 import { InfoCircle, Power } from 'react-bootstrap-icons';
 import VPNBody from '../components/home/vpn-body';
 import AuthDialog from '../components/settings/auth-dialog';
 
-import { setGlobalMixedConfig, setGlobalTunConfig, setMixedConfig, setTunConfig } from '../config/helper';
 import { useSubscriptions } from '../hooks/useDB';
+import { useIsRunning } from '../hooks/useVersion';
 import { NavContext } from '../single/context';
-import { getClashApiSecret, getEnableTun, getStoreValue, setStoreValue } from "../single/store";
-import { RULE_MODE_STORE_KEY, SING_BOX_VERSION, SSI_STORE_KEY } from '../types/definition';
-import { t, verifyPrivileged, vpnServiceManager } from "../utils/helper";
+import { getStoreValue, setStoreValue } from "../single/store";
+import { RULE_MODE_STORE_KEY } from '../types/definition';
+import { t, vpnServiceManager } from "../utils/helper";
 
 type SelectedModeType = 'rules' | 'global';
 
@@ -21,8 +18,8 @@ export default function HomePage() {
   const { setActiveScreen } = useContext(NavContext);
 
   // 状态管理
-  const [isOn, setIsOn] = useState(false);
-  const [isOnLoading, setIsOnLoading] = useState(false);
+  const [isOperating, setIsOperating] = useState(false);
+  const [operationStatus, setOperationStatus] = useState<'starting' | 'stopping' | 'idle'>('idle');
   const [selectedMode, setSelectedMode] = useState<SelectedModeType>('rules');
   const [isEmpty, setIsEmpty] = useState(false);
   const [indicatorStyle, setIndicatorStyle] = useState({ left: 0, width: 0 });
@@ -30,15 +27,15 @@ export default function HomePage() {
 
   const modeButtonsRef = useRef<HTMLDivElement>(null);
   const { data } = useSubscriptions();
+  const { isRunning, isLoading: serviceLoading, mutate } = useIsRunning()
+
+  // 合并所有loading状态
+  const isLoading = isOperating || serviceLoading;
+
 
   // 初始化检查
   useEffect(() => {
-    //  检查是否正在运行
-    getClashApiSecret().then(async (secret) => {
-      const status = await invoke<boolean>("is_running", { secret: secret });
-      setIsOn(status);
-    })
-
+    mutate();
     // 获取当前规则模式
     getStoreValue(RULE_MODE_STORE_KEY).then((v: SelectedModeType) => {
       if (v) {
@@ -56,20 +53,7 @@ export default function HomePage() {
     });
   }, []);
 
-  //事件监听 
-  useEffect(() => {
-    const unsubscribe = listen('status-changed', async (_) => {
-      let secret = await getClashApiSecret();
-      setIsOn(await invoke<boolean>('is_running', { secret: secret }));
 
-    });
-
-    return () => {
-      unsubscribe.then(fn => fn());
-    };
-  }, [isOn]);
-
-  // 订阅数据监听
   useEffect(() => {
     setIsEmpty(!data?.length);
   }, [data]);
@@ -91,43 +75,13 @@ export default function HomePage() {
   }, [selectedMode]);
 
   // 抽取配置逻辑
-  const configureProxy = async (identifier: string) => {
-    const useTun = await getEnableTun();
 
-    //zh: 直接使用 getStoreValue(RULE_MODE_STORE_KEY) 代替 setStoreValue 来获取当前模式，这样不会读到旧的值
-    //en: Directly use getStoreValue(RULE_MODE_STORE_KEY) instead of setStoreValue to get the current mode, so that the old value will not be read
-    const currentMode = await getStoreValue(RULE_MODE_STORE_KEY)
-
-    //zh: 在 linux 和 macOS 上使用 TUN 模式时需要输入超级管理员密码
-    //en: When using TUN mode on linux and macOS, you need to enter the super administrator password
-    if (useTun && (type() == 'linux' || type() == 'macos')) {
-      console.log('在 Linux 或 macOS 上使用 TUN 模式，需要输入超级管理员密码');
-      const privileged = await verifyPrivileged();
-      console.log('是否有超级管理员权限:', privileged);
-      if (!privileged) {
-        console.log('没有超级管理员权限，弹出授权对话框');
-        setPrivilegedDialog(true);
-        return false;
-      } else {
-        console.log('有超级管理员权限，继续配置');
-        console.log('privileged:', privileged);
-      }
-      const fn = currentMode === 'global' ? setGlobalTunConfig : setTunConfig;
-      await fn(identifier, SING_BOX_VERSION);
-    } else if (useTun && type() == 'windows') {
-      console.log('在 Windows 上使用 TUN 模式，无需密码');
-      const fn = currentMode === 'global' ? setGlobalTunConfig : setTunConfig;
-      await fn(identifier, SING_BOX_VERSION);
-    } else {
-      console.log('使用普通模式');
-      const fn = currentMode === 'global' ? setGlobalMixedConfig : setMixedConfig;
-      await fn(identifier, SING_BOX_VERSION);
-    }
-    return true;
-  };
 
   const turnOff = async () => {
+    setOperationStatus('stopping');
     await vpnServiceManager.stop();
+    mutate();
+    setOperationStatus('idle');
   }
 
   const turnOn = async () => {
@@ -135,17 +89,41 @@ export default function HomePage() {
       setActiveScreen('configuration');
       return message(t('please_add_subscription'), { title: t('tips'), kind: 'error' });
     }
-    const identifier = await getStoreValue(SSI_STORE_KEY);
-    const ok = await configureProxy(identifier);
-    if (!ok) {
-      await turnOff();
-    } else {
-      await vpnServiceManager.start();
-    }
+
+    // 立即设置为操作中状态，给用户即时反馈
+    setIsOperating(true);
+    setOperationStatus('starting');
+
+    vpnServiceManager.syncConfig({
+      onSuccess: async () => {
+        try {
+          await vpnServiceManager.start();
+          mutate(); // 确保服务启动后再更新状态
+        } catch (error) {
+          console.error('启动服务失败:', error);
+          await message(t('connect_failed'), { title: t('error'), kind: 'error' });
+        } finally {
+          setIsOperating(false);
+          setOperationStatus('idle');
+        }
+      },
+      onError: async (error) => {
+        console.error('同步配置失败:', error);
+        await turnOff();
+        setIsOperating(false);
+        setOperationStatus('idle');
+      },
+      onRequirePrivileged: () => {
+        setPrivilegedDialog(true);
+        setIsOperating(false);
+        setOperationStatus('idle');
+      }
+    });
+
   }
 
   const restart = async () => {
-    setIsOnLoading(true);
+    setIsOperating(true);
     try {
       await turnOff();
       await turnOn();
@@ -153,7 +131,7 @@ export default function HomePage() {
       console.error('重启服务失败:', error);
       await message(t('reconnect_failed'), { title: t('error'), kind: 'error' });
     } finally {
-      setTimeout(() => setIsOnLoading(false), 1200);
+      setTimeout(() => setIsOperating(false), 1200);
     }
   }
 
@@ -162,16 +140,19 @@ export default function HomePage() {
       setActiveScreen('configuration');
       return message(t('please_add_subscription'), { title: t('tips'), kind: 'error' });
     }
-    setIsOnLoading(true);
+
     try {
       // 根据当前状态决定是开启还是关闭
-      isOn ? await turnOff() : await turnOn();
-      setIsOn(prev => !prev);
+      if (isRunning) {
+        await turnOff(); // turnOff 内部会处理状态
+      } else {
+        await turnOn(); // turnOn 内部会处理 isOperating 状态
+      }
     } catch (error) {
       console.error('连接失败:', error);
       await message(`${t('connect_failed')}: ${error}`, { title: t('error'), kind: 'error' });
-    } finally {
-      setTimeout(() => setIsOnLoading(false), 1200);
+      setIsOperating(false);
+      setOperationStatus('idle');
     }
   };
 
@@ -184,7 +165,7 @@ export default function HomePage() {
 
     // zh: 然后重启服务
     // en: Then restart the service
-    if (isOnLoading || isOn) {
+    if (isLoading || isRunning) {
       await restart();
     }
   };
@@ -193,19 +174,14 @@ export default function HomePage() {
     <div className="bg-gray-50 flex flex-col items-center justify-center p-6  w-full">
       <AuthDialog onAuthSuccess={async () => {
         setPrivilegedDialog(false);
-        setIsOnLoading(true);
-        await turnOn();
-        setTimeout(() => {
-          setIsOnLoading(false);
-        }, 1200);
-
+        await turnOn(); // turnOn 内部会处理 isOperating 状态
       }} open={privilegedDialog} onClose={() => { setPrivilegedDialog(false) }} />
 
-      <label className={`cursor-pointer ${isOnLoading ? 'pointer-events-none' : ''}`}>
-        <input type="checkbox" checked={isOn} onChange={() => { }} className="hidden" />
+      <label className={`cursor-pointer ${isLoading ? 'pointer-events-none' : ''}`}>
+        <input type="checkbox" checked={isRunning} onChange={() => { }} className="hidden" />
         <div
           className="relative w-36 h-36 mb-6"
-          onClick={!isOnLoading ? handleToggle : undefined}
+          onClick={!isLoading ? handleToggle : undefined}
         >
           <div className="absolute inset-0 bg-blue-100 rounded-full opacity-10"></div>
           <div className="absolute inset-2 bg-blue-100 rounded-full opacity-20"></div>
@@ -215,15 +191,15 @@ export default function HomePage() {
               className={`
                 bg-white rounded-full w-24 h-24 flex items-center justify-center
                 shadow-md transition-all duration-300 ease-in-out
-                ${isOn ? 'ring-2 ring-blue-500' : ''}
+                ${isRunning ? 'ring-2 ring-blue-500' : ''}
               `}
             >
               <Power
                 size={40}
                 className={`
                   transition-colors duration-300
-                  ${isOn ? 'text-blue-500' : 'text-gray-400'}
-                  ${isOnLoading ? ' opacity-70' : ''}
+                  ${isRunning ? 'text-blue-500' : 'text-gray-400'}
+                  ${isLoading ? ' opacity-70' : ''}
                 `}
               />
             </div>
@@ -231,10 +207,13 @@ export default function HomePage() {
         </div>
       </label>
 
-      <div className="w-full text-center text-sm mb-2 flex items-center justify-center" style={{ color: isOn ? '#3B82F6' : '#9CA3AF' }}>
+      <div className="w-full text-center text-sm mb-2 flex items-center justify-center" style={{ color: isRunning ? '#3B82F6' : '#9CA3AF' }}>
         <InfoCircle size={16} className="mr-1.5 text-gray-300" />
         <span className="text-base capitalize">
-          {isOnLoading ? t('switching') : isOn ? t('connected') : t('not_connected')}
+          {operationStatus === 'starting' ? t('connecting') :
+            operationStatus === 'stopping' ? t('switching') :
+              isLoading ? t('switching') :
+                isRunning ? t('connected') : t('not_connected')}
         </span>
       </div>
 
@@ -267,7 +246,7 @@ export default function HomePage() {
         ))}
       </div>
 
-      <VPNBody isRunning={isOn}></VPNBody>
+      <VPNBody isRunning={Boolean(isRunning)}></VPNBody>
 
     </div >
   )

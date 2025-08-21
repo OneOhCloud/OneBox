@@ -297,7 +297,7 @@ pub async fn is_running(secret: String) -> bool {
     }
 
     let client = reqwest::Client::builder()
-        .timeout(Duration::from_secs(2))
+        .timeout(Duration::from_secs(1))
         .no_proxy()
         .build()
         .unwrap();
