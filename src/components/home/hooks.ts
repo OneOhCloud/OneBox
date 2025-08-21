@@ -166,7 +166,15 @@ export const useVPNOperations = () => {
                 try {
                     await vpnServiceManager.start();
                     mutate();
-                } catch (error) {
+                } catch (error: any) {
+                    // 检查是否是权限问题
+                    if (error?.message?.includes('REQUIRE_PRIVILEGE')) {
+                        console.log('需要权限验证，显示权限对话框');
+                        setPrivilegedDialog(true);
+                        setIsOperating(false);
+                        setOperationStatus('idle');
+                        return;
+                    }
                     console.error('启动服务失败:', error);
                     await message(t('connect_failed'), { title: t('error'), kind: 'error' });
                 } finally {
