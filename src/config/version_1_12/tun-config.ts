@@ -64,7 +64,7 @@ const tunConfig = {
                     "geosite-samsung",
                     "geosite-private"
                 ],
-                "strategy": "prefer_ipv4",
+                "strategy": "ipv4_only",
                 "server": "system"
 
             },
@@ -75,11 +75,14 @@ const tunConfig = {
                     "CNAME"
                 ],
                 "client_subnet": "114.114.114.114",
-                "server": "remote"
+                "server": "remote",
+                "strategy": "ipv4_only"
+
             }
         ],
+        "client_subnet": "114.114.114.114",
         "final": "dns_proxy",
-        "strategy": "prefer_ipv4"
+        "strategy": "ipv4_only"
 
     },
     "inbounds": [
