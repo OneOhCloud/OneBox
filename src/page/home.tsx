@@ -1,191 +1,98 @@
-import { message } from '@tauri-apps/plugin-dialog';
-import { useContext, useEffect, useRef, useState } from "react";
+import { useEffect } from "react";
 import { InfoCircle, Power } from 'react-bootstrap-icons';
-import VPNBody from '../components/home/vpn-body';
+import Body from '../components/home/body';
 import AuthDialog from '../components/settings/auth-dialog';
 
+import { ProxyMode, useModeIndicator, useProxyMode, useVPNOperations } from "../components/home/hooks";
 import { useSubscriptions } from '../hooks/useDB';
-import { useIsRunning } from '../hooks/useVersion';
-import { NavContext } from '../single/context';
-import { getStoreValue, setStoreValue } from "../single/store";
-import { RULE_MODE_STORE_KEY } from '../types/definition';
-import { t, vpnServiceManager } from "../utils/helper";
+import { t } from "../utils/helper";
 
-type SelectedModeType = 'rules' | 'global';
+
 
 export default function HomePage() {
-  // 使用NavContext替代props
-  const { setActiveScreen } = useContext(NavContext);
+  // 使用自定义hooks管理状态和逻辑
+  const { data: subscriptions } = useSubscriptions();
+  const { selectedMode, initializeMode, changeMode } = useProxyMode();
+  const {
+    isLoading,
+    isRunning,
+    operationStatus,
+    privilegedDialog,
+    setPrivilegedDialog,
+    startService,
+    toggleService,
+    restartService,
+    mutate
+  } = useVPNOperations();
+  const { indicatorStyle, modeButtonsRef } = useModeIndicator(selectedMode);
 
-  // 状态管理
-  const [isOperating, setIsOperating] = useState(false);
-  const [operationStatus, setOperationStatus] = useState<'starting' | 'stopping' | 'idle'>('idle');
-  const [selectedMode, setSelectedMode] = useState<SelectedModeType>('rules');
-  const [isEmpty, setIsEmpty] = useState(false);
-  const [indicatorStyle, setIndicatorStyle] = useState({ left: 0, width: 0 });
-  const [privilegedDialog, setPrivilegedDialog] = useState(false);
+  // 派生状态
+  const isEmpty = !subscriptions?.length;
 
-  const modeButtonsRef = useRef<HTMLDivElement>(null);
-  const { data } = useSubscriptions();
-  const { isRunning, isLoading: serviceLoading, mutate } = useIsRunning()
-
-  // 合并所有loading状态
-  const isLoading = isOperating || serviceLoading;
-
-
-  // 初始化检查
+  // 初始化效果
   useEffect(() => {
     mutate();
-    // 获取当前规则模式
-    getStoreValue(RULE_MODE_STORE_KEY).then((v: SelectedModeType) => {
-      if (v) {
-        setSelectedMode(v);
-      } else {
-        setStoreValue(RULE_MODE_STORE_KEY, 'rules');
-        setSelectedMode('rules');
-      }
-
-    }).catch((error) => {
-      console.error('获取规则模式发生错误:', error);
-      setStoreValue(RULE_MODE_STORE_KEY, 'rules');
-      setSelectedMode('rules');
-
-    });
+    initializeMode();
   }, []);
 
+  /**
+   * 处理模式切换
+   */
+  const handleModeChange = async (mode: ProxyMode) => {
+    // 必须先保存当前的模式
+    await changeMode(mode);
 
-  useEffect(() => {
-    setIsEmpty(!data?.length);
-  }, [data]);
-
-  // 模式指示器位置更新
-  useEffect(() => {
-    const container = modeButtonsRef.current;
-    const activeButton = container?.querySelector(`button[data-mode="${selectedMode}"]`);
-
-    if (container && activeButton) {
-      const containerRect = container.getBoundingClientRect();
-      const buttonRect = activeButton.getBoundingClientRect();
-
-      setIndicatorStyle({
-        left: buttonRect.left - containerRect.left,
-        width: buttonRect.width,
-      });
-    }
-  }, [selectedMode]);
-
-  // 抽取配置逻辑
-
-
-  const turnOff = async () => {
-    setOperationStatus('stopping');
-    await vpnServiceManager.stop();
-    mutate();
-    setOperationStatus('idle');
-  }
-
-  const turnOn = async () => {
-    if (isEmpty) {
-      setActiveScreen('configuration');
-      return message(t('please_add_subscription'), { title: t('tips'), kind: 'error' });
-    }
-
-    // 立即设置为操作中状态，给用户即时反馈
-    setIsOperating(true);
-    setOperationStatus('starting');
-
-    vpnServiceManager.syncConfig({
-      onSuccess: async () => {
-        try {
-          await vpnServiceManager.start();
-          mutate(); // 确保服务启动后再更新状态
-        } catch (error) {
-          console.error('启动服务失败:', error);
-          await message(t('connect_failed'), { title: t('error'), kind: 'error' });
-        } finally {
-          setIsOperating(false);
-          setOperationStatus('idle');
-        }
-      },
-      onError: async (error) => {
-        console.error('同步配置失败:', error);
-        await turnOff();
-        setIsOperating(false);
-        setOperationStatus('idle');
-      },
-      onRequirePrivileged: () => {
-        setPrivilegedDialog(true);
-        setIsOperating(false);
-        setOperationStatus('idle');
-      }
-    });
-
-  }
-
-  const restart = async () => {
-    setIsOperating(true);
-    try {
-      await turnOff();
-      await turnOn();
-    } catch (error) {
-      console.error('重启服务失败:', error);
-      await message(t('reconnect_failed'), { title: t('error'), kind: 'error' });
-    } finally {
-      setTimeout(() => setIsOperating(false), 1200);
-    }
-  }
-
-  const handleToggle = async () => {
-    if (isEmpty) {
-      setActiveScreen('configuration');
-      return message(t('please_add_subscription'), { title: t('tips'), kind: 'error' });
-    }
-
-    try {
-      // 根据当前状态决定是开启还是关闭
-      if (isRunning) {
-        await turnOff(); // turnOff 内部会处理状态
-      } else {
-        await turnOn(); // turnOn 内部会处理 isOperating 状态
-      }
-    } catch (error) {
-      console.error('连接失败:', error);
-      await message(`${t('connect_failed')}: ${error}`, { title: t('error'), kind: 'error' });
-      setIsOperating(false);
-      setOperationStatus('idle');
+    // 如果服务正在运行或加载中，需要重启服务
+    if (isLoading || isRunning) {
+      await restartService(isEmpty);
     }
   };
 
-  const handleModeChange = async (mode: SelectedModeType) => {
+  const handleUpdate = async () => {
+    await restartService(isEmpty);
+  }
 
-    // zh: 一定要先保存当前的模式！！
-    // en: You must save the current mode first!!
-    await setStoreValue(RULE_MODE_STORE_KEY, mode);
-    setSelectedMode(mode);
 
-    // zh: 然后重启服务
-    // en: Then restart the service
-    if (isLoading || isRunning) {
-      await restart();
+
+  /**
+   * 获取状态文本显示
+   */
+  const getStatusText = () => {
+    switch (operationStatus) {
+      case 'starting':
+        return t('connecting');
+      case 'stopping':
+        return t('switching');
+      default:
+        return isLoading ? t('switching') : isRunning ? t('connected') : t('not_connected');
     }
   };
 
   return (
-    <div className="bg-gray-50 flex flex-col items-center justify-center p-6  w-full">
-      <AuthDialog onAuthSuccess={async () => {
-        setPrivilegedDialog(false);
-        await turnOn(); // turnOn 内部会处理 isOperating 状态
-      }} open={privilegedDialog} onClose={() => { setPrivilegedDialog(false) }} />
+    <div className="bg-gray-50 flex flex-col items-center justify-center p-6 w-full">
+      {/* 权限认证对话框 */}
+      <AuthDialog
+        onAuthSuccess={async () => {
+          setPrivilegedDialog(false);
+          await startService(isEmpty);
+        }}
+        open={privilegedDialog}
+        onClose={() => setPrivilegedDialog(false)}
+      />
 
+      {/* 主开关按钮 */}
       <label className={`cursor-pointer ${isLoading ? 'pointer-events-none' : ''}`}>
         <input type="checkbox" checked={isRunning} onChange={() => { }} className="hidden" />
         <div
           className="relative w-36 h-36 mb-6"
-          onClick={!isLoading ? handleToggle : undefined}
+          onClick={!isLoading ? () => toggleService(isEmpty) : undefined}
         >
+          {/* 背景圆环动画 */}
           <div className="absolute inset-0 bg-blue-100 rounded-full opacity-10"></div>
           <div className="absolute inset-2 bg-blue-100 rounded-full opacity-20"></div>
           <div className="absolute inset-4 bg-blue-100 rounded-full opacity-30"></div>
+
+          {/* 中心按钮 */}
           <div className="absolute inset-0 flex items-center justify-center">
             <div
               className={`
@@ -207,16 +114,18 @@ export default function HomePage() {
         </div>
       </label>
 
-      <div className="w-full text-center text-sm mb-2 flex items-center justify-center" style={{ color: isRunning ? '#3B82F6' : '#9CA3AF' }}>
+      {/* 状态文本显示 */}
+      <div
+        className="w-full text-center text-sm mb-2 flex items-center justify-center"
+        style={{ color: isRunning ? '#3B82F6' : '#9CA3AF' }}
+      >
         <InfoCircle size={16} className="mr-1.5 text-gray-300" />
         <span className="text-base capitalize">
-          {operationStatus === 'starting' ? t('connecting') :
-            operationStatus === 'stopping' ? t('switching') :
-              isLoading ? t('switching') :
-                isRunning ? t('connected') : t('not_connected')}
+          {getStatusText()}
         </span>
       </div>
 
+      {/* 模式切换器 */}
       <div className="bg-gray-100 p-1 rounded-xl mb-4 inline-flex relative" ref={modeButtonsRef}>
         {/* 动画指示器 */}
         <span
@@ -227,8 +136,9 @@ export default function HomePage() {
           }}
         />
 
-        {['rules', 'global'].map((mode) => (
-          <div key={mode} className='tooltip text-xs' >
+        {/* 模式按钮 */}
+        {(['rules', 'global'] as const).map((mode) => (
+          <div key={mode} className='tooltip text-xs'>
             <div className="tooltip-content">
               <div className="text-xs max-w-[220px] whitespace-normal">
                 {t(`${mode}_tip`)}
@@ -236,18 +146,20 @@ export default function HomePage() {
             </div>
             <button
               data-mode={mode}
-              className={`capitalize relative px-4 py-1 rounded-lg transition-colors duration-300 ${selectedMode === mode ? 'text-black' : 'text-gray-500 hover:text-gray-700'}`}
-              onClick={() => handleModeChange(mode as SelectedModeType)}
+              className={`
+                capitalize relative px-4 py-1 rounded-lg transition-colors duration-300 
+                ${selectedMode === mode ? 'text-black' : 'text-gray-500 hover:text-gray-700'}
+              `}
+              onClick={() => handleModeChange(mode)}
             >
-
               {t(mode)}
             </button>
           </div>
         ))}
       </div>
 
-      <VPNBody isRunning={Boolean(isRunning)}></VPNBody>
-
-    </div >
-  )
+      {/* 主体内容 */}
+      <Body isRunning={Boolean(isRunning)} onUpdate={handleUpdate} />
+    </div>
+  );
 }
