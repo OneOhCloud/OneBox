@@ -26,10 +26,10 @@ const mixedConfig = {
         "server_port": 53,
       },
       {
-        "type": "quic",
         "tag": DEFAULT_DOMAIN_RESOLVER_TAG,
-        "server": "223.6.6.6",
-        "server_port": 853,
+        "type": "udp",
+        "server": "223.5.5.5",
+        "server_port": 53,
       },
 
       {
