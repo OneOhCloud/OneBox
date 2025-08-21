@@ -9,7 +9,7 @@ const API_CONFIG = {
     BASE_URL: 'http://127.0.0.1:9191',
     TIMEOUT: 3000,
     REFRESH_INTERVAL: 5000,
-    TIMEOUT_DELAY: 5000
+    TIMEOUT_DELAY: 2000
 } as const;
 
 const DelayTestUrl = "https://www.google.com/generate_204"

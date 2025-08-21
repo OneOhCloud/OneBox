@@ -122,7 +122,8 @@ jobs:
           tagName: "dev"
           releaseName: "Dev"
           releaseBody: "Fix some bugs and add some new features"
-          args: ${{ matrix.args }}
+          args: ${{ matrix.args }}  --ignore-version-mismatches
+
           prerelease: true
 
       - name: Clean Up Temporary Apple AuthKey (macOS Only)

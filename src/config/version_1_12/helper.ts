@@ -2,6 +2,8 @@ import { getClashApiSecret } from "../../single/store";
 import { writeConfigFile } from "../helper";
 
 
+export const DEFAULT_DOMAIN_RESOLVER_TAG = "alibaba_quic_dns"
+
 type Item = {
     tag: string;
     type: string;
@@ -35,7 +37,7 @@ export async function updateVPNServerConfigFromDB(fileName: string, dbConfigData
 
 
     for (let i = 0; i < vpnServerList.length; i++) {
-        vpnServerList[i]["domain_resolver"] = "system";
+        vpnServerList[i]["domain_resolver"] = DEFAULT_DOMAIN_RESOLVER_TAG;
         outboundsSelector.push(vpnServerList[i].tag);
 
     }

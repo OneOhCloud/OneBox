@@ -4,7 +4,7 @@ import { getSubscriptionConfig } from '../../action/db';
 import { getAllowLan, getStoreValue } from '../../single/store';
 import { TUN_STACK_STORE_KEY } from '../../types/definition';
 import { clashApi, ruleSet } from '../common';
-import { updateVPNServerConfigFromDB } from './helper';
+import { DEFAULT_DOMAIN_RESOLVER_TAG, updateVPNServerConfigFromDB } from './helper';
 
 
 const tunConfig = {
@@ -20,10 +20,10 @@ const tunConfig = {
                 "type": "local",
             },
             {
-                "type": "quic",
-                "tag": "alibaba_quic_dns",
-                "server": "223.6.6.6",
-                "server_port": 853,
+                "tag": DEFAULT_DOMAIN_RESOLVER_TAG,
+                "type": "udp",
+                "server": "223.5.5.5",
+                "server_port": 53,
             },
             {
                 "tag": "dns_proxy",
