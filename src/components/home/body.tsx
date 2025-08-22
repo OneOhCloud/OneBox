@@ -4,12 +4,12 @@ import { useSubscriptions } from "../../hooks/useDB";
 import { Subscription } from "../../types/definition";
 import { t, vpnServiceManager } from "../../utils/helper";
 import { AppleNetworkStatus, GoogleNetworkStatus } from "./network-check";
+import SelectSub from "./select-config";
 import SelectNode from "./select-node";
-import SelectSub from "./select-sub";
 
 const formatDate = (date: number) => new Date(date).toLocaleDateString('zh-CN');
 
-export default function VPNBody({ isRunning }: { isRunning: boolean }) {
+export default function Body({ isRunning, onUpdate }: { isRunning: boolean, onUpdate: () => void }) {
     const [sub, setSub] = useState<Subscription>();
     const { data, isLoading } = useSubscriptions();
 
@@ -17,7 +17,10 @@ export default function VPNBody({ isRunning }: { isRunning: boolean }) {
     const handleUpdate = async (identifier: string, isUpdate: boolean) => {
         try {
             setSub(data?.find(item => item.identifier === identifier));
-            if (isUpdate && isRunning) await vpnServiceManager.stop();
+            if (isUpdate && isRunning) {
+                await vpnServiceManager.syncConfig({});
+                onUpdate()
+            }
         } catch (error) {
             console.error(t("update_config_failed") + ":", error);
         }

@@ -23,3 +23,4 @@ export function useSubscriptions() {
     return useSWR<Subscription[]>(GET_SUBSCRIPTIONS_LIST_SWR_KEY, subscriptionsFetcher)
 }
 
+

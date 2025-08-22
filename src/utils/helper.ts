@@ -2,13 +2,14 @@ import { invoke } from '@tauri-apps/api/core';
 import * as path from '@tauri-apps/api/path';
 import { writeText } from '@tauri-apps/plugin-clipboard-manager';
 import { arch, locale, type, version } from '@tauri-apps/plugin-os';
-import { OsInfo, SING_BOX_VERSION } from '../types/definition';
+import { OsInfo, RULE_MODE_STORE_KEY, SING_BOX_VERSION, SSI_STORE_KEY } from '../types/definition';
 
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { message } from '@tauri-apps/plugin-dialog';
+import { setGlobalMixedConfig, setGlobalTunConfig, setMixedConfig, setTunConfig } from '../config/helper';
 import en from '../lang/en.json';
 import zh from '../lang/zh.json';
-import { getEnableTun, getLanguage } from '../single/store';
+import { getEnableTun, getLanguage, getStoreValue } from '../single/store';
 const appWindow = getCurrentWindow();
 const enLang = en as Record<string, string>;
 const zhLang = zh as Record<string, string>;
@@ -106,30 +107,74 @@ export async function getSingBoxConfigPath() {
 
 type vpnServiceManagerMode = 'SystemProxy' | 'TunProxy'
 
+type SyncConfigProps = {
+    onError?: (error: any) => void;
+    onSuccess?: () => void;
+    onRequirePrivileged?: () => void;
+}
+
+
+
 export const vpnServiceManager = {
+    syncConfig: async (props: SyncConfigProps) => {
+        try {
+            const identifier = await getStoreValue(SSI_STORE_KEY);
+            const useTun = await getEnableTun();
+
+            //zh: 直接使用 getStoreValue(RULE_MODE_STORE_KEY) 代替 setStoreValue 来获取当前模式，这样不会读到旧的值
+            //en: Directly use getStoreValue(RULE_MODE_STORE_KEY) instead of setStoreValue to get the current mode, so that the old value will not be read
+            const currentMode = await getStoreValue(RULE_MODE_STORE_KEY)
+
+            //zh: 在 linux 和 macOS 上使用 TUN 模式时需要输入超级管理员密码
+            //en: When using TUN mode on linux and macOS, you need to enter the super administrator password
+            if (useTun && (type() == 'linux' || type() == 'macos')) {
+                console.log('在 Linux 或 macOS 上使用 TUN 模式，需要输入超级管理员密码');
+                const privileged = await verifyPrivileged();
+                console.log('是否有超级管理员权限:', privileged);
+                if (!privileged) {
+                    console.log('没有超级管理员权限，弹出授权对话框');
+                    props.onRequirePrivileged?.();
+                    props.onError?.(new Error("没有超级管理员权限"));
+                } else {
+                    console.log('有超级管理员权限，继续配置');
+                    console.log('privileged:', privileged);
+                }
+                const fn = currentMode === 'global' ? setGlobalTunConfig : setTunConfig;
+                await fn(identifier, SING_BOX_VERSION);
+            } else if (useTun && type() == 'windows') {
+                console.log('在 Windows 上使用 TUN 模式，无需密码');
+                const fn = currentMode === 'global' ? setGlobalTunConfig : setTunConfig;
+                await fn(identifier, SING_BOX_VERSION);
+            } else {
+                console.log('使用普通模式');
+                const fn = currentMode === 'global' ? setGlobalMixedConfig : setMixedConfig;
+                await fn(identifier, SING_BOX_VERSION);
+            }
+            props.onSuccess?.();
+        } catch (error: any) {
+            console.error('Failed to sync VPN config:', error);
+            props.onError?.(error);
+        }
+    },
     start: async () => {
         try {
             const configPath = await getSingBoxConfigPath();
             const tunMode: boolean | undefined = await getEnableTun();
             let mode: vpnServiceManagerMode = tunMode ? 'TunProxy' : 'SystemProxy';
-            let osType = type();
             console.log("启动VPN服务");
             console.log("模式:", mode);
             console.log("配置文件路径:", configPath);
 
-            // 在 linux 和 macOS 上使用 TUN 模式时需要输入超级管理员密码
-            if (tunMode && (osType == 'linux' || osType == 'macos')) {
-                let ok = await verifyPrivileged();
-                if (!ok) {
-                    // 一般来说不会弹出这个提示，如果弹出此提示，说明之前的交互逻辑有问题。
-                    await message('致命错误：授权失败', { title: '提示', kind: 'error' });
-                }
-            }
             await invoke("start", { app: appWindow, path: configPath, mode: mode });
 
-        } catch (error) {
+        } catch (error: any) {
             console.error('Failed to start VPN service:', error);
+            // 如果是权限问题，抛出特定错误让上层处理
+            if (error?.toString().includes('REQUIRE_PRIVILEGE')) {
+                throw new Error('REQUIRE_PRIVILEGE');
+            }
             await message('Failed to start VPN service', { title: 'error', kind: 'error' });
+            throw error;
         }
 
     },
