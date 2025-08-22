@@ -40,6 +40,7 @@ const tunConfig = {
         "rules": [
             {
                 "domain": [
+                    "captive.oneoh.cloud",
                     "captive.apple.com",
                     "nmcheck.gnome.org",
                     "www.msftconnecttest.com"
@@ -153,7 +154,14 @@ const tunConfig = {
                 "protocol": "quic",
                 "action": "reject"
             },
+
             {
+                "domain": [
+                    "captive.oneoh.cloud",
+                    "captive.apple.com",
+                    "nmcheck.gnome.org",
+                    "www.msftconnecttest.com"
+                ],
                 "domain_suffix": [
                     "local",
                     "lan",
