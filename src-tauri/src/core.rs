@@ -58,8 +58,9 @@ async fn get_password_for_mode(mode: &ProxyMode) -> Result<String, String> {
     {
         if *mode == ProxyMode::TunProxy {
             let pwd = privilege::get_privilege_password_from_keyring().await;
+            // 如果密码为空，返回特殊错误标识，而不是直接失败
             if pwd.is_empty() {
-                return Err("Password is empty".to_string());
+                return Err("REQUIRE_PRIVILEGE".to_string());
             }
             Ok(pwd)
         } else {
@@ -81,7 +82,15 @@ pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Resu
     // 启动前先停止已有进程
     stop(app.clone()).await?;
     let mode_clone = mode.clone();
-    let password = get_password_for_mode(&mode).await?;
+    
+    // 检查是否需要权限验证
+    let password = match get_password_for_mode(&mode).await {
+        Ok(pwd) => pwd,
+        Err(err) if err == "REQUIRE_PRIVILEGE" => {
+            return Err("REQUIRE_PRIVILEGE".to_string());
+        }
+        Err(err) => return Err(err),
+    };
 
     let sidecar_command_opt = if mode == ProxyMode::SystemProxy {
         // 普通权限执行
@@ -297,7 +306,7 @@ pub async fn is_running(secret: String) -> bool {
     }
 
     let client = reqwest::Client::builder()
-        .timeout(Duration::from_secs(2))
+        .timeout(Duration::from_secs(1))
         .no_proxy()
         .build()
         .unwrap();

@@ -177,10 +177,6 @@ pub fn run() {
                     }
                 }
             }
-            WindowEvent::Resized { .. } => {
-                // 窗口大小改变
-                log::info!("窗口大小改变");
-            }
             WindowEvent::Destroyed => {
                 // 只针对 main 窗口
                 if window.label() == "main" {
