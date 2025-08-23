@@ -29,6 +29,34 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Read CHANGELOG
+        id: changelog
+        shell: bash
+        run: |
+          if [[ "$OSTYPE" == "darwin"* ]]; then
+            # macOS
+            content=$(base64 < CHANGELOG.MD | tr -d '\n')
+          else
+            # Linux
+            content=$(base64 -w 0 CHANGELOG.MD)
+          fi
+          echo "content=${content}" >> $GITHUB_OUTPUT
+
+      - name: Decode CHANGELOG
+        id: decode
+        shell: bash
+        run: |
+          if [[ "$OSTYPE" == "darwin"* ]]; then
+            # macOS
+            content=$(echo "${{ steps.changelog.outputs.content }}" | base64 -D)
+          else
+            # Linux
+            content=$(echo "${{ steps.changelog.outputs.content }}" | base64 -d)
+          fi
+          echo "content<<EOF" >> $GITHUB_OUTPUT
+          echo "$content" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
       - name: Get Tauri Version
         id: tauri_version
         run: echo "version=$(node -p "require('./src-tauri/tauri.conf.json').version")" >> $GITHUB_OUTPUT
@@ -78,7 +106,6 @@ jobs:
           echo "${{ secrets.APPLE_AUTH_KEY }}" > $GITHUB_WORKSPACE/temp_auth_key.p8
         shell: bash
 
-
       - name: Build and Release with Tauri Action
         uses: tauri-apps/tauri-action@v0
         env:
@@ -96,7 +123,8 @@ jobs:
         with:
           tagName: "v${{ steps.tauri_version.outputs.version }}"
           releaseName: "v${{ steps.tauri_version.outputs.version }}"
-          releaseBody: "Fix some bugs and add some new features"
+          releaseBody: |
+            ${{ steps.decode.outputs.content }}
           args: ${{ matrix.args }}
 
       - name: Clean Up Temporary Apple AuthKey (macOS Only)

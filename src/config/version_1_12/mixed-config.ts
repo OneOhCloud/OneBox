@@ -34,7 +34,7 @@ const mixedConfig = {
 
       {
         "tag": "system",
-        "type": "local",
+        "type": "dhcp",
       },
       {
         "tag": "tencent",
@@ -60,7 +60,7 @@ const mixedConfig = {
           "www.msftconnecttest.com"
         ],
         "server": "system",
-        "strategy": "ipv4_only"
+        "strategy": "prefer_ipv4"
       },
       {
         "domain_suffix": [
@@ -99,9 +99,7 @@ const mixedConfig = {
           "geosite-private"
         ],
         "invert": true,
-        "server": "dns_proxy",
-        "client_subnet": "114.114.114.114",
-
+        "server": "dns_proxy"
       }
     ],
     "strategy": "prefer_ipv4",
