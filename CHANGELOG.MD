@@ -1,10 +1,6 @@
-# Changelog / 更新日志
+# Changelog
 
-[English](#english) | [中文](#chinese)
-
-## English
-
-All notable changes to this project will be documented in this file.
+All annotation changes for this release will be recorded in this file.
 
 ### New Features
 - Added core log API interface support
@@ -17,9 +13,9 @@ All notable changes to this project will be documented in this file.
 - Significantly improved access speed for non-proxied websites on Windows
 - Resolved performance bottleneck issues in LOCAL DNS resolution mode
 
-## Chinese
+## 中文
 
-此项目的所有值得注意的变更都将记录在此文件中。
+此版本的所有值得注意的变更都将记录在此文件中。
 
 ### 新增功能
 - 新增核心日志 API 接口支持
