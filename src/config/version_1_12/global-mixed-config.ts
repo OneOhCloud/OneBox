@@ -14,7 +14,7 @@ const mixedConfig = {
         "servers": [
             {
                 "tag": "system",
-                "type": "local",
+                "type": "dhcp",
             },
             {
                 "tag": "alibaba",
@@ -46,7 +46,7 @@ const mixedConfig = {
                     "www.msftconnecttest.com"
                 ],
                 "server": "system",
-                "strategy": "ipv4_only"
+                "strategy": "prefer_ipv4"
             },
             {
                 "query_type": [

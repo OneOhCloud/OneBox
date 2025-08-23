@@ -48,7 +48,7 @@ const tunConfig = {
                     "www.msftconnecttest.com"
                 ],
                 "server": "system",
-                "strategy": "ipv4_only"
+                "strategy": "prefer_ipv4"
             },
             {
                 "query_type": [
@@ -67,7 +67,7 @@ const tunConfig = {
                     "geosite-samsung",
                     "geosite-private"
                 ],
-                "strategy": "ipv4_only",
+                "strategy": "prefer_ipv4",
                 "server": "system"
 
             },
@@ -77,15 +77,13 @@ const tunConfig = {
                     "AAAA",
                     "CNAME"
                 ],
-                "client_subnet": "114.114.114.114",
                 "server": "remote",
-                "strategy": "ipv4_only"
+                "strategy": "prefer_ipv4"
 
             }
         ],
-        "client_subnet": "114.114.114.114",
         "final": "dns_proxy",
-        "strategy": "ipv4_only"
+        "strategy": "prefer_ipv4"
 
     },
     "inbounds": [

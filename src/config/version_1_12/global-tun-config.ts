@@ -51,7 +51,7 @@ const tunConfig = {
                     "www.msftconnecttest.com"
                 ],
                 "server": "system",
-                "strategy": "ipv4_only"
+                "strategy": "prefer_ipv4"
             },
             {
                 "query_type": [

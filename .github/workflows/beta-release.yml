@@ -104,6 +104,16 @@ jobs:
           echo "${{ secrets.APPLE_AUTH_KEY }}" > $GITHUB_WORKSPACE/temp_auth_key.p8
         shell: bash
 
+      - name: Read CHANGELOG
+        id: changelog
+        run: |
+          {
+            echo 'content<<EOL'
+            cat CHANGELOG.MD
+            echo 'EOL'
+          } >> $GITHUB_OUTPUT
+        shell: bash
+
       - name: Build and Release with Tauri Action
         uses: tauri-apps/tauri-action@v0
         env:
@@ -121,7 +131,8 @@ jobs:
         with:
           tagName: "beta"
           releaseName: "Beta"
-          releaseBody: "Fix some bugs and add some new features"
+          releaseBody: |
+            ${{ steps.changelog.outputs.content }}
           args: ${{ matrix.args }}
           prerelease: true
 

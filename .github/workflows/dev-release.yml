@@ -104,6 +104,16 @@ jobs:
         shell: bash
 
 
+      - name: Read CHANGELOG
+        id: changelog
+        run: |
+          {
+            echo 'content<<EOL'
+            cat CHANGELOG.MD
+            echo 'EOL'
+          } >> $GITHUB_OUTPUT
+        shell: bash
+
       - name: Build and Release with Tauri Action
         uses: tauri-apps/tauri-action@v0
         env:
@@ -121,7 +131,8 @@ jobs:
         with:
           tagName: "dev"
           releaseName: "Dev"
-          releaseBody: "Fix some bugs and add some new features"
+          releaseBody: |
+            ${{ steps.changelog.outputs.content }}
           args: ${{ matrix.args }}  --ignore-version-mismatches
 
           prerelease: true
