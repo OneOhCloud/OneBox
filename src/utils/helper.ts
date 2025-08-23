@@ -190,13 +190,13 @@ export const verifyPrivileged = async () => {
 };
 
 // 同步版本的翻译函数
-export const t = (id: string): string => {
+export const t = (id: string, defaultMessage?: string): string => {
     const translation = languageOptions[currentLanguage][id];
     if (translation) {
         return translation;
     } else {
         console.warn(`Translation for "${id}" not found in "${currentLanguage}"`);
-        return id;
+        return defaultMessage || id;
     }
 }
 

@@ -76,16 +76,7 @@ pub async fn open_browser(app: AppHandle, url: String) -> Result<(), String> {
 
 #[tauri::command]
 pub async fn ping_captive() -> String {
-    let platform = tauri_plugin_os::platform();
-    let mut url = "http://captive.apple.com";
-
-    if platform == "windows" {
-        url = "http://www.msftconnecttest.com/connecttest.txt";
-    } else if platform == "linux" {
-        url = "http://nmcheck.gnome.org/check_network_status.txt";
-    } else if platform == "macos" {
-        url = "http://captive.apple.com";
-    }
+    let url = "http://captive.oneoh.cloud";
 
     log::debug!("Pinging URL: {}", url);
 

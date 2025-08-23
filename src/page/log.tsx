@@ -1,20 +1,21 @@
-import { listen } from '@tauri-apps/api/event';
+import { type } from '@tauri-apps/plugin-os';
 import { useEffect, useRef, useState } from 'react';
 import ConfigViewer from '../components/config-viewer/config-viewer';
-import { initLanguage, t } from "../utils/helper";
-
-interface LogEntry {
-    message: string;
-    timestamp: string;
-}
+import EmptyLogMessage from '../components/log/empty-log-message';
+import LogTable from '../components/log/log-table';
+import LogTabs from '../components/log/log-tabs';
+import { LogSourceType, useLogSource } from '../hooks/useLogSource';
+import { initLanguage } from "../utils/helper";
 
 export default function LogPage() {
-    const [logs, setLogs] = useState<LogEntry[]>([]);
-    const logContainerRef = useRef<HTMLDivElement>(null);
-    const [autoScroll, setAutoScroll] = useState(true);
+    const osType = type();
     const [filter, setFilter] = useState('');
+    const [autoScroll, setAutoScroll] = useState(true);
+    const logContainerRef = useRef<HTMLDivElement>(null);
     const [isLanguageLoading, setIsLanguageLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<'logs' | 'config'>('logs');
+    const [logSource, setLogSource] = useState<LogSourceType>(osType === 'windows' ? 'api' : 'tauri');
+    const { logs, clearLogs } = useLogSource(logSource);
 
     // 过滤后的日志
     const filteredLogs = filter
@@ -48,22 +49,7 @@ export default function LogPage() {
         fn();
     }, []);
 
-    useEffect(() => {
-        const unlisten = listen('core_backend', (event) => {
-            const message = event.payload as string;
-            const newLog: LogEntry = {
-                message,
-                timestamp: new Date().toTimeString().split(' ')[0], // 获取当前时间的时分秒
-            };
-            setLogs(prev => [...prev, newLog]);
-        });
-
-
-
-        return () => {
-            unlisten.then(fn => fn());
-        };
-    }, []);
+    // 日志源的逻辑已移至 useLogSource hook
 
     // 监听滚动事件，判断是否要启用自动滚动
     useEffect(() => {
@@ -100,92 +86,34 @@ export default function LogPage() {
     }
 
     return (
-        <div className="flex flex-col h-full">
-            <div className="sticky top-0 z-10 bg-base-100 px-2">
-                <div className="tabs tabs-bordered">
-                    <a
-                        className={`tab ${activeTab === 'logs' ? 'tab-active' : ''}`}
-                        onClick={() => setActiveTab('logs')}
-                    >
-                        {t("log_viewer")}
-                    </a>
-                    <a
-                        className={`tab ${activeTab === 'config' ? 'tab-active' : ''}`}
-                        onClick={() => setActiveTab('config')}
-                    >
-                        {t("config_viewer") || "配置查看器"}
-                    </a>
-                </div>
-            </div>
+        <div className="flex flex-col h-full px-4 py-2 bg-gray-100">
+            <LogTabs
+                activeTab={activeTab}
+                setActiveTab={setActiveTab}
+                filter={filter}
+                setFilter={setFilter}
+                logSource={logSource}
+                setLogSource={setLogSource}
+                autoScroll={autoScroll}
+                setAutoScroll={setAutoScroll}
+                clearLogs={clearLogs}
+            />
 
             {/* 日志标签页内容 */}
-            <div className={`flex-1 flex flex-col  ${activeTab === 'logs' ? '' : 'hidden'}`} role="tabpanel">
-                <div className="flex items-center justify-end mb-4 space-x-4">
-                    <div className="flex items-center space-x-2">
-                        <input
-                            type="text"
-                            value={filter}
-                            onChange={(e) => setFilter(e.target.value)}
-                            placeholder={t("filter_placeholder") || "过滤关键词..."}
-                            className="input input-bordered input-sm w-full max-w-xs"
-                        />
-                        {filter && (
-                            <button
-                                onClick={() => setFilter('')}
-                                className="btn btn-ghost btn-sm"
-                                title={t("clear_filter") || "清除过滤"}
-                            >
-                                ✕
-                            </button>
-                        )}
-                    </div>
-                    <label className="label cursor-pointer">
-                        <input
-                            type="checkbox"
-                            checked={autoScroll}
-                            onChange={(e) => setAutoScroll(e.target.checked)}
-                            className="checkbox checkbox-sm"
-                        />
-                        <span className="label-text ml-2">{t("auto_scroll")}</span>
-                    </label>
-                    <button
-                        onClick={() => setLogs([])}
-                        className="btn btn-ghost btn-sm"
-                    >
-                        {t("clear_log")}
-                    </button>
-                </div>
-
+            <div className={`flex-1 flex flex-col ${activeTab === 'logs' ? '' : 'hidden'}`} role="tabpanel">
                 <div
                     ref={logContainerRef}
-                    className="flex-1 rounded-lg border border-base-300 bg-base-200 font-mono overflow-auto"
+                    className="flex-1 rounded-xl border border-base-300 bg-base-200 font-mono overflow-y-auto h-[calc(100dvh-60px)] shadow-inner"
                 >
-                    <div className="p-4">
+                    <div className="p-4 h-full">
                         {filteredLogs.length === 0 ? (
-                            <div className="text-center text-base-content/60 py-8">
-                                {filter ? (
-                                    <div>
-                                        <div>{t("no_matching_logs") || "没有匹配的日志记录"}</div>
-                                        <div className="text-xs mt-2">过滤条件: "{filter}"</div>
-                                    </div>
-                                ) : (
-                                    t("no_log_records")
-                                )}
-                            </div>
+                            <EmptyLogMessage filter={filter} />
                         ) : (
-                            filteredLogs.map((log, index) => (
-                                <div
-                                    key={`${log.timestamp}-${index}`}
-                                    className="flex items-start text-xs mb-1"
-                                >
-                                    <span className="text-base-content/60 flex-shrink-0 mr-3">
-                                        {log.timestamp}
-                                    </span>
-                                    <span className="text-base-content whitespace-pre-wrap">
-                                        {highlightText(log.message, filter)}
-                                    </span>
-                                </div>
-                            ))
+                            <LogTable
+                                logs={filteredLogs}
+                                filter={filter}
+                                highlightText={highlightText}
+                            />
                         )}
                     </div>
                 </div>
@@ -193,7 +121,9 @@ export default function LogPage() {
 
             {/* 配置标签页内容 */}
             <div className={`flex-1 ${activeTab === 'config' ? '' : 'hidden'}`} role="tabpanel">
-                <ConfigViewer />
+                <div className="h-[calc(100dvh-60px)] overflow-y-auto overflow-x-hidden">
+                    <ConfigViewer />
+                </div>
             </div>
         </div>
     );
