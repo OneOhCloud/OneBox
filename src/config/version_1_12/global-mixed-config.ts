@@ -40,6 +40,7 @@ const mixedConfig = {
         "rules": [
             {
                 "domain": [
+                    "captive.oneoh.cloud",
                     "captive.apple.com",
                     "nmcheck.gnome.org",
                     "www.msftconnecttest.com"
@@ -85,6 +86,12 @@ const mixedConfig = {
                 "action": "reject"
             },
             {
+                "domain": [
+                    "captive.oneoh.cloud",
+                    "captive.apple.com",
+                    "nmcheck.gnome.org",
+                    "www.msftconnecttest.com"
+                ],
                 "domain_suffix": [
                     "local",
                     "lan",

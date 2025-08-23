@@ -54,6 +54,7 @@ const mixedConfig = {
       },
       {
         "domain": [
+          "captive.oneoh.cloud",
           "captive.apple.com",
           "nmcheck.gnome.org",
           "www.msftconnecttest.com"
@@ -149,6 +150,12 @@ const mixedConfig = {
         "outbound": "direct"
       },
       {
+        "domain": [
+          "captive.oneoh.cloud",
+          "captive.apple.com",
+          "nmcheck.gnome.org",
+          "www.msftconnecttest.com"
+        ],
         "domain_suffix": [
           ".oneoh.cloud",
           ".n2ray.dev",
