@@ -17,7 +17,9 @@ const tunConfig = {
         "servers": [
             {
                 "tag": "system",
-                "type": "local",
+                // tun 模式下使用 local 会导致性能问题，
+                // https://github.com/SagerNet/sing-box/issues/456
+                "type": "dhcp",
             },
             {
                 "tag": DEFAULT_DOMAIN_RESOLVER_TAG,
