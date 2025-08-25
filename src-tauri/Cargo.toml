@@ -44,7 +44,7 @@ anyhow = "1.0"
 tauri-plugin-log = "2"
 lazy_static = "1.5.0"
 
-sysproxy = { git = "https://github.com/clash-verge-rev/sysproxy-rs", rev = "3d748b5" }
+sysproxy = { git = "https://github.com/OneOhCloud/sysproxy-rs" }
 tauri-plugin-clipboard-manager = "2"
 
 winapi = { version = "0.3", features = ["winbase"] }
