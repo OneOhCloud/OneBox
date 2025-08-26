@@ -6,9 +6,8 @@ export interface NetworkSpeed {
     download: number;
 }
 
-export const formatNetworkSpeed = (bits: number): string => {
+export const formatNetworkSpeed = (bytes: number): string => {
     const units = ['B', 'KB', 'MB', 'GB'];
-    const bytes = bits / 8; // 转换为字节
     let value = bytes;
     let unitIndex = 0;
 
