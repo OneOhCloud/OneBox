@@ -3,9 +3,10 @@
 All annotation changes for this release will be recorded in this file.
 
 ### New Features
-- Added core log API interface support
+- Added real-time network speed display in the log page
+- Added sing-box log API interface support
 - Windows systems now use API method for log retrieval by default
-- Other systems continue to use IPC method for logging
+- Other systems now use IPC method for log retrieval by default
 - Note: Specifically addresses log stream access issues in Windows TUN mode caused by UAC permissions
 
 ### System Optimizations
@@ -18,9 +19,10 @@ All annotation changes for this release will be recorded in this file.
 此版本的所有值得注意的变更都将记录在此文件中。
 
 ### 新增功能
-- 新增核心日志 API 接口支持
+- 新增实时网速在日志页面中
+- 新增 sing-box 日志 API 接口支持
 - Windows 系统默认使用 API 方式获取日志
-- 其他系统继续使用 IPC 方式获取日志
+- 其他系统默认使用 IPC 方式获取日志
 - 优化说明：特别解决了 Windows TUN 模式下，因 UAC 权限导致的日志流获取问题
 
 ### 系统优化
