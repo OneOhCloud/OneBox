@@ -73,7 +73,7 @@ pub fn create_privileged_command(
 
 /// 停止TUN模式下的进程
 pub fn stop_tun_process(password: &str) -> Result<(), String> {
-    let command = format!("echo '{}' | sudo -S pkill -9 -f sing-box", password);
+    let command = format!("echo '{}' | sudo -S pkill -f sing-box", password);
     log::info!("Executing command: {}", command);
     Command::new("sh")
         .arg("-c")

@@ -82,7 +82,7 @@ pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Resu
     // 启动前先停止已有进程
     stop(app.clone()).await?;
     let mode_clone = mode.clone();
-    
+
     // 检查是否需要权限验证
     let password = match get_password_for_mode(&mode).await {
         Ok(pwd) => pwd,

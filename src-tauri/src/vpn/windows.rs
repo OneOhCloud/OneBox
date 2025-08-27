@@ -117,7 +117,7 @@ pub fn stop_tun_process(_password: &str) -> Result<(), String> {
         .encode_wide()
         .chain(Some(0))
         .collect::<Vec<u16>>();
-    let args = OsStr::new("/F /IM sing-box.exe")
+    let args = OsStr::new("/IM sing-box.exe")
         .encode_wide()
         .chain(Some(0))
         .collect::<Vec<u16>>();
