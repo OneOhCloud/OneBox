@@ -191,6 +191,12 @@ export const vpnServiceManager = {
         }
 
     },
+    /**
+     * 停止VPN服务
+     * 
+     * 此方法调用后端命令以停止VPN服务, 请不要在调用前将 TUN 设置提前保存，会造成意外错误。
+     * 
+     */
     stop: async () => {
         await invoke("stop", { app: appWindow })
     },
