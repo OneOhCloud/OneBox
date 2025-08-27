@@ -1,0 +1,30 @@
+.tooltip-delayed {
+  /* 自定义变量 */
+  --show-delay: 800ms;  /* 显示延迟1秒 */
+  --hide-delay: 0ms;     /* 隐藏无延迟 */
+  --show-duration: 200ms; /* 显示过渡持续时间 */
+  --hide-duration: 100ms; /* 隐藏过渡持续时间 */
+}
+/* 默认状态 - 快速消失 */
+.tooltip-delayed > .tooltip-content,
+.tooltip-delayed[data-tip]:before,
+.tooltip-delayed:after {
+  transition: 
+    opacity var(--hide-duration) cubic-bezier(0.4, 0, 0.2, 1) var(--hide-delay), 
+    transform var(--hide-duration) cubic-bezier(0.4, 0, 0.2, 1) var(--hide-delay);
+}
+/* 悬停状态 - 延迟显示 */
+.tooltip-delayed.tooltip-open > .tooltip-content,
+.tooltip-delayed.tooltip-open:before,
+.tooltip-delayed.tooltip-open:after,
+.tooltip-delayed[data-tip]:not([data-tip=""]):hover:before,
+.tooltip-delayed[data-tip]:not([data-tip=""]):hover:after,
+.tooltip-delayed:not(:has(.tooltip-content:empty)):has(.tooltip-content):hover > .tooltip-content,
+.tooltip-delayed:not(:has(.tooltip-content:empty)):has(.tooltip-content):hover:after,
+.tooltip-delayed:has(:focus-visible) > .tooltip-content,
+.tooltip-delayed:has(:focus-visible):before,
+.tooltip-delayed:has(:focus-visible):after {
+  transition: 
+    opacity var(--show-duration) cubic-bezier(0.4, 0, 0.2, 1) var(--show-delay), 
+    transform var(--show-duration) cubic-bezier(0.4, 0, 0.2, 1) var(--show-delay);
+}

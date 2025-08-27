@@ -3,11 +3,12 @@ import { InfoCircle, Power } from 'react-bootstrap-icons';
 import Body from '../components/home/body';
 import AuthDialog from '../components/settings/auth-dialog';
 
+import clsx from 'clsx';
 import { ProxyMode, useModeIndicator, useProxyMode, useVPNOperations } from "../components/home/hooks";
 import { useSubscriptions } from '../hooks/useDB';
 import { t } from "../utils/helper";
 
-
+import './home.css';
 
 export default function HomePage() {
   // 使用自定义hooks管理状态和逻辑
@@ -95,19 +96,22 @@ export default function HomePage() {
           {/* 中心按钮 */}
           <div className="absolute inset-0 flex items-center justify-center">
             <div
-              className={`
-                bg-white rounded-full w-24 h-24 flex items-center justify-center
-                shadow-md transition-all duration-300 ease-in-out
-                ${isRunning ? 'ring-2 ring-blue-500' : ''}
-              `}
+              className={
+                clsx(
+                  "bg-white rounded-full w-24 h-24 flex items-center justify-center shadow-md transition-all duration-300 ease-in-out",
+                  isRunning ? "ring-2 ring-blue-500" : "",
+                  isLoading ? "ring-1 ring-blue-500  opacity-80" : "hover:scale-105"
+                )
+              }
             >
               <Power
                 size={40}
-                className={`
-                  transition-colors duration-300
-                  ${isRunning ? 'text-blue-500' : 'text-gray-400'}
-                  ${isLoading ? ' opacity-70' : ''}
-                `}
+                className={
+                  clsx(
+                    "transition-colors duration-300",
+                    isLoading || isRunning ? "text-blue-500" : "text-gray-400"
+                  )
+                }
               />
             </div>
           </div>
@@ -116,8 +120,14 @@ export default function HomePage() {
 
       {/* 状态文本显示 */}
       <div
-        className="w-full text-center text-sm mb-2 flex items-center justify-center"
-        style={{ color: isRunning ? '#3B82F6' : '#9CA3AF' }}
+
+        className={
+          clsx(
+            "w-full text-center text-sm mb-2 flex items-center justify-center ",
+            isLoading || isRunning ? "text-blue-500" : "text-gray-400",
+          )
+        }
+
       >
         <InfoCircle size={16} className="mr-1.5 text-gray-300" />
         <span className="text-base capitalize">
@@ -138,7 +148,7 @@ export default function HomePage() {
 
         {/* 模式按钮 */}
         {(['rules', 'global'] as const).map((mode) => (
-          <div key={mode} className='tooltip text-xs'>
+          <div key={mode} className='tooltip text-xs  tooltip-delayed'>
             <div className="tooltip-content">
               <div className="text-xs max-w-[220px] whitespace-normal">
                 {t(`${mode}_tip`)}
@@ -155,6 +165,7 @@ export default function HomePage() {
               {t(mode)}
             </button>
           </div>
+
         ))}
       </div>
 
