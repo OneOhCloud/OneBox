@@ -208,7 +208,7 @@ pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Resu
 
                                                 // 通知前端状态已更改
                                                 if let Err(e) =
-                                                    cleanup_app.emit("status-changed", ())
+                                                    cleanup_app.emit("status-changed", exit_code)
                                                 {
                                                     log::error!(
                                                         "Failed to emit status-changed event: {}",
@@ -219,7 +219,9 @@ pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Resu
                                         } else {
                                             // 对于非系统代理模式，直接通知前端
                                             drop(manager);
-                                            if let Err(e) = app_handle.emit("status-changed", ()) {
+                                            if let Err(e) =
+                                                app_handle.emit("status-changed", exit_code)
+                                            {
                                                 log::error!(
                                                     "Failed to emit status-changed event: {}",
                                                     e

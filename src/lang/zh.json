@@ -26,6 +26,7 @@
     "config_viewer": "配置查看器",
     "configuration": "配置",
     "confirm": "确认",
+    "connect_failed_retry": "连接失败，请稍等一分钟后重试。",
     "connect_failed": "连接失败",
     "connected": "已连接",
     "connecting": "连接中",

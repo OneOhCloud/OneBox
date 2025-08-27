@@ -4,6 +4,7 @@ import { listen } from '@tauri-apps/api/event';
 import { Menu, MenuOptions } from '@tauri-apps/api/menu';
 import { TrayIcon } from '@tauri-apps/api/tray';
 import { getCurrentWindow } from '@tauri-apps/api/window';
+import { message } from '@tauri-apps/plugin-dialog';
 import { type } from '@tauri-apps/plugin-os';
 import { getClashApiSecret, getStoreValue } from './single/store';
 import { DEVELOPER_TOGGLE_STORE_KEY } from './types/definition';
@@ -145,7 +146,19 @@ export async function setupTrayIcon() {
 }
 
 export async function setupStatusListener() {
-    await listen('status-changed', async () => {
+    await listen('status-changed', async (event) => {
+        console.error(event.payload)
+        // @ts-ignore
+        if (event.payload && event.payload.code && event.payload.code === 1) {
+            // await message(`${t('connect_failed')}`, { title: t('error'), kind: 'error' });
+            //  连接失败，请稍等一分钟后重试。
+            await message(
+                t('connect_failed_retry'),
+                { title: t('error'), kind: 'error' }
+            )
+
+
+        }
         const newMenu = await createTrayMenu();
         if (trayInstance) {
             await trayInstance.setMenu(newMenu);
