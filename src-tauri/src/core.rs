@@ -330,22 +330,32 @@ pub async fn is_running(secret: String) -> bool {
 
 // 重载配置
 #[tauri::command]
-pub async fn reload_config(app: tauri::AppHandle) -> Result<String, String> {
+pub async fn reload_config(app: tauri::AppHandle, is_tun: bool) -> Result<String, String> {
     // 获取当前模式和密码信息
     let (current_mode, password) = {
         let manager = match PROCESS_MANAGER.lock() {
             Ok(m) => m,
             Err(e) => e.into_inner(),
         };
-
-        if manager.current_mode.is_none() {
-            return Err("No running process found".to_string());
+        match manager.current_mode {
+            Some(ProxyMode::TunProxy) if is_tun => (
+                Some(ProxyMode::TunProxy),
+                manager.tun_password.clone().unwrap_or_default(),
+            ),
+            Some(ProxyMode::SystemProxy) if !is_tun => (
+                Some(ProxyMode::SystemProxy),
+                manager.tun_password.clone().unwrap_or_default(),
+            ),
+            Some(ProxyMode::TunProxy) => {
+                return Err("Current mode is not TUN mode".to_string());
+            }
+            Some(ProxyMode::SystemProxy) => {
+                return Err("Current mode is not System Proxy mode".to_string());
+            }
+            None => {
+                return Err("No running process found".to_string());
+            }
         }
-
-        (
-            manager.current_mode.clone(),
-            manager.tun_password.clone().unwrap_or_default(),
-        )
     };
 
     #[cfg(unix)]
@@ -377,13 +387,6 @@ pub async fn reload_config(app: tauri::AppHandle) -> Result<String, String> {
         };
 
         if output.status.success() {
-            if is_privileged {
-                // 设置系统代理
-                let _ = PlatformVpnProxy::unset_proxy(&app).await;
-            } else {
-                // 如果是 TUN 模式，取消系统代理
-                let _ = PlatformVpnProxy::set_proxy(&app).await;
-            };
             Ok("Configuration reloaded successfully".to_string())
         } else {
             let error = String::from_utf8_lossy(&output.stderr);
@@ -402,20 +405,10 @@ pub async fn reload_config(app: tauri::AppHandle) -> Result<String, String> {
             (manager.config_path.clone(), manager.current_mode.clone())
         };
 
-        if let (Some(config_path), Some(mode)) = (config_path, current_mode) {
-            // 重新启动进程
-            match start(app, config_path, mode).await {
-                Ok(_) => {
-                    Ok("Configuration reloaded successfully by restarting process".to_string())
-                }
-                Err(e) => Err(format!(
-                    "Failed to reload config by restarting process: {}",
-                    e
-                )),
-            }
-        } else {
-            Err("No running process found or missing configuration path".to_string())
-        }
+        let sidecar_path = helper::get_sidecar_path(Path::new("sing-box"))
+            .map_err(|e| format!("Failed to get sidecar path: {}", e))?;
+        PlatformVpnProxy::restart(sidecar_path, config_path.unwrap_or_default());
+        Ok("Configuration reload attempted by restarting process".to_string())
     }
 
     #[cfg(not(any(unix, target_os = "windows")))]

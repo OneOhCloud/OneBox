@@ -19,7 +19,12 @@ const tunConfig = {
                 "tag": "system",
                 // tun 模式下使用 local 会导致性能问题，
                 // https://github.com/SagerNet/sing-box/issues/456
-                "type": "dhcp",
+                // tun 模式虽然支持 dhcp 但从普通模式 与 tun 模式 反复切换时会导致 macOS 端口占用的问题
+                // "type": "dhcp",
+                "type": "udp",
+                "server": "223.5.5.5",
+                "server_port": 53,
+
             },
             {
                 "tag": DEFAULT_DOMAIN_RESOLVER_TAG,

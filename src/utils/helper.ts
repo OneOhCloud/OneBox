@@ -114,6 +114,7 @@ type SyncConfigProps = {
 }
 
 
+
 async function isRunning() {
     let secret = await getClashApiSecret();
     if (!secret) {
@@ -122,48 +123,52 @@ async function isRunning() {
     return invoke<boolean>("is_running", { secret: secret });
 }
 
+async function syncConfig(props: SyncConfigProps) {
+    try {
+        const identifier = await getStoreValue(SSI_STORE_KEY);
+        const useTun = await getEnableTun();
+
+        //zh: 直接使用 getStoreValue(RULE_MODE_STORE_KEY) 代替 setStoreValue 来获取当前模式，这样不会读到旧的值
+        //en: Directly use getStoreValue(RULE_MODE_STORE_KEY) instead of setStoreValue to get the current mode, so that the old value will not be read
+        const currentMode = await getStoreValue(RULE_MODE_STORE_KEY)
+
+        //zh: 在 linux 和 macOS 上使用 TUN 模式时需要输入超级管理员密码
+        //en: When using TUN mode on linux and macOS, you need to enter the super administrator password
+        if (useTun && (type() == 'linux' || type() == 'macos')) {
+            console.log('在 Linux 或 macOS 上使用 TUN 模式，需要输入超级管理员密码');
+            const privileged = await verifyPrivileged();
+            console.log('是否有超级管理员权限:', privileged);
+            if (!privileged) {
+                console.log('没有超级管理员权限，弹出授权对话框');
+                props.onRequirePrivileged?.();
+                props.onError?.(new Error("没有超级管理员权限"));
+            } else {
+                console.log('有超级管理员权限，继续配置');
+                console.log('privileged:', privileged);
+            }
+            const fn = currentMode === 'global' ? setGlobalTunConfig : setTunConfig;
+            await fn(identifier, SING_BOX_VERSION);
+        } else if (useTun && type() == 'windows') {
+            console.log('在 Windows 上使用 TUN 模式，无需密码');
+            const fn = currentMode === 'global' ? setGlobalTunConfig : setTunConfig;
+            await fn(identifier, SING_BOX_VERSION);
+        } else {
+            console.log('使用普通模式');
+            const fn = currentMode === 'global' ? setGlobalMixedConfig : setMixedConfig;
+            await fn(identifier, SING_BOX_VERSION);
+        }
+        props.onSuccess?.();
+    } catch (error: any) {
+        console.error('Failed to sync VPN config:', error);
+        props.onError?.(error);
+    }
+
+}
+
+
+
 
 export const vpnServiceManager = {
-    syncConfig: async (props: SyncConfigProps) => {
-        try {
-            const identifier = await getStoreValue(SSI_STORE_KEY);
-            const useTun = await getEnableTun();
-
-            //zh: 直接使用 getStoreValue(RULE_MODE_STORE_KEY) 代替 setStoreValue 来获取当前模式，这样不会读到旧的值
-            //en: Directly use getStoreValue(RULE_MODE_STORE_KEY) instead of setStoreValue to get the current mode, so that the old value will not be read
-            const currentMode = await getStoreValue(RULE_MODE_STORE_KEY)
-
-            //zh: 在 linux 和 macOS 上使用 TUN 模式时需要输入超级管理员密码
-            //en: When using TUN mode on linux and macOS, you need to enter the super administrator password
-            if (useTun && (type() == 'linux' || type() == 'macos')) {
-                console.log('在 Linux 或 macOS 上使用 TUN 模式，需要输入超级管理员密码');
-                const privileged = await verifyPrivileged();
-                console.log('是否有超级管理员权限:', privileged);
-                if (!privileged) {
-                    console.log('没有超级管理员权限，弹出授权对话框');
-                    props.onRequirePrivileged?.();
-                    props.onError?.(new Error("没有超级管理员权限"));
-                } else {
-                    console.log('有超级管理员权限，继续配置');
-                    console.log('privileged:', privileged);
-                }
-                const fn = currentMode === 'global' ? setGlobalTunConfig : setTunConfig;
-                await fn(identifier, SING_BOX_VERSION);
-            } else if (useTun && type() == 'windows') {
-                console.log('在 Windows 上使用 TUN 模式，无需密码');
-                const fn = currentMode === 'global' ? setGlobalTunConfig : setTunConfig;
-                await fn(identifier, SING_BOX_VERSION);
-            } else {
-                console.log('使用普通模式');
-                const fn = currentMode === 'global' ? setGlobalMixedConfig : setMixedConfig;
-                await fn(identifier, SING_BOX_VERSION);
-            }
-            props.onSuccess?.();
-        } catch (error: any) {
-            console.error('Failed to sync VPN config:', error);
-            props.onError?.(error);
-        }
-    },
     start: async () => {
         try {
             const configPath = await getSingBoxConfigPath();
@@ -186,18 +191,22 @@ export const vpnServiceManager = {
         }
 
     },
-    stop: async () => await invoke("stop", { app: appWindow }),
-    is_running: async () => await isRunning(),
+    stop: async () => {
+        await invoke("stop", { app: appWindow })
+    },
 
-    reload_config: async (delay: number) => {
+
+    reload: async (delay: number) => {
         if (await isRunning()) {
+            const useTun = await getEnableTun();
             await new Promise(resolve => setTimeout(resolve, delay));
-            await invoke("reload_config", { app: appWindow });
+            await invoke("reload_config", { app: appWindow, isTun: useTun });
         } else {
             console.warn("VPN service is not running, cannot reload config");
         }
     },
-
+    is_running: async () => await isRunning(),
+    syncConfig: syncConfig,
 };
 
 

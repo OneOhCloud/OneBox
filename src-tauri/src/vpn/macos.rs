@@ -48,7 +48,6 @@ pub async fn unset_proxy(_app: &AppHandle) -> anyhow::Result<()> {
     // 清理系统代理设置
     let mut sysproxy = Sysproxy::get_system_proxy().map_err(|e| anyhow::anyhow!(e))?;
     sysproxy.enable = false;
-
     sysproxy.set_system_proxy()?;
     log::info!("Proxy unset");
     Ok(())

@@ -5,8 +5,8 @@ import ConfigViewer from '../components/config-viewer/config-viewer';
 import EmptyLogMessage from '../components/log/empty-log-message';
 import LogTable from '../components/log/log-table';
 import LogTabs from '../components/log/log-tabs';
-import { LogSourceType, useLogSource } from '../hooks/useLogSource';
-import { formatNetworkSpeed, useNetworkSpeed } from '../hooks/useNetworkSpeed';
+
+import { formatNetworkSpeed, LogSourceType, useLogSource, useNetworkSpeed } from '../utils/clash-api';
 import { initLanguage } from "../utils/helper";
 
 export default function LogPage() {

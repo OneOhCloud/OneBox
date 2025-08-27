@@ -207,7 +207,7 @@ export const useVPNOperations = () => {
 
         try {
             vpnServiceManager.syncConfig({});
-            vpnServiceManager.reload_config(1000);
+            vpnServiceManager.reload(1000);
         } catch (error) {
             console.error('重启服务失败:', error);
             await message(t('reconnect_failed'), { title: t('error'), kind: 'error' });

@@ -19,6 +19,12 @@ pub trait VpnProxy {
 
     /// 停止TUN模式进程
     fn stop_tun_process(password: &str) -> Result<(), String>;
+
+    #[cfg(target_os = "windows")]
+    fn restart(sidecar_path: String, path: String) {
+        let _ = sidecar_path;
+        let _ = path;
+    }
 }
 
 pub mod helper;

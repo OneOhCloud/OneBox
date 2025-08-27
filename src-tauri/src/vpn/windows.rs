@@ -146,12 +146,7 @@ pub fn stop_tun_process(_password: &str) -> Result<(), String> {
 
 /// 特权模式下重启进程（合并停止和启动为一个提权命令）
 #[cfg(target_os = "windows")]
-pub fn restart_privileged_command(
-    _app: &AppHandle,
-    sidecar_path: String,
-    path: String,
-    _password: String,
-) -> Result<(), String> {
+pub fn restart_privileged_command(sidecar_path: String, path: String) -> Result<(), String> {
     // 创建批处理脚本内容，先停止再启动
     let batch_content = format!(
         "taskkill /IM sing-box.exe >nul 2>&1\n\"{}\" run -c \"{}\" --disable-color",
@@ -218,12 +213,7 @@ impl VpnProxy for WindowsVpnProxy {
         stop_tun_process(password)
     }
 
-    fn restart_privileged_command(
-        app: &AppHandle,
-        sidecar_path: String,
-        path: String,
-        password: String,
-    ) -> Result<(), String> {
-        restart_privileged_command(app, sidecar_path, path, password)
+    fn restart(sidecar_path: String, path: String) {
+        let _ = restart_privileged_command(sidecar_path, path);
     }
 }

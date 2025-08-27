@@ -73,6 +73,7 @@
     "mixed_stack": "Mixed",
     "name_placeholder_1": "name auto-filled from remote (optional)",
     "name_placeholder_2": "config address: https://xxxxxxxx",
+    "need_restart_vpn": "disconnected, please start vpn service manually",
     "network_abnormal": "error",
     "network_need_login_title": "Wi‑Fi Login Required",
     "network_need_login": "This Wi‑Fi network requires you to sign in through a web page to access the Internet. Tap “OK” to open the login page.",
@@ -93,7 +94,9 @@
     "please_add_subscription": "please add config first",
     "please_dont_leave": "please don't leave this page",
     "please_input_valid_url": "please input valid url",
+    "please_wait_releasing_resources": "please wait, releasing resources...",
     "reconnect_failed": "reconnect failed, please check network",
+    "release_success_stop_vpn": "resources released, vpn service stopped",
     "remaining_days": "remaining days",
     "remaining_traffic": "available traffic",
     "rules_tip": "Only non-mainland China websites count towards data usage",
@@ -103,6 +106,7 @@
     "settings": "settings",
     "stable_version": "stable",
     "starting": "starting...",
+    "subscription_invalid_expired": "The config link is invalid or expired",
     "subscription_management": "my config",
     "subscription_not_exist": "config not exist",
     "switching": "switching...",
@@ -128,6 +132,5 @@
     "url_cannot_empty": "url cannot be empty",
     "version": "ver",
     "vpn_network": "vpn network",
-    "subscription_invalid_expired": "The config link is invalid or expired",
     "zzzzzeof": "zzzzzeof"
 }
