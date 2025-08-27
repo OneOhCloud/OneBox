@@ -36,17 +36,19 @@ export default function ToggleTun() {
             return;
 
         } else {
-            const promise = (async () => {
+
+            const promise = new Promise<void>(async (resolve, reject) => {
                 const previous = toggle;
-                await vpnServiceManager.stop();
-                if (previous) {
-                    // 关闭TUN模式，等待5秒...
-                    await new Promise(resolve => setTimeout(resolve, 2000));
-
+                try {
+                    await vpnServiceManager.stop();
+                    if (previous) {
+                        await new Promise(res => setTimeout(res, 2000));
+                    }
+                    resolve();
+                } catch (error) {
+                    reject(error);
                 }
-                throw new Error("need_restart_vpn");
-
-            })();
+            });
 
             toast.promise(promise, {
                 // 请勿操作,正在释放资源中，
