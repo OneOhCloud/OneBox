@@ -151,8 +151,7 @@ jobs:
           releaseName: "Dev"
           releaseBody: |
             ${{ steps.decode.outputs.content }}
-          args: ${{ matrix.args }}  --ignore-version-mismatches
-
+          args: ${{ matrix.args }}
           prerelease: true
 
       - name: Clean Up Apple Signing Key
