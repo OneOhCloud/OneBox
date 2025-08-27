@@ -200,7 +200,16 @@ export const vpnServiceManager = {
         if (await isRunning()) {
             const useTun = await getEnableTun();
             await new Promise(resolve => setTimeout(resolve, delay));
-            await invoke("reload_config", { isTun: useTun });
+
+            // 判断系统类型
+            if (type() === 'windows' && !useTun) {
+                // Windows 下的系统代理模式需要重启服务
+                await invoke("stop", { app: appWindow });
+                await new Promise(resolve => setTimeout(resolve, 1000)); // 等待1秒确保服务完全停止
+                await vpnServiceManager.start();
+            } else {
+                await invoke("reload_config", { isTun: useTun });
+            }
         } else {
             console.warn("VPN service is not running, cannot reload config");
         }
