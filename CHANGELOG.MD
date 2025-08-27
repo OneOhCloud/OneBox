@@ -10,6 +10,9 @@ All annotation changes for this release will be recorded in this file.
 ### System Optimizations
 - Optimized process restart logic on non-Windows systems
 
+### Bug Fixes
+- Fixed an issue where the log page height displayed abnormally on Windows
+
 
 ## 中文
 
@@ -23,3 +26,7 @@ All annotation changes for this release will be recorded in this file.
 
 ### 系统优化
 - 优化非 Windows 系统下的进程重启逻辑
+
+### bug 修复
+- 修复日志页面在 Windows 上高度显示异常的问题
+
