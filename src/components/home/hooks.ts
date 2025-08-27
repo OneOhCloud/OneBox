@@ -232,8 +232,10 @@ export const useVPNOperations = () => {
                 try {
                     await startService(isEmpty);
                 } finally {
-                    setIsOperating(false);
-                    setOperationStatus('idle');
+                    setTimeout(() => {
+                        setIsOperating(false);
+                        setOperationStatus('idle');
+                    }, 2000)
                 }
             }
         } catch (error) {
