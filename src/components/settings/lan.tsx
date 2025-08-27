@@ -59,9 +59,8 @@ export default function ToggleLan() {
     } else {
       await setAllowLan(!toggle);
       setToggle(!toggle);
-      await vpnServiceManager.stop();
-
-
+      await vpnServiceManager.syncConfig({});
+      await vpnServiceManager.reload(1000);
     }
   }
 

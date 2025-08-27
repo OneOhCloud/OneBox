@@ -100,7 +100,7 @@ jobs:
       - name: Download Binaries
         run: bun run scripts/download-binaries.ts
 
-      - name: Create Temporary Apple AuthKey (macOS Only)
+      - name: Initialize Apple Signing Key
         if: matrix.platform == 'macos-latest'
         run: |
           echo "${{ secrets.APPLE_AUTH_KEY }}" > $GITHUB_WORKSPACE/temp_auth_key.p8
@@ -127,7 +127,7 @@ jobs:
             ${{ steps.decode.outputs.content }}
           args: ${{ matrix.args }}
 
-      - name: Clean Up Temporary Apple AuthKey (macOS Only)
+      - name: Clean Up Apple Signing Key
         if: matrix.platform == 'macos-latest'
         run: rm -f temp_auth_key.p8
         shell: bash
