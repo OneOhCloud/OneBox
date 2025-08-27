@@ -28,7 +28,8 @@ export default function ToggleTun() {
     const handleToggle = async () => {
         setToggle(!toggle);
         await setEnableTun(!toggle);
-        await vpnServiceManager.stop();
+        await vpnServiceManager.syncConfig({});
+        await vpnServiceManager.reload_config(1000);
     }
 
 

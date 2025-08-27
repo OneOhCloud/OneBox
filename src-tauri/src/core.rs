@@ -331,22 +331,21 @@ pub async fn is_running(secret: String) -> bool {
 // 重载配置
 #[tauri::command]
 pub async fn reload_config(app: tauri::AppHandle) -> Result<String, String> {
-    // 发送 SIGHUP 信号给 PROCESS_MANAGER 中的进程
-    let (child_id, current_mode, password) = {
+    // 获取当前模式和密码信息
+    let (current_mode, password) = {
         let manager = match PROCESS_MANAGER.lock() {
             Ok(m) => m,
             Err(e) => e.into_inner(),
         };
 
-        if let Some(ref child) = manager.child {
-            (
-                child.pid(),
-                manager.current_mode.clone(),
-                manager.tun_password.clone().unwrap_or_default(),
-            )
-        } else {
+        if manager.current_mode.is_none() {
             return Err("No running process found".to_string());
         }
+
+        (
+            manager.current_mode.clone(),
+            manager.tun_password.clone().unwrap_or_default(),
+        )
     };
 
     #[cfg(unix)]
@@ -358,19 +357,21 @@ pub async fn reload_config(app: tauri::AppHandle) -> Result<String, String> {
         // 检查是否是特权模式（TUN模式）
         let is_privileged = matches!(current_mode, Some(ProxyMode::TunProxy));
 
+        // 直接查找 sing-box 进程并发送 HUP 信号
         let output = if is_privileged && !password.is_empty() {
             // 特权模式下使用 sudo 发送信号
-            let command = format!("echo '{}' | sudo -S kill -HUP {}", password, child_id);
+            let command = "echo '{}' | sudo -S pkill -HUP sing-box";
+            let command = command.replace("{}", &password);
             Command::new("sh")
                 .arg("-c")
                 .arg(&command)
                 .output()
                 .map_err(|e| format!("Failed to send SIGHUP signal with sudo: {}", e))?
         } else {
-            // 普通模式或无密码时直接发送信号
-            Command::new("kill")
+            // 普通模式下直接发送信号
+            Command::new("pkill")
                 .arg("-HUP")
-                .arg(child_id.to_string())
+                .arg("sing-box")
                 .output()
                 .map_err(|e| format!("Failed to send SIGHUP signal: {}", e))?
         };

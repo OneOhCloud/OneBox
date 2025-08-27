@@ -9,7 +9,7 @@ import { message } from '@tauri-apps/plugin-dialog';
 import { setGlobalMixedConfig, setGlobalTunConfig, setMixedConfig, setTunConfig } from '../config/helper';
 import en from '../lang/en.json';
 import zh from '../lang/zh.json';
-import { getEnableTun, getLanguage, getStoreValue } from '../single/store';
+import { getClashApiSecret, getEnableTun, getLanguage, getStoreValue } from '../single/store';
 const appWindow = getCurrentWindow();
 const enLang = en as Record<string, string>;
 const zhLang = zh as Record<string, string>;
@@ -114,6 +114,14 @@ type SyncConfigProps = {
 }
 
 
+async function isRunning() {
+    let secret = await getClashApiSecret();
+    if (!secret) {
+        return false;
+    }
+    return invoke<boolean>("is_running", { secret: secret });
+}
+
 
 export const vpnServiceManager = {
     syncConfig: async (props: SyncConfigProps) => {
@@ -179,7 +187,16 @@ export const vpnServiceManager = {
 
     },
     stop: async () => await invoke("stop", { app: appWindow }),
+    is_running: async () => await isRunning(),
 
+    reload_config: async (delay: number) => {
+        if (await isRunning()) {
+            await new Promise(resolve => setTimeout(resolve, delay));
+            await invoke("reload_config", { app: appWindow });
+        } else {
+            console.warn("VPN service is not running, cannot reload config");
+        }
+    },
 
 };
 
