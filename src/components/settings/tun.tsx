@@ -38,7 +38,6 @@ export default function ToggleTun() {
         } else {
             const promise = (async () => {
                 const previous = toggle;
-                await setEnableTun(!toggle);
                 await vpnServiceManager.stop();
                 if (previous) {
                     // 关闭TUN模式，等待5秒...
@@ -52,7 +51,8 @@ export default function ToggleTun() {
             toast.promise(promise, {
                 // 请勿操作,正在释放资源中，
                 loading: t("please_wait_releasing_resources"),
-                success: () => {
+                success: async () => {
+                    await setEnableTun(!toggle);
                     setToggle(!toggle);
                     // 释放成功
                     return t("release_success_stop_vpn");
