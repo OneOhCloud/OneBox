@@ -86,7 +86,7 @@ export default function LogPage() {
     }
 
     return (
-        <div className="flex flex-col h-full px-4 py-2 bg-gray-100">
+        <div className="flex flex-col  px-4 py-2 bg-gray-100  h-screen">
             <LogTabs
                 activeTab={activeTab}
                 setActiveTab={setActiveTab}

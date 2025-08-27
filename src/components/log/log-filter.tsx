@@ -17,10 +17,6 @@ export default function LogFilter({
 }: LogFilterProps) {
     return (
         <div className="flex items-center gap-4 ml-auto px-4">
-            <label className="swap">
-                <div className="swap-on badge badge-primary badge-md">{t("api_logs", "API 日志")}</div>
-                <div className="swap-off badge badge-secondary badge-md">{t("tauri_logs", "Tauri 日志")}</div>
-            </label>
             <div className="join">
                 <input
                     type="text"

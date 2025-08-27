@@ -200,7 +200,7 @@ export const vpnServiceManager = {
         if (await isRunning()) {
             const useTun = await getEnableTun();
             await new Promise(resolve => setTimeout(resolve, delay));
-            await invoke("reload_config", { app: appWindow, isTun: useTun });
+            await invoke("reload_config", { isTun: useTun });
         } else {
             console.warn("VPN service is not running, cannot reload config");
         }

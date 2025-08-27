@@ -450,39 +450,36 @@ pub async fn is_running(secret: String) -> bool {
 
 // 重载配置
 #[tauri::command]
-pub async fn reload_config(app: tauri::AppHandle, is_tun: bool) -> Result<String, String> {
-    // 获取当前模式和密码信息
-    let (current_mode, password) = {
-        let manager = match PROCESS_MANAGER.lock() {
-            Ok(m) => m,
-            Err(e) => e.into_inner(),
-        };
-        match manager.current_mode {
-            Some(ProxyMode::TunProxy) if is_tun => (
-                Some(ProxyMode::TunProxy),
-                manager.tun_password.clone().unwrap_or_default(),
-            ),
-            Some(ProxyMode::SystemProxy) if !is_tun => (
-                Some(ProxyMode::SystemProxy),
-                manager.tun_password.clone().unwrap_or_default(),
-            ),
-            Some(ProxyMode::TunProxy) => {
-                return Err("Current mode is not TUN mode".to_string());
-            }
-            Some(ProxyMode::SystemProxy) => {
-                return Err("Current mode is not System Proxy mode".to_string());
-            }
-            None => {
-                return Err("No running process found".to_string());
-            }
-        }
-    };
-
+pub async fn reload_config(is_tun: bool) -> Result<String, String> {
     #[cfg(unix)]
     {
         use std::process::Command;
-
-        let _ = &app; // 避免未使用警告
+        // 获取当前模式和密码信息
+        let (current_mode, password) = {
+            let manager = match PROCESS_MANAGER.lock() {
+                Ok(m) => m,
+                Err(e) => e.into_inner(),
+            };
+            match manager.current_mode {
+                Some(ProxyMode::TunProxy) if is_tun => (
+                    Some(ProxyMode::TunProxy),
+                    manager.tun_password.clone().unwrap_or_default(),
+                ),
+                Some(ProxyMode::SystemProxy) if !is_tun => (
+                    Some(ProxyMode::SystemProxy),
+                    manager.tun_password.clone().unwrap_or_default(),
+                ),
+                Some(ProxyMode::TunProxy) => {
+                    return Err("Current mode is not TUN mode".to_string());
+                }
+                Some(ProxyMode::SystemProxy) => {
+                    return Err("Current mode is not System Proxy mode".to_string());
+                }
+                None => {
+                    return Err("No running process found".to_string());
+                }
+            }
+        };
 
         // 检查是否是特权模式（TUN模式）
         let is_privileged = matches!(current_mode, Some(ProxyMode::TunProxy));
@@ -517,12 +514,13 @@ pub async fn reload_config(app: tauri::AppHandle, is_tun: bool) -> Result<String
     #[cfg(target_os = "windows")]
     {
         // Windows 平台不支持 SIGHUP 信号，需要通过重启进程来重载配置
-        let (config_path, current_mode) = {
+        let _ = is_tun;
+        let config_path = {
             let manager = match PROCESS_MANAGER.lock() {
                 Ok(m) => m,
                 Err(e) => e.into_inner(),
             };
-            (manager.config_path.clone(), manager.current_mode.clone())
+            manager.config_path.clone()
         };
 
         let sidecar_path = helper::get_sidecar_path(Path::new("sing-box"))
@@ -533,7 +531,6 @@ pub async fn reload_config(app: tauri::AppHandle, is_tun: bool) -> Result<String
 
     #[cfg(not(any(unix, target_os = "windows")))]
     {
-        let _ = app; // 避免未使用警告
         Err("SIGHUP signal is not supported on this platform".to_string())
     }
 }

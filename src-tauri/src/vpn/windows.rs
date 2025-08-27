@@ -118,7 +118,7 @@ pub fn stop_tun_process(_password: &str) -> Result<(), String> {
         .encode_wide()
         .chain(Some(0))
         .collect::<Vec<u16>>();
-    let args = OsStr::new("/IM sing-box.exe")
+    let args = OsStr::new("/F /IM sing-box.exe")
         .encode_wide()
         .chain(Some(0))
         .collect::<Vec<u16>>();
@@ -144,23 +144,23 @@ pub fn stop_tun_process(_password: &str) -> Result<(), String> {
     Ok(())
 }
 
-/// 特权模式下重启进程（合并停止和启动为一个提权命令）
 #[cfg(target_os = "windows")]
 pub fn restart_privileged_command(sidecar_path: String, path: String) -> Result<(), String> {
-    // 创建批处理脚本内容，先停止再启动
-    let batch_content = format!(
-        "taskkill /IM sing-box.exe >nul 2>&1\n\"{}\" run -c \"{}\" --disable-color",
-        sidecar_path.replace("/", "\\"),
-        path.replace("/", "\\")
+    // 使用 PowerShell 脚本，路径处理更可靠
+    let ps_script = format!(
+        "Stop-Process -Name 'sing-box' -Force -ErrorAction SilentlyContinue; Start-Sleep -Milliseconds 500; & '{}' run -c '{}' --disable-color",
+        sidecar_path.replace("\\", "/"), // PowerShell 接受正斜杠
+        path.replace("\\", "/")
     );
 
-    // 使用cmd执行批处理命令
-    let cmd = OsStr::new("cmd")
+    let powershell = OsStr::new("powershell")
         .encode_wide()
         .chain(Some(0))
         .collect::<Vec<u16>>();
-    let args = format!("/C {}", batch_content);
+
+    let args = format!("-Command \"{}\"", ps_script);
     let args_wide: Vec<u16> = OsStr::new(&args).encode_wide().chain(Some(0)).collect();
+
     let verb = OsStr::new("runas")
         .encode_wide()
         .chain(Some(0))
@@ -170,7 +170,7 @@ pub fn restart_privileged_command(sidecar_path: String, path: String) -> Result<
         ShellExecuteW(
             HWND(0),
             PCWSTR(verb.as_ptr()),
-            PCWSTR(cmd.as_ptr()),
+            PCWSTR(powershell.as_ptr()),
             PCWSTR(args_wide.as_ptr()),
             PCWSTR(std::ptr::null()),
             windows::Win32::UI::WindowsAndMessaging::SHOW_WINDOW_CMD(0),
@@ -181,10 +181,7 @@ pub fn restart_privileged_command(sidecar_path: String, path: String) -> Result<
         return Err(format!("ShellExecuteW failed: code {}", res.0 as usize));
     }
 
-    log::info!(
-        "Restart tun mode with privileged command: stop and start {}",
-        sidecar_path
-    );
+    log::info!("Restart tun mode with PowerShell command: {}", ps_script);
     Ok(())
 }
 
