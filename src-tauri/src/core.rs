@@ -377,6 +377,13 @@ pub async fn reload_config(app: tauri::AppHandle) -> Result<String, String> {
         };
 
         if output.status.success() {
+            if is_privileged {
+                // 设置系统代理
+                let _ = PlatformVpnProxy::unset_proxy(&app).await;
+            } else {
+                // 如果是 TUN 模式，取消系统代理
+                let _ = PlatformVpnProxy::set_proxy(&app).await;
+            };
             Ok("Configuration reloaded successfully".to_string())
         } else {
             let error = String::from_utf8_lossy(&output.stderr);
@@ -396,9 +403,6 @@ pub async fn reload_config(app: tauri::AppHandle) -> Result<String, String> {
         };
 
         if let (Some(config_path), Some(mode)) = (config_path, current_mode) {
-            // 先停止当前进程
-            stop(app.clone()).await?;
-
             // 重新启动进程
             match start(app, config_path, mode).await {
                 Ok(_) => {
