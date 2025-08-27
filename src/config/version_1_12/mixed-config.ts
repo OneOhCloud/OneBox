@@ -34,8 +34,7 @@ const mixedConfig = {
 
       {
         "tag": "system",
-        "type": "dhcp",
-        "reuse_addr": true,
+        "type": "dhcp"
       },
       {
         "tag": "tencent",

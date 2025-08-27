@@ -2,7 +2,6 @@ use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
-use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
 use tauri_plugin_http::reqwest;
 
 #[cfg(not(target_os = "windows"))]
@@ -10,7 +9,7 @@ use crate::privilege;
 use crate::vpn::helper;
 use crate::vpn::{PlatformVpnProxy, VpnProxy};
 use tauri::Emitter;
-use tauri_plugin_shell::process::{Command, CommandChild, CommandEvent};
+use tauri_plugin_shell::process::CommandChild;
 use tauri_plugin_shell::ShellExt;
 
 /// 代理模式
@@ -73,173 +72,261 @@ async fn get_password_for_mode(mode: &ProxyMode) -> Result<String, String> {
         Ok(String::new())
     }
 }
+
 /// 启动代理进程
 #[tauri::command]
 pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Result<(), String> {
-    // 启动前先停止已有进程
-    stop(app.clone()).await?;
-    let mode_clone = mode.clone();
+    log::info!("Starting proxy process in mode: {:?}", mode);
 
-    // 检查是否需要权限验证
+    // 检查是否需要权限验证 (异步调用)
     let password = match get_password_for_mode(&mode).await {
         Ok(pwd) => pwd,
-        Err(err) if err == "REQUIRE_PRIVILEGE" => {
-            return Err("REQUIRE_PRIVILEGE".to_string());
+        Err(err) if err == "REQUIRE_PRIVILEGE" => return Err(err),
+        Err(err) => {
+            log::error!("Failed to get privilege password: {}", err);
+            return Err(err);
         }
-        Err(err) => return Err(err),
     };
 
+    // 确定是否是受管理的进程（需要在后面使用等待时间）
+    let is_managed_process;
+
+    // 准备命令
     let sidecar_command_opt = if mode == ProxyMode::SystemProxy {
         // 普通权限执行
-        let cmd: Command = app.shell().sidecar("sing-box").map_err(|e| e.to_string())?;
-        Some(cmd.args(["run", "-c", &path, "--disable-color"]))
+        is_managed_process = true;
+        match app.shell().sidecar("sing-box") {
+            Ok(cmd) => Some(cmd.args(["run", "-c", &path, "--disable-color"])),
+            Err(e) => {
+                log::error!("Failed to get sidecar command: {}", e);
+                return Err(e.to_string());
+            }
+        }
     } else {
-        let sidecar_path = helper::get_sidecar_path(Path::new("sing-box")).unwrap();
-        PlatformVpnProxy::create_privileged_command(
-            &app,
-            sidecar_path,
-            path.clone(),
-            password.clone(),
-        )
+        // TUN模式执行
+        match helper::get_sidecar_path(Path::new("sing-box")) {
+            Ok(sidecar_path) => {
+                let cmd = PlatformVpnProxy::create_privileged_command(
+                    &app,
+                    sidecar_path,
+                    path.clone(),
+                    password.clone(),
+                );
+                is_managed_process = cmd.is_some();
+                cmd
+            }
+            Err(e) => {
+                log::error!("Failed to get sidecar path: {}", e);
+                return Err(e.to_string());
+            }
+        }
     };
 
-    if let Some(sidecar_command) = sidecar_command_opt {
-        let (mut rx, child) = sidecar_command.spawn().map_err(|e| e.to_string())?;
+    // 启动进程并获取子进程句柄（如果有）
+    let child_opt = if let Some(sidecar_command) = sidecar_command_opt {
+        log::info!("Spawning sidecar command");
+        match sidecar_command.spawn() {
+            Ok((mut rx, child)) => {
+                // 为了在进程终止时能够清理资源，克隆必要的数据
+                let app_handle = app.clone();
+                let process_mode = mode.clone();
 
-        // 临时存储密码，稍后再设置到 manager
-        let tun_password = if mode == ProxyMode::TunProxy {
-            Some(password.clone())
+                // 启动一个任务来监听子进程输出
+                tokio::spawn(async move {
+                    let mut terminated = false;
+
+                    while let Some(event) = rx.recv().await {
+                        if terminated {
+                            // 如果已经处理了终止事件，只记录其他事件但不再处理
+                            match event {
+                                tauri_plugin_shell::process::CommandEvent::Stdout(line) => {
+                                    log::info!(
+                                        "Post-terminate stdout: {:?}",
+                                        String::from_utf8_lossy(&line)
+                                    );
+                                }
+                                tauri_plugin_shell::process::CommandEvent::Stderr(line) => {
+                                    log::error!(
+                                        "Post-terminate stderr: {:?}",
+                                        String::from_utf8_lossy(&line)
+                                    );
+                                }
+                                _ => {}
+                            }
+                            continue;
+                        }
+
+                        match event {
+                            tauri_plugin_shell::process::CommandEvent::Stdout(line) => {
+                                log::info!("Proxy stdout: {:?}", String::from_utf8_lossy(&line));
+                            }
+
+                            tauri_plugin_shell::process::CommandEvent::Error(err) => {
+                                log::error!("Proxy process error: {}", err);
+                            }
+                            tauri_plugin_shell::process::CommandEvent::Terminated(exit_code) => {
+                                terminated = true; // 标记为已处理终止事件
+                                log::info!(
+                                    "Proxy process terminated with exit code: {:?}",
+                                    exit_code
+                                );
+
+                                // 清理资源
+                                {
+                                    let mut manager = match PROCESS_MANAGER.lock() {
+                                        Ok(m) => m,
+                                        Err(e) => {
+                                            log::error!("Failed to lock process manager: {:?}", e);
+                                            e.into_inner()
+                                        }
+                                    };
+
+                                    // 只有当当前模式与启动时的模式匹配时才清理资源
+                                    if manager.current_mode.as_ref() == Some(&process_mode) {
+                                        log::info!(
+                                            "Cleaning up resources after process termination"
+                                        );
+                                        manager.child = None;
+                                        manager.current_mode = None;
+                                        manager.config_path = None;
+                                        manager.tun_password = None;
+
+                                        // 如果是系统代理模式，则需要取消系统代理设置
+                                        if process_mode == ProxyMode::SystemProxy {
+                                            // 不能在同步代码块中异步调用，所以这里克隆并立即释放锁
+                                            drop(manager);
+
+                                            // 在异步块外清理代理设置
+                                            let cleanup_app = app_handle.clone();
+                                            tokio::spawn(async move {
+                                                if let Err(e) =
+                                                    PlatformVpnProxy::unset_proxy(&cleanup_app)
+                                                        .await
+                                                {
+                                                    log::error!("Failed to unset proxy after process termination: {}", e);
+                                                }
+
+                                                // 通知前端状态已更改
+                                                if let Err(e) =
+                                                    cleanup_app.emit("status-changed", ())
+                                                {
+                                                    log::error!(
+                                                        "Failed to emit status-changed event: {}",
+                                                        e
+                                                    );
+                                                }
+                                            });
+                                        } else {
+                                            // 对于非系统代理模式，直接通知前端
+                                            drop(manager);
+                                            if let Err(e) = app_handle.emit("status-changed", ()) {
+                                                log::error!(
+                                                    "Failed to emit status-changed event: {}",
+                                                    e
+                                                );
+                                            }
+                                        }
+                                    } else {
+                                        log::info!("Process mode has changed, skipping cleanup");
+                                    }
+                                } // 结束锁作用域
+                            }
+                            _ => {}
+                        }
+                    }
+                });
+                Some(child)
+            }
+            Err(e) => {
+                log::error!("Failed to spawn sidecar command: {}", e);
+                return Err(e.to_string());
+            }
+        }
+    } else {
+        None
+    };
+
+    // 更新进程管理器状态 (无异步操作)
+    {
+        let mut manager = match PROCESS_MANAGER.lock() {
+            Ok(m) => m,
+            Err(e) => {
+                log::error!("Mutex lock error during process setup: {:?}", e);
+                e.into_inner()
+            }
+        };
+
+        manager.current_mode = Some(mode.clone());
+        manager.config_path = Some(path.clone());
+        manager.tun_password = if mode == ProxyMode::TunProxy {
+            Some(password)
         } else {
             None
         };
+        manager.child = child_opt;
+    } // MutexGuard 在这里被释放
 
-        // 保存子进程，但不要在异步操作中持有 mutex guard
-        {
-            let mut manager = match PROCESS_MANAGER.lock() {
-                Ok(m) => m,
-                Err(e) => e.into_inner(),
-            };
+    // 根据模式设置或取消系统代理 (异步操作)
+    let proxy_result = if mode == ProxyMode::SystemProxy {
+        PlatformVpnProxy::set_proxy(&app).await
+    } else {
+        PlatformVpnProxy::unset_proxy(&app).await
+    };
 
-            if let Some(pass) = &tun_password {
-                manager.tun_password = Some(pass.clone());
+    // 处理代理设置结果
+    if let Err(e) = proxy_result {
+        // 清理子进程
+        let mut manager = match PROCESS_MANAGER.lock() {
+            Ok(m) => m,
+            Err(e) => {
+                log::error!("Mutex lock error during cleanup: {:?}", e);
+                e.into_inner()
             }
-            manager.child = Some(child);
-            manager.config_path = Some(path.clone());
-        } // MutexGuard 在这里被释放
-
-        // 根据当前模式执行不同的操作
-        let proxy_result = if mode == ProxyMode::SystemProxy {
-            // 设置系统代理
-            PlatformVpnProxy::set_proxy(&app).await
-        } else {
-            // 如果是 TUN 模式，取消系统代理
-            PlatformVpnProxy::unset_proxy(&app).await
         };
 
-        // 如果设置代理失败，清理进程并返回错误
-        if let Err(e) = proxy_result {
-            // 清理子进程
-            let mut manager = match PROCESS_MANAGER.lock() {
-                Ok(m) => m,
-                Err(e) => e.into_inner(),
-            };
-
-            if let Some(child) = manager.child.take() {
-                let _ = child.kill(); // 忽略可能的错误
+        if let Some(child) = manager.child.take() {
+            log::info!("Killing child process due to proxy setup failure");
+            #[cfg(unix)]
+            {
+                use libc::{kill, SIGTERM};
+                let pid = child.pid();
+                log::info!("Sending SIGTERM to process with PID: {}", pid);
+                let res = unsafe { kill(pid as i32, SIGTERM) };
+                if res != 0 {
+                    log::error!(
+                        "Failed to send SIGTERM to process with PID {}: {}",
+                        pid,
+                        std::io::Error::last_os_error()
+                    );
+                }
             }
-            manager.tun_password = None;
-            return Err(e.to_string());
+            #[cfg(not(unix))]
+            {
+                // 非unix不能发信号, 只能 kill
+                child.kill().map_err(|e| e.to_string())?;
+            }
         }
+        manager.current_mode = None;
+        manager.config_path = None;
+        manager.tun_password = None;
 
-        // 只有在所有操作都成功后才设置当前模式
-        {
-            let mut manager = match PROCESS_MANAGER.lock() {
-                Ok(m) => m,
-                Err(e) => e.into_inner(),
-            };
-            manager.current_mode = Some(mode);
-        } // MutexGuard 在这里被释放
-
-        let process_manager = PROCESS_MANAGER.clone();
-        let app_clone = app.clone();
-        // 后台异步处理进程事件
-        tauri::async_runtime::spawn(async move {
-            let handle_event = |event: CommandEvent| {
-                let message = match &event {
-                    CommandEvent::Stdout(line) => String::from_utf8_lossy(line.trim_ascii()),
-                    CommandEvent::Stderr(line) => String::from_utf8_lossy(line.trim_ascii()),
-                    CommandEvent::Terminated(status) => {
-                        if let Ok(mut manager) = process_manager.lock() {
-                            manager.child = None;
-                        } else if let Err(e) = process_manager.lock() {
-                            e.into_inner().child = None;
-                        }
-
-                        let msg = format!("Process terminated with status: {:?}", status);
-                        app_clone.emit("core_backend", &msg).unwrap();
-                        std::borrow::Cow::Owned(msg)
-                    }
-                    _ => return Ok(()),
-                };
-
-                log::debug!("[{:#?}]:{}", mode_clone, message);
-
-                if message.contains("FATAL") {
-                    // 如果是错误信息，弹出对话框
-                    app_clone
-                        .dialog()
-                        .message(message.clone())
-                        .kind(MessageDialogKind::Error)
-                        .title("Error")
-                        .blocking_show();
-                }
-
-                app_clone
-                    .emit("core_backend", Some(message))
-                    .map_err(|e| e.to_string())
-            };
-
-            while let Some(event) = rx.recv().await {
-                if let Err(e) = handle_event(event) {
-                    log::error!("Event handling error: {}", e);
-                    app_clone
-                        .emit("core_backend", Some(format!("Event handling error: {}", e)))
-                        .unwrap();
-                }
-            }
-        });
-        // 睡眠 1.5s 等待进程启动
-        std::thread::sleep(std::time::Duration::from_millis(1500));
-        app.emit("status-changed", ()).unwrap();
-    } else {
-        // Windows TUN 模式等不可管理进程场景
-        {
-            let mut manager = match PROCESS_MANAGER.lock() {
-                Ok(m) => m,
-                Err(e) => e.into_inner(),
-            };
-            if mode == ProxyMode::TunProxy {
-                manager.tun_password = Some(password);
-            }
-            manager.child = None;
-            manager.current_mode = Some(mode);
-            manager.config_path = Some(path.clone());
-        } // MutexGuard 在这里被释放
-
-        // 睡眠 1s 等待进程启动
-        std::thread::sleep(std::time::Duration::from_millis(1000));
-
-        app.emit("status-changed", ()).unwrap();
+        log::error!("Failed to set proxy: {}", e);
+        return Err(e.to_string());
     }
 
-    Ok(())
-}
+    // 等待进程启动
+    let wait_time = if is_managed_process {
+        std::time::Duration::from_millis(1500)
+    } else {
+        std::time::Duration::from_millis(1000)
+    };
 
-pub async fn reset_system_proxy(app: &tauri::AppHandle) -> Result<(), String> {
-    // 清理系统代理
-    PlatformVpnProxy::unset_proxy(app)
-        .await
-        .map_err(|e| e.to_string())?;
+    std::thread::sleep(wait_time);
+
+    log::info!("Proxy process started successfully");
+    if let Err(e) = app.emit("status-changed", ()) {
+        log::error!("Failed to emit status-changed event: {}", e);
+    }
 
     Ok(())
 }
@@ -248,10 +335,15 @@ pub async fn reset_system_proxy(app: &tauri::AppHandle) -> Result<(), String> {
 #[tauri::command]
 pub async fn stop(app: tauri::AppHandle) -> Result<(), String> {
     // 在临时作用域中获取需要的信息，避免在await跨越时持有MutexGuard
+
+    log::info!("Stopping proxy process");
     let (current_mode, tun_password, child_option) = {
         let mut manager = match PROCESS_MANAGER.lock() {
             Ok(m) => m,
-            Err(e) => e.into_inner(),
+            Err(e) => {
+                log::error!("Mutex lock error during stop: {:?}", e);
+                e.into_inner()
+            }
         };
 
         let mode = manager.current_mode.clone();
@@ -270,25 +362,51 @@ pub async fn stop(app: tauri::AppHandle) -> Result<(), String> {
     if let Some(mode) = &current_mode {
         match mode {
             ProxyMode::SystemProxy => {
-                reset_system_proxy(&app).await.map_err(|e| e.to_string())?;
+                if let Err(e) = PlatformVpnProxy::unset_proxy(&app).await {
+                    log::error!("Failed to unset system proxy: {}", e);
+                }
             }
             ProxyMode::TunProxy => {
                 if let Some(password) = &tun_password {
-                    PlatformVpnProxy::stop_tun_process(password)?;
+                    PlatformVpnProxy::stop_tun_process(password).map_err(|e| {
+                        log::error!("Failed to stop TUN process: {}", e);
+                        e
+                    })?;
                 }
             }
         }
     }
 
     // 停止进程
-    if let Some(child) = child_option {
-        child.kill().map_err(|e| e.to_string())?;
-    }
 
+    #[cfg(unix)]
+    {
+        use libc::{kill, SIGTERM};
+        if let Some(child) = child_option {
+            let pid = child.pid();
+            log::info!("Sending SIGTERM to process with PID: {}", pid);
+            let res = unsafe { kill(pid as i32, SIGTERM) };
+            if res != 0 {
+                log::error!(
+                    "Failed to send SIGTERM to process with PID {}: {}",
+                    pid,
+                    std::io::Error::last_os_error()
+                );
+            }
+        } else {
+            log::info!("No child process to terminate");
+        }
+    }
+    #[cfg(not(unix))]
+    {
+        // 非unix不能发信号, 只能 kill
+        if let Some(child) = child_option {
+            child.kill().map_err(|e| e.to_string())?;
+        }
+    }
     // 睡眠 0.5 等待进程退出
     std::thread::sleep(std::time::Duration::from_millis(500));
     app.emit("status-changed", ()).unwrap();
-
     Ok(())
 }
 
