@@ -119,6 +119,7 @@ pub fn run() {
             core::start,
             core::version,
             core::is_running,
+            core::reload_config,
             privilege::is_privileged,
             privilege::save_privilege_password_to_keyring,
         ])

@@ -26,6 +26,7 @@ struct ProcessManager {
     child: Option<CommandChild>,
     current_mode: Option<ProxyMode>,
     tun_password: Option<String>, // 仅记录密码
+    config_path: Option<String>,  // 记录配置文件路径
 }
 
 // 全局进程管理器
@@ -34,6 +35,7 @@ lazy_static! {
         child: None,
         current_mode: None,
         tun_password: None,
+        config_path: None,
     }));
 }
 
@@ -93,7 +95,12 @@ pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Resu
         Some(cmd.args(["run", "-c", &path, "--disable-color"]))
     } else {
         let sidecar_path = helper::get_sidecar_path(Path::new("sing-box")).unwrap();
-        PlatformVpnProxy::create_privileged_command(&app, sidecar_path, path.clone(), password.clone())
+        PlatformVpnProxy::create_privileged_command(
+            &app,
+            sidecar_path,
+            path.clone(),
+            password.clone(),
+        )
     };
 
     if let Some(sidecar_command) = sidecar_command_opt {
@@ -117,6 +124,7 @@ pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Resu
                 manager.tun_password = Some(pass.clone());
             }
             manager.child = Some(child);
+            manager.config_path = Some(path.clone());
         } // MutexGuard 在这里被释放
 
         // 根据当前模式执行不同的操作
@@ -215,6 +223,7 @@ pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Resu
             }
             manager.child = None;
             manager.current_mode = Some(mode);
+            manager.config_path = Some(path.clone());
         } // MutexGuard 在这里被释放
 
         // 睡眠 1s 等待进程启动
@@ -252,6 +261,7 @@ pub async fn stop(app: tauri::AppHandle) -> Result<(), String> {
         // 提前清理状态，避免后续await时仍持有锁
         manager.current_mode = None;
         manager.tun_password = None;
+        manager.config_path = None;
 
         (mode, password, child)
     }; // MutexGuard在此作用域结束时释放
@@ -316,4 +326,96 @@ pub async fn is_running(secret: String) -> bool {
         }
     }
     false
+}
+
+// 重载配置
+#[tauri::command]
+pub async fn reload_config(app: tauri::AppHandle) -> Result<String, String> {
+    // 发送 SIGHUP 信号给 PROCESS_MANAGER 中的进程
+    let (child_id, current_mode, password) = {
+        let manager = match PROCESS_MANAGER.lock() {
+            Ok(m) => m,
+            Err(e) => e.into_inner(),
+        };
+
+        if let Some(ref child) = manager.child {
+            (
+                child.pid(),
+                manager.current_mode.clone(),
+                manager.tun_password.clone().unwrap_or_default(),
+            )
+        } else {
+            return Err("No running process found".to_string());
+        }
+    };
+
+    #[cfg(unix)]
+    {
+        use std::process::Command;
+
+        let _ = &app; // 避免未使用警告
+
+        // 检查是否是特权模式（TUN模式）
+        let is_privileged = matches!(current_mode, Some(ProxyMode::TunProxy));
+
+        let output = if is_privileged && !password.is_empty() {
+            // 特权模式下使用 sudo 发送信号
+            let command = format!("echo '{}' | sudo -S kill -HUP {}", password, child_id);
+            Command::new("sh")
+                .arg("-c")
+                .arg(&command)
+                .output()
+                .map_err(|e| format!("Failed to send SIGHUP signal with sudo: {}", e))?
+        } else {
+            // 普通模式或无密码时直接发送信号
+            Command::new("kill")
+                .arg("-HUP")
+                .arg(child_id.to_string())
+                .output()
+                .map_err(|e| format!("Failed to send SIGHUP signal: {}", e))?
+        };
+
+        if output.status.success() {
+            Ok("Configuration reloaded successfully".to_string())
+        } else {
+            let error = String::from_utf8_lossy(&output.stderr);
+            Err(format!("Failed to reload config: {}", error))
+        }
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        // Windows 平台不支持 SIGHUP 信号，需要通过重启进程来重载配置
+        let (config_path, current_mode) = {
+            let manager = match PROCESS_MANAGER.lock() {
+                Ok(m) => m,
+                Err(e) => e.into_inner(),
+            };
+            (manager.config_path.clone(), manager.current_mode.clone())
+        };
+
+        if let (Some(config_path), Some(mode)) = (config_path, current_mode) {
+            // 先停止当前进程
+            stop(app.clone()).await?;
+
+            // 重新启动进程
+            match start(app, config_path, mode).await {
+                Ok(_) => {
+                    Ok("Configuration reloaded successfully by restarting process".to_string())
+                }
+                Err(e) => Err(format!(
+                    "Failed to reload config by restarting process: {}",
+                    e
+                )),
+            }
+        } else {
+            Err("No running process found or missing configuration path".to_string())
+        }
+    }
+
+    #[cfg(not(any(unix, target_os = "windows")))]
+    {
+        let _ = app; // 避免未使用警告
+        Err("SIGHUP signal is not supported on this platform".to_string())
+    }
 }
