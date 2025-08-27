@@ -3,8 +3,6 @@ import { t } from "../../utils/helper";
 interface LogFilterProps {
     filter: string;
     setFilter: (filter: string) => void;
-    logSource: 'tauri' | 'api';
-    setLogSource: (source: 'tauri' | 'api') => void;
     autoScroll: boolean;
     setAutoScroll: (autoScroll: boolean) => void;
     clearLogs: () => void;
@@ -13,8 +11,6 @@ interface LogFilterProps {
 export default function LogFilter({
     filter,
     setFilter,
-    logSource,
-    setLogSource,
     autoScroll,
     setAutoScroll,
     clearLogs
@@ -22,11 +18,6 @@ export default function LogFilter({
     return (
         <div className="flex items-center gap-4 ml-auto px-4">
             <label className="swap">
-                <input
-                    type="checkbox"
-                    checked={logSource === 'api'}
-                    onChange={(e) => setLogSource(e.target.checked ? 'api' : 'tauri')}
-                />
                 <div className="swap-on badge badge-primary badge-md">{t("api_logs", "API 日志")}</div>
                 <div className="swap-off badge badge-secondary badge-md">{t("tauri_logs", "Tauri 日志")}</div>
             </label>

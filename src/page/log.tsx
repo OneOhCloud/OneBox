@@ -1,4 +1,3 @@
-import { type } from '@tauri-apps/plugin-os';
 import { useEffect, useRef, useState } from 'react';
 import { ArrowDownCircle, ArrowUpCircle } from 'react-bootstrap-icons';
 import ConfigViewer from '../components/config-viewer/config-viewer';
@@ -6,18 +5,16 @@ import EmptyLogMessage from '../components/log/empty-log-message';
 import LogTable from '../components/log/log-table';
 import LogTabs from '../components/log/log-tabs';
 
-import { formatNetworkSpeed, LogSourceType, useLogSource, useNetworkSpeed } from '../utils/clash-api';
+import { formatNetworkSpeed, useLogSource, useNetworkSpeed } from '../utils/clash-api';
 import { initLanguage } from "../utils/helper";
 
 export default function LogPage() {
-    const osType = type();
     const [filter, setFilter] = useState('');
     const [autoScroll, setAutoScroll] = useState(true);
     const logContainerRef = useRef<HTMLDivElement>(null);
     const [isLanguageLoading, setIsLanguageLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<'logs' | 'config'>('logs');
-    const [logSource, setLogSource] = useState<LogSourceType>(osType === 'windows' ? 'api' : 'tauri');
-    const { logs, clearLogs } = useLogSource(logSource);
+    const { logs, clearLogs } = useLogSource();
     const speed = useNetworkSpeed();
 
     // 过滤后的日志
@@ -95,8 +92,7 @@ export default function LogPage() {
                 setActiveTab={setActiveTab}
                 filter={filter}
                 setFilter={setFilter}
-                logSource={logSource}
-                setLogSource={setLogSource}
+
                 autoScroll={autoScroll}
                 setAutoScroll={setAutoScroll}
                 clearLogs={clearLogs}

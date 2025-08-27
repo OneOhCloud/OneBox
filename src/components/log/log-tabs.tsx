@@ -6,8 +6,6 @@ interface LogTabsProps {
     setActiveTab: (tab: 'logs' | 'config') => void;
     filter: string;
     setFilter: (filter: string) => void;
-    logSource: 'tauri' | 'api';
-    setLogSource: (source: 'tauri' | 'api') => void;
     autoScroll: boolean;
     setAutoScroll: (autoScroll: boolean) => void;
     clearLogs: () => void;
@@ -18,8 +16,6 @@ export default function LogTabs({
     setActiveTab,
     filter,
     setFilter,
-    logSource,
-    setLogSource,
     autoScroll,
     setAutoScroll,
     clearLogs
@@ -45,8 +41,7 @@ export default function LogTabs({
                     <LogFilter
                         filter={filter}
                         setFilter={setFilter}
-                        logSource={logSource}
-                        setLogSource={setLogSource}
+
                         autoScroll={autoScroll}
                         setAutoScroll={setAutoScroll}
                         clearLogs={clearLogs}
