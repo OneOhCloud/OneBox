@@ -11,6 +11,7 @@ use windows::Win32::Foundation::HWND;
 use windows::Win32::UI::Shell::ShellExecuteW;
 
 use crate::vpn::helper;
+use crate::vpn::VpnProxy;
 // 默认绕过列表
 pub static DEFAULT_BYPASS: &str = "localhost;127.*;192.168.*;10.*;172.16.*;172.17.*;172.18.*;172.19.*;172.20.*;172.21.*;172.22.*;172.23.*;172.24.*;172.25.*;172.26.*;172.27.*;172.28.*;172.29.*;172.30.*;172.31.*;<local>";
 
@@ -141,4 +142,30 @@ pub fn stop_tun_process(_password: &str) -> Result<(), String> {
 
     log::info!("Stop tun mode with command: taskkill /F /IM sing-box.exe");
     Ok(())
+}
+
+/// Windows平台的VPN代理实现
+pub struct WindowsVpnProxy;
+
+impl VpnProxy for WindowsVpnProxy {
+    async fn set_proxy(app: &AppHandle) -> anyhow::Result<()> {
+        set_proxy(app).await
+    }
+
+    async fn unset_proxy(app: &AppHandle) -> anyhow::Result<()> {
+        unset_proxy(app).await
+    }
+
+    fn create_privileged_command(
+        app: &AppHandle,
+        sidecar_path: String,
+        path: String,
+        password: String,
+    ) -> Option<TauriCommand> {
+        create_privileged_command(app, sidecar_path, path, password)
+    }
+
+    fn stop_tun_process(password: &str) -> Result<(), String> {
+        stop_tun_process(password)
+    }
 }

@@ -8,12 +8,7 @@ use tauri_plugin_http::reqwest;
 #[cfg(not(target_os = "windows"))]
 use crate::privilege;
 use crate::vpn::helper;
-#[cfg(target_os = "linux")]
-use crate::vpn::linux as platform_impl;
-#[cfg(target_os = "macos")]
-use crate::vpn::macos as platform_impl;
-#[cfg(target_os = "windows")]
-use crate::vpn::windows as platform_impl;
+use crate::vpn::{PlatformVpnProxy, VpnProxy};
 use tauri::Emitter;
 use tauri_plugin_shell::process::{Command, CommandChild, CommandEvent};
 use tauri_plugin_shell::ShellExt;
@@ -98,7 +93,7 @@ pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Resu
         Some(cmd.args(["run", "-c", &path, "--disable-color"]))
     } else {
         let sidecar_path = helper::get_sidecar_path(Path::new("sing-box")).unwrap();
-        platform_impl::create_privileged_command(&app, sidecar_path, path.clone(), password.clone())
+        PlatformVpnProxy::create_privileged_command(&app, sidecar_path, path.clone(), password.clone())
     };
 
     if let Some(sidecar_command) = sidecar_command_opt {
@@ -127,10 +122,10 @@ pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Resu
         // 根据当前模式执行不同的操作
         let proxy_result = if mode == ProxyMode::SystemProxy {
             // 设置系统代理
-            platform_impl::set_proxy(&app).await
+            PlatformVpnProxy::set_proxy(&app).await
         } else {
             // 如果是 TUN 模式，取消系统代理
-            platform_impl::unset_proxy(&app).await
+            PlatformVpnProxy::unset_proxy(&app).await
         };
 
         // 如果设置代理失败，清理进程并返回错误
@@ -233,7 +228,7 @@ pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Resu
 
 pub async fn reset_system_proxy(app: &tauri::AppHandle) -> Result<(), String> {
     // 清理系统代理
-    platform_impl::unset_proxy(app)
+    PlatformVpnProxy::unset_proxy(app)
         .await
         .map_err(|e| e.to_string())?;
 
@@ -269,7 +264,7 @@ pub async fn stop(app: tauri::AppHandle) -> Result<(), String> {
             }
             ProxyMode::TunProxy => {
                 if let Some(password) = &tun_password {
-                    platform_impl::stop_tun_process(password)?;
+                    PlatformVpnProxy::stop_tun_process(password)?;
                 }
             }
         }
