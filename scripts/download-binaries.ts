@@ -36,11 +36,11 @@ async function downloadFile(url: string, dest: string): Promise<void> {
     const response = await fetch(url);
 
     if (!response.ok) {
-        throw new Error(`下载失败: '${url}' (${response.status})`);
+        throw new Error(`Download failed: '${url}' (${response.status})`);
     }
 
     if (!response.body) {
-        throw new Error('响应体为空');
+        throw new Error('Response body is empty');
     }
 
     await streamPipeline(response.body as any, createWriteStream(dest));
@@ -67,29 +67,29 @@ async function embeddingExternalBinaries(
     const downloadPath = path.join(tmpDir, fileName);
 
     try {
-        // 创建临时目录
+        // Create temporary directory
         !fs.existsSync(tmpDir) && fs.mkdirSync(tmpDir, { recursive: true });
 
-        // 下载和解压文件
-        console.log(`正在下载 ${platform}-${arch}-${SING_BOX_VERSION} 版本的 sing-box...`);
+        // Download and extract file
+        console.log(`Downloading sing-box version ${platform}-${arch}-${SING_BOX_VERSION}...`);
         await downloadFile(downloadUrl, downloadPath);
         await extractFile(downloadPath, fileExtension, tmpDir);
 
-        // 移动文件到目标位置
+        // Move file to target location
         const extractedFilePath = path.join(tmpDir, `${BINARY_NAME}-${SING_BOX_VERSION.substring(1)}-${platform}-${arch}/${BINARY_NAME}${extension}`);
         const targetPath = `src-tauri/binaries/${BINARY_NAME}-${targetTriple}${extension}`;
 
-        // 确保目标目录存在
+        // Ensure target directory exists
         const targetDir = path.dirname(targetPath);
         !fs.existsSync(targetDir) && fs.mkdirSync(targetDir, { recursive: true });
 
-        // 移动文件并清理
+        // Move file and cleanup
         fs.renameSync(extractedFilePath, targetPath);
         fs.rmSync(tmpDir, { recursive: true, force: true });
 
-        console.log(`${platform}-${arch} 版本处理完成`);
+        console.log(`${platform}-${arch} version processed successfully`);
     } catch (error) {
-        console.error('处理失败:', error);
+        console.error('Processing failed:', error);
         throw error;
     }
 }
@@ -107,15 +107,15 @@ async function downloadEmbeddingExternalBinaries(): Promise<void> {
 
             // 为 Windows x64 下载 sysproxy
             if (platform === 'windows' && arch === 'amd64') {
-                console.log('正在下载 Windows sysproxy...');
+                console.log('Downloading Windows sysproxy...');
                 const targetPath = `src-tauri/binaries/sysproxy-${targetTriple}${extension}`;
 
-                // 确保目标目录存在
+                // Ensure target directory exists
                 const targetDir = path.dirname(targetPath);
                 !fs.existsSync(targetDir) && fs.mkdirSync(targetDir, { recursive: true });
 
                 await downloadFile(SYSPROXY_URL, targetPath);
-                console.log('sysproxy 下载完成');
+                console.log('sysproxy download completed');
             }
         }
     }

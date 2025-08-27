@@ -197,15 +197,23 @@ export const useVPNOperations = () => {
     };
 
     const restartService = async (isEmpty: boolean) => {
+        if (isEmpty) {
+            setActiveScreen('configuration');
+            return message(t('please_add_subscription'), { title: t('tips'), kind: 'error' });
+        }
+
         setIsOperating(true);
+        setOperationStatus('starting');
+
         try {
-            await stopService();
-            await startService(isEmpty);
+            vpnServiceManager.syncConfig({});
+            vpnServiceManager.reload(1000);
         } catch (error) {
             console.error('重启服务失败:', error);
             await message(t('reconnect_failed'), { title: t('error'), kind: 'error' });
         } finally {
-            setTimeout(() => setIsOperating(false), 1200);
+            setIsOperating(false);
+            setOperationStatus('idle');
         }
     };
 
@@ -219,7 +227,16 @@ export const useVPNOperations = () => {
             if (isRunning) {
                 await stopService();
             } else {
-                await startService(isEmpty);
+                setIsOperating(true);
+                setOperationStatus('starting');
+                try {
+                    await startService(isEmpty);
+                } finally {
+                    setTimeout(() => {
+                        setIsOperating(false);
+                        setOperationStatus('idle');
+                    }, 2000)
+                }
             }
         } catch (error) {
             console.error('连接失败:', error);

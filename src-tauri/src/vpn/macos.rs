@@ -5,6 +5,8 @@ use tauri::AppHandle;
 use tauri_plugin_shell::process::Command as TauriCommand;
 use tauri_plugin_shell::ShellExt;
 
+use crate::vpn::VpnProxy;
+
 // 默认绕过列表
 pub static DEFAULT_BYPASS: &str =
     "127.0.0.1,192.168.0.0/16,10.0.0.0/8,172.16.0.0/12,172.29.0.0/16,localhost,*.local,*.crashlytics.com,<local>";
@@ -46,7 +48,6 @@ pub async fn unset_proxy(_app: &AppHandle) -> anyhow::Result<()> {
     // 清理系统代理设置
     let mut sysproxy = Sysproxy::get_system_proxy().map_err(|e| anyhow::anyhow!(e))?;
     sysproxy.enable = false;
-
     sysproxy.set_system_proxy()?;
     log::info!("Proxy unset");
     Ok(())
@@ -74,7 +75,7 @@ pub fn create_privileged_command(
 
 /// 停止TUN模式下的进程
 pub fn stop_tun_process(password: &str) -> Result<(), String> {
-    let command = format!("echo '{}' | sudo -S pkill -9 -f sing-box", password);
+    let command = format!("echo '{}' | sudo -S pkill -15 -f sing-box", password);
     log::info!(
         "Stop tun mode with command : {}",
         command.replace(password, "******")
@@ -85,4 +86,30 @@ pub fn stop_tun_process(password: &str) -> Result<(), String> {
         .output()
         .map_err(|e| e.to_string())?;
     Ok(())
+}
+
+/// macOS平台的VPN代理实现
+pub struct MacOSVpnProxy;
+
+impl VpnProxy for MacOSVpnProxy {
+    async fn set_proxy(_app: &AppHandle) -> anyhow::Result<()> {
+        set_proxy(_app).await
+    }
+
+    async fn unset_proxy(_app: &AppHandle) -> anyhow::Result<()> {
+        unset_proxy(_app).await
+    }
+
+    fn create_privileged_command(
+        app: &AppHandle,
+        sidecar_path: String,
+        path: String,
+        password: String,
+    ) -> Option<TauriCommand> {
+        create_privileged_command(app, sidecar_path, path, password)
+    }
+
+    fn stop_tun_process(password: &str) -> Result<(), String> {
+        stop_tun_process(password)
+    }
 }

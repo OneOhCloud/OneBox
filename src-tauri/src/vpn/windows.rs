@@ -11,6 +11,7 @@ use windows::Win32::Foundation::HWND;
 use windows::Win32::UI::Shell::ShellExecuteW;
 
 use crate::vpn::helper;
+use crate::vpn::VpnProxy;
 // 默认绕过列表
 pub static DEFAULT_BYPASS: &str = "localhost;127.*;192.168.*;10.*;172.16.*;172.17.*;172.18.*;172.19.*;172.20.*;172.21.*;172.22.*;172.23.*;172.24.*;172.25.*;172.26.*;172.27.*;172.28.*;172.29.*;172.30.*;172.31.*;<local>";
 
@@ -141,4 +142,75 @@ pub fn stop_tun_process(_password: &str) -> Result<(), String> {
 
     log::info!("Stop tun mode with command: taskkill /F /IM sing-box.exe");
     Ok(())
+}
+
+#[cfg(target_os = "windows")]
+pub fn restart_privileged_command(sidecar_path: String, path: String) -> Result<(), String> {
+    // 使用 PowerShell 脚本，路径处理更可靠
+    let ps_script = format!(
+        "Stop-Process -Name 'sing-box' -Force -ErrorAction SilentlyContinue; Start-Sleep -Milliseconds 500; & '{}' run -c '{}' --disable-color",
+        sidecar_path.replace("\\", "/"), // PowerShell 接受正斜杠
+        path.replace("\\", "/")
+    );
+
+    let powershell = OsStr::new("powershell")
+        .encode_wide()
+        .chain(Some(0))
+        .collect::<Vec<u16>>();
+
+    let args = format!("-Command \"{}\"", ps_script);
+    let args_wide: Vec<u16> = OsStr::new(&args).encode_wide().chain(Some(0)).collect();
+
+    let verb = OsStr::new("runas")
+        .encode_wide()
+        .chain(Some(0))
+        .collect::<Vec<u16>>();
+
+    let res = unsafe {
+        ShellExecuteW(
+            HWND(0),
+            PCWSTR(verb.as_ptr()),
+            PCWSTR(powershell.as_ptr()),
+            PCWSTR(args_wide.as_ptr()),
+            PCWSTR(std::ptr::null()),
+            windows::Win32::UI::WindowsAndMessaging::SHOW_WINDOW_CMD(0),
+        )
+    };
+
+    if res.0 as usize <= 32 {
+        return Err(format!("ShellExecuteW failed: code {}", res.0 as usize));
+    }
+
+    log::info!("Restart tun mode with PowerShell command: {}", ps_script);
+    Ok(())
+}
+
+/// Windows平台的VPN代理实现
+pub struct WindowsVpnProxy;
+
+impl VpnProxy for WindowsVpnProxy {
+    async fn set_proxy(app: &AppHandle) -> anyhow::Result<()> {
+        set_proxy(app).await
+    }
+
+    async fn unset_proxy(app: &AppHandle) -> anyhow::Result<()> {
+        unset_proxy(app).await
+    }
+
+    fn create_privileged_command(
+        app: &AppHandle,
+        sidecar_path: String,
+        path: String,
+        password: String,
+    ) -> Option<TauriCommand> {
+        create_privileged_command(app, sidecar_path, path, password)
+    }
+
+    fn stop_tun_process(password: &str) -> Result<(), String> {
+        stop_tun_process(password)
+    }
+
+    fn restart(sidecar_path: String, path: String) {
+        let _ = restart_privileged_command(sidecar_path, path);
+    }
 }

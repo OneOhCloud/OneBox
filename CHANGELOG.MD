@@ -1,29 +1,41 @@
 # Changelog
 
-All annotation changes for this release will be recorded in this file.
+## [v1.1.x]
 
-### New Features
-- Added core log API interface support
-- Windows systems now use API method for log retrieval by default
-- Other systems continue to use IPC method for logging
-- Note: Specifically addresses log stream access issues in Windows TUN mode caused by UAC permissions
+### ⚠ BREAKING CHANGES
+- Removed support for legacy protocols
+- Refactored the log page for better performance and maintainability
 
-### System Optimizations
-- Changed default DNS resolution method from LOCAL to DHCP
-- Significantly improved access speed for non-proxied websites on Windows
-- Resolved performance bottleneck issues in LOCAL DNS resolution mode
+### ✨ Features 
+- Added real-time network speed on the log page
+- Added sing-box reload signal support
+- Use a safer method to terminate processes, removing unnecessary force options
 
-## 中文
+### 🐛 Bug Fixes
+- Fixed visual feedback when clicking the "Start" button
+- Fixed an issue where the log page height displayed abnormally on Windows
 
-此版本的所有值得注意的变更都将记录在此文件中。
+### 🔨 Performance
+- Optimized process restart logic on non-Windows systems
 
-### 新增功能
-- 新增核心日志 API 接口支持
-- Windows 系统默认使用 API 方式获取日志
-- 其他系统继续使用 IPC 方式获取日志
-- 优化说明：特别解决了 Windows TUN 模式下，因 UAC 权限导致的日志流获取问题
+---
 
-### 系统优化
-- 将默认 DNS 解析方式从 LOCAL 调整为 DHCP
-- 显著提升 Windows 系统上非代理网站的访问速度
-- 解决了 LOCAL 模式下 DNS 解析性能瓶颈问题
+# 更新日志
+
+## [v1.1.x]
+
+### ⚠ 重大变更
+- 移除了对旧版协议的支持
+- 日志页面重构，提升性能和可维护性
+
+### ✨ 新增功能
+- 新增实时网速在日志页面中
+- 新增 sing-box 重载信号支持
+- 结束进程时使用更安全的方式，移除不必要的强制选项
+
+### 🐛 问题修复
+- 修复"启动"按钮的点击反馈效果
+- 修复日志页面在 Windows 上高度显示异常的问题
+
+### 🔨 性能优化
+- 优化非 Windows 系统下的进程重启逻辑

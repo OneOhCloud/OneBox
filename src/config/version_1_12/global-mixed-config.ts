@@ -14,7 +14,7 @@ const mixedConfig = {
         "servers": [
             {
                 "tag": "system",
-                "type": "dhcp",
+                "type": "dhcp"
             },
             {
                 "tag": "alibaba",
