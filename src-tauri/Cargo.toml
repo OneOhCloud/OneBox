@@ -22,6 +22,10 @@ debug = false
 name = "oneoh_sing_box_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
+[[bin]]
+name = "privilege-controller"
+path = "src/bin/privilege-controller.rs"
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
@@ -43,6 +47,7 @@ tokio = { version = "1.44.1", features = ["full"] }
 anyhow = "1.0"
 tauri-plugin-log = "2"
 lazy_static = "1.5.0"
+env_logger = "0.11"
 
 sysproxy = { git = "https://github.com/OneOhCloud/sysproxy-rs" }
 tauri-plugin-clipboard-manager = "2"

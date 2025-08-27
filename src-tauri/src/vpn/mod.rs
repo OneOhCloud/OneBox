@@ -26,6 +26,7 @@ pub mod helper;
 pub mod linux;
 #[cfg(target_os = "macos")]
 pub mod macos;
+pub mod privilege_controller;
 #[cfg(target_os = "windows")]
 pub mod windows;
 

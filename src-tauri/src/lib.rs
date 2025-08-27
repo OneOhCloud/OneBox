@@ -6,7 +6,7 @@ mod database;
 mod lan;
 mod plugins;
 mod privilege;
-mod vpn;
+pub mod vpn;
 
 #[tauri::command]
 fn get_app_version(app: AppHandle) -> String {
