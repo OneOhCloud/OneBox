@@ -5,6 +5,7 @@ use tauri::{
 };
 use tauri_plugin_http::reqwest::{self, redirect::Policy};
 use tokio::process::Command;
+use tokio::time::timeout;
 use webbrowser;
 
 #[tauri::command]
@@ -76,6 +77,17 @@ pub async fn open_browser(app: AppHandle, url: String) -> Result<(), String> {
 
 #[tauri::command]
 pub async fn ping_captive() -> String {
+    let socket = tokio::net::TcpSocket::new_v4().unwrap();
+    let addr = "223.5.5.5:53".parse().unwrap();
+    let result = timeout(std::time::Duration::from_millis(100), socket.connect(addr)).await;
+
+    match result {
+        Ok(_) => {
+            return "true".to_string();
+        }
+        Err(_) => log::debug!("Socket connection failed"),
+    }
+
     let url = "http://captive.oneoh.cloud";
 
     log::debug!("Pinging URL: {}", url);
