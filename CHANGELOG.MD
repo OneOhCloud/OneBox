@@ -1,6 +1,9 @@
 # Changelog
+Use development and beta versions only if you are aware of the potential risks.
 
-## [Changes since v1.1.47]
+## Changes since v1.1.47
+All annotation changes for this release will be recorded in this file.
+
 
 ### ⚠ CHANGES
 - The application checks network status on startup.
@@ -10,7 +13,10 @@
 - ping_captive adds a check for 223.5.5.5 port 853 to quickly detect network status. If the check fails, the original logic is executed.
 
 
-## [自 v1.1.47 以来的变更]
+## 自 v1.1.47 以来的变更
+
+此版本的所有值得注意的变更都将记录在此文件中。
+
 
 ### ⚠ 变更
 - 应用程序启动时检测网络状态。
