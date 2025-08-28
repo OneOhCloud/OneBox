@@ -1,6 +1,6 @@
 {
     "about": "关于",
-    "add_subscription_failed": "添加配置文件失败，请粘贴正确的 URL",
+    "add_subscription_failed": "添加配置文件失败，请粘贴正确的 URL 或者重启电脑尝试。",
     "add_subscription_success": "添加配置文件成功",
     "add_subscription": "添加配置文件",
     "add": "添加",
