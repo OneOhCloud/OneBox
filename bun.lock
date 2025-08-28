@@ -36,10 +36,10 @@
       },
       "devDependencies": {
         "@tauri-apps/cli": "^2.8.3",
-        "@types/react": "^19.1.11",
+        "@types/react": "^19.1.12",
         "@types/react-dom": "^19.1.8",
         "@vitejs/plugin-react": "^4.7.0",
-        "daisyui": "^5.0.51",
+        "daisyui": "^5.0.52",
         "husky": "^9.1.7",
         "tar": "^7.4.3",
         "typescript": "~5.6.3",
@@ -319,7 +319,7 @@
 
     "csstype": ["csstype@3.1.3", "", {}, "sha512-M1uQkMl8rQK/szD0LNhtqxIPLpimGm8sOBwU7lLnCpSbTyY3yeU1Vc7l4KT5zT4s/yOxHH5O7tIuuLOCnLADRw=="],
 
-    "daisyui": ["daisyui@5.0.52", "", {}, "sha512-AbZYZ1Pv/vuvSE0zk36mjPc3zWedicMP62RxTn360td6+bVUhYocXszGtGuM1Ih45E/sMLEK/oCcLi00G1uamQ=="],
+    "daisyui": ["daisyui@5.0.53", "", {}, "sha512-uOt80dipPOhPeybJ7o+Y5CxqH9XLh9NDsVlwLL5cLZ5RUJF0WatPEQymWGN/EWiCvuYMD9qviPedF+ExhBJ25g=="],
 
     "debug": ["debug@4.4.1", "", { "dependencies": { "ms": "^2.1.3" } }, "sha512-KcKCqiftBJcZr++7ykoDIEwSa3XWowTfNPo92BYxjXiyYEVrUQh2aLyhxBCwww+heortUFxEJYcRzosstTEBYQ=="],
 

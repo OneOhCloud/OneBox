@@ -1,6 +1,6 @@
 {
     "about": "about",
-    "add_subscription_failed": "add config failed, please paste the correct URL",
+    "add_subscription_failed": "add config failed, please paste the correct URL or restart your computer",
     "add_subscription_success": "add config success",
     "add_subscription": "add config",
     "add": "add",
