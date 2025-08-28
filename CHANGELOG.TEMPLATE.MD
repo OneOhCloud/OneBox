@@ -9,6 +9,8 @@
 - ping_captive adds a check for 223.5.5.5 port 53 to quickly detect network status. If the check fails, the original logic is executed.
 
 
+
+
 ## [自 v1.1.47 以来的变更]
 
 ### ⚠ 重大变更
