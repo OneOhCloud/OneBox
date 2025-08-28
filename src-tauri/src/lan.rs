@@ -78,7 +78,7 @@ pub async fn open_browser(app: AppHandle, url: String) -> Result<(), String> {
 #[tauri::command]
 pub async fn ping_captive() -> String {
     let socket = tokio::net::TcpSocket::new_v4().unwrap();
-    let addr = "223.5.5.5:53".parse().unwrap();
+    let addr = "223.5.5.5:853".parse().unwrap();
     let result = timeout(std::time::Duration::from_millis(100), socket.connect(addr)).await;
 
     match result {
