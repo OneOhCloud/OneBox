@@ -18,4 +18,4 @@ All significant changes in this version are documented here.
 - sing-box 内核升级至 v1.12.4。
 - 应用启动时自动检测网络状态。
 - 配置文件添加失败时，新增“建议重启电脑”的提示。
-- 网络检测地址更新为 http://connectivitycheck.gstatic.com/generate_204，并简化了检测逻辑。
+- 网络检测地址更新为 http://connectivitycheck.gstatic.com/generate_204 并简化了检测逻辑。
