@@ -2,7 +2,7 @@
 Use development and beta versions only if you are aware of the potential risks.
 
 ## Changes since v1.1.47
-All annotation changes for this release will be recorded in this file.
+All significant changes in this version are documented here.
 
 ### ⚠ CHANGES
 - Removed support for legacy protocols
