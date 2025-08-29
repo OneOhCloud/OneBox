@@ -178,11 +178,10 @@ function About({ onClose }: AboutProps) {
 
                         <div>
                             <button
-                                className="mt-4 btn btn-sm btn-ghost  btn-success w-full"
+                                className="mt-4 btn btn-sm  btn-secondary w-full capitalize"
                                 onClick={() => {
                                     setActiveScreen('developer_options');
                                     onClose();
-
                                 }}
                             >
                                 {t("developer_options")}

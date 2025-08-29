@@ -1,6 +1,8 @@
 # Changelog
+Use development and beta versions only if you are aware of the potential risks.
 
-## [Changes since v1.1.47]
+## Changes since v1.1.47
+All significant changes in this version are documented here.
 
 ### ⚠ CHANGES
 - Removed support for legacy protocols
@@ -19,7 +21,8 @@
 - Optimized process restart logic on non-Windows systems
 
 
-## [自 v1.1.47 以来的变更]
+## 自 v1.1.47 以来的变更
+此版本的所有值得注意的变更都将记录在此文件中。
 
 ### ⚠ 变更
 - 移除了对旧版协议的支持

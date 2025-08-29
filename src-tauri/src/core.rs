@@ -340,7 +340,7 @@ pub async fn stop(app: tauri::AppHandle) -> Result<(), String> {
 
     log::info!("Stopping proxy process");
     let (current_mode, tun_password, child_option) = {
-        let mut manager = match PROCESS_MANAGER.lock() {
+        let mut manager: std::sync::MutexGuard<'_, ProcessManager> = match PROCESS_MANAGER.lock() {
             Ok(m) => m,
             Err(e) => {
                 log::error!("Mutex lock error during stop: {:?}", e);
