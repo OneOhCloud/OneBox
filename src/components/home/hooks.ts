@@ -9,7 +9,6 @@ import { getStoreValue, setStoreValue } from "../../single/store";
 import { RULE_MODE_STORE_KEY } from "../../types/definition";
 import { t, vpnServiceManager } from "../../utils/helper";
 
-const url = "http://connectivitycheck.gstatic.com/generate_204";
 
 
 export function useNetworkCheck(key: string, checkFn: () => Promise<number>) {
@@ -33,6 +32,8 @@ export function useNetworkCheck(key: string, checkFn: () => Promise<number>) {
 
                 if (answer) {
                     setConfirmShown(false);
+                    await vpnServiceManager.stop();
+                    let url = await invoke("get_captive_redirect_url");
                     await invoke('open_browser', {
                         app: getCurrentWindow(),
                         url: url
@@ -62,7 +63,7 @@ export function useNetworkCheck(key: string, checkFn: () => Promise<number>) {
 export function useGstaticNetworkCheck() {
     return useNetworkCheck(
         `apple-network-check`, async () => {
-            return await invoke<number>('ping_captive')
+            return await invoke<number>('check_captive_portal_status')
         }
 
     );
