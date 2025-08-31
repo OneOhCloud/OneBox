@@ -9,38 +9,34 @@ import { getStoreValue, setStoreValue } from "../../single/store";
 import { RULE_MODE_STORE_KEY } from "../../types/definition";
 import { t, vpnServiceManager } from "../../utils/helper";
 
-type NetworkResponse = {
-    status: boolean | string;
-    needsLogin?: boolean;
-    loginUrl?: string;
-};
 
-export function useNetworkCheck(key: string, checkFn: () => Promise<NetworkResponse>) {
+
+export function useNetworkCheck(key: string, checkFn: () => Promise<number>) {
     const [shouldRefresh, setShouldRefresh] = useState(true);
     const [confirmShown, setConfirmShown] = useState(false);
 
     async function handleNetworkCheck() {
         if (!shouldRefresh) {
-            return { status: false };
+            return false
         }
 
         try {
-            const response = await checkFn();
-
-            if (response.needsLogin && !confirmShown) {
+            const status = await checkFn();
+            if (status == 1 && !confirmShown) {
                 setShouldRefresh(false);
                 setConfirmShown(true);
-
                 const answer = await confirm(t("network_need_login"), {
                     title: t("network_need_login_title"),
                     kind: 'warning',
                 });
 
-                if (answer && response.loginUrl) {
+                if (answer) {
                     setConfirmShown(false);
+                    await vpnServiceManager.stop();
+                    let url = await invoke("get_captive_redirect_url");
                     await invoke('open_browser', {
                         app: getCurrentWindow(),
-                        url: response.loginUrl
+                        url: url
                     });
                 }
 
@@ -50,11 +46,13 @@ export function useNetworkCheck(key: string, checkFn: () => Promise<NetworkRespo
                 }, 15000);
             }
 
-            return response;
+            //  状态为 0 代表网络正常。
+            return status == 0;
         } catch (error) {
             console.error(`Network check failed: ${error}`);
-            return { status: false };
+            return false;
         }
+
     }
 
     return useSWR(key, handleNetworkCheck, {
@@ -62,20 +60,12 @@ export function useNetworkCheck(key: string, checkFn: () => Promise<NetworkRespo
     });
 }
 
-export function useAppleNetworkCheck() {
-    async function checkAppleNetwork() {
-        const res = await invoke<string>('ping_captive');
-        console.log("Network check result:", res);
-        return {
-            status: res === "true",
-            needsLogin: res.startsWith("http"),
-            loginUrl: res.startsWith("http") ? res : undefined
-        };
-    }
-
+export function useGstaticNetworkCheck() {
     return useNetworkCheck(
-        `apple-network-check`,
-        checkAppleNetwork
+        `apple-network-check`, async () => {
+            return await invoke<number>('check_captive_portal_status')
+        }
+
     );
 }
 

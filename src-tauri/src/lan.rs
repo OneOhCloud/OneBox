@@ -7,6 +7,17 @@ use tauri_plugin_http::reqwest::{self, redirect::Policy};
 use tokio::process::Command;
 use webbrowser;
 
+const DEFAULT_CAPTIVE_URL: &str = "http://captive.oneoh.cloud";
+
+fn build_no_redirect_client() -> reqwest::Client {
+    reqwest::ClientBuilder::new()
+        .timeout(std::time::Duration::from_secs(10))
+        .redirect(Policy::none())
+        .no_proxy()
+        .build()
+        .unwrap()
+}
+
 #[tauri::command]
 pub async fn get_lan_ip() -> Result<String, String> {
     #[cfg(target_os = "windows")]
@@ -75,50 +86,53 @@ pub async fn open_browser(app: AppHandle, url: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub async fn ping_captive() -> String {
-    let url = "http://captive.oneoh.cloud";
+pub async fn check_captive_portal_status() -> i8 {
+    // -1 代表无法访问, 0 代表可以访问, 1 代表需要认证
 
-    log::debug!("Pinging URL: {}", url);
+    // 如果需要替换其他检测地址，务必满足以下条件
+    // - 中国大陆以及海外可访问
+    // - 支持无重定向的 http 协议
+    // - 解析记录仅 IPv4，如果有 IPv6 记录可能在纯 IPv4 网络下失败导致误报。
 
-    // 创建 HTTP 客户端，禁用自动重定向
-    let builder = reqwest::ClientBuilder::new()
-        .timeout(std::time::Duration::from_secs(10))
-        .redirect(Policy::none())
-        .no_proxy();
+    let url = "http://connectivitycheck.gstatic.com/generate_204";
 
-    let client = builder.build().unwrap();
-
+    let client = build_no_redirect_client();
     match client.get(url).send().await {
         Ok(response) => {
             let status = response.status();
-            if status == StatusCode::OK {
-                // zh: 200 网络认证成功，返回 true
-                // en: 200 Network authentication successful, return true
-                "true".to_string()
-            } else if matches!(
-                status,
-                StatusCode::FOUND
-                    | StatusCode::MOVED_PERMANENTLY
-                    | StatusCode::TEMPORARY_REDIRECT
-                    | StatusCode::PERMANENT_REDIRECT
-            ) {
-                if let Some(location) = response.headers().get(LOCATION) {
-                    if let Ok(redirect_url) = location.to_str() {
-                        return redirect_url.to_string();
-                    } else {
-                        log::error!("Invalid redirect URL");
-                    }
-                }
-                log::error!("Redirect without location header");
-                "false".to_string()
+            if status == StatusCode::NO_CONTENT {
+                0
+            } else if status.is_redirection() {
+                1
             } else {
-                // 其他非预期状态返回 false
-                // Other unexpected status returns false
                 log::error!("Unexpected status code: {}", status);
-                "false".to_string()
+                -1
             }
         }
-        Err(_) => false.to_string(), // 请求失败返回 false
+        Err(_) => -1,
+    }
+}
+
+#[tauri::command]
+pub async fn get_captive_redirect_url() -> String {
+    let client = build_no_redirect_client();
+
+    match client.get(DEFAULT_CAPTIVE_URL).send().await {
+        Ok(response) => {
+            let status = response.status();
+            if status.is_redirection() {
+                response
+                    .headers()
+                    .get(LOCATION)
+                    .and_then(|h| h.to_str().ok())
+                    .map(|s| s.to_string())
+                    .unwrap_or_else(|| DEFAULT_CAPTIVE_URL.to_string())
+            } else {
+                log::error!("Unexpected status code: {}", status);
+                DEFAULT_CAPTIVE_URL.to_string()
+            }
+        }
+        Err(_) => DEFAULT_CAPTIVE_URL.to_string(),
     }
 }
 

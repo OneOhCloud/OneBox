@@ -1,6 +1,7 @@
 #[cfg(target_os = "windows")]
 use png;
 use tauri::{AppHandle, Manager, Window, WindowEvent};
+use tauri_plugin_http::reqwest;
 mod core;
 mod database;
 mod lan;
@@ -114,7 +115,8 @@ pub fn run() {
             lan::get_lan_ip,
             lan::ping_google,
             lan::open_browser,
-            lan::ping_captive,
+            lan::get_captive_redirect_url,
+            lan::check_captive_portal_status,
             core::stop,
             core::start,
             core::version,
@@ -135,6 +137,16 @@ pub fn run() {
             log::info!("app config path: {:?}", app.path().app_config_dir());
             log::info!("app local data path: {:?}", app.path().app_local_data_dir());
 
+            tauri::async_runtime::spawn(async {
+                match reqwest::get("http://captive.oneoh.cloud").await {
+                    Ok(resp) => {
+                        log::info!("captive.oneoh.cloud status: {}", resp.status());
+                    }
+                    Err(e) => {
+                        log::error!("captive.oneoh.cloud request error: {}", e);
+                    }
+                }
+            });
             #[cfg(target_os = "macos")]
             {
                 app.set_activation_policy(tauri::ActivationPolicy::Accessory);

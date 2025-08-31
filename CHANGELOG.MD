@@ -1,41 +1,21 @@
 # Changelog
+Use development and beta versions only if you are aware of the potential risks.
 
-## [v1.1.x]
+## Changes since v1.1.47
+All significant changes in this version are documented here.
 
-### ⚠ BREAKING CHANGES
-- Removed support for legacy protocols
-- Refactored the log page for better performance and maintainability
+### ⚠ CHANGES
+- Upgraded sing-box core to v1.12.4.
+- The application now automatically checks network status on startup.
+- Added a prompt suggesting a computer restart if adding a configuration file fails.
+- Updated the network check address to http://connectivitycheck.gstatic.com/generate_204
 
-### ✨ Features 
-- Added real-time network speed on the log page
-- Added sing-box reload signal support
-- Use a safer method to terminate processes, removing unnecessary force options
 
-### 🐛 Bug Fixes
-- Fixed visual feedback when clicking the "Start" button
-- Fixed an issue where the log page height displayed abnormally on Windows
+## 自 v1.1.47 以来的变更
+本版本的所有重要变更将记录于此。
 
-### 🔨 Performance
-- Optimized process restart logic on non-Windows systems
-
----
-
-# 更新日志
-
-## [v1.1.x]
-
-### ⚠ 重大变更
-- 移除了对旧版协议的支持
-- 日志页面重构，提升性能和可维护性
-
-### ✨ 新增功能
-- 新增实时网速在日志页面中
-- 新增 sing-box 重载信号支持
-- 结束进程时使用更安全的方式，移除不必要的强制选项
-
-### 🐛 问题修复
-- 修复"启动"按钮的点击反馈效果
-- 修复日志页面在 Windows 上高度显示异常的问题
-
-### 🔨 性能优化
-- 优化非 Windows 系统下的进程重启逻辑
+### ⚠ 变更
+- sing-box 内核升级至 v1.12.4。
+- 应用启动时自动检测网络状态。
+- 配置文件添加失败时，新增“建议重启电脑”的提示。
+- 网络检测地址更新为 http://connectivitycheck.gstatic.com/generate_204

@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
 import { Globe, Icon, Reception4 } from "react-bootstrap-icons";
 import { t } from "../../utils/helper";
-import { useAppleNetworkCheck, useGoogleNetworkCheck } from "./hooks";
+import { useGoogleNetworkCheck, useGstaticNetworkCheck } from "./hooks";
 
 type NetworkStatusProps = {
     isOk: boolean;
@@ -32,9 +32,8 @@ const NetworkStatus = ({ isOk, icon: Icon, tip }: NetworkStatusProps) => (
 );
 
 export function AppleNetworkStatus() {
-    const { data, isLoading, error } = useAppleNetworkCheck();
+    const { data: ok, isLoading, error } = useGstaticNetworkCheck();
 
-    if (isLoading || !data) return <LoadingStatus icon={Reception4} />;
     if (error) {
         console.error("Network check error:", error);
         return <NetworkStatus
@@ -44,8 +43,10 @@ export function AppleNetworkStatus() {
         />;
     }
 
+    if (isLoading || ok === undefined) return <LoadingStatus icon={Reception4} />;
+
     return <NetworkStatus
-        isOk={Boolean(data.status)}
+        isOk={ok}
         icon={Reception4}
         tip={t("normal_network")}
     />;

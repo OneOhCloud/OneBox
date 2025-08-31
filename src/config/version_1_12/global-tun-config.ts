@@ -148,7 +148,8 @@ const tunConfig = {
                     "captive.oneoh.cloud",
                     "captive.apple.com",
                     "nmcheck.gnome.org",
-                    "www.msftconnecttest.com"
+                    "www.msftconnecttest.com",
+                    "connectivitycheck.gstatic.com"
                 ],
                 "domain_suffix": [
                     "local",

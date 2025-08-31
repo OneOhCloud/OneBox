@@ -1,6 +1,6 @@
 {
     "about": "关于",
-    "add_subscription_failed": "添加配置文件失败，请粘贴正确的 URL",
+    "add_subscription_failed": "添加配置文件失败，请粘贴正确的 URL 或者重启电脑尝试。",
     "add_subscription_success": "添加配置文件成功",
     "add_subscription": "添加配置文件",
     "add": "添加",
@@ -26,7 +26,7 @@
     "config_viewer": "配置查看器",
     "configuration": "配置",
     "confirm": "确认",
-    "connect_failed_retry": "连接失败，请稍等一分钟后重试。",
+    "connect_failed_retry": "连接失败，请退出程序一分钟后重试。",
     "connect_failed": "连接失败",
     "connected": "已连接",
     "connecting": "连接中",
