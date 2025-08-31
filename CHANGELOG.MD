@@ -8,7 +8,7 @@ All significant changes in this version are documented here.
 - Upgraded sing-box core to v1.12.4.
 - The application now automatically checks network status on startup.
 - Added a prompt suggesting a computer restart if adding a configuration file fails.
-- Updated the network check address to http://connectivitycheck.gstatic.com/generate_204 and simplified the detection logic.
+- Updated the network check address to http://connectivitycheck.gstatic.com/generate_204
 
 
 ## 自 v1.1.47 以来的变更
@@ -18,4 +18,4 @@ All significant changes in this version are documented here.
 - sing-box 内核升级至 v1.12.4。
 - 应用启动时自动检测网络状态。
 - 配置文件添加失败时，新增“建议重启电脑”的提示。
-- 网络检测地址更新为 http://connectivitycheck.gstatic.com/generate_204 并简化了检测逻辑。
+- 网络检测地址更新为 http://connectivitycheck.gstatic.com/generate_204
