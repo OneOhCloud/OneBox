@@ -8,6 +8,7 @@ export const DEVELOPER_TOGGLE_STORE_KEY = 'developer_toggle_key'
 export const STAGE_VERSION_STORE_KEY = 'stage_version_key'
 export const TUN_STACK_STORE_KEY = 'tun_stack_key'
 export const USE_DHCP_STORE_KEY = 'use_dhcp_key'
+export const ENABLE_BYPASS_ROUTER_STORE_KEY = 'enable_bypass_router_key'
 
 
 // 允许局域网连接
