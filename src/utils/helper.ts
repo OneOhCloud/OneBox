@@ -2,7 +2,7 @@ import { invoke } from '@tauri-apps/api/core';
 import * as path from '@tauri-apps/api/path';
 import { writeText } from '@tauri-apps/plugin-clipboard-manager';
 import { arch, locale, type, version } from '@tauri-apps/plugin-os';
-import { OsInfo, RULE_MODE_STORE_KEY, SING_BOX_VERSION, SSI_STORE_KEY } from '../types/definition';
+import { OsInfo, RULE_MODE_STORE_KEY, SING_BOX_VERSION, SSI_STORE_KEY, USE_DHCP_STORE_KEY } from '../types/definition';
 
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { message } from '@tauri-apps/plugin-dialog';
@@ -19,7 +19,9 @@ const languageOptions = {
     en: enLang,
     zh: zhLang,
 
+
 }
+
 export async function initLanguage() {
     try {
         // 优先使用用户设置的语言
@@ -246,3 +248,24 @@ export async function updateLanguage() {
     currentLanguage = await getLanguage() as "zh" | "en";
 }
 
+
+export async function getUseDHCP(): Promise<boolean> {
+    let useDHCP: boolean;
+
+    switch (type()) {
+        case 'windows':
+            useDHCP = false;
+            break;
+        case 'linux':
+            useDHCP = false;
+            break;
+        case 'macos':
+            useDHCP = false;
+            break;
+        default:
+            useDHCP = false;
+            break;
+    }
+
+    return await getStoreValue(USE_DHCP_STORE_KEY, useDHCP);
+}

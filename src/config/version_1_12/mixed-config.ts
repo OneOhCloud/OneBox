@@ -2,7 +2,7 @@ import * as path from '@tauri-apps/api/path';
 import { getSubscriptionConfig } from '../../action/db';
 import { getAllowLan } from '../../single/store';
 import { clashApi, ruleSet } from '../common';
-import { DEFAULT_DOMAIN_RESOLVER_TAG, updateVPNServerConfigFromDB } from './helper';
+import { DEFAULT_DOMAIN_RESOLVER_TAG, updateDHCPSettings2Config, updateVPNServerConfigFromDB } from './helper';
 
 const mixedConfig = {
   "log": {
@@ -12,6 +12,12 @@ const mixedConfig = {
   },
   "dns": {
     "servers": [
+      {
+        "tag": "system",
+        "type": "udp",
+        "server": "223.5.5.5",
+        "server_port": 53,
+      },
       {
         "tag": "dns_proxy",
         "type": "tcp",
@@ -32,10 +38,7 @@ const mixedConfig = {
         "server_port": 53,
       },
 
-      {
-        "tag": "system",
-        "type": "dhcp"
-      },
+
       {
         "tag": "tencent",
         "type": "udp",
@@ -208,17 +211,19 @@ const mixedConfig = {
 
 
 export default async function setMixedConfig(identifier: string) {
+  // 一定要优先深拷贝配置文件，否则会修改原始配置文件对象，导致后续使用时出错。
+  const newConfig = JSON.parse(JSON.stringify(mixedConfig));
+
+
   console.log("写入[规则]系统代理配置文件");
-
   let dbConfigData = await getSubscriptionConfig(identifier);
-
   const appConfigPath = await path.appConfigDir();
   const dbCacheFilePath = await path.join(appConfigPath, 'mixed-cache-rule--v1.db');
 
-  // 深拷贝配置文件
-  const newConfig = JSON.parse(JSON.stringify(mixedConfig));
-  newConfig["experimental"]["cache_file"]["path"] = dbCacheFilePath;
 
+
+
+  newConfig["experimental"]["cache_file"]["path"] = dbCacheFilePath;
   const allowLan = await getAllowLan();
 
   if (allowLan) {
@@ -227,6 +232,7 @@ export default async function setMixedConfig(identifier: string) {
     newConfig["inbounds"][0]["listen"] = "127.0.0.1";
   }
 
-  updateVPNServerConfigFromDB('config.json', dbConfigData, newConfig);
+  await updateDHCPSettings2Config(newConfig);
+  await updateVPNServerConfigFromDB('config.json', dbConfigData, newConfig);
 
 }

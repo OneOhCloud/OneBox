@@ -408,6 +408,7 @@ pub async fn stop(app: tauri::AppHandle) -> Result<(), String> {
     }
     // 睡眠 0.5 等待进程退出
     std::thread::sleep(std::time::Duration::from_millis(500));
+    log::info!("Proxy process stopped");
     app.emit("status-changed", ()).unwrap();
     Ok(())
 }
