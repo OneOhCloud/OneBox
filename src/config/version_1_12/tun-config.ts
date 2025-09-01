@@ -18,7 +18,10 @@ const tunConfig = {
                 "tag": "system",
                 // tun 模式下使用 local 会导致性能问题，
                 // https://github.com/SagerNet/sing-box/issues/456
-                "type": "dhcp"
+                // "type": "dhcp"
+                "type": "udp",
+                "server": "223.5.5.5",
+                "server_port": 53,
 
             },
             {

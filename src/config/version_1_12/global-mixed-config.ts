@@ -14,7 +14,10 @@ const mixedConfig = {
         "servers": [
             {
                 "tag": "system",
-                "type": "dhcp"
+                // "type": "dhcp"
+                "type": "udp",
+                "server": "223.5.5.5",
+                "server_port": 53,
             },
             {
                 "tag": "alibaba",
