@@ -4,7 +4,7 @@ import { getSubscriptionConfig } from '../../action/db';
 import { getAllowLan, getStoreValue } from '../../single/store';
 import { TUN_STACK_STORE_KEY } from '../../types/definition';
 import { clashApi, ruleSet } from '../common';
-import { DEFAULT_DOMAIN_RESOLVER_TAG, updateVPNServerConfigFromDB } from './helper';
+import { DEFAULT_DOMAIN_RESOLVER_TAG, updateDHCPSettings2Config, updateVPNServerConfigFromDB } from './helper';
 
 
 const tunConfig = {
@@ -17,9 +17,6 @@ const tunConfig = {
         "servers": [
             {
                 "tag": "system",
-                // tun 模式下使用 local 会导致性能问题，
-                // https://github.com/SagerNet/sing-box/issues/456
-                // "type": "dhcp"
                 "type": "udp",
                 "server": "223.5.5.5",
                 "server_port": 53,
@@ -202,16 +199,22 @@ const tunConfig = {
 }
 
 export default async function setGlobalTunConfig(identifier: string) {
+    // 一定要优先深拷贝配置文件，否则会修改原始配置文件对象，导致后续使用时出错。
+    const newConfig = JSON.parse(JSON.stringify(tunConfig));
+
+
     console.log("写入[全局]TUN代理配置文件");
-
     let dbConfigData = await getSubscriptionConfig(identifier);
-
     const appConfigPath = await path.appConfigDir();
     const dbCacheFilePath = await path.join(appConfigPath, 'tun-cache-global-v1.db');
 
+
+
+
+
     // Windows 使用 system stack 兼容性是最佳的。（弃用！！！）
     // if (type() === "windows" || type() === "linux") {
-    //     tunConfig.inbounds[0].stack = "system";
+    //     newConfig.inbounds[0].stack = "system";
     // }
 
     // 2025年8月17日经过测试，
@@ -221,20 +224,17 @@ export default async function setGlobalTunConfig(identifier: string) {
     // linux 中默认使用 system 栈，除非有实际证据表明性能也不如 gVisor。
 
     if (type() === "linux") {
-        tunConfig.inbounds[0].stack = "system";
+        newConfig.inbounds[0].stack = "system";
     }
 
     // 如果用户在设置中选择了 TUN Stack，则使用用户选择的 stack
     // macOS 强制默认使用 gvisor stack，因为经过测试 system stack 无法正常运作。
     if (type() !== "macos" && await getStoreValue(TUN_STACK_STORE_KEY)) {
-        tunConfig.inbounds[0].stack = await getStoreValue(TUN_STACK_STORE_KEY);
+        newConfig.inbounds[0].stack = await getStoreValue(TUN_STACK_STORE_KEY);
     }
 
-    console.log("当前 TUN Stack:", tunConfig.inbounds[0].stack);
+    console.log("当前 TUN Stack:", newConfig.inbounds[0].stack);
 
-
-    // 深拷贝配置文件
-    const newConfig = JSON.parse(JSON.stringify(tunConfig));
     newConfig["experimental"]["cache_file"]["path"] = dbCacheFilePath;
 
     const allowLan = await getAllowLan();
@@ -243,5 +243,7 @@ export default async function setGlobalTunConfig(identifier: string) {
     } else {
         newConfig["inbounds"][1]["listen"] = "127.0.0.1";
     }
-    updateVPNServerConfigFromDB('config.json', dbConfigData, newConfig);
+
+    await updateDHCPSettings2Config(newConfig);
+    await updateVPNServerConfigFromDB('config.json', dbConfigData, newConfig);
 }

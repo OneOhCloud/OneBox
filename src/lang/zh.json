@@ -117,6 +117,8 @@
     "tips": "提示",
     "tun_mode_desc": "接管所有流量",
     "tun_mode": "Tun 模式",
+    "use_dhcp": "DHCP DNS",
+    "use_dhcp_desc": "DNS 将通过 DHCP 获取",
     "tun_stack_desc": "选择 TUN 网络栈实现",
     "tun_stack": "TUN 网络栈",
     "update_available": "有新版本可用",
