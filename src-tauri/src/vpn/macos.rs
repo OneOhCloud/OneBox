@@ -1,11 +1,11 @@
+use crate::vpn::VpnProxy;
 use anyhow;
 use std::process::Command;
 use sysproxy::Sysproxy;
 use tauri::AppHandle;
 use tauri_plugin_shell::process::Command as TauriCommand;
 use tauri_plugin_shell::ShellExt;
-
-use crate::vpn::VpnProxy;
+use tauri_plugin_store::StoreExt;
 
 // 默认绕过列表
 pub static DEFAULT_BYPASS: &str =
@@ -60,6 +60,13 @@ pub fn create_privileged_command(
     path: String,
     password: String,
 ) -> Option<TauriCommand> {
+    let store = app.get_store("settings.json")?;
+    let enable_bypass_router_key = "enable_bypass_router_key";
+    let enable_bypass_router: bool = store
+        .get(enable_bypass_router_key)
+        .and_then(|value| value.as_bool())
+        .unwrap_or(false);
+
     let command = format!(
         r#"echo '{}' | sudo -S '{}' run -c '{}' --disable-color"#,
         password.escape_default(),
@@ -70,6 +77,24 @@ pub fn create_privileged_command(
         "Enable tun mode with command: {}",
         command.replace(password.as_str(), "******")
     );
+
+    // 如果启用了旁路由模式，则开启IP转发
+    if enable_bypass_router {
+        let command = format!(
+            "echo '{}' | sudo -S sysctl -w net.inet.ip.forwarding=1",
+            password
+        );
+        log::info!(
+            "Enable IP forwarding with command : {}",
+            command.replace(password.as_str(), "******")
+        );
+        let _ = Command::new("sh")
+            .arg("-c")
+            .arg(command)
+            .output()
+            .map_err(|e| e.to_string());
+    }
+
     Some(app.shell().command("sh").args(vec!["-c", &command]))
 }
 
@@ -78,6 +103,21 @@ pub fn stop_tun_process(password: &str) -> Result<(), String> {
     let command = format!("echo '{}' | sudo -S pkill -15 -f sing-box", password);
     log::info!(
         "Stop tun mode with command : {}",
+        command.replace(password, "******")
+    );
+    Command::new("sh")
+        .arg("-c")
+        .arg(command)
+        .output()
+        .map_err(|e| e.to_string())?;
+
+    // 关闭IP转发
+    let command = format!(
+        "echo '{}' | sudo -S sysctl -w net.inet.ip.forwarding=0",
+        password
+    );
+    log::info!(
+        "Disable IP forwarding with command : {}",
         command.replace(password, "******")
     );
     Command::new("sh")

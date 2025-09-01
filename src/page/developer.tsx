@@ -6,6 +6,7 @@ import ToggleDev from "../components/developer/dev-toggle";
 import ToggleDHCP from "../components/developer/dhcp-toggle";
 import StageSetting from "../components/developer/stage";
 import TunStackSetting from "../components/developer/tun-stack";
+import ToggleBypassRouter from "../components/settings/bypass-router";
 import { t } from "../utils/helper";
 
 const appWindow = getCurrentWindow();
@@ -18,6 +19,8 @@ export default function Page() {
                     <div className="divide-y divide-gray-50">
                         <ToggleDev />
                         <ToggleDHCP />
+                        <ToggleBypassRouter />
+
                     </div>
                 </div>
 
