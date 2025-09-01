@@ -1,4 +1,5 @@
 import { getClashApiSecret } from "../../single/store";
+import { getUseDHCP } from "../../utils/helper";
 import { writeConfigFile } from "../helper";
 
 
@@ -10,6 +11,25 @@ type Item = {
 }
 
 
+
+export async function updateDHCPSettings2Config(newConfig: any) {
+    const useDHCP = await getUseDHCP();
+    newConfig.dns.servers.forEach((server: any) => {
+        if (server.tag === "system") {
+            if (useDHCP) {
+                server.type = "dhcp";
+                delete server.server;
+                delete server.server_port;
+                console.log("启用 DHCP DNS 模式");
+            } else {
+                server.type = "udp";
+                server.server = "223.5.5.5";
+                server.server_port = 53;
+                console.log("启用 UDP DNS 模式");
+            }
+        }
+    });
+}
 
 /**
  * 只提取 VPN 服务器节点配置合并到配置文件中

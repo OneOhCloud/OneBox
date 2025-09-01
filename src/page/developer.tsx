@@ -3,6 +3,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { JournalText } from "react-bootstrap-icons";
 import { SettingItem } from "../components/developer/common";
 import ToggleDev from "../components/developer/dev-toggle";
+import ToggleDHCP from "../components/developer/dhcp-toggle";
 import StageSetting from "../components/developer/stage";
 import TunStackSetting from "../components/developer/tun-stack";
 import { t } from "../utils/helper";
@@ -16,6 +17,7 @@ export default function Page() {
                 <div className="mb-6 rounded-xl overflow-hidden bg-white shadow-none">
                     <div className="divide-y divide-gray-50">
                         <ToggleDev />
+                        <ToggleDHCP />
                     </div>
                 </div>
 

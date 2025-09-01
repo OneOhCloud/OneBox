@@ -2,7 +2,7 @@ import * as path from '@tauri-apps/api/path';
 import { getSubscriptionConfig } from '../../action/db';
 import { getAllowLan } from '../../single/store';
 import { clashApi } from '../common';
-import { DEFAULT_DOMAIN_RESOLVER_TAG, updateVPNServerConfigFromDB } from './helper';
+import { DEFAULT_DOMAIN_RESOLVER_TAG, updateDHCPSettings2Config, updateVPNServerConfigFromDB } from './helper';
 
 const mixedConfig = {
     "log": {
@@ -14,7 +14,9 @@ const mixedConfig = {
         "servers": [
             {
                 "tag": "system",
-                "type": "dhcp"
+                "type": "udp",
+                "server": "223.5.5.5",
+                "server_port": 53,
             },
             {
                 "tag": "alibaba",
@@ -137,13 +139,17 @@ const mixedConfig = {
 }
 
 export default async function setGlobalMixedConfig(identifier: string) {
+    // 一定要优先深拷贝配置文件，否则会修改原始配置文件对象，导致后续使用时出错。
+    const newConfig = JSON.parse(JSON.stringify(mixedConfig));
+
+
     console.log("写入[全局]系统代理配置文件");
     let dbConfigData = await getSubscriptionConfig(identifier);
-
     const appConfigPath = await path.appConfigDir();
     const dbCacheFilePath = await path.join(appConfigPath, 'mixed-cache-gloabl-v1.db');
-    // 深拷贝配置文件
-    const newConfig = JSON.parse(JSON.stringify(mixedConfig));
+
+
+
     newConfig["experimental"]["cache_file"]["path"] = dbCacheFilePath;
 
     const allowLan = await getAllowLan();
@@ -153,7 +159,9 @@ export default async function setGlobalMixedConfig(identifier: string) {
     } else {
         newConfig["inbounds"][0]["listen"] = "127.0.0.1";
     }
-    updateVPNServerConfigFromDB('config.json', dbConfigData, newConfig);
+
+    await updateDHCPSettings2Config(newConfig);
+    await updateVPNServerConfigFromDB('config.json', dbConfigData, newConfig);
 
 
 }

@@ -117,6 +117,8 @@
     "tips": "Tips",
     "tun_mode_desc": "All traffic through the tunnel",
     "tun_mode": "Tun mode",
+    "use_dhcp": "DHCP DNS",
+    "use_dhcp_desc": "DNS will be obtained via DHCP",
     "tun_stack_desc": "Select TUN network stack implementation",
     "tun_stack": "TUN Stack",
     "update_available": "Update available",
