@@ -1,42 +1,56 @@
 import { useEffect, useState } from "react";
 import { Ethernet } from "react-bootstrap-icons";
-import { setStoreValue } from "../../single/store";
-import { USE_DHCP_STORE_KEY } from "../../types/definition";
-import { getUseDHCP, t, vpnServiceManager } from "../../utils/helper";
+import { getUseDHCP, isBypassRouterEnabled, setUseDHCP } from "../../single/store";
+import { t, vpnServiceManager } from "../../utils/helper";
 import { ToggleSetting } from "./common";
 
 
 export default function ToggleDHCP() {
     const [toggle, setToggle] = useState(false);
+    const [loading, setLoading] = useState(false);
+    const [useBypassRouter, setUseBypassRouter] = useState(false);
 
     useEffect(() => {
         const loadState = async () => {
+            if (loading) return;
             try {
-                // 优先使用 helper 中封装的 getUseDHCP()，它会根据系统返回默认值并读取 store
                 const state: boolean = await getUseDHCP();
                 setToggle(Boolean(state));
+                setUseBypassRouter(await isBypassRouterEnabled());
+
             } catch (error) {
                 console.warn("Error loading DHCP state, defaulting to false.");
             }
         };
-
         loadState();
+        const loadStateID = setInterval(loadState, 500);
+        return () => clearTimeout(loadStateID);
     }, []);
 
     const handleToggle = async () => {
-        const next = !toggle;
-        setToggle(next);
+        setLoading(true);
         try {
-            await setStoreValue(USE_DHCP_STORE_KEY, next);
+            const next = !toggle;
+            setToggle(next);
+            setUseDHCP(next);
+
+            if (!await vpnServiceManager.is_running()) return;
+
             // 切换 DHCP 设置后需要同步并重载配置
             await vpnServiceManager.syncConfig({});
             await vpnServiceManager.reload(1000);
         } catch (error) {
-            console.error("Error saving DHCP state:", error);
+            console.error("Failed to toggle DHCP:", error);
+
+        } finally {
+            setLoading(false);
         }
 
     }
 
+    if (useBypassRouter) {
+        return <div></div>;
+    }
 
     return (
         <ToggleSetting
