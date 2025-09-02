@@ -2,9 +2,9 @@ import { type } from "@tauri-apps/plugin-os";
 import { useEffect, useState } from "react";
 import { Modem } from "react-bootstrap-icons";
 import { toast } from "sonner";
-import { getEnableBypassRouter, setEnableBypassRouter, setEnableTun } from "../../single/store";
+import { isBypassRouterEnabled, setBypassRouterEnabled, setEnableTun, setUseDHCP } from "../../single/store";
 import { t, vpnServiceManager } from "../../utils/helper";
-import { ToggleSetting } from "./common";
+import { ToggleSetting } from "../settings/common";
 
 
 
@@ -14,7 +14,7 @@ export default function ToggleBypassRouter() {
     useEffect(() => {
         const loadTunState = async () => {
             try {
-                const state: boolean | undefined = await getEnableBypassRouter();
+                const state: boolean | undefined = await isBypassRouterEnabled();
                 if (state !== undefined) {
                     setToggle(state);
                 } else {
@@ -30,25 +30,37 @@ export default function ToggleBypassRouter() {
 
 
     const handleToggle = async () => {
-        await setEnableBypassRouter(!toggle);
+        // 切换旁路由模式时，同时切换 TUN 模式并禁用 DHCP
+        // When toggling bypass router mode, also toggle TUN mode and disable DHCP
+
+        await setBypassRouterEnabled(!toggle);
         await setEnableTun(!toggle);
-        setToggle(!toggle);
-        if (await vpnServiceManager.is_running()) {
-            toast.promise(
-                vpnServiceManager.stop(),
-                {
-                    loading: t("setting_bypass_router_up"),
-                    success: t("setting_bypass_router_success"),
-                    error: t("setting_bypass_router_failed"),
-                }
-            );
 
-        } else {
-            if (!toggle) {
-                toast.success(t("setting_bypass_router_success"));
 
-            }
+        // off -> on
+        if (!toggle) {
+            // 启用旁路由模式时，禁用 DHCP
+            // Disable DHCP when enabling bypass router mode
+            await setUseDHCP(false);
+
         }
+
+        setToggle(!toggle);
+
+
+        if (!await vpnServiceManager.is_running()) return;
+
+        toast.promise(
+            vpnServiceManager.stop(),
+            {
+                loading: t("setting_bypass_router_up"),
+                success: t("setting_bypass_router_success"),
+                error: t("setting_bypass_router_failed"),
+            }
+        );
+
+
+
 
     };
 
