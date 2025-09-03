@@ -107,7 +107,7 @@
     "select_tun_stack": "选择网络栈",
     "select_update_stage": "选择更新阶段",
     "setting_bypass_router_failed": "设置旁路由模式失败",
-    "setting_bypass_router_success": "设置旁路由模式成功，请启动 VPN",
+    "setting_bypass_router_success": "设置成功，VPN 服务已停止",
     "setting_bypass_router_up": "设置旁路由模式并停止 VPN 服务...",
     "settings": "设置",
     "stable_version": "稳定版",

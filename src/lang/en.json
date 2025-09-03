@@ -107,7 +107,7 @@
     "select_tun_stack": "Select Network Stack",
     "select_update_stage": "Select update stage",
     "setting_bypass_router_failed": "Setting bypass router mode failed",
-    "setting_bypass_router_success": "Bypass router mode set successfully, please start vpn service manually",
+    "setting_bypass_router_success": "Setting successful, vpn service stopped",
     "setting_bypass_router_up": "Setting bypass router mode and stopping vpn service...",
     "settings": "Settings",
     "stable_version": "Stable",
