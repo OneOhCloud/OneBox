@@ -62,6 +62,8 @@ export function ToggleSetting({
     isEnabled,
     onToggle
 }: ToggleSettingProps) {
+
+
     return (
         <div className="flex items-center justify-between p-4  cursor-default transition-colors">
             <div className="flex items-center">
