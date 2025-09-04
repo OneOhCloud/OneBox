@@ -9,6 +9,31 @@ use webbrowser;
 
 const DEFAULT_CAPTIVE_URL: &str = "http://captive.oneoh.cloud";
 
+#[cfg(target_os = "macos")]
+fn is_private_ip(ip: &str) -> bool {
+    let parts: Vec<&str> = ip.split('.').collect();
+    if parts.len() != 4 {
+        return false;
+    }
+
+    let octets: Result<Vec<u8>, _> = parts.iter().map(|s| s.parse()).collect();
+    if let Ok(octets) = octets {
+        // 10.0.0.0/8
+        if octets[0] == 10 {
+            return true;
+        }
+        // 172.16.0.0/12
+        if octets[0] == 172 && octets[1] >= 16 && octets[1] <= 31 {
+            return true;
+        }
+        // 192.168.0.0/16
+        if octets[0] == 192 && octets[1] == 168 {
+            return true;
+        }
+    }
+    false
+}
+
 fn build_no_redirect_client() -> reqwest::Client {
     reqwest::ClientBuilder::new()
         .timeout(std::time::Duration::from_secs(10))
@@ -59,12 +84,61 @@ pub async fn get_lan_ip() -> Result<String, String> {
     {
         let output = Command::new("bash")
             .arg("-c")
-            .arg("ifconfig | grep 'flags=' | cut -d: -f1 | xargs -I {} ipconfig getifaddr {} 2>/dev/null")
+            .arg("ifconfig")
             .output()
             .await
             .map_err(|e| e.to_string())?;
-        let ip = String::from_utf8_lossy(&output.stdout);
-        Ok(ip.trim().to_string())
+
+        let ifconfig_output = String::from_utf8_lossy(&output.stdout);
+
+        // 解析ifconfig输出，查找最合适的局域网IP
+        let mut best_ip: Option<String> = None;
+        let mut current_interface = String::new();
+        let mut is_up = false;
+        let mut is_running = false;
+
+        for line in ifconfig_output.lines() {
+            // 检测新的网络接口
+            if !line.starts_with('\t') && !line.starts_with(' ') && line.contains(':') {
+                if let Some(interface) = line.split(':').next() {
+                    current_interface = interface.to_string();
+                    is_up = line.contains("UP");
+                    is_running = line.contains("RUNNING");
+                }
+            }
+
+            // 查找inet地址
+            if line.trim().starts_with("inet ") && is_up && is_running {
+                let parts: Vec<&str> = line.trim().split_whitespace().collect();
+                if parts.len() >= 2 {
+                    let ip = parts[1];
+
+                    // 跳过回环地址
+                    if ip.starts_with("127.") {
+                        continue;
+                    }
+
+                    // 跳过链路本地地址
+                    if ip.starts_with("169.254.") {
+                        continue;
+                    }
+
+                    // 检查是否为私有网络地址
+                    if is_private_ip(ip) {
+                        // 优先级：en0 (以太网/WiFi) > en1 > 其他接口
+                        if current_interface == "en0" {
+                            return Ok(ip.to_string());
+                        } else if current_interface.starts_with("en") && best_ip.is_none() {
+                            best_ip = Some(ip.to_string());
+                        } else if best_ip.is_none() {
+                            best_ip = Some(ip.to_string());
+                        }
+                    }
+                }
+            }
+        }
+
+        best_ip.ok_or_else(|| "No LAN IP found".to_string())
     }
 }
 
