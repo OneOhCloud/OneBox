@@ -2,7 +2,7 @@ import { confirm, message } from '@tauri-apps/plugin-dialog';
 import { exit, relaunch } from '@tauri-apps/plugin-process';
 import { type Update } from '@tauri-apps/plugin-updater';
 import { useEffect, useState } from "react";
-import { CheckCircle, CloudArrowDown, CloudArrowUpFill } from "react-bootstrap-icons";
+import { CheckCircle, CloudArrowUpFill } from "react-bootstrap-icons";
 import { t, vpnServiceManager } from "../../utils/helper";
 import { SettingItem } from "./common";
 import { useUpdate } from "./update-context";
@@ -122,41 +122,18 @@ function DownloadProgress({
 
     return (
         <div className="animate-fadeIn">
-            <div className="px-4 py-5">
-                <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center space-x-3">
-                        <CloudArrowDown size={20} className="text-primary" />
-                        <span className="text-[#1C1C1E] text-sm font-medium">
-                            {downloadProgress < 100 ? t("downloading") : t("download_complete")}
-                        </span>
-                    </div>
-                    <span className="text-sm font-medium text-primary">{downloadProgress}%</span>
-                </div>
-
-                <div className="relative h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                    <div
-                        className="absolute h-full bg-primary rounded-full transition-all duration-300 ease-out"
-                        style={{ width: `${downloadProgress}%` }}
-                    />
-                </div>
-
-                <div className="mt-3 flex items-center space-x-2">
-                    <div className="w-1.5 h-1.5 bg-amber-400 rounded-full animate-pulse" />
-                    <span className="text-xs text-gray-500">
-                        {t("please_dont_leave")}
-                    </span>
-                </div>
-            </div>
+            <div
+                className="h-[2px] bg-primary rounded-2xl transition-all duration-300 ease-out"
+                style={{ width: `${downloadProgress}%` }}
+            />
         </div>
     );
 }
-
 // 更新按钮组件
 function UpdateButton({
     isSimulating,
     updateInfo,
     downloadComplete,
-    isClicked,
     isUpdating,
     onUpdateClick,
     onInstallClick
@@ -164,7 +141,6 @@ function UpdateButton({
     isSimulating: boolean;
     updateInfo: Update | null;
     downloadComplete: boolean;
-    isClicked: boolean;
     isUpdating: boolean;
     onUpdateClick: () => void;
     onInstallClick: () => void;
@@ -172,7 +148,7 @@ function UpdateButton({
     const updateAvailable = !!updateInfo;
 
     // 如果已下载完成且用户已点击，显示安装按钮
-    if (isClicked && downloadComplete && updateInfo) {
+    if (downloadComplete && updateInfo) {
         return (
             <SettingItem
                 icon={<CloudArrowUpFill className="text-[#34C759]" size={22} />}
@@ -231,13 +207,13 @@ export default function UpdaterItem() {
     return (
         <>
             <UpdateButton
-                isSimulating={isSimulating}
                 updateInfo={updateInfo}
-                downloadComplete={downloadComplete}
-                isClicked={isClicked}
                 isUpdating={isUpdating}
+                isSimulating={isSimulating}
                 onUpdateClick={onUpdateClick}
                 onInstallClick={onInstallClick}
+                downloadComplete={downloadComplete}
+
             />
 
             <DownloadProgress
