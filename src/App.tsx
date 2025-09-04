@@ -6,6 +6,7 @@ import { GearWideConnected, House, Layers } from 'react-bootstrap-icons';
 import { Toaster } from 'sonner';
 
 import React from 'react';
+import { UpdateProvider } from './components/settings/update-context';
 import HomePage from "./page/home";
 import { ActiveScreenType, NavContext } from './single/context';
 import { initLanguage, t } from './utils/helper';
@@ -116,52 +117,54 @@ function App() {
 
   return (
     <NavContext.Provider value={{ activeScreen, setActiveScreen, handleLanguageChange }}>
-      <Toaster position="top-center" toastOptions={{ duration: 2000 }} />
+      <UpdateProvider>
+        <Toaster position="top-center" toastOptions={{ duration: 2000 }} />
 
-      <main className="relative bg-gray-50 flex flex-col h-screen">
-        {activeScreen === 'home' &&
-          <div className='absolute inset-0  z-2   max-h-max flex justify-end p-1'>
-            <Suspense >
-              <UpdaterButton />
-            </Suspense>
-          </div>
-        }
-        <Body activeScreen={activeScreen} lang={language} />
+        <main className="relative bg-gray-50 flex flex-col h-screen">
+          {activeScreen === 'home' &&
+            <div className='absolute inset-0  z-2   max-h-max flex justify-end p-1'>
+              <Suspense >
+                <UpdaterButton />
+              </Suspense>
+            </div>
+          }
+          <Body activeScreen={activeScreen} lang={language} />
 
-        <div className="dock  dock-sm  bg-gray-50 border-0">
-          <button
-            onClick={() => setActiveScreen('home')}
-            className={` ${activeScreen === 'home' ? 'text-blue-500' : ''}`}
-          >
-            <House />
-            <span className='text-xs capitalize'>{dockLang.home}</span>
-          </button>
-
-          <button
-            onClick={() => setActiveScreen('configuration')}
-            className={`${activeScreen === 'configuration' ? 'text-blue-500' : ''}`}
-          >
-            <Layers />
-            <span className='text-xs capitalize'>{dockLang.configuration}</span>
-          </button>
-
-          <button
-            onClick={() => setActiveScreen('settings')}
-            className={`${activeScreen === 'settings' ? 'text-blue-500' : ''}`}
-            onMouseEnter={() => setIsSettingsHovered(true)}
-            onMouseLeave={() => setIsSettingsHovered(false)}
-          >
-            <motion.div
-              animate={{ rotate: isSettingsHovered ? 180 : 0 }}
-              transition={{ duration: 0.3 }}
+          <div className="dock  dock-sm  bg-gray-50 border-0">
+            <button
+              onClick={() => setActiveScreen('home')}
+              className={` ${activeScreen === 'home' ? 'text-blue-500' : ''}`}
             >
-              <GearWideConnected />
-            </motion.div>
-            <span className='text-xs capitalize'>{dockLang.settings}</span>
-          </button>
-        </div>
+              <House />
+              <span className='text-xs capitalize'>{dockLang.home}</span>
+            </button>
 
-      </main>
+            <button
+              onClick={() => setActiveScreen('configuration')}
+              className={`${activeScreen === 'configuration' ? 'text-blue-500' : ''}`}
+            >
+              <Layers />
+              <span className='text-xs capitalize'>{dockLang.configuration}</span>
+            </button>
+
+            <button
+              onClick={() => setActiveScreen('settings')}
+              className={`${activeScreen === 'settings' ? 'text-blue-500' : ''}`}
+              onMouseEnter={() => setIsSettingsHovered(true)}
+              onMouseLeave={() => setIsSettingsHovered(false)}
+            >
+              <motion.div
+                animate={{ rotate: isSettingsHovered ? 180 : 0 }}
+                transition={{ duration: 0.3 }}
+              >
+                <GearWideConnected />
+              </motion.div>
+              <span className='text-xs capitalize'>{dockLang.settings}</span>
+            </button>
+          </div>
+
+        </main>
+      </UpdateProvider>
     </NavContext.Provider>
   );
 }
