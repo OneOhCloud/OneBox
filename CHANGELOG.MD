@@ -12,6 +12,7 @@ All significant changes in this version are documented here.
 - Improved the method of obtaining LAN IP on macOS, fixing the issue of not being able to get it correctly in some cases.
 
 ### 🔨 Performance Improvements
+- Simplified the download progress component and updated related translations.
 - Refactored the update check and download logic to improve code maintainability and stability.
 
 ## 自 v1.1.54 以来的变更
@@ -25,4 +26,5 @@ All significant changes in this version are documented here.
 - 改进了在 macOS 上获取局域网 IP 的方法，修复了某些情况下无法正确获取的问题。
 
 ### 🔨 性能优化
+- 简化了下载进度组件，并更新了相关翻译。
 - 重构了更新检查和下载逻辑，提高了代码的可维护性和稳定性。
