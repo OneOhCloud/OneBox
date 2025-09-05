@@ -1,4 +1,4 @@
-import { platform } from '@tauri-apps/plugin-os';
+import { platform, type } from '@tauri-apps/plugin-os';
 import { useEffect, useState } from "react";
 import { Ethernet } from "react-bootstrap-icons";
 import { getStoreValue, setStoreValue } from "../../single/store";
@@ -51,6 +51,10 @@ export default function TunStackSetting() {
             console.error("Failed to save tun stack:", error);
         }
     };
+
+    if (type() == "macos") {
+        return null;
+    }
 
     return (
         <>
