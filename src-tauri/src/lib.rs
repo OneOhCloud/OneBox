@@ -137,8 +137,22 @@ pub fn run() {
             log::info!("app config path: {:?}", app.path().app_config_dir());
             log::info!("app local data path: {:?}", app.path().app_local_data_dir());
 
-            tauri::async_runtime::spawn(async {
-                match reqwest::get("http://captive.oneoh.cloud").await {
+            let app_version = app.package_info().version.to_string();
+            let os = tauri_plugin_os::platform();
+            let arch = tauri_plugin_os::arch();
+            let locale = tauri_plugin_os::locale().unwrap_or_else(|| String::from("en-US"));
+            let os_info = format!("{}/{}", os, arch);
+            let user_agent = format!("OneBox/{} (Tauri; {}; {})", app_version, os_info, locale);
+
+            tauri::async_runtime::spawn(async move {
+                log::info!("User-Agent: {}", user_agent);
+                let client = reqwest::Client::new();
+                match client
+                    .get("https://captive.oneoh.cloud")
+                    .header("User-Agent", user_agent)
+                    .send()
+                    .await
+                {
                     Ok(resp) => {
                         log::info!("captive.oneoh.cloud status: {}", resp.status());
                     }
@@ -147,6 +161,7 @@ pub fn run() {
                     }
                 }
             });
+
             #[cfg(target_os = "macos")]
             {
                 app.set_activation_policy(tauri::ActivationPolicy::Accessory);
