@@ -6,7 +6,9 @@ All significant changes in this version are documented here.
 
 ### ⚠ CHANGES
 - Updated translation files
-- Added Bypass Router Mode, macOS only.
+- Added Bypass Router Mode, macOS only
+- Simplified the user interface for stage selection to enhance user experience
+
 
 ### 🐛 Bug Fixes
 - Improved the method of obtaining LAN IP on macOS, fixing the issue of not being able to get it correctly in some cases.
@@ -20,7 +22,9 @@ All significant changes in this version are documented here.
 
 ### ⚠ 变更
 - 更新翻译文件
-- 新增旁路由模式，仅 macOS。
+- 新增旁路由模式，仅 macOS
+- 简化了阶段选择的用户界面，以提升用户体验
+
 
 ### 🐛 问题修复
 - 改进了在 macOS 上获取局域网 IP 的方法，修复了某些情况下无法正确获取的问题。
