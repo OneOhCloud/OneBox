@@ -1,17 +1,19 @@
-import { locale } from '@tauri-apps/plugin-os';
+import { locale, type } from '@tauri-apps/plugin-os';
 import { LazyStore } from '@tauri-apps/plugin-store';
-import { ALLOWLAN_STORE_KEY, ENABLE_TUN_STORE_KEY } from '../types/definition';
+import { toast } from 'sonner';
+import { ALLOWLAN_STORE_KEY, ENABLE_BYPASS_ROUTER_STORE_KEY, ENABLE_TUN_STORE_KEY, USE_DHCP_STORE_KEY } from '../types/definition';
 
+const OsType = type();
 export const LANGUAGE_STORE_KEY = 'language';
 export const CLASH_API_SECRET = 'clash_api_secret_key';
-
 
 
 
 export async function getStoreValue(key: string, val?: any): Promise<any> {
     let value = await store.get(key);
 
-    // 如果 val 存在且 value 为 undefined、null 或空字符串，则返回 val
+    // zh: 如果 val 存在且 value 为 undefined、null 或空字符串，则返回 val
+    // en: If val exists and value is undefined, null, or an empty string, return val
     if (val && (value === undefined || value === null || value === '')) {
         return val;
     }
@@ -33,6 +35,8 @@ export async function getEnableTun(): Promise<boolean> {
     let b = await store.get(ENABLE_TUN_STORE_KEY);
     return Boolean(b);
 }
+
+
 
 export async function setEnableTun(value: boolean) {
     await store.set(ENABLE_TUN_STORE_KEY, value);
@@ -85,10 +89,39 @@ export const getLanguage = async () => {
             return 'en';
         }
     }
-    return 'en'; // 默认为英文
+    return 'en';
 };
 
-// 设置语言
 export const setLanguage = async (language: string) => {
     await setStoreValue(LANGUAGE_STORE_KEY, language);
 };
+
+
+export async function isBypassRouterEnabled(): Promise<boolean> {
+    let b = await store.get(ENABLE_BYPASS_ROUTER_STORE_KEY);
+    return Boolean(b);
+
+}
+
+export async function setBypassRouterEnabled(value: boolean) {
+    if (OsType !== "macos") {
+        toast.error("旁路由模式仅 macOS 支持");
+        return;
+    }
+    await store.set(ENABLE_BYPASS_ROUTER_STORE_KEY, value);
+    await store.save();
+}
+
+
+export async function getUseDHCP(): Promise<boolean> {
+    let b = await store.get(USE_DHCP_STORE_KEY);
+    if (b === undefined) {
+        return false;
+    }
+    return Boolean(b);
+}
+
+export async function setUseDHCP(value: boolean) {
+    await store.set(USE_DHCP_STORE_KEY, value);
+    await store.save();
+}

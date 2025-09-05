@@ -1,5 +1,4 @@
-import { getClashApiSecret } from "../../single/store";
-import { getUseDHCP } from "../../utils/helper";
+import { getClashApiSecret, getUseDHCP } from "../../single/store";
 import { writeConfigFile } from "../helper";
 
 

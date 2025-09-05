@@ -1,13 +1,14 @@
 import { useEffect, useState } from "react";
-import { Cpu } from "react-bootstrap-icons";
+import { Cpu, Modem } from "react-bootstrap-icons";
 import { toast } from "sonner";
-import { getEnableTun, setEnableTun } from "../../single/store";
+import { getEnableTun, isBypassRouterEnabled, setEnableTun } from "../../single/store";
 import { t, vpnServiceManager } from "../../utils/helper";
 import { ToggleSetting } from "./common";
 
 
 export default function ToggleTun() {
     const [toggle, setToggle] = useState(false);
+    const [useBypassRouter, setUseBypassRouter] = useState(false);
 
     useEffect(() => {
         const loadTunState = async () => {
@@ -18,6 +19,7 @@ export default function ToggleTun() {
                 } else {
                     setToggle(false);
                 }
+                setUseBypassRouter(await isBypassRouterEnabled());
             } catch (error) {
                 console.error("Failed to load tun state:", error);
             }
@@ -25,6 +27,8 @@ export default function ToggleTun() {
 
         loadTunState();
     }, []);
+
+    const icon = useBypassRouter ? <Modem className="text-[#5856D6]" size={22} /> : <Cpu className="text-[#5856D6]" size={22} />;
 
 
     const handleToggle = async () => {
@@ -70,9 +74,10 @@ export default function ToggleTun() {
 
     return (
         <ToggleSetting
-            icon={<Cpu className="text-[#5856D6]" size={22} />}
+            icon={icon}
             title={t("tun_mode")}
-            subTitle={t("tun_mode_desc")}
+            subTitle={t("tun_mode_desc") + (useBypassRouter ? " +" : "")
+            }
             isEnabled={toggle}
             onToggle={handleToggle}
         />

@@ -47,7 +47,7 @@ export function AddSubConfigurationModal() {
         } catch (error) {
             if (error instanceof z.ZodError) {
                 const newErrors: ValidationErrors = {};
-                error.errors.forEach(err => {
+                error.issues.forEach(err => {
                     const path = err.path[0] as keyof ValidationErrors;
                     newErrors[path] = err.message;
                 });

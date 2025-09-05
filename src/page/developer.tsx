@@ -1,10 +1,11 @@
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { JournalText } from "react-bootstrap-icons";
+import ToggleBypassRouter from "../components/developer/bypass-router";
 import { SettingItem } from "../components/developer/common";
 import ToggleDev from "../components/developer/dev-toggle";
 import ToggleDHCP from "../components/developer/dhcp-toggle";
-import StageSetting from "../components/developer/stage";
+import StageSetting from "../components/developer/select-stage";
 import TunStackSetting from "../components/developer/tun-stack";
 import { t } from "../utils/helper";
 
@@ -18,6 +19,8 @@ export default function Page() {
                     <div className="divide-y divide-gray-50">
                         <ToggleDev />
                         <ToggleDHCP />
+                        <ToggleBypassRouter />
+
                     </div>
                 </div>
 
