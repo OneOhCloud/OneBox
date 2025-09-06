@@ -136,7 +136,6 @@ const tunConfig = {
             "type": "mixed",
             "listen": "127.0.0.1",
             "listen_port": 6789,
-            "sniff": true,
             "reuse_addr": true,
             "tcp_fast_open": true,
             "set_system_proxy": false,
@@ -145,7 +144,7 @@ const tunConfig = {
     "route": {
         "rules": [
             {
-                "inbound": "tun",
+                "inbound": "mixed",
                 "action": "sniff"
             },
             {

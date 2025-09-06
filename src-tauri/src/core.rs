@@ -160,6 +160,12 @@ pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Resu
                             tauri_plugin_shell::process::CommandEvent::Stdout(line) => {
                                 log::info!("Proxy stdout: {:?}", String::from_utf8_lossy(&line));
                             }
+                            tauri_plugin_shell::process::CommandEvent::Stderr(line) => {
+                                let line_str = String::from_utf8_lossy(&line);
+                                let parts: Vec<&str> = line_str.split("ms] ").collect();
+                                let last_part = parts.last().unwrap_or(&"").trim();
+                                log::info!("{}", last_part);
+                            }
 
                             tauri_plugin_shell::process::CommandEvent::Error(err) => {
                                 log::error!("Proxy process error: {}", err);
