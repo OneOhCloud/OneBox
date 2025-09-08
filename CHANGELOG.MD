@@ -8,10 +8,8 @@ All significant changes in this version are documented here.
 - Removed duplicate sniff configuration.
 
 
-### 🐛 Bug Fixes
-
-
-### 🔨 Performance Improvements
+### ✨ Features
+- Added a local configuration toggle to enable or disable the drag-and-drop import of local configuration files.
 
 
 ## 自 v1.1.59 以来的变更
@@ -20,8 +18,5 @@ All significant changes in this version are documented here.
 ### ⚠ 变更
 - 去掉重复 sniff 的配置。 
 
-### 🐛 问题修复
-
-
-
-### 🔨 性能优化
+### ✨ 新增功能
+- 新增本地配置开关，可以开启或关闭拖拽导入本地配置文件的功能。
