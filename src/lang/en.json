@@ -46,6 +46,8 @@
     "developer_options": "Developer options",
     "developer_toggle_desc": "Enable developer options, requires app restart",
     "developer_toggle": "Developer toggle",
+    "drag_config_desc": "Drag and drop to import local config file",
+    "drag_config": "Local config",
     "disable": "Disable",
     "disconnected": "Disconnected",
     "download_complete": "Download complete",

@@ -1,11 +1,17 @@
+import { listen } from "@tauri-apps/api/event";
 import { motion } from "framer-motion";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowRepeat } from "react-bootstrap-icons";
-import { updateSubscription } from "../action/db";
+import { mutate } from "swr";
+import { addSubscription, updateSubscription } from "../action/db";
 import { SubscriptionItem } from "../components/configuration/item";
 import { AddSubConfigurationModal } from "../components/configuration/modal";
 import { useSubscriptions } from "../hooks/useDB";
+import { getStoreValue } from "../single/store";
+import { GET_SUBSCRIPTIONS_LIST_SWR_KEY, SUPPORT_LOCAL_FILE_STORE_KEY } from "../types/definition";
 import { t } from "../utils/helper";
+
+
 
 function ConfigurationNav({ onUpdateAllSubscriptions }: { onUpdateAllSubscriptions?: () => Promise<void> }) {
     const [isUpdating, setIsUpdating] = useState(false);
@@ -19,6 +25,32 @@ function ConfigurationNav({ onUpdateAllSubscriptions }: { onUpdateAllSubscriptio
             setIsUpdating(false);
         }
     };
+
+    useEffect(() => {
+
+        const setupListener = async () => {
+            const unListen = await listen('tauri://drag-drop', async event => {
+                const flag = await getStoreValue(SUPPORT_LOCAL_FILE_STORE_KEY, false)
+                if (!flag) {
+                    console.log('Local file import is disabled');
+                    return
+                }
+                console.log('File dropped:', event);
+                let path = `file://${(event as any).payload.paths[0]}`
+                let fileName = (event as any).payload.paths[0].split('/').pop()
+                await addSubscription(path, fileName)
+                await mutate(GET_SUBSCRIPTIONS_LIST_SWR_KEY)
+            })
+            return unListen
+        }
+
+        let unListenPromise = setupListener()
+
+        return () => {
+            unListenPromise.then(unListen => unListen())
+        }
+
+    }, [])
 
     return (
         <div className="flex justify-between items-center p-2">
@@ -66,8 +98,11 @@ export default function Configuration() {
         }
     };
 
+
     return (
-        <div className="h-full mb-4 w-full">
+        <div
+            className="h-full mb-4 w-full"
+        >
             <ConfigurationNav onUpdateAllSubscriptions={(data && data.length > 0) ? onUpdateAllSubscriptions : undefined} />
             <ConfigurationBody />
         </div>
