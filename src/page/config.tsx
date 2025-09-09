@@ -112,10 +112,12 @@ export default function Configuration() {
 
     return (
         <div
-            className="h-dvh  w-full "
+            className="h-[calc(100dvh-56px)]  w-full flex flex-col "
         >
             <ConfigurationNav onUpdateAllSubscriptions={(data && data.length > 0) ? onUpdateAllSubscriptions : undefined} />
-            <ConfigurationBody />
+            <div className="flex-1 overflow-hidden h-full">
+                <ConfigurationBody />
+            </div>
         </div>
     )
 }
@@ -153,18 +155,20 @@ export function ConfigurationBody() {
 
 
     return (
-        <ul className="list bg-base-100 rounded-box mx-2 overflow-y-auto max-h-[435px]">
-            {
-                data.map((item) => {
-                    return <SubscriptionItem
-                        key={item.identifier}
-                        item={item}
-                        expanded={expanded}
-                        setExpanded={setExpanded}
-                    ></SubscriptionItem>
-                })
-            }
-        </ul>
+        <div className="h-full overflow-auto p-2">
+            <ul className="list bg-base-100 rounded-box">
+                {
+                    data.map((item) => {
+                        return <SubscriptionItem
+                            key={item.identifier}
+                            item={item}
+                            expanded={expanded}
+                            setExpanded={setExpanded}
+                        ></SubscriptionItem>
+                    })
+                }
+            </ul>
+        </div>
     )
 
 }
