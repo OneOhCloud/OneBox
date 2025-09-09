@@ -35,7 +35,7 @@ async function fetchConfigContent(url: string): Promise<ConfigResponse> {
             return {
                 data: JSON.parse(content),
                 headers: {
-                    'subscription-userinfo': `upload=0; download=0; total=1125899906842624; expire=${Math.floor(Date.now() / 1000 + 100 * 365 * 24 * 60 * 60)}`,
+                    'subscription-userinfo': `upload=0; download=0; total=1125899906842624; expire=32503680000`,
                     'official-website': 'https://sing-box.net',
                     'content-disposition': `attachment; filename=local-config-${Date.now()}.json`
                 },

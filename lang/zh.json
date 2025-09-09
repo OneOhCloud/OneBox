@@ -48,6 +48,7 @@
     "developer_toggle": "开发者选项",
     "drag_config_desc": "拖放导入本地配置文件",
     "drag_config": "本地配置",
+    "local_file_no_expire": "本地文件，无过期时间",
     "disable": "禁用",
     "disconnected": "未连接",
     "download_complete": "下载完成",

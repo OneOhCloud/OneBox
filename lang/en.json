@@ -49,6 +49,7 @@
     "drag_config_desc": "Drag and drop to import local config file",
     "drag_config": "Local config",
     "disable": "Disable",
+    "local_file_no_expire": "Local file, no expire",
     "disconnected": "Disconnected",
     "download_complete": "Download complete",
     "downloading": "Downloading",

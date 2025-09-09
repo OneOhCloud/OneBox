@@ -7,7 +7,15 @@ import { AppleNetworkStatus, GoogleNetworkStatus } from "./network-check";
 import SelectSub from "./select-config";
 import SelectNode from "./select-node";
 
-const formatDate = (date: number) => new Date(date).toLocaleDateString('zh-CN');
+const formatDate = (prefix: string, date: number) => {
+    if (date === 32503680000000) {
+        // 是本地文件
+        return t("local_file_no_expire")
+    } else {
+        return `${prefix} ${new Date(date).toLocaleDateString('zh-CN')}`
+    }
+
+};
 
 export default function Body({ isRunning, onUpdate }: { isRunning: boolean, onUpdate: () => void }) {
     const [sub, setSub] = useState<Subscription>();
@@ -67,8 +75,8 @@ export default function Body({ isRunning, onUpdate }: { isRunning: boolean, onUp
 
                     <div className="flex items-center justify-center mt-1">
                         <span className="text-xs text-blue-500 ">
-                            {t("expired_at") + " "}
-                            {formatDate(sub.expire_time)}
+
+                            {formatDate(t("expired_at"), sub.expire_time)}
                         </span>
                     </div>
                 </div>
