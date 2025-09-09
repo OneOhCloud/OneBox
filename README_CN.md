@@ -1,10 +1,14 @@
 # OneBox
+[![Dev Build](https://github.com/OneOhCloud/OneBox/actions/workflows/dev-release.yml/badge.svg)](https://github.com/OneOhCloud/OneBox/actions/workflows/dev-release.yml)
+[![Beta Build](https://github.com/OneOhCloud/OneBox/actions/workflows/beta-release.yml/badge.svg)](https://github.com/OneOhCloud/OneBox/actions/workflows/beta-release.yml)
+[![Stable Build](https://github.com/OneOhCloud/OneBox/actions/workflows/stable-release.yml/badge.svg)](https://github.com/OneOhCloud/OneBox/actions/workflows/stable-release.yml)
 
 基于 sing-box 内核的跨平台 GUI 客户端。
 
-## 项目目标 ✨
+## 核心宗旨 ✨
 
-OneBox 采用 "简洁至上" 的设计理念，专注于核心功能和即时可用性。相比市面上功能复杂的开源项目，本应用通过精简界面提供必要功能，减少学习成本和配置负担。
+**简单，稳定，安全。无需复杂配置，开箱即用**
+
 
 需要高级定制功能的用户可考虑以下项目：
 
