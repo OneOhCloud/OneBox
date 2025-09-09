@@ -1,4 +1,5 @@
 import { listen } from "@tauri-apps/api/event";
+import { type } from "@tauri-apps/plugin-os";
 import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
 import { ArrowRepeat } from "react-bootstrap-icons";
@@ -35,9 +36,19 @@ function ConfigurationNav({ onUpdateAllSubscriptions }: { onUpdateAllSubscriptio
                     console.log('Local file import is disabled');
                     return
                 }
-                console.log('File dropped:', event);
+                let fileName = "";
                 let path = `file://${(event as any).payload.paths[0]}`
-                let fileName = (event as any).payload.paths[0].split('/').pop()
+
+                console.log('File dropped:', event);
+
+                // zh:对不同操作系统的路径分隔符进行处理
+                // en:Handle path separators for different operating systems
+                if (type() == "windows") {
+                    fileName = (event as any).payload.paths[0].split('\\').pop()
+                } else {
+                    fileName = (event as any).payload.paths[0].split('/').pop()
+                }
+
                 await addSubscription(path, fileName)
                 await mutate(GET_SUBSCRIPTIONS_LIST_SWR_KEY)
             })
