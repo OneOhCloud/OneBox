@@ -112,7 +112,7 @@ export default function Configuration() {
 
     return (
         <div
-            className="h-full mb-4 w-full"
+            className="h-dvh  w-full "
         >
             <ConfigurationNav onUpdateAllSubscriptions={(data && data.length > 0) ? onUpdateAllSubscriptions : undefined} />
             <ConfigurationBody />
@@ -153,7 +153,7 @@ export function ConfigurationBody() {
 
 
     return (
-        <ul className="list bg-base-100 rounded-box m-2  overflow-y-auto max-h-[410px]">
+        <ul className="list bg-base-100 rounded-box mx-2 overflow-y-auto max-h-[435px]">
             {
                 data.map((item) => {
                     return <SubscriptionItem
