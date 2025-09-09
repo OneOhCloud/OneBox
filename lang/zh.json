@@ -57,6 +57,7 @@
     "error": "错误",
     "expired_at": "有效至",
     "filter_placeholder": "过滤关键词...",
+    "config_copied_to_clipboard": "配置已复制到剪贴板",
     "get_subscription_config_failed": "获取配置文件配置失败",
     "global_tip": "代理所有公共互联网流量",
     "global": "全局",

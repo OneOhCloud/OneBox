@@ -55,6 +55,7 @@
     "enable": "Enable",
     "error_loading_config": "Error loading config file",
     "error": "Error",
+    "config_copied_to_clipboard": "Config copied to clipboard",
     "expired_at": "Expired at",
     "filter_placeholder": "Filter keyword...",
     "get_subscription_config_failed": "Get config config failed",
