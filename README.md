@@ -1,12 +1,14 @@
 # OneBox ｜ [简体中文](./README_CN.md)
 
-
+[![Dev Build](https://github.com/OneOhCloud/OneBox/actions/workflows/dev-release.yml/badge.svg)](https://github.com/OneOhCloud/OneBox/actions/workflows/dev-release.yml)
+[![Beta Build](https://github.com/OneOhCloud/OneBox/actions/workflows/beta-release.yml/badge.svg)](https://github.com/OneOhCloud/OneBox/actions/workflows/beta-release.yml)
+[![Stable Build](https://github.com/OneOhCloud/OneBox/actions/workflows/stable-release.yml/badge.svg)](https://github.com/OneOhCloud/OneBox/actions/workflows/stable-release.yml)
 
 A cross-platform GUI client based on sing-box kernel.
 
 ## Project Objectives ✨
 
-OneBox implements a "simplicity-first" design philosophy focused on core functionality and immediate usability. Unlike feature-heavy open-source alternatives, this application provides essential capabilities through a streamlined interface, reducing learning curves and configuration overhead.
+**Simplicity, Stability, Security. No complex configuration, ready to use out of the box.**
 
 For users requiring advanced customization, the following projects are recommended:
 

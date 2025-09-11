@@ -1,34 +1,28 @@
 # Changelog
 Use development and beta versions only if you are aware of the potential risks.
 
-## Changes since v1.1.54
+## Changes since v1.1.59
 All significant changes in this version are documented here.
 
 ### ⚠ CHANGES
-- Updated translation files
-- Added Bypass Router Mode, macOS only
-- Simplified the user interface for stage selection to enhance user experience
+- Removed duplicate sniff configuration.
 
+
+### ✨ Features
+- Added a local configuration toggle to enable or disable the drag-and-drop import of local configuration files.
 
 ### 🐛 Bug Fixes
-- Improved the method of obtaining LAN IP on macOS, fixing the issue of not being able to get it correctly in some cases.
+- Fixed layout inconsistencies between Windows and macOS.
 
-### 🔨 Performance Improvements
-- Simplified the download progress component and updated related translations.
-- Refactored the update check and download logic to improve code maintainability and stability.
-
-## 自 v1.1.54 以来的变更
+## 自 v1.1.59 以来的变更
 本版本的所有重要变更将记录于此。
 
 ### ⚠ 变更
-- 更新翻译文件
-- 新增旁路由模式，仅 macOS
-- 简化了阶段选择的用户界面，以提升用户体验
+- 去掉重复 sniff 的配置。 
+
+### ✨ 新增功能
+- 新增本地配置开关，可以开启或关闭拖拽导入本地配置文件的功能。
 
 
 ### 🐛 问题修复
-- 改进了在 macOS 上获取局域网 IP 的方法，修复了某些情况下无法正确获取的问题。
-
-### 🔨 性能优化
-- 简化了下载进度组件，并更新了相关翻译。
-- 重构了更新检查和下载逻辑，提高了代码的可维护性和稳定性。
+- 修复 Windows 与 macOS 布局不一致的问题。

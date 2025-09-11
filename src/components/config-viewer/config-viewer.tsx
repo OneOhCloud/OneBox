@@ -31,7 +31,7 @@ export default function ConfigViewer() {
             navigator.clipboard.writeText(configContent),
             {
                 loading: "Copying config...",
-                success: () => "Config copied to clipboard",
+                success: () => t("config_copied_to_clipboard"),
                 error: (err) => err instanceof Error ? err.message : String(err),
             }
         )

@@ -5,6 +5,7 @@ import ToggleBypassRouter from "../components/developer/bypass-router";
 import { SettingItem } from "../components/developer/common";
 import ToggleDev from "../components/developer/dev-toggle";
 import ToggleDHCP from "../components/developer/dhcp-toggle";
+import ToggleLocalConfig from "../components/developer/local-config-toggle";
 import StageSetting from "../components/developer/select-stage";
 import TunStackSetting from "../components/developer/tun-stack";
 import { t } from "../utils/helper";
@@ -20,6 +21,7 @@ export default function Page() {
                         <ToggleDev />
                         <ToggleDHCP />
                         <ToggleBypassRouter />
+                        <ToggleLocalConfig />
 
                     </div>
                 </div>

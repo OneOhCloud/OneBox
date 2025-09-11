@@ -70,7 +70,7 @@ export default function HomePage() {
   };
 
   return (
-    <div className="bg-gray-50 flex flex-col items-center justify-center p-6 w-full">
+    <div className="bg-gray-50 flex flex-col items-center justify-center p-6 w-full  h-[calc(100dvh-56px)]">
       {/* 权限认证对话框 */}
       <AuthDialog
         onAuthSuccess={async () => {

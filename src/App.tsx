@@ -130,7 +130,7 @@ function App() {
           }
           <Body activeScreen={activeScreen} lang={language} />
 
-          <div className="dock  dock-sm  bg-gray-50 border-0">
+          <div className="dock  dock-sm  bg-gray-50 border-0 ">
             <button
               onClick={() => setActiveScreen('home')}
               className={` ${activeScreen === 'home' ? 'text-blue-500' : ''}`}

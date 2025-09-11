@@ -10,7 +10,7 @@ import { t } from "../../utils/helper";
 // 定义验证模式
 const subscriptionSchema = z.object({
     name: z.string().optional(),
-    url: z.string().url(t("please_input_valid_url")).min(1, t("url_cannot_empty"))
+    url: z.url(t("please_input_valid_url")).min(1, t("url_cannot_empty"))
 });
 
 type ValidationErrors = {

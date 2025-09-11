@@ -6,9 +6,9 @@ import { OsInfo, RULE_MODE_STORE_KEY, SING_BOX_VERSION, SSI_STORE_KEY } from '..
 
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { message } from '@tauri-apps/plugin-dialog';
+import en from '../../lang/en.json';
+import zh from '../../lang/zh.json';
 import { setGlobalMixedConfig, setGlobalTunConfig, setMixedConfig, setTunConfig } from '../config/helper';
-import en from '../lang/en.json';
-import zh from '../lang/zh.json';
 import { getClashApiSecret, getEnableTun, getLanguage, getStoreValue } from '../single/store';
 const appWindow = getCurrentWindow();
 const enLang = en as Record<string, string>;
