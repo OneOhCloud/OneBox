@@ -4,12 +4,15 @@ Use development and beta versions only if you are aware of the potential risks.
 ## Changes since v1.1.59
 All significant changes in this version are documented here.
 
-### ⚠ CHANGES
-- Removed duplicate sniff configuration.
-
 
 ### ✨ Features
-- Added a local configuration toggle to enable or disable the drag-and-drop import of local configuration files.
+- Added a local configuration switch to enable or disable the drag-and-drop import of local configuration files.
+
+
+### ⚠ CHANGES LOG
+- Updated dependencies.
+- Removed duplicate sniff configuration.
+- Added connection timeout configuration for DNS servers, default value is 5 seconds.
 
 ### 🐛 Bug Fixes
 - Fixed layout inconsistencies between Windows and macOS.
@@ -17,11 +20,14 @@ All significant changes in this version are documented here.
 ## 自 v1.1.59 以来的变更
 本版本的所有重要变更将记录于此。
 
-### ⚠ 变更
-- 去掉重复 sniff 的配置。 
-
 ### ✨ 新增功能
 - 新增本地配置开关，可以开启或关闭拖拽导入本地配置文件的功能。
+
+### ⚠ 变更日志
+- 更新依赖项
+- 去掉重复 sniff 的配置
+- DNS 服务器添加连接超时配置，默认值为 5 秒
+
 
 
 ### 🐛 问题修复

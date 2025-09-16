@@ -1,6 +1,7 @@
 import * as path from '@tauri-apps/api/path';
 import { getSubscriptionConfig } from '../../action/db';
-import { getAllowLan } from '../../single/store';
+import { getAllowLan, getStoreValue } from '../../single/store';
+import { STAGE_VERSION_STORE_KEY } from '../../types/definition';
 import { clashApi, ruleSet } from '../common';
 import { DEFAULT_DOMAIN_RESOLVER_TAG, updateDHCPSettings2Config, updateVPNServerConfigFromDB } from './helper';
 
@@ -17,6 +18,8 @@ const mixedConfig = {
         "type": "udp",
         "server": "223.5.5.5",
         "server_port": 53,
+        "connect_timeout": "5s",
+
       },
       {
         "tag": "dns_proxy",
@@ -24,18 +27,24 @@ const mixedConfig = {
         "server": "1.0.0.1",
         "server_port": 53,
         "detour": "ExitGateway",
+        "connect_timeout": "5s",
+
       },
       {
         "tag": "alibaba",
         "type": "udp",
         "server": "223.6.6.6",
         "server_port": 53,
+        "connect_timeout": "5s",
+
       },
       {
         "tag": DEFAULT_DOMAIN_RESOLVER_TAG,
         "type": "udp",
         "server": "223.5.5.5",
         "server_port": 53,
+        "connect_timeout": "5s",
+
       },
 
 
@@ -44,6 +53,8 @@ const mixedConfig = {
         "type": "udp",
         "server": "119.29.29.29",
         "server_port": 53,
+        "connect_timeout": "5s",
+
       }
     ],
     "rules": [
@@ -54,17 +65,6 @@ const mixedConfig = {
           "PTR"
         ],
         "action": "reject"
-      },
-      {
-        "domain": [
-          "captive.oneoh.cloud",
-          "captive.apple.com",
-          "nmcheck.gnome.org",
-          "www.msftconnecttest.com",
-          "connectivitycheck.gstatic.com"
-        ],
-        "server": "system",
-        "strategy": "ipv4_only"
       },
       {
         "domain_suffix": [
@@ -89,6 +89,7 @@ const mixedConfig = {
           "geosite-samsung",
           "geosite-private"
         ],
+        "disable_cache": true,
         "strategy": "prefer_ipv4",
         "server": "system"
       },
@@ -213,6 +214,9 @@ export default async function setMixedConfig(identifier: string) {
   // 一定要优先深拷贝配置文件，否则会修改原始配置文件对象，导致后续使用时出错。
   const newConfig = JSON.parse(JSON.stringify(mixedConfig));
 
+  // 根据当前的 Stage 版本设置日志等级
+  let level = await getStoreValue(STAGE_VERSION_STORE_KEY) === "dev" ? "debug" : "info";
+  newConfig.log.level = level;
 
   console.log("写入[规则]系统代理配置文件");
   let dbConfigData = await getSubscriptionConfig(identifier);

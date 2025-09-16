@@ -6,14 +6,18 @@ import unzipper from 'unzipper';
 import { promisify } from 'util';
 import { SING_BOX_VERSION } from '../src/types/definition';
 
-// 配置常量
 const BINARY_NAME = 'sing-box';
 const GITHUB_RELEASE_URL = 'https://github.com/SagerNet/sing-box/releases/download/';
 
-// sysproxy 下载地址, 仅支持 Windows x64 版本。
+// sysproxy download URL, only supports Windows x64 version.
 const SYSPROXY_URL = "https://github.com/clash-verge-rev/sysproxy/releases/download/x64/sysproxy.exe";
 
-// 支持的目标架构映射
+
+const SkipVersionList = [
+    "v1.12.5", //This version of sing - box has DNS issues, skip downloading
+];
+
+// Supported target architecture mapping
 const RUST_TARGET_TRIPLES = {
     "darwin": {
         "arm64": "aarch64-apple-darwin",
@@ -105,7 +109,7 @@ async function downloadEmbeddingExternalBinaries(): Promise<void> {
                 targetTriple
             );
 
-            // 为 Windows x64 下载 sysproxy
+            // Download sysproxy for Windows amd64
             if (platform === 'windows' && arch === 'amd64') {
                 console.log('Downloading Windows sysproxy...');
                 const targetPath = `src-tauri/binaries/sysproxy-${targetTriple}${extension}`;
@@ -121,5 +125,11 @@ async function downloadEmbeddingExternalBinaries(): Promise<void> {
     }
 }
 
-// 执行下载任务
-downloadEmbeddingExternalBinaries().catch(console.error);
+if (SkipVersionList.includes(SING_BOX_VERSION)) {
+    console.log(`Skipping download for version ${SING_BOX_VERSION}`);
+    throw new Error(`Version ${SING_BOX_VERSION} is in the skip list.`);
+
+} else {
+    downloadEmbeddingExternalBinaries().catch(console.error);
+
+}
