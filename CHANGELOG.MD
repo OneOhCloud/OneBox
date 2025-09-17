@@ -16,6 +16,8 @@ All significant changes in this version are documented here.
 
 ### 🐛 Bug Fixes
 - Fixed layout inconsistencies between Windows and macOS.
+- Fixed issue where node list did not refresh when switching between different subscriptions.
+
 
 ## 自 v1.1.59 以来的变更
 本版本的所有重要变更将记录于此。
@@ -31,4 +33,5 @@ All significant changes in this version are documented here.
 
 
 ### 🐛 问题修复
+- 修复切换不同订阅时，节点列表未刷新的问题。
 - 修复 Windows 与 macOS 布局不一致的问题。
