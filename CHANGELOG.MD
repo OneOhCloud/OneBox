@@ -6,6 +6,7 @@ All significant changes in this version are documented here.
 
 
 ### ✨ Features
+- On macOS, when starting in TUN mode, the default `ulimit` has been adjusted to 65535.
 - Added a local configuration switch to enable or disable the drag-and-drop import of local configuration files.
 
 
@@ -24,6 +25,8 @@ All significant changes in this version are documented here.
 
 ### ✨ 新增功能
 - 新增本地配置开关，可以开启或关闭拖拽导入本地配置文件的功能。
+- 在 macOS 上以 TUN 模式启动时，默认的 `ulimit` 限制已调整为 65535。
+
 
 ### ⚠ 变更日志
 - 更新依赖项
