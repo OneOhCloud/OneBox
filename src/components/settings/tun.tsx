@@ -46,7 +46,7 @@ export default function ToggleTun() {
                 try {
                     await vpnServiceManager.stop();
                     if (previous) {
-                        await new Promise(res => setTimeout(res, 2000));
+                        await new Promise(res => setTimeout(res, 200));
                     }
                     resolve();
                 } catch (error) {

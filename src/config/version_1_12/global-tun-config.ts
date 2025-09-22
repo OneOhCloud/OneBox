@@ -199,6 +199,8 @@ const tunConfig = {
         {
             "tag": "auto",
             "type": "urltest",
+            "url": "https://www.google.com/generate_204",
+
             "outbounds": []
         }
     ]
