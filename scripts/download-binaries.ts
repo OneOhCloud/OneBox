@@ -37,7 +37,12 @@ type Architecture = keyof typeof RUST_TARGET_TRIPLES[Platform];
 
 async function downloadFile(url: string, dest: string): Promise<void> {
     const streamPipeline = promisify(pipeline);
-    const response = await fetch(url);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 seconds timeout
+
+    const response = await fetch(url, {
+        signal: controller.signal,
+    }).finally(() => clearTimeout(timeoutId));
 
     if (!response.ok) {
         throw new Error(`Download failed: '${url}' (${response.status})`);
