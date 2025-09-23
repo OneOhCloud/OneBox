@@ -68,7 +68,7 @@ pub fn create_privileged_command(
         .unwrap_or(false);
 
     let command = format!(
-        r#"echo '{}' | sudo -S '{}' run -c '{}' --disable-color"#,
+        r#"ulimit -n 65535 && echo '{}' | sudo -S '{}' run -c '{}' --disable-color"#,
         password.escape_default(),
         sidecar_path.escape_default(),
         path.escape_default()

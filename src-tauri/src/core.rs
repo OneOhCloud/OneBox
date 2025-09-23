@@ -158,22 +158,20 @@ pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Resu
 
                         match event {
                             tauri_plugin_shell::process::CommandEvent::Stdout(line) => {
-                                log::info!("Proxy stdout: {:?}", String::from_utf8_lossy(&line));
+                                log::info!("sing-box stdout: {:?}", String::from_utf8_lossy(&line));
                             }
                             tauri_plugin_shell::process::CommandEvent::Stderr(line) => {
                                 let line_str = String::from_utf8_lossy(&line);
-                                let parts: Vec<&str> = line_str.split("ms] ").collect();
-                                let last_part = parts.last().unwrap_or(&"").trim();
-                                log::info!("{}", last_part);
+                                print!("{}", line_str);
                             }
 
                             tauri_plugin_shell::process::CommandEvent::Error(err) => {
-                                log::error!("Proxy process error: {}", err);
+                                log::error!("sing-box process error: {}", err);
                             }
                             tauri_plugin_shell::process::CommandEvent::Terminated(exit_code) => {
                                 terminated = true; // 标记为已处理终止事件
                                 log::info!(
-                                    "Proxy process terminated with exit code: {:?}",
+                                    "sing-box process terminated with exit code: {:?}",
                                     exit_code
                                 );
 
@@ -284,40 +282,7 @@ pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Resu
     // 处理代理设置结果
     if let Err(e) = proxy_result {
         // 清理子进程
-        let mut manager = match PROCESS_MANAGER.lock() {
-            Ok(m) => m,
-            Err(e) => {
-                log::error!("Mutex lock error during cleanup: {:?}", e);
-                e.into_inner()
-            }
-        };
-
-        if let Some(child) = manager.child.take() {
-            log::info!("Killing child process due to proxy setup failure");
-            #[cfg(unix)]
-            {
-                use libc::{kill, SIGTERM};
-                let pid = child.pid();
-                log::info!("Sending SIGTERM to process with PID: {}", pid);
-                let res = unsafe { kill(pid as i32, SIGTERM) };
-                if res != 0 {
-                    log::error!(
-                        "Failed to send SIGTERM to process with PID {}: {}",
-                        pid,
-                        std::io::Error::last_os_error()
-                    );
-                }
-            }
-            #[cfg(not(unix))]
-            {
-                // 非unix不能发信号, 只能 kill
-                child.kill().map_err(|e| e.to_string())?;
-            }
-        }
-        manager.current_mode = None;
-        manager.config_path = None;
-        manager.tun_password = None;
-
+        stop(app).await.ok();
         log::error!("Failed to set proxy: {}", e);
         return Err(e.to_string());
     }
@@ -373,6 +338,36 @@ pub async fn stop(app: tauri::AppHandle) -> Result<(), String> {
                 if let Err(e) = PlatformVpnProxy::unset_proxy(&app).await {
                     log::error!("Failed to unset system proxy: {}", e);
                 }
+                // 停止进程
+                #[cfg(unix)]
+                {
+                    use libc::{kill, SIGTERM};
+                    if let Some(child) = child_option {
+                        let pid = child.pid();
+                        log::info!("[stop] Sending SIGTERM to process with PID: {}", pid);
+                        let res = unsafe { kill(pid as i32, SIGTERM) };
+                        if res != 0 {
+                            log::error!(
+                                "[stop] Failed to send SIGTERM to process with PID {}: {}",
+                                pid,
+                                std::io::Error::last_os_error()
+                            );
+                        } else {
+                            log::info!("[stop] SIGTERM sent successfully to PID: {}", pid);
+                        }
+                    } else {
+                        log::info!("No child process to terminate");
+                    }
+                }
+                #[cfg(not(unix))]
+                {
+                    // 非unix不能发信号, 只能 kill
+                    if let Some(child) = child_option {
+                        child.kill().map_err(|e| e.to_string())?;
+                    }
+                }
+                // 睡眠 0.5 等待进程退出
+                std::thread::sleep(std::time::Duration::from_millis(500));
             }
             ProxyMode::TunProxy => {
                 if let Some(password) = &tun_password {
@@ -385,35 +380,6 @@ pub async fn stop(app: tauri::AppHandle) -> Result<(), String> {
         }
     }
 
-    // 停止进程
-
-    #[cfg(unix)]
-    {
-        use libc::{kill, SIGTERM};
-        if let Some(child) = child_option {
-            let pid = child.pid();
-            log::info!("Sending SIGTERM to process with PID: {}", pid);
-            let res = unsafe { kill(pid as i32, SIGTERM) };
-            if res != 0 {
-                log::error!(
-                    "Failed to send SIGTERM to process with PID {}: {}",
-                    pid,
-                    std::io::Error::last_os_error()
-                );
-            }
-        } else {
-            log::info!("No child process to terminate");
-        }
-    }
-    #[cfg(not(unix))]
-    {
-        // 非unix不能发信号, 只能 kill
-        if let Some(child) = child_option {
-            child.kill().map_err(|e| e.to_string())?;
-        }
-    }
-    // 睡眠 0.5 等待进程退出
-    std::thread::sleep(std::time::Duration::from_millis(500));
     log::info!("Proxy process stopped");
     app.emit("status-changed", ()).unwrap();
     Ok(())

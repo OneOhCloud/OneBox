@@ -38,6 +38,9 @@ export default function SelectNode(props: SelectNodeProps) {
         });
         let res = await response.json();
         return res
+    }, {
+        revalidateOnFocus: true,
+        refreshInterval: 1000,
     });
 
 

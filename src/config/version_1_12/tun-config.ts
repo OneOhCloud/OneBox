@@ -2,7 +2,7 @@ import * as path from '@tauri-apps/api/path';
 import { type } from '@tauri-apps/plugin-os';
 import { getSubscriptionConfig } from '../../action/db';
 import { getAllowLan, getStoreValue } from '../../single/store';
-import { TUN_STACK_STORE_KEY } from '../../types/definition';
+import { STAGE_VERSION_STORE_KEY, TUN_STACK_STORE_KEY } from '../../types/definition';
 import { clashApi, ruleSet } from '../common';
 import { DEFAULT_DOMAIN_RESOLVER_TAG, updateDHCPSettings2Config, updateVPNServerConfigFromDB } from './helper';
 
@@ -19,19 +19,25 @@ const tunConfig = {
                 "type": "udp",
                 "server": "223.5.5.5",
                 "server_port": 53,
+                "connect_timeout": "5s",
+
 
             },
             {
                 "tag": "dns_proxy",
                 "type": "tcp",
                 "server": "1.0.0.1",
-                "detour": "ExitGateway"
+                "detour": "ExitGateway",
+                "connect_timeout": "5s",
+
             },
             {
                 "tag": DEFAULT_DOMAIN_RESOLVER_TAG,
                 "type": "udp",
                 "server": "223.5.5.5",
                 "server_port": 53,
+                "connect_timeout": "5s",
+
             },
             {
                 "tag": "remote",
@@ -41,17 +47,6 @@ const tunConfig = {
             }
         ],
         "rules": [
-            {
-                "domain": [
-                    "captive.oneoh.cloud",
-                    "captive.apple.com",
-                    "nmcheck.gnome.org",
-                    "www.msftconnecttest.com",
-                    "connectivitycheck.gstatic.com"
-                ],
-                "server": "system",
-                "strategy": "ipv4_only"
-            },
             {
                 "query_type": [
                     "HTTPS",
@@ -69,6 +64,7 @@ const tunConfig = {
                     "geosite-samsung",
                     "geosite-private"
                 ],
+                "disable_cache": true,
                 "strategy": "prefer_ipv4",
                 "server": "system"
 
@@ -212,6 +208,7 @@ const tunConfig = {
         {
             "tag": "auto",
             "type": "urltest",
+            "url": "https://www.google.com/generate_204",
             "outbounds": []
         }
     ]
@@ -220,6 +217,11 @@ const tunConfig = {
 export default async function setTunConfig(identifier: string) {
     // 一定要优先深拷贝配置文件，否则会修改原始配置文件对象，导致后续使用时出错。
     const newConfig = JSON.parse(JSON.stringify(tunConfig));
+
+    // 根据当前的 Stage 版本设置日志等级
+    let level = await getStoreValue(STAGE_VERSION_STORE_KEY) === "dev" ? "debug" : "info";
+    newConfig.log.level = level;
+
 
 
     console.log("写入[规则]TUN代理配置文件");
