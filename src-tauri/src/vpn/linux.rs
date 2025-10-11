@@ -69,14 +69,14 @@ pub fn create_privileged_command(
         sidecar_path.escape_default(),
         path.escape_default()
     );
-    log::info!("Executing command: {}", command);
+    log::debug!("Executing command: {}", command);
     Some(app.shell().command("sh").args(vec!["-c", &command]))
 }
 
 /// 停止TUN模式下的进程
 pub fn stop_tun_process(password: &str) -> Result<(), String> {
     let command = format!("echo '{}' | sudo -S pkill -f sing-box", password);
-    log::info!("Executing command: {}", command);
+    log::debug!("Executing command: {}", command);
     Command::new("sh")
         .arg("-c")
         .arg(command)
