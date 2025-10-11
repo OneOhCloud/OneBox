@@ -1,5 +1,6 @@
 import { locale, type } from '@tauri-apps/plugin-os';
 import { LazyStore } from '@tauri-apps/plugin-store';
+import * as crypto from 'crypto';
 import { toast } from 'sonner';
 import { ALLOWLAN_STORE_KEY, ENABLE_BYPASS_ROUTER_STORE_KEY, ENABLE_TUN_STORE_KEY, USE_DHCP_STORE_KEY } from '../types/definition';
 
@@ -67,7 +68,7 @@ export async function getClashApiSecret(): Promise<string> {
     if (secret) {
         return secret as string;
     } else {
-        const randomSecret = Math.random().toString(36).substring(2, 18);
+        const randomSecret = crypto.randomBytes(12).toString('hex');
         await store.set(CLASH_API_SECRET, randomSecret);
         await store.save();
         return randomSecret;
