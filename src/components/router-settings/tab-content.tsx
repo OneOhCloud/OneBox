@@ -49,7 +49,7 @@ export function TabContent({ rules, addRule, removeRule, domainInput, setDomainI
                         placeholder="example.com"
                         value={domainInput}
                         onChange={(e) => setDomainInput(e.target.value)}
-                        onKeyPress={(e) => e.key === 'Enter' && addRule('domain', domainInput)}
+                        onKeyDown={(e) => e.key === 'Enter' && addRule('domain', domainInput)}
                     />
                     <button
                         className="px-3 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded transition-colors"
@@ -87,7 +87,7 @@ export function TabContent({ rules, addRule, removeRule, domainInput, setDomainI
                         placeholder=".example.com"
                         value={domainSuffixInput}
                         onChange={(e) => setDomainSuffixInput(e.target.value)}
-                        onKeyPress={(e) => e.key === 'Enter' && addRule('domain_suffix', domainSuffixInput)}
+                        onKeyDown={(e) => e.key === 'Enter' && addRule('domain_suffix', domainSuffixInput)}
                     />
                     <button
                         className="px-3 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded transition-colors"
@@ -125,7 +125,7 @@ export function TabContent({ rules, addRule, removeRule, domainInput, setDomainI
                         placeholder="192.168.1.0/24"
                         value={ipCidrInput}
                         onChange={(e) => setIpCidrInput(e.target.value)}
-                        onKeyPress={(e) => e.key === 'Enter' && addRule('ip_cidr', ipCidrInput)}
+                        onKeyDown={(e) => e.key === 'Enter' && addRule('ip_cidr', ipCidrInput)}
                     />
                     <button
                         className="px-3 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded transition-colors"
