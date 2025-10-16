@@ -10,6 +10,9 @@ All significant changes in this version are documented here.
 
 
 ### ✨ Features
+[doing] Custom rules
+
+[doing] Custom DNS servers
 
 
 ### ⚠ CHANGES LOG
@@ -28,6 +31,10 @@ All significant changes in this version are documented here.
 本版本的所有重要变更将记录于此。
 
 ### ✨ 新增功能
+
+[进行中] 自定义规则
+
+[进行中] 自定义 DNS 服务器
 
 
 

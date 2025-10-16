@@ -130,3 +130,35 @@ export async function setUseDHCP(value: boolean) {
     await store.set(USE_DHCP_STORE_KEY, value);
     await store.save();
 }
+
+
+export async function setCustomRuleSet(key: 'direct' | 'proxy', config: { domain: string[]; domain_suffix: string[]; ip_cidr: string[] }) {
+    await store.set(`custom_ruleset_${key}`, JSON.stringify(config));
+    await store.save();
+}
+
+export async function getCustomRuleSet(key: 'direct' | 'proxy'): Promise<{ domain: string[]; domain_suffix: string[]; ip_cidr: string[] }> {
+    let s = await store.get(`custom_ruleset_${key}`) as string | undefined;
+    if (s) {
+        try {
+            const config = JSON.parse(s);
+            if (config && typeof config === 'object') {
+                if (!Array.isArray(config.domain)) {
+                    config.domain = [];
+                }
+                if (!Array.isArray(config.domain_suffix)) {
+                    config.domain_suffix = [];
+                }
+                if (!Array.isArray(config.ip_cidr)) {
+                    config.ip_cidr = [];
+                }
+                return config
+            }
+
+        } catch (e) {
+            console.error('解析自定义规则集失败:', e);
+        }
+    }
+    return { domain: [], domain_suffix: [], ip_cidr: [] };
+}
+
