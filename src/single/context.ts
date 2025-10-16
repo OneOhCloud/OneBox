@@ -2,7 +2,7 @@ import { createContext } from "react";
 
 
 
-export type ActiveScreenType = 'home' | 'configuration' | 'settings' | 'developer_options';
+export type ActiveScreenType = 'home' | 'configuration' | 'settings' | 'developer_options' | 'router_settings';
 
 
 

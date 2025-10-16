@@ -1,6 +1,5 @@
 import { locale, type } from '@tauri-apps/plugin-os';
 import { LazyStore } from '@tauri-apps/plugin-store';
-import * as crypto from 'crypto';
 import { toast } from 'sonner';
 import { ALLOWLAN_STORE_KEY, ENABLE_BYPASS_ROUTER_STORE_KEY, ENABLE_TUN_STORE_KEY, USE_DHCP_STORE_KEY } from '../types/definition';
 
@@ -68,7 +67,12 @@ export async function getClashApiSecret(): Promise<string> {
     if (secret) {
         return secret as string;
     } else {
-        const randomSecret = crypto.randomBytes(12).toString('hex');
+        // 使用 Web Crypto API 生成随机字节
+        const array = new Uint8Array(12);
+        crypto.getRandomValues(array);
+        const randomSecret = Array.from(array)
+            .map(b => b.toString(16).padStart(2, '0'))
+            .join('');
         await store.set(CLASH_API_SECRET, randomSecret);
         await store.save();
         return randomSecret;
@@ -125,4 +129,51 @@ export async function getUseDHCP(): Promise<boolean> {
 export async function setUseDHCP(value: boolean) {
     await store.set(USE_DHCP_STORE_KEY, value);
     await store.save();
+}
+
+
+export async function setCustomRuleSet(key: 'direct' | 'proxy', config: { domain: string[]; domain_suffix: string[]; ip_cidr: string[] }) {
+    await store.set(`custom_ruleset_${key}`, JSON.stringify(config));
+    await store.save();
+}
+
+export async function getCustomRuleSet(key: 'direct' | 'proxy'): Promise<{ domain: string[]; domain_suffix: string[]; ip_cidr: string[] }> {
+    let s = await store.get(`custom_ruleset_${key}`) as string | undefined;
+    if (s) {
+        try {
+            const config = JSON.parse(s);
+            if (config && typeof config === 'object') {
+                if (!Array.isArray(config.domain)) {
+                    config.domain = [];
+                }
+                if (!Array.isArray(config.domain_suffix)) {
+                    config.domain_suffix = [];
+                }
+                if (!Array.isArray(config.ip_cidr)) {
+                    config.ip_cidr = [];
+                }
+                return config
+            }
+
+        } catch (e) {
+            console.error('解析自定义规则集失败:', e);
+        }
+    }
+    return { domain: [], domain_suffix: [], ip_cidr: [] };
+}
+
+
+
+// set dns for direct connection
+export async function setDirectDNS(dnsServers: string) {
+    await store.set('direct_dns', dnsServers);
+    await store.save();
+}
+
+export async function getDirectDNS(): Promise<string> {
+    let s = await store.get('direct_dns') as string | undefined;
+    if (s) {
+        return s;
+    }
+    return '223.5.5.5';
 }

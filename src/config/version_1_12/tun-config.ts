@@ -1,7 +1,7 @@
 import * as path from '@tauri-apps/api/path';
 import { type } from '@tauri-apps/plugin-os';
 import { getSubscriptionConfig } from '../../action/db';
-import { getAllowLan, getStoreValue } from '../../single/store';
+import { getAllowLan, getCustomRuleSet, getStoreValue } from '../../single/store';
 import { STAGE_VERSION_STORE_KEY, TUN_STACK_STORE_KEY } from '../../types/definition';
 import { clashApi, ruleSet } from '../common';
 import { DEFAULT_DOMAIN_RESOLVER_TAG, updateDHCPSettings2Config, updateVPNServerConfigFromDB } from './helper';
@@ -151,6 +151,25 @@ const tunConfig = {
                 "protocol": "quic",
                 "action": "reject"
             },
+            {
+                "domain": [
+                    "direct-tag.oneoh.cloud"
+                ],
+                "domain_suffix": [],
+                "ip_cidr": [],
+                "outbound": "direct"
+
+            },
+
+            {
+                "domain": [
+                    "proxy-tag.oneoh.cloud"
+                ],
+                "domain_suffix": [],
+                "ip_cidr": [],
+                "outbound": "ExitGateway"
+            },
+
 
             {
                 "domain": [
@@ -228,6 +247,37 @@ export default async function setTunConfig(identifier: string) {
     let dbConfigData = await getSubscriptionConfig(identifier);
     const appConfigPath = await path.appConfigDir();
     const dbCacheFilePath = await path.join(appConfigPath, 'tun-cache-rule-v1.db');
+
+    let directCustomRuleSet = await getCustomRuleSet('direct');
+    let proxyCustomRuleSet = await getCustomRuleSet('proxy');
+
+
+    if (directCustomRuleSet) {
+        // 找到包含 direct-tag.oneoh.cloud 的规则的坐标，插入自定义规则
+        for (let i = 0; i < newConfig.route.rules.length; i++) {
+            let rule = newConfig.route.rules[i];
+            if (rule.domain && Array.isArray(rule.domain) && rule.domain.includes('direct-tag.oneoh.cloud')) {
+                rule.domain.push(...directCustomRuleSet.domain);
+                rule.domain_suffix.push(...directCustomRuleSet.domain_suffix);
+                rule.ip_cidr.push(...directCustomRuleSet.ip_cidr);
+                break;
+            }
+
+        }
+    }
+
+
+    if (proxyCustomRuleSet) {
+        for (let i = 0; i < newConfig.route.rules.length; i++) {
+            let rule = newConfig.route.rules[i];
+            if (rule.domain && Array.isArray(rule.domain) && rule.domain.includes('proxy-tag.oneoh.cloud')) {
+                rule.domain.push(...proxyCustomRuleSet.domain);
+                rule.domain_suffix.push(...proxyCustomRuleSet.domain_suffix);
+                rule.ip_cidr.push(...proxyCustomRuleSet.ip_cidr);
+                break;
+            }
+        }
+    }
 
 
 
