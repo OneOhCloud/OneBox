@@ -1,4 +1,4 @@
-import { getClashApiSecret, getUseDHCP } from "../../single/store";
+import { getClashApiSecret, getStoreValue, getUseDHCP } from "../../single/store";
 import { writeConfigFile } from "../helper";
 
 
@@ -13,7 +13,7 @@ type Item = {
 
 export async function updateDHCPSettings2Config(newConfig: any) {
     const useDHCP = await getUseDHCP();
-    newConfig.dns.servers.forEach((server: any) => {
+    newConfig.dns.servers.forEach(async (server: any) => {
         if (server.tag === "system") {
             if (useDHCP) {
                 server.type = "dhcp";
@@ -21,8 +21,9 @@ export async function updateDHCPSettings2Config(newConfig: any) {
                 delete server.server_port;
                 console.log("启用 DHCP DNS 模式");
             } else {
+                let directDNS = await getStoreValue('direct_dns');
                 server.type = "udp";
-                server.server = "223.5.5.5";
+                server.server = directDNS.trim() || "223.5.5.5";
                 server.server_port = 53;
                 console.log("启用 UDP DNS 模式");
             }

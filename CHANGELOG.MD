@@ -10,9 +10,9 @@ All significant changes in this version are documented here.
 
 
 ### ✨ Features
-[doing] Custom rules
 
-[doing] Custom DNS servers
+- Added routing rules support
+- Added custom DNS servers for direct connections
 
 
 ### ⚠ CHANGES LOG
@@ -32,9 +32,8 @@ All significant changes in this version are documented here.
 
 ### ✨ 新增功能
 
-[进行中] 自定义规则
-
-[进行中] 自定义 DNS 服务器
+- 支持自定义路由规则
+- 支持自定义直连的 DNS 服务器
 
 
 

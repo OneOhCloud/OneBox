@@ -162,3 +162,18 @@ export async function getCustomRuleSet(key: 'direct' | 'proxy'): Promise<{ domai
     return { domain: [], domain_suffix: [], ip_cidr: [] };
 }
 
+
+
+// set dns for direct connection
+export async function setDirectDNS(dnsServers: string) {
+    await store.set('direct_dns', dnsServers);
+    await store.save();
+}
+
+export async function getDirectDNS(): Promise<string> {
+    let s = await store.get('direct_dns') as string | undefined;
+    if (s) {
+        return s;
+    }
+    return '223.5.5.5';
+}
