@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { HddRack, Save, X } from "react-bootstrap-icons";
 import { toast } from "sonner";
-import { getDirectDNS, setDirectDNS } from "../../single/store";
+import { getDirectDNS, getUseDHCP, setDirectDNS } from "../../single/store";
 import { t } from "../../utils/helper";
 import { SettingItem } from "../settings/common";
 
@@ -10,15 +10,19 @@ export default function DNSSettingsItem() {
     const [isOpen, setIsOpen] = useState(false);
     const [dnsServers, setDnsServers] = useState<string>("");
     const [isLoading, setIsLoading] = useState(false);
+    const [isUseDHCP, setIsUseDHCP] = useState(false);
 
     useEffect(() => {
         if (isOpen) {
             loadDNS();
+
         }
     }, [isOpen]);
 
     const loadDNS = async () => {
         const dns = await getDirectDNS();
+        const state: boolean = await getUseDHCP();
+        setIsUseDHCP(state);
         setDnsServers(dns);
     };
 
@@ -46,6 +50,10 @@ export default function DNSSettingsItem() {
             setIsLoading(false);
         }
     };
+
+    if (isUseDHCP) {
+        return <></>;
+    }
 
     return (
         <>
@@ -91,7 +99,7 @@ export default function DNSSettingsItem() {
                                     value={dnsServers}
                                     onChange={(e) => setDnsServers(e.target.value)}
                                 />
-                                <p className="text-xs text-gray-500 mt-1">
+                                <p className="text-xs text-gray-500 mt-2">
                                     {t("dns_hint", "Enter DNS server address for direct connections")}
                                 </p>
                             </div>
