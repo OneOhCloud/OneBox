@@ -4,26 +4,25 @@
 
 Use development and beta versions only if you are aware of the potential risks.
 
-## Changes since v1.1.70
+## Changes since v1.1.73
 
 All significant changes in this version are documented here.
 
 
 ### ✨ Features
 
-- Added routing rules support
-- Added custom DNS servers for direct connections
+- None
 
 
 ### ⚠ CHANGES LOG
 
-- Updated dependencies.
-- Updated sing-box core to v1.12.10.
-
+- Improved UI details
+- Updated dependencies
+- Improved translations
 
 ### 🐛 Bug Fixes
 
-- Fixed issues found in security audit.
+- Direct DNS and DHCP options are mutually exclusive
 
 
 ## 自 v1.1.70 以来的变更
@@ -32,15 +31,16 @@ All significant changes in this version are documented here.
 
 ### ✨ 新增功能
 
-- 支持自定义路由规则
-- 支持自定义直连的 DNS 服务器
-
+- 无
 
 
 ### ⚠ 变更日志
-- 更新依赖项。
-- 将 sing-box 核心更新至 v1.12.10。
+
+- 改进翻译
+- 改进UI细节
+- 更新依赖项
+
 
 ### 🐛 问题修复
 
-- 解决安全审计中发现的问题。
+- "DHCP" 与 "直连DNS" 选项互斥
