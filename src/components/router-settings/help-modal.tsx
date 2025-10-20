@@ -14,7 +14,7 @@ export function HelpModal({ isOpen, onClose }: HelpModalProps) {
     if (!isOpen) return null;
     return (
         <dialog className="modal modal-open">
-            <div className="modal-box w-full h-full bg-white border border-gray-200">
+            <div className="modal-box w-full h-full bg-white  rounded-none ">
                 <div className="flex justify-between  items-center mb-4">
                     <div className="font-semibold text-base text-gray-900 ">{t('rule_info_title', 'Rule Information')}</div>
                     <button className="btn btn-sm btn-circle btn-ghost text-gray-500 hover:bg-gray-200 " onClick={onClose}>
