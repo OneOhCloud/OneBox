@@ -56,7 +56,7 @@
     "direct_dns_settings": "Direct DNS Settings",
     "disconnected": "Disconnected",
     "dns_cannot_empty": "DNS cannot be empty",
-    "dns_hint": "Enter DNS server address for direct connections",
+    "dns_hint": "This DNS is used to resolve non-proxy traffic domains",
     "dns_save_failed": "Failed to save DNS settings",
     "dns_saved": "DNS settings saved successfully",
     "domain_rules_desc": "Match exact domain names, e.g., example.com",

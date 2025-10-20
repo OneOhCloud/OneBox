@@ -144,3 +144,5 @@ https://v2.tauri.app/learn/window-customization/
 @plugin "daisyui" {
    themes: light --default, light --prefersdark;
  }
+
+:root { text-autospace: normal; }
