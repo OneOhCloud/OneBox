@@ -5,7 +5,13 @@
 
 基于 sing-box 内核的跨平台 GUI 客户端。
 
-## 核心宗旨 ✨
+
+## 软件截图 
+
+|![主页](./docs/image/zh/Home.png)|![配置](./docs/image/zh/Config.png)|![设置](./docs/image/zh/Settings.png)|
+|:---:|:---:|:---:|
+
+## 核心宗旨
 
 **简单，稳定，安全。无需复杂配置，开箱即用**
 
@@ -16,11 +22,6 @@
 - https://github.com/clash-verge-rev/clash-verge-rev
 - https://github.com/2dust/v2rayN
 
-
-## 软件截图 
-
-|![主页](./docs/image/zh/Home.png)|![配置](./docs/image/zh/Config.png)|![设置](./docs/image/zh/Settings.png)|
-|:---:|:---:|:---:|
 
 ## 下载安装 
 

@@ -35,16 +35,12 @@ jobs:
         include:
           - platform: "macos-latest"
             args: "--target aarch64-apple-darwin"
-            cache: "aarch64"
           - platform: "macos-latest"
             args: "--target x86_64-apple-darwin"
-            cache: "x86_64"
           - platform: "ubuntu-24.04"
             args: ""
-            cache: "x86_64"
           - platform: "windows-latest"
             args: ""
-            cache: "x86_64"
 
 
     runs-on: ${{ matrix.platform }}
@@ -109,16 +105,6 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
-
-      - name: Cache Rust Dependencies
-        uses: swatinem/rust-cache@v2
-        with:
-          shared-key: "global-rust-cache"
-          key: "target-${{ matrix.platform}}-${{matrix.cache || 'default'}}"
-          workspaces: src-tauri
-          cache-all-crates: true
-          cache-on-failure: true
-
 
       - name: Install Frontend Dependencies
         run: bun install

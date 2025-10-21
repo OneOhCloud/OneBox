@@ -1,4 +1,7 @@
-import { Globe, ShieldCheck } from "react-bootstrap-icons";
+import {
+    Globe, ShieldCheck,
+    X,
+} from "react-bootstrap-icons";
 import { t } from "../../utils/helper";
 
 interface HelpModalProps {
@@ -11,8 +14,13 @@ export function HelpModal({ isOpen, onClose }: HelpModalProps) {
     if (!isOpen) return null;
     return (
         <dialog className="modal modal-open">
-            <div className="modal-box max-w-md bg-white border border-gray-200">
-                <h3 className="font-semibold text-base text-gray-900 mb-4">{t('rule_info_title', 'Rule Information')}</h3>
+            <div className="modal-box w-full h-full bg-white  rounded-none ">
+                <div className="flex justify-between  items-center mb-4">
+                    <div className="font-semibold text-base text-gray-900 ">{t('rule_info_title', 'Rule Information')}</div>
+                    <button className="btn btn-sm btn-circle btn-ghost text-gray-500 hover:bg-gray-200 " onClick={onClose}>
+                        <X size={24} className="text-gray-500" />
+                    </button>
+                </div>
                 <div className="space-y-3">
                     <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
                         <p className="font-medium text-gray-900 mb-1.5 flex items-center gap-2">
