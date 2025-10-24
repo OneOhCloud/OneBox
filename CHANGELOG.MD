@@ -19,13 +19,14 @@ All significant changes in this version are documented here.
 - Improved UI details
 - Updated dependencies
 - Improved translations
+- sing-box core updated to v1.12.11
 
 ### 🐛 Bug Fixes
 
 - Direct DNS and DHCP options are mutually exclusive
 
 
-## 自 v1.1.70 以来的变更
+## 自 v1.1.73 以来的变更
 
 本版本的所有重要变更将记录于此。
 
@@ -39,6 +40,7 @@ All significant changes in this version are documented here.
 - 改进翻译
 - 改进UI细节
 - 更新依赖项
+- sing-box 内核更新至 v1.12.11
 
 
 ### 🐛 问题修复
