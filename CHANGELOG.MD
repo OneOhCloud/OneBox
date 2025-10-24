@@ -4,7 +4,7 @@
 
 Use development and beta versions only if you are aware of the potential risks.
 
-## Changes since v1.1.73
+## Changes since v1.1.76
 
 All significant changes in this version are documented here.
 
@@ -16,14 +16,11 @@ All significant changes in this version are documented here.
 
 ### ⚠ CHANGES LOG
 
-- Improved UI details
-- Updated dependencies
-- Improved translations
 - sing-box core updated to v1.12.11
 
 ### 🐛 Bug Fixes
 
-- Direct DNS and DHCP options are mutually exclusive
+- None
 
 
 ## 自 v1.1.73 以来的变更
@@ -37,12 +34,9 @@ All significant changes in this version are documented here.
 
 ### ⚠ 变更日志
 
-- 改进翻译
-- 改进UI细节
-- 更新依赖项
 - sing-box 内核更新至 v1.12.11
 
 
 ### 🐛 问题修复
 
-- "DHCP" 与 "直连DNS" 选项互斥
+- 无
