@@ -48,6 +48,13 @@ const tunConfig = {
                 "action": "reject"
             },
             {
+                "domain": [
+                    "captive.oneoh.cloud",
+                    "captive.apple.com",
+                    "nmcheck.gnome.org",
+                    "www.msftconnecttest.com",
+                    "connectivitycheck.gstatic.com",
+                ],
                 "rule_set": [
                     "geoip-cn",
                     "geosite-cn",
@@ -168,7 +175,8 @@ const tunConfig = {
                     "captive.oneoh.cloud",
                     "captive.apple.com",
                     "nmcheck.gnome.org",
-                    "www.msftconnecttest.com"
+                    "www.msftconnecttest.com",
+                    "connectivitycheck.gstatic.com",
                 ],
                 "domain_suffix": [
                     "local",

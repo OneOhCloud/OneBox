@@ -46,7 +46,8 @@ const mixedConfig = {
                     "captive.oneoh.cloud",
                     "captive.apple.com",
                     "nmcheck.gnome.org",
-                    "www.msftconnecttest.com"
+                    "www.msftconnecttest.com",
+                    "connectivitycheck.gstatic.com",
                 ],
                 "disable_cache": true,
                 "server": "system",
@@ -106,7 +107,8 @@ const mixedConfig = {
                     "captive.oneoh.cloud",
                     "captive.apple.com",
                     "nmcheck.gnome.org",
-                    "www.msftconnecttest.com"
+                    "www.msftconnecttest.com",
+                    "connectivitycheck.gstatic.com",
                 ],
                 "domain_suffix": [
                     "local",
