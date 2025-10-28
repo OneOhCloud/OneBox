@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { HddRack, Save, X } from "react-bootstrap-icons";
 import { toast } from "sonner";
-import { DEFAULT_SYSTEM_DNS } from "../../config/helper";
+import { DEFAULT_SYSTEM_DNS } from "../../config/common";
 import { getDirectDNS, getUseDHCP, setDirectDNS } from "../../single/store";
 import { t } from "../../utils/helper";
 import { SettingItem } from "../settings/common";

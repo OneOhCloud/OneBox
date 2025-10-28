@@ -3,7 +3,6 @@ import { BaseDirectory, create, exists, writeFile } from '@tauri-apps/plugin-fs'
 
 
 
-export const DEFAULT_SYSTEM_DNS = "119.29.29.29"
 
 
 

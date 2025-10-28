@@ -16,7 +16,7 @@ All significant changes in this version are documented here.
 
 ### ⚠ CHANGES LOG
 
-- sing-box core updated to v1.12.11
+- sing-box core updated to v1.12.12
 
 ### 🐛 Bug Fixes
 
@@ -34,7 +34,7 @@ All significant changes in this version are documented here.
 
 ### ⚠ 变更日志
 
-- sing-box 内核更新至 v1.12.11
+- sing-box 内核更新至 v1.12.12
 
 
 ### 🐛 问题修复
