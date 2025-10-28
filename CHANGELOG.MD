@@ -4,7 +4,7 @@
 
 Use development and beta versions only if you are aware of the potential risks.
 
-## Changes since v1.1.76
+## Changes since v1.1.78
 
 All significant changes in this version are documented here.
 
@@ -21,7 +21,7 @@ All significant changes in this version are documented here.
 - Fix the issue of failing to get "Direct DNS"
 
 
-## 自 v1.1.73 以来的变更
+## 自 v1.1.78 以来的变更
 
 本版本的所有重要变更将记录于此。
 
