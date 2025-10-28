@@ -3,8 +3,8 @@ import { type } from '@tauri-apps/plugin-os';
 import { getSubscriptionConfig } from '../../action/db';
 import { getAllowLan, getStoreValue } from '../../single/store';
 import { STAGE_VERSION_STORE_KEY, TUN_STACK_STORE_KEY } from '../../types/definition';
-import { clashApi, ruleSet } from '../common';
-import { DEFAULT_DOMAIN_RESOLVER_TAG, updateDHCPSettings2Config, updateVPNServerConfigFromDB } from './helper';
+import { clashApi, DEFAULT_SYSTEM_DNS, ruleSet } from '../common';
+import { updateDHCPSettings2Config, updateVPNServerConfigFromDB } from './helper';
 
 
 const tunConfig = {
@@ -18,18 +18,10 @@ const tunConfig = {
             {
                 "tag": "system",
                 "type": "udp",
-                "server": "223.5.5.5",
+                "server": DEFAULT_SYSTEM_DNS,
                 "server_port": 53,
                 "connect_timeout": "5s",
 
-
-            },
-            {
-                "tag": DEFAULT_DOMAIN_RESOLVER_TAG,
-                "type": "udp",
-                "server": "223.5.5.5",
-                "server_port": 53,
-                "connect_timeout": "5s",
 
             },
             {

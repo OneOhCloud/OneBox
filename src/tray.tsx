@@ -147,7 +147,10 @@ export async function setupTrayIcon() {
 
 export async function setupStatusListener() {
     await listen('status-changed', async (event) => {
-        console.error(event.payload)
+        if (event == null) {
+            return;
+        }
+        console.log("Received status-changed event:", event);
         // @ts-ignore
         if (event.payload && event.payload.code && event.payload.code === 1) {
             // await message(`${t('connect_failed')}`, { title: t('error'), kind: 'error' });

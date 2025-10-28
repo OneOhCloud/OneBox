@@ -1,3 +1,5 @@
+export const DEFAULT_SYSTEM_DNS = "119.29.29.29"
+
 
 export const ruleSet = [
     {
@@ -5,7 +7,7 @@ export const ruleSet = [
         "type": "remote",
         "format": "binary",
         "url": "https://jsdelivr.oneoh.cloud/gh/MetaCubeX/meta-rules-dat@sing/geo/geoip/cn.srs",
-        "download_detour": "direct"
+
     },
     {
         "type": "remote",
@@ -24,42 +26,42 @@ export const ruleSet = [
         "type": "remote",
         "format": "binary",
         "url": "https://jsdelivr.oneoh.cloud/gh/OneOhCloud/one-geosite@rules/geosite-one-cn.srs",
-        "download_detour": "direct"
+
     },
     {
         "tag": "geosite-apple",
         "type": "remote",
         "format": "binary",
         "url": "https://jsdelivr.oneoh.cloud/gh/SagerNet/sing-geosite@rule-set/geosite-apple.srs",
-        "download_detour": "direct"
+
     },
     {
         "tag": "geosite-microsoft-cn",
         "type": "remote",
         "format": "binary",
         "url": "https://jsdelivr.oneoh.cloud/gh/SagerNet/sing-geosite@rule-set/geosite-microsoft@cn.srs",
-        "download_detour": "direct"
+
     },
     {
         "tag": "geosite-samsung",
         "type": "remote",
         "format": "binary",
         "url": "https://jsdelivr.oneoh.cloud/gh/SagerNet/sing-geosite@rule-set/geosite-samsung.srs",
-        "download_detour": "direct"
+
     },
     {
         "tag": "geosite-telegram",
         "type": "remote",
         "format": "binary",
         "url": "https://jsdelivr.oneoh.cloud/gh/SagerNet/sing-geosite@rule-set/geosite-telegram.srs",
-        "download_detour": "direct"
+
     },
     {
         "tag": "geosite-private",
         "type": "remote",
         "format": "binary",
         "url": "https://jsdelivr.oneoh.cloud/gh/SagerNet/sing-geosite@rule-set/geosite-private.srs",
-        "download_detour": "direct"
+
     }
 ]
 

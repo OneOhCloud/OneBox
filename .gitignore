@@ -29,3 +29,4 @@ src-tauri/binaries
 
 src-tauri/*.db
 src-tauri/examples
+target

@@ -1,8 +1,8 @@
 import { getClashApiSecret, getStoreValue, getUseDHCP } from "../../single/store";
+import { DEFAULT_SYSTEM_DNS } from '../common';
 import { writeConfigFile } from "../helper";
 
 
-export const DEFAULT_DOMAIN_RESOLVER_TAG = "alibaba_quic_dns"
 
 type Item = {
     tag: string;
@@ -21,11 +21,12 @@ export async function updateDHCPSettings2Config(newConfig: any) {
                 delete server.server_port;
                 console.log("启用 DHCP DNS 模式");
             } else {
-                let directDNS = await getStoreValue('direct_dns');
+                let directDNS = await getStoreValue('direct_dns') || DEFAULT_SYSTEM_DNS
+                console.log("当前使用直连 DNS 地址：", directDNS);
                 server.type = "udp";
-                server.server = directDNS.trim() || "223.5.5.5";
+                server.server = directDNS.trim();
                 server.server_port = 53;
-                console.log("启用 UDP DNS 模式");
+                console.log("启用 UDP DNS 模式, 服务器地址：", server.server);
             }
         }
     });
@@ -57,7 +58,7 @@ export async function updateVPNServerConfigFromDB(fileName: string, dbConfigData
 
 
     for (let i = 0; i < vpnServerList.length; i++) {
-        vpnServerList[i]["domain_resolver"] = DEFAULT_DOMAIN_RESOLVER_TAG;
+        vpnServerList[i]["domain_resolver"] = "system";
         outboundsSelector.push(vpnServerList[i].tag);
 
     }
