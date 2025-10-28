@@ -68,6 +68,7 @@ const mixedConfig = {
           "nmcheck.gnome.org",
           "detectportal.firefox.com",
           "connectivitycheck.android.com",
+          "connectivitycheck.gstatic.com",
           "www.miwifi.com",
           "router.asus.com"
         ],
@@ -168,7 +169,8 @@ const mixedConfig = {
           "captive.oneoh.cloud",
           "captive.apple.com",
           "nmcheck.gnome.org",
-          "www.msftconnecttest.com"
+          "www.msftconnecttest.com",
+          "connectivitycheck.gstatic.com",
         ],
         "domain_suffix": [
           ".oneoh.cloud",
