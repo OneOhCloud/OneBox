@@ -1,6 +1,6 @@
 import { Arch, OsType } from "@tauri-apps/plugin-os"
 
-export const SING_BOX_VERSION = "v1.12.11"
+export const SING_BOX_VERSION = "v1.12.12"
 export const GITHUB_URL = 'https://github.com/OneOhCloud/OneBox'
 export const OFFICIAL_WEBSITE = 'https://sing-box.net'
 export const SSI_STORE_KEY = 'selected_subscription_identifier'
