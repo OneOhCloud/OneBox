@@ -56,7 +56,7 @@ export function useNetworkCheck(key: string, checkFn: () => Promise<number>) {
     }
 
     return useSWR(key, handleNetworkCheck, {
-        refreshInterval: 1000
+        refreshInterval: 1000 * 5, // check every 5 seconds
     });
 }
 
