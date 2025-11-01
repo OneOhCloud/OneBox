@@ -177,6 +177,10 @@ pub fn run() {
             "show" => {
                 // 显示窗口
                 if let Some(main_window) = app.get_webview_window("main") {
+                    #[cfg(any(target_os = "windows", target_os = "linux"))]
+                    {
+                       main_window.unminimize().unwrap();
+                    }
                     main_window.show().unwrap();
                     main_window.set_focus().unwrap();
                 }
