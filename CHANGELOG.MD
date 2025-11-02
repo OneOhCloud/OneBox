@@ -8,6 +8,10 @@ Use development and beta versions only if you are aware of the potential risks.
 
 All significant changes in this version are documented here.
 
+### ✨ Features
+
+- Added support for UA settings
+
 
 ### ⚠ CHANGES LOG
 
@@ -19,11 +23,15 @@ All significant changes in this version are documented here.
 ### 🐛 Bug Fixes
 
 - Fix the issue of failing to get "Direct DNS"
-
+- Fix the issue of clicking "Dashboard" not responding on some systems
 
 ## 自 v1.1.78 以来的变更
 
 本版本的所有重要变更将记录于此。
+
+### ✨ 新增功能
+
+- 支持 UA 设置
 
 ### ⚠ 变更日志
 
@@ -32,6 +40,8 @@ All significant changes in this version are documented here.
 - sing-box 内核更新至 v1.12.12
 
 
+
 ### 🐛 问题修复
 
 - 修复获取"直连 DNS" 失败的问题
+- 修复点击 "仪表盘" 在部分系统上无响应的问题
