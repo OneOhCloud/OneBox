@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { JournalText } from "react-bootstrap-icons";
+import { Binoculars } from "react-bootstrap-icons";
 import ToggleBypassRouter from "../components/developer/bypass-router";
 import { SettingItem } from "../components/developer/common";
 import ToggleDev from "../components/developer/dev-toggle";
@@ -36,7 +36,7 @@ export default function Page() {
                         <DNSSettingsItem />
                         <UASettingsItem />
                         <SettingItem
-                            icon={<JournalText className="w-5 h-5 text-gray-500" />}
+                            icon={<Binoculars className="w-5 h-5 text-gray-500" />}
 
                             title={t("open_log")}
                             subTitle={t("open_log_desc")}

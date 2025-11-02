@@ -179,7 +179,7 @@
     "ua_option_sfm_1_12": "sing-box 1.12 mac",
     "ua_option_sfa_1_12": "sing-box 1.12 android",
     "ua_option_custom": "自定义",
-    "user_agent_settings": "User Agent 设置",
+    "user_agent_settings": "User Agent",
     "open_user_agent": "打开 UA 设置",
     "custom_ua_placeholder": "输入自定义 User Agent",
     "ua_hint": "为请求选择或输入自定义 User Agent",

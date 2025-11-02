@@ -4,7 +4,7 @@
 
 Use development and beta versions only if you are aware of the potential risks.
 
-## Changes since v1.1.78
+## Changes since v1.1.79
 
 All significant changes in this version are documented here.
 
@@ -25,7 +25,7 @@ All significant changes in this version are documented here.
 - Fix the issue of failing to get "Direct DNS"
 - Fix the issue of clicking "Dashboard" not responding on some systems
 
-## 自 v1.1.78 以来的变更
+## 自 v1.1.79 以来的变更
 
 本版本的所有重要变更将记录于此。
 

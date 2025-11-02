@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Save, TextIndentLeft, X } from "react-bootstrap-icons";
+import { Save, Tools, X } from "react-bootstrap-icons";
 import { toast } from "sonner";
 import { t } from "../../utils/helper";
 import { SettingItem } from "../settings/common";
@@ -90,7 +90,7 @@ export default function UASettingsItem() {
     return (
         <>
             <SettingItem
-                icon={<TextIndentLeft className="w-5 h-5 text-gray-500" />}
+                icon={<Tools className="w-5 h-5 text-gray-500" />}
                 title={t("user_agent_settings", "User Agent Settings")}
                 subTitle={t("open_user_agent", "Open user agent settings")}
                 disabled={false}
@@ -107,7 +107,7 @@ export default function UASettingsItem() {
                     <div className="relative bg-white rounded-lg p-3 w-80 max-w-full">
                         <div className="flex items-center justify-between mb-4">
                             <div className="flex items-center gap-2">
-                                <TextIndentLeft size={14} className="text-gray-500" />
+                                <Tools size={14} className="text-gray-500" />
                                 <h3 className="text-xs font-medium text-gray-700">
                                     {t("user_agent_settings", "User Agent Settings")}
                                 </h3>
