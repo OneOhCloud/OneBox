@@ -111,14 +111,14 @@ export default function UASettingsItem() {
                                 <h3 className="text-xs font-medium text-gray-700">
                                     {t("user_agent_settings", "User Agent Settings")}
                                 </h3>
-                            </div>
+                            </div >
                             <button
                                 onClick={handleClose}
                                 className="hover:bg-gray-100 rounded p-1 transition-colors"
                             >
                                 <X size={14} className="text-gray-500" />
                             </button>
-                        </div>
+                        </div >
 
                         <div className="flex flex-col gap-6">
                             <div>
@@ -167,9 +167,10 @@ export default function UASettingsItem() {
                                 {isLoading ? t("saving", "Saving...") : t("save", "Save")}
                             </button>
                         </div>
-                    </div>
-                </div>
-            )}
+                    </div >
+                </div >
+            )
+            }
         </>
     );
 }
