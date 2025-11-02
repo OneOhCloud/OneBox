@@ -10,7 +10,8 @@ export const TUN_STACK_STORE_KEY = 'tun_stack_key'
 export const USE_DHCP_STORE_KEY = 'use_dhcp_key'
 export const ENABLE_BYPASS_ROUTER_STORE_KEY = 'enable_bypass_router_key'
 export const SUPPORT_LOCAL_FILE_STORE_KEY = 'support_local_file_key'
-
+// User Agent 配置键
+export const USER_AGENT_STORE_KEY = 'user_agent_key'
 
 // 允许局域网连接
 export const ALLOWLAN_STORE_KEY = 'allow_lan_key'

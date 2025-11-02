@@ -174,5 +174,17 @@
     "use_dhcp": "DHCP",
     "version": "Version",
     "vpn_network": "VPN",
+    "ua_option_default": "default",
+    "ua_option_sfi_1_12": "sing-box 1.12 iOS ",
+    "ua_option_sfm_1_12": "sing-box 1.12 mac",
+    "ua_option_sfa_1_12": "sing-box 1.12 android",
+    "ua_option_custom": "custom",
+    "user_agent_settings": "User Agent Settings",
+    "open_user_agent": "Open user agent settings",
+    "custom_ua_placeholder": "Enter custom User Agent",
+    "ua_hint": "Select or enter a custom User Agent for requests",
+    "ua_cannot_empty": "User Agent cannot be empty",
+    "ua_saved": "User Agent settings saved successfully",
+    "ua_save_failed": "Failed to save User Agent settings",
     "zzzzzeof": "Zzzzzeof"
 }

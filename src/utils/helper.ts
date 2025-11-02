@@ -9,7 +9,7 @@ import { message } from '@tauri-apps/plugin-dialog';
 import en from '../../lang/en.json';
 import zh from '../../lang/zh.json';
 import { setGlobalMixedConfig, setGlobalTunConfig, setMixedConfig, setTunConfig } from '../config/helper';
-import { getClashApiSecret, getEnableTun, getLanguage, getStoreValue } from '../single/store';
+import { getClashApiSecret, getEnableTun, getLanguage, getStoreValue, getUserAgent } from '../single/store';
 const appWindow = getCurrentWindow();
 const enLang = en as Record<string, string>;
 const zhLang = zh as Record<string, string>;
@@ -87,7 +87,12 @@ export function formatOsInfo(osType: string, osArch: string) {
 }
 
 export async function getSingBoxUserAgent() {
+    const ua = await getUserAgent();
+    if (ua && ua.trim() !== "" && ua.trim() !== "default") {
+        return ua;
+    }
     const osInfo = await getOsInfo()
+
 
     let prefix = 'SFW';
     if (osInfo.osType === 'linux') {

@@ -9,6 +9,7 @@ import DNSSettingsItem from "../components/developer/dns-settings";
 import ToggleLocalConfig from "../components/developer/local-config-toggle";
 import StageSetting from "../components/developer/select-stage";
 import TunStackSetting from "../components/developer/tun-stack";
+import UASettingsItem from "../components/developer/ua-settings";
 import { t } from "../utils/helper";
 
 const appWindow = getCurrentWindow();
@@ -33,7 +34,7 @@ export default function Page() {
                         <TunStackSetting />
 
                         <DNSSettingsItem />
-
+                        <UASettingsItem />
                         <SettingItem
                             icon={<JournalText className="w-5 h-5 text-gray-500" />}
 

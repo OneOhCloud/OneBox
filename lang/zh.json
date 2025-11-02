@@ -174,5 +174,17 @@
     "use_dhcp": "DHCP",
     "version": "版本",
     "vpn_network": "VPN",
+    "ua_option_default": "默认",
+    "ua_option_sfi_1_12": "sing-box 1.12 iOS ",
+    "ua_option_sfm_1_12": "sing-box 1.12 mac",
+    "ua_option_sfa_1_12": "sing-box 1.12 android",
+    "ua_option_custom": "自定义",
+    "user_agent_settings": "User Agent 设置",
+    "open_user_agent": "打开 UA 设置",
+    "custom_ua_placeholder": "输入自定义 User Agent",
+    "ua_hint": "为请求选择或输入自定义 User Agent",
+    "ua_cannot_empty": "User Agent 不能为空",
+    "ua_saved": "User Agent 设置保存成功",
+    "ua_save_failed": "保存 User Agent 设置失败",
     "zzzzzeof": "zzzzzeof"
 }

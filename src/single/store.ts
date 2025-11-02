@@ -1,7 +1,7 @@
 import { locale, type } from '@tauri-apps/plugin-os';
 import { LazyStore } from '@tauri-apps/plugin-store';
 import { toast } from 'sonner';
-import { ALLOWLAN_STORE_KEY, ENABLE_BYPASS_ROUTER_STORE_KEY, ENABLE_TUN_STORE_KEY, USE_DHCP_STORE_KEY } from '../types/definition';
+import { ALLOWLAN_STORE_KEY, ENABLE_BYPASS_ROUTER_STORE_KEY, ENABLE_TUN_STORE_KEY, USE_DHCP_STORE_KEY, USER_AGENT_STORE_KEY } from '../types/definition';
 
 const OsType = type();
 export const LANGUAGE_STORE_KEY = 'language';
@@ -176,4 +176,19 @@ export async function getDirectDNS(): Promise<string> {
         return s;
     }
     return '223.5.5.5';
+}
+
+// 获取用户设置的 User Agent
+export async function getUserAgent(): Promise<string> {
+    const ua = await store.get(USER_AGENT_STORE_KEY) as string | undefined;
+    if (ua) {
+        return ua;
+    }
+    return 'default';
+}
+
+// 设置 User Agent
+export async function setUserAgent(ua: string) {
+    await store.set(USER_AGENT_STORE_KEY, ua);
+    await store.save();
 }
