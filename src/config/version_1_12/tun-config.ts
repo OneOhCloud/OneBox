@@ -20,8 +20,6 @@ const tunConfig = {
                 "server": DEFAULT_SYSTEM_DNS,
                 "server_port": 53,
                 "connect_timeout": "5s",
-
-
             },
             {
                 "tag": "dns_proxy",

@@ -168,13 +168,13 @@ pub async fn check_captive_portal_status() -> i8 {
     // - 支持无重定向的 http 协议
     // - 解析记录仅 IPv4，如果有 IPv6 记录可能在纯 IPv4 网络下失败导致误报。
 
-    let url = "http://connectivitycheck.gstatic.com/generate_204";
+    let url = "http://captive.apple.com/";
 
     let client = build_no_redirect_client();
     match client.get(url).send().await {
         Ok(response) => {
             let status = response.status();
-            if status == StatusCode::NO_CONTENT {
+            if status == StatusCode::OK {
                 0
             } else if status.is_redirection() {
                 1

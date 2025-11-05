@@ -66,6 +66,7 @@ const mixedConfig = {
           "wiportal.wiwide.com",
           ".msftconnecttest.com",
           "nmcheck.gnome.org",
+          "captive.apple.com",
           "detectportal.firefox.com",
           "connectivitycheck.android.com",
           "connectivitycheck.gstatic.com",
