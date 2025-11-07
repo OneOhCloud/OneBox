@@ -49,7 +49,6 @@ const mixedConfig = {
                     "www.msftconnecttest.com",
                     "connectivitycheck.gstatic.com",
                 ],
-                "disable_cache": true,
                 "server": "system",
                 "strategy": "prefer_ipv4"
             },

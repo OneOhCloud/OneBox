@@ -61,7 +61,6 @@ const tunConfig = {
                     "geosite-samsung",
                     "geosite-private"
                 ],
-                "disable_cache": true,
                 "strategy": "prefer_ipv4",
                 "server": "system"
 
