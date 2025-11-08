@@ -155,6 +155,10 @@ export async function setupStatusListener() {
         if (event.payload && event.payload.code && event.payload.code === 1) {
             // await message(`${t('connect_failed')}`, { title: t('error'), kind: 'error' });
             //  连接失败，请稍等一分钟后重试。
+            let info = await invoke<string>('read_logs', { isError: false });
+            let error = await invoke<string>('read_logs', { isError: true });
+            console.log("Info logs:", info);
+            console.log("Error logs:", error);
             await message(
                 t('connect_failed_retry'),
                 { title: t('error'), kind: 'error' }

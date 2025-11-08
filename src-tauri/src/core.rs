@@ -2,8 +2,10 @@ use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
+use tauri::Manager;
 use tauri_plugin_http::reqwest;
 
+use crate::app_status::{AppData, LogType};
 #[cfg(not(target_os = "windows"))]
 use crate::privilege;
 use crate::vpn::helper;
@@ -134,6 +136,7 @@ pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Resu
                 // 启动一个任务来监听子进程输出
                 tokio::spawn(async move {
                     let mut terminated = false;
+                    let app_status_data = app_handle.state::<AppData>();
 
                     while let Some(event) = rx.recv().await {
                         if terminated {
@@ -163,10 +166,12 @@ pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Resu
                             tauri_plugin_shell::process::CommandEvent::Stderr(line) => {
                                 let line_str = String::from_utf8_lossy(&line);
                                 print!("{}", line_str);
+                                app_status_data.write(line_str.to_string(), LogType::Info);
                             }
 
                             tauri_plugin_shell::process::CommandEvent::Error(err) => {
                                 log::error!("sing-box process error: {}", err);
+                                app_status_data.write(err.to_string(), LogType::Error);
                             }
                             tauri_plugin_shell::process::CommandEvent::Terminated(exit_code) => {
                                 terminated = true; // 标记为已处理终止事件

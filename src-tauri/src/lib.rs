@@ -2,6 +2,7 @@
 use png;
 use tauri::{AppHandle, Manager, Window, WindowEvent};
 use tauri_plugin_http::reqwest;
+mod app_status;
 mod core;
 mod database;
 mod lan;
@@ -122,6 +123,7 @@ pub fn run() {
             core::version,
             core::is_running,
             core::reload_config,
+            app_status::read_logs,
             privilege::is_privileged,
             privilege::save_privilege_password_to_keyring,
         ])
@@ -131,6 +133,8 @@ pub fn run() {
                 app.handle()
                     .plugin(tauri_plugin_updater::Builder::new().build())?;
             }
+
+            app.manage(app_status::AppData::new());
             log::info!("app log path: {:?}", app.path().app_log_dir());
             log::info!("app data path: {:?}", app.path().app_data_dir());
             log::info!("app cache path: {:?}", app.path().app_cache_dir());
@@ -179,7 +183,7 @@ pub fn run() {
                 if let Some(main_window) = app.get_webview_window("main") {
                     #[cfg(any(target_os = "windows", target_os = "linux"))]
                     {
-                       main_window.unminimize().unwrap();
+                        main_window.unminimize().unwrap();
                     }
                     main_window.show().unwrap();
                     main_window.set_focus().unwrap();
