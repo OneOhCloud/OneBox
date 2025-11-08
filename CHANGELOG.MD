@@ -4,21 +4,18 @@
 
 Use development and beta versions only if you are aware of the potential risks.
 
-## Changes since v1.1.82
+## Changes since v1.1.83
 
 All significant changes in this version are documented here.
 
 
-### 🐛 Bug Fixes
+### ✨ Features
+- Implemented log status management
 
-- Fix crash when configuration content is invalid
 
-
-## 自 v1.1.82 以来的变更
+## 自 v1.1.83 以来的变更
 
 本版本的所有重要变更将记录于此。
 
-
-### 🐛 问题修复
-
-- 修复配置内容无效时导致的崩溃问题 
+### ✨ 新增功能
+- 实现日志状态管理
