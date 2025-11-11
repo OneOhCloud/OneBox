@@ -157,7 +157,6 @@ const tunConfig = {
                     "bypass.local",
                     "captive.apple.com",
                 ],
-                "disable_cache": true,
                 "outbound": "direct"
             }
 
