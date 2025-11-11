@@ -4,18 +4,19 @@
 
 Use development and beta versions only if you are aware of the potential risks.
 
-## Changes since v1.1.83
+## Changes since v1.1.84
 
 All significant changes in this version are documented here.
 
 
-### ✨ Features
-- Implemented log status management
+### ⚠ CHANGES
 
+- Added geosite rules for LinkedIn to ensure smooth access, as LinkedIn has exited the mainland China market.
 
-## 自 v1.1.83 以来的变更
+## 自 v1.1.84 以来的变更
 
 本版本的所有重要变更将记录于此。
 
-### ✨ 新增功能
-- 实现日志状态管理
+### ⚠ 变更
+
+- 因为 LinkedIn 退出了中国大陆市场，新增了针对 LinkedIn 的 geosite 规则集，以确保访问顺畅。
