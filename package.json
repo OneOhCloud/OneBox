@@ -39,7 +39,7 @@
     "zod": "^4.1.12"
   },
   "devDependencies": {
-    "@tauri-apps/cli": "^2.9.3",
+    "@tauri-apps/cli": "^2.9.4",
     "@types/bytes": "^3.1.5",
     "@types/node": "^22.19.0",
     "@types/unzipper": "^0.10.11",

@@ -57,6 +57,13 @@ const mixedConfig = {
         "action": "reject"
       },
       {
+        "rule_set": [
+          "geosite-linkedin",
+          "geosite-linkedin-cn"
+        ],
+        "server": "dns_proxy"
+      },
+      {
         "domain_suffix": [
           ".oneoh.cloud",
           ".n2ray.dev",
@@ -140,6 +147,8 @@ const mixedConfig = {
         "action": "reject"
       },
 
+
+
       {
         "ip_is_private": true,
         "outbound": "direct"
@@ -161,6 +170,14 @@ const mixedConfig = {
         ],
         "domain_suffix": [],
         "ip_cidr": [],
+        "outbound": "ExitGateway"
+      },
+
+      {
+        "rule_set": [
+          "geosite-linkedin",
+          "geosite-linkedin-cn"
+        ],
         "outbound": "ExitGateway"
       },
 

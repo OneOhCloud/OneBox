@@ -46,6 +46,13 @@ const tunConfig = {
                 "action": "reject"
             },
             {
+                "rule_set": [
+                    "geosite-linkedin",
+                    "geosite-linkedin-cn"
+                ],
+                "server": "remote"
+            },
+            {
                 "domain": [
                     "captive.oneoh.cloud",
                     "captive.apple.com",
@@ -163,6 +170,14 @@ const tunConfig = {
                 ],
                 "domain_suffix": [],
                 "ip_cidr": [],
+                "outbound": "ExitGateway"
+            },
+
+            {
+                "rule_set": [
+                    "geosite-linkedin",
+                    "geosite-linkedin-cn"
+                ],
                 "outbound": "ExitGateway"
             },
 

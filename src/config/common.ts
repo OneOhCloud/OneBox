@@ -16,6 +16,18 @@ export const ruleSet = [
         "url": "https://jsdelivr.oneoh.cloud/gh/MetaCubeX/meta-rules-dat@sing/geo/geosite/geolocation-cn.json"
     },
     {
+        "tag": "geosite-linkedin",
+        "type": "remote",
+        "format": "binary",
+        "url": "https://jsdelivr.oneoh.cloud/gh/SagerNet/sing-geosite@rule-set/geosite-linkedin.srs",
+    },
+    {
+        "tag": "geosite-linkedin-cn",
+        "type": "remote",
+        "format": "binary",
+        "url": "https://jsdelivr.oneoh.cloud/gh/SagerNet/sing-geosite@rule-set/geosite-linkedin@cn.srs",
+    },
+    {
         "type": "remote",
         "tag": "geosite-geolocation-!cn",
         "format": "source",
