@@ -4,19 +4,21 @@
 
 Use development and beta versions only if you are aware of the potential risks.
 
-## Changes since v1.1.84
+## Changes since v1.1.86
 
 All significant changes in this version are documented here.
 
 
 ### ⚠ CHANGES
 
-- Added geosite rules for LinkedIn to ensure smooth access, as LinkedIn has exited the mainland China market.
+- Refactored the underlying logic for fetching configuration files, soon to support remote/local configuration files
 
-## 自 v1.1.84 以来的变更
+
+## 自 v1.1.86 以来的变更
 
 本版本的所有重要变更将记录于此。
 
+
 ### ⚠ 变更
 
-- 因为 LinkedIn 退出了中国大陆市场，新增了针对 LinkedIn 的 geosite 规则集，以确保访问顺畅。
+- 重构获取配置文件的底层逻辑，即将支持远程配置文件/本地配置文件
