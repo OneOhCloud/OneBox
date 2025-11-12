@@ -8,7 +8,7 @@ import { getCurrentWindow } from '@tauri-apps/api/window';
 import { message } from '@tauri-apps/plugin-dialog';
 import en from '../../lang/en.json';
 import zh from '../../lang/zh.json';
-import { setGlobalMixedConfig, setGlobalTunConfig, setMixedConfig, setTunConfig } from '../config/helper';
+import setGlobalTunConfig, { setGlobalMixedConfig, setMixedConfig, setTunConfig } from '../config/version_1_12/main';
 import { getClashApiSecret, getEnableTun, getLanguage, getStoreValue, getUserAgent } from '../single/store';
 const appWindow = getCurrentWindow();
 const enLang = en as Record<string, string>;
@@ -154,15 +154,15 @@ async function syncConfig(props: SyncConfigProps) {
                 console.log('privileged:', privileged);
             }
             const fn = currentMode === 'global' ? setGlobalTunConfig : setTunConfig;
-            await fn(identifier, SING_BOX_VERSION);
+            await fn(identifier);
         } else if (useTun && type() == 'windows') {
             console.log('在 Windows 上使用 TUN 模式，无需密码');
             const fn = currentMode === 'global' ? setGlobalTunConfig : setTunConfig;
-            await fn(identifier, SING_BOX_VERSION);
+            await fn(identifier);
         } else {
             console.log('使用普通模式');
             const fn = currentMode === 'global' ? setGlobalMixedConfig : setMixedConfig;
-            await fn(identifier, SING_BOX_VERSION);
+            await fn(identifier);
         }
         props.onSuccess?.();
     } catch (error: any) {

@@ -1,5 +1,4 @@
-import { getClashApiSecret, getStoreValue, getUseDHCP } from "../../single/store";
-import { DEFAULT_SYSTEM_DNS } from '../common';
+import { getStoreValue, getUseDHCP } from "../../single/store";
 import { writeConfigFile } from "../helper";
 
 
@@ -21,7 +20,7 @@ export async function updateDHCPSettings2Config(newConfig: any) {
                 delete server.server_port;
                 console.log("启用 DHCP DNS 模式");
             } else {
-                let directDNS = await getStoreValue('direct_dns') || DEFAULT_SYSTEM_DNS
+                let directDNS = await getStoreValue('direct_dns') || "119.29.29.29"
                 console.log("当前使用直连 DNS 地址：", directDNS);
                 server.type = "udp";
                 server.server = directDNS.trim();
@@ -72,7 +71,6 @@ export async function updateVPNServerConfigFromDB(fileName: string, dbConfigData
 
     outbound_groups.push(...vpnServerList);
 
-    newConfig["experimental"]["clash_api"]["secret"] = await getClashApiSecret();
 
     await writeConfigFile(fileName, new TextEncoder().encode(JSON.stringify(newConfig)));
 

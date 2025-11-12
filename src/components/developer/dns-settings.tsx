@@ -2,7 +2,6 @@
 import { useEffect, useState } from "react";
 import { HddRack, Save, X } from "react-bootstrap-icons";
 import { toast } from "sonner";
-import { DEFAULT_SYSTEM_DNS } from "../../config/common";
 import { getDirectDNS, getUseDHCP, setDirectDNS } from "../../single/store";
 import { t } from "../../utils/helper";
 import { SettingItem } from "../settings/common";
@@ -96,7 +95,7 @@ export default function DNSSettingsItem() {
                                 <input
                                     type="text"
                                     className="w-full px-2 py-1 text-xs rounded border border-gray-300 focus:border-gray-400 focus:ring-1 focus:ring-gray-400 outline-none transition-colors"
-                                    placeholder={DEFAULT_SYSTEM_DNS}
+                                    placeholder={"119.29.29.29"}
                                     value={dnsServers}
                                     onChange={(e) => setDnsServers(e.target.value)}
                                 />
