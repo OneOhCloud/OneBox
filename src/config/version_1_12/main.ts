@@ -5,18 +5,21 @@ import { STAGE_VERSION_STORE_KEY } from '../../types/definition';
 import { updateDHCPSettings2Config, updateVPNServerConfigFromDB } from './helper';
 
 import { type } from '@tauri-apps/plugin-os';
-import { TUN_STACK_STORE_KEY } from '../../types/definition';
-import { configType, getDefaultConfigTemplate } from './zh-cn/config';
+import { SING_BOX_VERSION, TUN_STACK_STORE_KEY } from '../../types/definition';
+import { configType, getConfigTemplateCacheKey } from '../common';
+import { getDefaultConfigTemplate } from './zh-cn/config';
+
 
 async function getConfigTemplate(mode: configType): Promise<any> {
 
     // 使用缓存机制来解耦配置模板来源
     // 后面可以灵活更换配置模板的存储位置，比如定期从远程服务器/本地文件获取等方式写入缓存
-    const cacheKey = `key-sing-box-${mode}-template-config-cache`;
-    let config = await getStoreValue(cacheKey, getDefaultConfigTemplate(mode));
-
+    const cacheKey = await getConfigTemplateCacheKey(mode);
+    let config = await getStoreValue(cacheKey, getDefaultConfigTemplate(mode, SING_BOX_VERSION));
     return JSON.parse(config);
 }
+
+
 
 
 async function updateExperimentalConfig(newConfig: any, dbCacheFilePath: string) {

@@ -1,3 +1,5 @@
+import { configType } from "../../common"
+
 const mixedRulesConfig = {
     "log": {
         "disabled": false,
@@ -952,20 +954,23 @@ const TunGlobalConfig = {
         }
     ]
 }
-export type configType = 'mixed' | 'tun' | 'mixed-global' | 'tun-global';
 
 
 
-export function getDefaultConfigTemplate(mode: configType): string {
-    switch (mode) {
-        case 'mixed':
-
-            return JSON.stringify(mixedRulesConfig)
-        case 'mixed-global':
-            return JSON.stringify(miexdGlobalConfig)
-        case 'tun':
-            return JSON.stringify(TunRulesConfig);
-        case 'tun-global':
-            return JSON.stringify(TunGlobalConfig);
+export function getDefaultConfigTemplate(mode: configType, version: string): string {
+    if (version.startsWith("v1.12")) {
+        switch (mode) {
+            case 'mixed':
+                return JSON.stringify(mixedRulesConfig)
+            case 'mixed-global':
+                return JSON.stringify(miexdGlobalConfig)
+            case 'tun':
+                return JSON.stringify(TunRulesConfig);
+            case 'tun-global':
+                return JSON.stringify(TunGlobalConfig);
+        }
+    } else {
+        alert("Only version 1.12.x is supported at the moment.")
+        throw new Error("Unsupported version")
     }
 }

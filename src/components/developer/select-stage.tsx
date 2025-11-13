@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
 import { Git } from "react-bootstrap-icons";
+import { StageVersionType } from "../../config/common";
 import { getStoreValue, setStoreValue } from "../../single/store";
 import { STAGE_VERSION_STORE_KEY } from "../../types/definition";
 import { t } from "../../utils/helper";
 import { SettingItem } from "./common";
 
 
-type StageVersionType = "stable" | "beta" | "dev";
 
 export default function StageSetting() {
     const [stageVersion, setStageVersion] = useState<StageVersionType>("stable");

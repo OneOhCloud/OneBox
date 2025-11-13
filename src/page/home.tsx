@@ -1,10 +1,10 @@
+import clsx from 'clsx';
+
 import { useEffect } from "react";
 import { InfoCircle, Power } from 'react-bootstrap-icons';
 import Body from '../components/home/body';
-import AuthDialog from '../components/settings/auth-dialog';
-
-import clsx from 'clsx';
 import { ProxyMode, useModeIndicator, useProxyMode, useVPNOperations } from "../components/home/hooks";
+import AuthDialog from '../components/settings/auth-dialog';
 import { useSubscriptions } from '../hooks/useDB';
 import { t } from "../utils/helper";
 
@@ -34,6 +34,7 @@ export default function HomePage() {
   useEffect(() => {
     mutate();
     initializeMode();
+
   }, []);
 
   /**

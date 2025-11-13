@@ -6,7 +6,9 @@ import { GearWideConnected, House, Layers } from 'react-bootstrap-icons';
 import { Toaster } from 'sonner';
 
 import React from 'react';
+import useSWR from "swr";
 import { UpdateProvider } from './components/settings/update-context';
+import { syncAllConfigTemplates } from "./hooks/useSwr";
 import HomePage from "./page/home";
 import { ActiveScreenType, NavContext } from './single/context';
 import { initLanguage, t } from './utils/helper';
@@ -92,6 +94,12 @@ function App() {
     configuration: t("configuration"),
     settings: t("settings"),
   })
+  useSWR('swr-syncAllConfigTemplates-key', async () => {
+    return await syncAllConfigTemplates();
+  }, {
+    revalidateOnFocus: true,
+    dedupingInterval: 60000 * 5, // 5 minutes
+  })
 
   const [language, setLanguage] = useState('unknown');
 
@@ -120,6 +128,7 @@ function App() {
       })
     })
   }, []);
+
 
 
 
