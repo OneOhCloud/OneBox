@@ -7,144 +7,14 @@ const mixedRulesConfig = {
     "dns": {
         "servers": [
             {
-                "tag": "system",
+                "tag": "system", // 🚫 禁止修改 tag 名称
                 "type": "udp",
                 "server": "119.29.29.29",
                 "server_port": 53,
                 "connect_timeout": "5s"
             },
             {
-                "tag": "dns_proxy",
-                "type": "tcp",
-                "server": "1.0.0.1",
-                "detour": "ExitGateway",
-                "connect_timeout": "5s"
-            }
-        ],
-        "rules": [
-            {
-                "domain": [
-                    "captive.oneoh.cloud",
-                    "captive.apple.com",
-                    "nmcheck.gnome.org",
-                    "www.msftconnecttest.com",
-                    "connectivitycheck.gstatic.com"
-                ],
-                "server": "system",
-                "strategy": "prefer_ipv4"
-            },
-            {
-                "query_type": [
-                    "HTTPS",
-                    "SVCB",
-                    "PTR"
-                ],
-                "action": "reject"
-            }
-        ],
-        "strategy": "prefer_ipv4",
-        "final": "dns_proxy"
-    },
-    "inbounds": [
-        {
-            "tag": "mixed",
-            "type": "mixed",
-            "listen": "127.0.0.1",
-            "listen_port": 6789,
-            "reuse_addr": true,
-            "tcp_fast_open": true,
-            "set_system_proxy": false
-        }
-    ],
-    "route": {
-        "rules": [
-            {
-                "action": "sniff"
-            },
-            {
-                "type": "logical",
-                "mode": "or",
-                "rules": [
-                    {
-                        "protocol": "dns"
-                    },
-                    {
-                        "port": 53
-                    }
-                ],
-                "action": "hijack-dns"
-            },
-            {
-                "protocol": "quic",
-                "action": "reject"
-            },
-            {
-                "domain": [
-                    "captive.oneoh.cloud",
-                    "captive.apple.com",
-                    "nmcheck.gnome.org",
-                    "www.msftconnecttest.com",
-                    "connectivitycheck.gstatic.com"
-                ],
-                "domain_suffix": [
-                    "local",
-                    "lan",
-                    "localdomain",
-                    "localhost",
-                    "bypass.local",
-                    "captive.apple.com"
-                ],
-                "ip_is_private": true,
-                "outbound": "direct"
-            }
-        ],
-        "final": "ExitGateway",
-        "auto_detect_interface": true
-    },
-    "experimental": {
-        "clash_api": {},
-        "cache_file": {}
-    },
-    "outbounds": [
-        {
-            "tag": "direct",
-            "type": "direct",
-            "domain_resolver": "system"
-        },
-        {
-            "tag": "ExitGateway",
-            "type": "selector",
-            "outbounds": [
-                "auto"
-            ],
-            "interrupt_exist_connections": true
-        },
-        {
-            "tag": "auto",
-            "type": "urltest",
-            "url": "https://www.google.com/generate_204",
-            "outbounds": []
-        }
-    ]
-}
-
-const miexdGlobalConfig = {
-    "log": {
-        "disabled": false,
-        "level": "debug",
-        "timestamp": false
-    },
-    "dns": {
-        "servers": [
-            {
-                "tag": "system",
-                "type": "udp",
-                "server": "119.29.29.29",
-                "server_port": 53,
-                "connect_timeout": "5s"
-            },
-            {
-                "tag": "dns_proxy",
+                "tag": "dns_proxy", // 🚫 禁止修改 tag 名称
                 "type": "tcp",
                 "server": "1.0.0.1",
                 "server_port": 53,
@@ -210,21 +80,22 @@ const miexdGlobalConfig = {
             }
         ],
         "strategy": "prefer_ipv4",
-        "final": "system"
+        "final": "system" // 🚫 禁止修改
     },
     "inbounds": [
         {
             "tag": "mixed",
             "type": "mixed",
             "listen": "127.0.0.1",
-            "listen_port": 6789,
+            "listen_port": 6789, // 🚫 禁止修改
             "reuse_addr": true,
             "tcp_fast_open": true,
-            "set_system_proxy": false
+            "set_system_proxy": false // 🚫 禁止修改
         }
     ],
     "route": {
         "rules": [
+            // 不可更改区域开始
             {
                 "action": "sniff"
             },
@@ -265,6 +136,7 @@ const miexdGlobalConfig = {
                 "ip_cidr": [],
                 "outbound": "ExitGateway"
             },
+            // 不可更改区域结束
             {
                 "rule_set": [
                     "geosite-linkedin",
@@ -297,7 +169,7 @@ const miexdGlobalConfig = {
                 "outbound": "direct"
             }
         ],
-        "final": "ExitGateway",
+        "final": "ExitGateway", // 🚫 禁止修改
         "auto_detect_interface": true,
         "rule_set": [
             {
@@ -369,9 +241,148 @@ const miexdGlobalConfig = {
         ]
     },
     "experimental": {
-        "clash_api": {},
-        "cache_file": {}
+        "clash_api": {}, // 此字段将被忽略
+        "cache_file": {} // 此字段将被忽略
     },
+    // ------------------ Outbounds ------------------
+    // OneBox 会自动追加远程配置或者本地配置内容中的服务节点
+    // 到 outbounds 以及 ExitGateway["outbounds"] 和 auto["outbounds"] 中
+    // 如果需要添加自定义的出站，可以在此处添加，但请不要有重复的 tag 名称以及修改以下三个出站的 tag 名称
+    // 记住一个修改原则：只追加，不修改，不删除，不重复
+    "outbounds": [
+        {
+            "tag": "direct",
+            "type": "direct",
+            "domain_resolver": "system"
+        },
+        {
+            "tag": "ExitGateway",
+            "type": "selector",
+            "outbounds": [
+                "auto"
+            ],
+            "interrupt_exist_connections": true
+        },
+        {
+            "tag": "auto",
+            "type": "urltest",
+            "url": "https://www.google.com/generate_204",
+            "outbounds": []
+        }
+    ]
+}
+const miexdGlobalConfig = {
+    "log": {
+        "disabled": false,
+        "level": "debug",
+        "timestamp": false
+    },
+    "dns": {
+        "servers": [
+            {
+                "tag": "system", // 🚫 禁止修改 tag 名称
+                "type": "udp",
+                "server": "119.29.29.29",
+                "server_port": 53,
+                "connect_timeout": "5s"
+            },
+            {
+                "tag": "dns_proxy", // 🚫 禁止修改 tag 名称
+                "type": "tcp",
+                "server": "1.0.0.1",
+                "detour": "ExitGateway",
+                "connect_timeout": "5s"
+            }
+        ],
+        "rules": [
+            {
+                "domain": [
+                    "captive.oneoh.cloud",
+                    "captive.apple.com",
+                    "nmcheck.gnome.org",
+                    "www.msftconnecttest.com",
+                    "connectivitycheck.gstatic.com"
+                ],
+                "server": "system",
+                "strategy": "prefer_ipv4"
+            },
+            {
+                "query_type": [
+                    "HTTPS",
+                    "SVCB",
+                    "PTR"
+                ],
+                "action": "reject"
+            }
+        ],
+        "strategy": "prefer_ipv4",
+        "final": "dns_proxy" // 🚫 禁止修改 
+    },
+    "inbounds": [
+        {
+            "tag": "mixed", // 🚫 禁止修改 tag 名称
+            "type": "mixed",
+            "listen": "127.0.0.1",
+            "listen_port": 6789, // 🚫 禁止修改 
+            "reuse_addr": true,
+            "tcp_fast_open": true,
+            "set_system_proxy": false // 🚫 禁止修改 
+        }
+    ],
+    "route": {
+        "rules": [
+            {
+                "action": "sniff"
+            },
+            {
+                "type": "logical",
+                "mode": "or",
+                "rules": [
+                    {
+                        "protocol": "dns"
+                    },
+                    {
+                        "port": 53
+                    }
+                ],
+                "action": "hijack-dns"
+            },
+            {
+                "protocol": "quic",
+                "action": "reject"
+            },
+            {
+                "domain": [
+                    "captive.oneoh.cloud",
+                    "captive.apple.com",
+                    "nmcheck.gnome.org",
+                    "www.msftconnecttest.com",
+                    "connectivitycheck.gstatic.com"
+                ],
+                "domain_suffix": [
+                    "local",
+                    "lan",
+                    "localdomain",
+                    "localhost",
+                    "bypass.local",
+                    "captive.apple.com"
+                ],
+                "ip_is_private": true,
+                "outbound": "direct"
+            }
+        ],
+        "final": "ExitGateway", // 🚫 禁止修改
+        "auto_detect_interface": true
+    },
+    "experimental": {
+        "clash_api": {}, // 此字段将被忽略
+        "cache_file": {} // 此字段将被忽略
+    },
+    // ------------------ Outbounds ------------------
+    // OneBox 会自动追加远程配置或者本地配置内容中的服务节点
+    // 到 outbounds 以及 ExitGateway["outbounds"] 和 auto["outbounds"] 中
+    // 如果需要添加自定义的出站，可以在此处添加，但请不要有重复的 tag 名称以及修改以下三个出站的 tag 名称
+    // 记住一个修改原则：只追加，不修改，不删除，不重复
     "outbounds": [
         {
             "tag": "direct",
@@ -404,21 +415,21 @@ const TunRulesConfig = {
     "dns": {
         "servers": [
             {
-                "tag": "system",
+                "tag": "system", // 🚫 禁止修改 tag 名称
                 "type": "udp",
                 "server": "119.29.29.29",
                 "server_port": 53,
                 "connect_timeout": "5s"
             },
             {
-                "tag": "dns_proxy",
+                "tag": "dns_proxy", // 🚫 禁止修改 tag 名称
                 "type": "tcp",
                 "server": "1.0.0.1",
                 "detour": "ExitGateway",
                 "connect_timeout": "5s"
             },
             {
-                "tag": "remote",
+                "tag": "remote", // 🚫 禁止修改 tag 名称
                 "type": "fakeip",
                 "inet4_range": "198.18.0.0/15",
                 "inet6_range": "fc00::/18"
@@ -482,9 +493,9 @@ const TunRulesConfig = {
             ],
             "platform": {
                 "http_proxy": {
-                    "enabled": true,
+                    "enabled": true, // 🚫 禁止修改 
                     "server": "127.0.0.1",
-                    "server_port": 6789
+                    "server_port": 6789 // 🚫 禁止修改 
                 }
             },
             "mtu": 9000,
@@ -515,17 +526,18 @@ const TunRulesConfig = {
             ]
         },
         {
-            "tag": "mixed",
+            "tag": "mixed", // 🚫 禁止修改 tag 名称
             "type": "mixed",
             "listen": "127.0.0.1",
-            "listen_port": 6789,
+            "listen_port": 6789, // 🚫 禁止修改
             "reuse_addr": true,
             "tcp_fast_open": true,
-            "set_system_proxy": false
+            "set_system_proxy": false // 🚫 禁止修改
         }
     ],
     "route": {
         "rules": [
+            // 不可更改区域开始
             {
                 "inbound": "mixed",
                 "action": "sniff"
@@ -554,6 +566,7 @@ const TunRulesConfig = {
                 "ip_cidr": [],
                 "outbound": "ExitGateway"
             },
+            // 不可更改区域结束
             {
                 "rule_set": [
                     "geosite-linkedin",
@@ -589,7 +602,7 @@ const TunRulesConfig = {
                 "outbound": "direct"
             }
         ],
-        "final": "ExitGateway",
+        "final": "ExitGateway", // 🚫 禁止修改 
         "rule_set": [
             {
                 "tag": "geoip-cn",
@@ -661,9 +674,14 @@ const TunRulesConfig = {
         "auto_detect_interface": true
     },
     "experimental": {
-        "clash_api": {},
-        "cache_file": {}
+        "clash_api": {}, // 此字段将被忽略
+        "cache_file": {} // 此字段将被忽略
     },
+    // ------------------ Outbounds ------------------
+    // OneBox 会自动追加远程配置或者本地配置内容中的服务节点
+    // 到 outbounds 以及 ExitGateway["outbounds"] 和 auto["outbounds"] 中
+    // 如果需要添加自定义的出站，可以在此处添加，但请不要有重复的 tag 名称以及修改以下三个出站的 tag 名称
+    // 记住一个修改原则：只追加，不修改，不删除，不重复
     "outbounds": [
         {
             "tag": "direct",
@@ -696,21 +714,21 @@ const TunGlobalConfig = {
     "dns": {
         "servers": [
             {
-                "tag": "system",
+                "tag": "system", // 🚫 禁止修改 tag 名称
                 "type": "udp",
                 "server": "119.29.29.29",
                 "server_port": 53,
                 "connect_timeout": "5s"
             },
             {
-                "tag": "dns_proxy",
+                "tag": "dns_proxy", // 🚫 禁止修改 tag 名称
                 "type": "tcp",
                 "server": "1.0.0.1",
                 "detour": "ExitGateway",
                 "connect_timeout": "5s"
             },
             {
-                "tag": "remote",
+                "tag": "remote", // 🚫 禁止修改 tag 名称
                 "type": "fakeip",
                 "inet4_range": "198.18.0.0/15",
                 "inet6_range": "fc00::/18"
@@ -746,7 +764,7 @@ const TunGlobalConfig = {
             }
         ],
         "strategy": "prefer_ipv4",
-        "final": "dns_proxy"
+        "final": "dns_proxy" // 🚫 禁止修改
     },
     "inbounds": [
         {
@@ -790,10 +808,10 @@ const TunGlobalConfig = {
             ]
         },
         {
-            "tag": "mixed",
+            "tag": "mixed", // 🚫 禁止修改 tag 名称
             "type": "mixed",
             "listen": "127.0.0.1",
-            "listen_port": 6789,
+            "listen_port": 6789, // 🚫 禁止修改
             "reuse_addr": true,
             "tcp_fast_open": true,
             "set_system_proxy": false
@@ -832,7 +850,7 @@ const TunGlobalConfig = {
                 "outbound": "direct"
             }
         ],
-        "final": "ExitGateway",
+        "final": "ExitGateway", // 🚫 禁止修改
         "auto_detect_interface": true,
         "rule_set": [
             {
@@ -904,9 +922,14 @@ const TunGlobalConfig = {
         ]
     },
     "experimental": {
-        "clash_api": {},
-        "cache_file": {}
+        "clash_api": {}, // 此字段将被忽略
+        "cache_file": {} // 此字段将被忽略
     },
+    // ------------------ Outbounds ------------------
+    // OneBox 会自动追加远程配置或者本地配置内容中的服务节点
+    // 到 outbounds 以及 ExitGateway["outbounds"] 和 auto["outbounds"] 中
+    // 如果需要添加自定义的出站，可以在此处添加，但请不要有重复的 tag 名称以及修改以下三个出站的 tag 名称
+    // 记住一个修改原则：只追加，不修改，不删除，不重复
     "outbounds": [
         {
             "tag": "direct",
@@ -929,7 +952,6 @@ const TunGlobalConfig = {
         }
     ]
 }
-
 export type configType = 'mixed' | 'tun' | 'mixed-global' | 'tun-global';
 
 
@@ -937,6 +959,7 @@ export type configType = 'mixed' | 'tun' | 'mixed-global' | 'tun-global';
 export function getDefaultConfigTemplate(mode: configType): string {
     switch (mode) {
         case 'mixed':
+
             return JSON.stringify(mixedRulesConfig)
         case 'mixed-global':
             return JSON.stringify(miexdGlobalConfig)

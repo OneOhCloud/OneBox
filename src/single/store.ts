@@ -9,14 +9,16 @@ export const CLASH_API_SECRET = 'clash_api_secret_key';
 
 
 
-export async function getStoreValue(key: string, val?: any): Promise<any> {
+export async function getStoreValue(key: string, defaultValue?: any): Promise<any> {
     let value = await store.get(key);
 
-    // zh: 如果 val 存在且 value 为 undefined、null 或空字符串，则返回 val
-    // en: If val exists and value is undefined, null, or an empty string, return val
-    if (val && (value === undefined || value === null || value === '')) {
-        return val;
+    // zh: 如果 defaultValue 存在且 value 为 undefined、null 或空字符串，则返回 val
+    // en: If defaultValue exists and value is undefined, null, or an empty string, return val
+    if (defaultValue && (value === undefined || value === null || value === '')) {
+        console.debug(`Store key "${key}" is empty, returning default value.`);
+        return defaultValue;
     }
+    console.debug(`Store key "${key}" found, returning stored value.`);
     return value;
 }
 export async function setStoreValue(key: string, value: any) {
