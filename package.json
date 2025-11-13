@@ -31,6 +31,7 @@
     "clsx": "^2.1.1",
     "framer-motion": "^12.23.24",
     "jsonc": "^2.0.0",
+    "jsonc-parser": "^3.3.1",
     "react": "^19.2.0",
     "react-bootstrap-icons": "^1.11.6",
     "react-dom": "^19.2.0",

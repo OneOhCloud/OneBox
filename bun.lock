@@ -25,6 +25,7 @@
         "clsx": "^2.1.1",
         "framer-motion": "^12.23.24",
         "jsonc": "^2.0.0",
+        "jsonc-parser": "^3.3.1",
         "react": "^19.2.0",
         "react-bootstrap-icons": "^1.11.6",
         "react-dom": "^19.2.0",
@@ -37,11 +38,11 @@
         "@tauri-apps/cli": "^2.9.4",
         "@types/bytes": "^3.1.5",
         "@types/node": "^22.19.1",
-        "@types/react": "^19.2.3",
+        "@types/react": "^19.2.4",
         "@types/react-dom": "^19.2.3",
         "@types/unzipper": "^0.10.11",
         "@vitejs/plugin-react": "^4.7.0",
-        "daisyui": "^5.5.0",
+        "daisyui": "^5.5.2",
         "husky": "^9.1.7",
         "tar": "^7.5.2",
         "typescript": "~5.6.3",
@@ -374,6 +375,8 @@
     "json5": ["json5@2.2.3", "", { "bin": { "json5": "lib/cli.js" } }, "sha512-XmOWe7eyHYH14cLdVPoyg+GOH3rYX++KpzrylJwSW98t3Nk+U8XOl8FWKOgwtzdb8lXGf6zYwDUzeHMWfxasyg=="],
 
     "jsonc": ["jsonc@2.0.0", "", { "dependencies": { "fast-safe-stringify": "^2.0.6", "graceful-fs": "^4.1.15", "mkdirp": "^0.5.1", "parse-json": "^4.0.0", "strip-bom": "^4.0.0", "strip-json-comments": "^3.0.1" } }, "sha512-B281bLCT2TRMQa+AQUQY5AGcqSOXBOKaYGP4wDzoA/+QswUfN8sODektbPEs9Baq7LGKun5jQbNFpzwGuVYKhw=="],
+
+    "jsonc-parser": ["jsonc-parser@3.3.1", "", {}, "sha512-HUgH65KyejrUFPvHFPbqOY0rsFip3Bo5wb4ngvdi1EpCYWUQDC5V+Y7mZws+DLkr4M//zQJoanu1SP+87Dv1oQ=="],
 
     "jsonfile": ["jsonfile@6.2.0", "", { "dependencies": { "universalify": "^2.0.0" }, "optionalDependencies": { "graceful-fs": "^4.1.6" } }, "sha512-FGuPw30AdOIUTRMC2OMRtQV+jkVj2cfPqSeWXv1NEAJ1qZ5zb1X6z1mFhbfOB/iy3ssJCD+3KuZ8r8C3uVFlAg=="],
 
