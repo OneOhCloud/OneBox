@@ -3,8 +3,9 @@ import { ArrowDownCircle, ArrowUpCircle } from 'react-bootstrap-icons';
 import ConfigViewer from '../components/config-viewer/config-viewer';
 import EmptyLogMessage from '../components/log/empty-log-message';
 import LogTable from '../components/log/log-table';
-import LogTabs from '../components/log/log-tabs';
+import LogTabs, { TabKeys } from '../components/log/log-tabs';
 
+import ConfigTemplate from '../components/config-template/config-template';
 import { formatNetworkSpeed, useLogSource, useNetworkSpeed } from '../utils/clash-api';
 import { initLanguage } from "../utils/helper";
 
@@ -13,7 +14,7 @@ export default function LogPage() {
     const [autoScroll, setAutoScroll] = useState(true);
     const logContainerRef = useRef<HTMLDivElement>(null);
     const [isLanguageLoading, setIsLanguageLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState<'logs' | 'config'>('logs');
+    const [activeTab, setActiveTab] = useState<TabKeys>('logs');
     const { logs, clearLogs } = useLogSource();
     const speed = useNetworkSpeed();
 
@@ -127,18 +128,28 @@ export default function LogPage() {
                 </div>
             </div>
 
+
+            {/* 配置标签页内容 */}
+            <div className={`flex-1 ${activeTab === 'config-template' ? '' : 'hidden'}`} role="tabpanel">
+                <div className="h-[calc(100dvh-100px)] overflow-y-auto overflow-x-hidden">
+                    <ConfigTemplate />
+                </div>
+            </div>
+
+
+
             <div className="flex   justify-end  items-center text-sm  p-2">
                 <div className="flex items-center gap-1  ">
                     <ArrowUpCircle size={12} className="text-blue-500" />
 
-                    <div className="font-mono font-medium tracking-tight min-w-[80px] ">
+                    <div className="font-mono font-medium tracking-tight min-w-20 ">
                         <span className="text-blue-600">{formatNetworkSpeed(speed.upload)}</span>
                     </div>
 
                 </div>
 
                 <div className="flex items-center gap-1 text-right justify-end">
-                    <div className="font-mono font-medium tracking-tight min-w-[80px]">
+                    <div className="font-mono font-medium tracking-tight min-w-20">
                         <span className="text-green-600">{formatNetworkSpeed(speed.download)}</span>
                     </div>
                     <ArrowDownCircle size={12} className="text-green-500" />

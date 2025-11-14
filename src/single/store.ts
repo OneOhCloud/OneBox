@@ -233,4 +233,23 @@ export async function setConfigTemplateURL(mode: configType, url: string) {
     await setStoreValue(cacheKey, url);
 }
 
+export async function getDefaultConfigTemplateURL(mode: configType): Promise<string> {
+    const remoteUrl = "https://jsdelivr.oneoh.cloud/gh/OneOhCloud/conf-template";
+    let stageVersion: StageVersionType = await getStoreValue(STAGE_VERSION_STORE_KEY)
+    let versionNumber = SING_BOX_VERSION.replace('v', '').split('.')
+    let major = versionNumber[0];
+    let minor = versionNumber[1];
+    let ver = `${major}.${minor}`;
+
+    switch (mode) {
+        case 'mixed':
+            return `${remoteUrl}@${stageVersion}/conf/${ver}/zh-cn/mixed-rules.jsonc`;
+        case 'tun':
+            return `${remoteUrl}@${stageVersion}/conf/${ver}/zh-cn/tun-rules.jsonc`;
+        case 'mixed-global':
+            return `${remoteUrl}@${stageVersion}/conf/${ver}/zh-cn/mixed-global.jsonc`;
+        case 'tun-global':
+            return `${remoteUrl}@${stageVersion}/conf/${ver}/zh-cn/tun-global.jsonc`;
+    }
+}
 
