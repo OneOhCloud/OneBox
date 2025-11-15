@@ -32,9 +32,9 @@ async function syncRemoteConfig(mode: configType) {
         const jsonString = JSON.stringify(jsonRes);
         setConfigTemplateCache(mode, jsonString);
         console.log(`Successfully synced config template for mode ${mode} from ${url}`);
-    } else if (url.startsWith('file://') || url.startsWith('/')) {
-        // 读取本地文件
-        const filePath = url.replace('file://', '');
+    } else {
+        // 读取本地文件 (支持完整路径: Windows: C:\path\to\file.json, macOS/Linux: /path/to/file.json)
+        const filePath = url;
 
         if (!filePath.endsWith('.json') && !filePath.endsWith('.jsonc')) {
             console.error('Only JSON/JSONC files are supported');
@@ -50,8 +50,6 @@ async function syncRemoteConfig(mode: configType) {
         } catch (err) {
             console.error(`Failed to read local file ${filePath}:`, err);
         }
-    } else {
-        console.warn("Only HTTPS URLs or local file paths are supported for remote config templates. Skipping sync for URL:", url);
     }
 
 }

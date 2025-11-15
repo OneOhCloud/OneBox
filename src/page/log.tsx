@@ -87,7 +87,7 @@ export default function LogPage() {
     }
 
     return (
-        <div className="flex flex-col  px-4 py-2 bg-gray-100  h-screen">
+        <div className="flex flex-col  px-4 py-2 bg-white  h-screen">
             <LogTabs
                 activeTab={activeTab}
                 setActiveTab={setActiveTab}
@@ -105,7 +105,7 @@ export default function LogPage() {
 
                 <div
                     ref={logContainerRef}
-                    className="flex-1 rounded-xl border border-base-300 bg-base-200 font-mono overflow-y-auto h-[calc(100dvh-100px)] shadow-inner"
+                    className="mt-2 flex-1 rounded-xl border border-gray-200 bg-gray-50 font-mono overflow-y-auto h-[calc(100dvh-100px)] shadow-inner"
                 >
                     <div className="p-4 h-full">
                         {filteredLogs.length === 0 ? (
@@ -140,7 +140,7 @@ export default function LogPage() {
 
             <div className="flex   justify-end  items-center text-sm  p-2">
                 <div className="flex items-center gap-1  ">
-                    <ArrowUpCircle size={12} className="text-blue-500" />
+                    <ArrowUpCircle size={12} className="text-blue-600" />
 
                     <div className="font-mono font-medium tracking-tight min-w-20 ">
                         <span className="text-blue-600">{formatNetworkSpeed(speed.upload)}</span>
@@ -150,9 +150,9 @@ export default function LogPage() {
 
                 <div className="flex items-center gap-1 text-right justify-end">
                     <div className="font-mono font-medium tracking-tight min-w-20">
-                        <span className="text-green-600">{formatNetworkSpeed(speed.download)}</span>
+                        <span className="text-blue-600">{formatNetworkSpeed(speed.download)}</span>
                     </div>
-                    <ArrowDownCircle size={12} className="text-green-500" />
+                    <ArrowDownCircle size={12} className="text-blue-600" />
 
                 </div>
 

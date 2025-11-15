@@ -11,11 +11,11 @@ export default function EmptyLogMessage({ filter }: EmptyLogMessageProps) {
                 <div>
                     {filter ? (
                         <div className="max-w-md">
-                            <h2 className="text-xl font-bold mb-2">{t("no_matching_logs") || "没有匹配的日志记录"}</h2>
-                            <div className="text-base-content/70">过滤条件: <span className="badge badge-neutral">{filter}</span></div>
+                            <h2 className="text-xl font-bold mb-2 text-gray-700">{t("no_matching_logs") || "没有匹配的日志记录"}</h2>
+                            <div className="text-gray-600">过滤条件: <span className="bg-gray-100 text-gray-700 px-2 py-1 rounded border border-gray-200">{filter}</span></div>
                         </div>
                     ) : (
-                        <div className="text-base-content/70">{t("no_log_records")}</div>
+                        <div className="text-gray-600">{t("no_log_records")}</div>
                     )}
                 </div>
             </div>

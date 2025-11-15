@@ -2,7 +2,7 @@ import { open } from '@tauri-apps/plugin-dialog';
 import { readTextFile } from '@tauri-apps/plugin-fs';
 import { parse } from 'jsonc-parser';
 import { useEffect, useState } from 'react';
-import { ArrowClockwise, ArrowCounterclockwise, Copy, Folder } from 'react-bootstrap-icons';
+import { ArrowClockwise, ArrowCounterclockwise, Check, Copy, Folder } from 'react-bootstrap-icons';
 import { toast, Toaster } from 'sonner';
 import { configType, getConfigTemplateCacheKey } from '../../config/common';
 import { getConfigTemplateURL, getDefaultConfigTemplateURL, getStoreValue, setConfigTemplateURL, setStoreValue } from '../../single/store';
@@ -18,6 +18,8 @@ const CONFIG_MODES: Array<{ value: configType; label: string }> = [
 export default function ConfigTemplate() {
     const [selectedMode, setSelectedMode] = useState<configType>('mixed');
     const [templatePath, setTemplatePath] = useState<string>('');
+    const [originalTemplatePath, setOriginalTemplatePath] = useState<string>('');
+    const [defaultTemplatePath, setDefaultTemplatePath] = useState<string>('');
     const [configContent, setConfigContent] = useState<string>('');
     const [loading, setLoading] = useState<boolean>(false);
 
@@ -28,7 +30,10 @@ export default function ConfigTemplate() {
     const loadTemplatePathAndContent = async () => {
         try {
             const path = await getConfigTemplateURL(selectedMode);
+            const defaultPath = await getDefaultConfigTemplateURL(selectedMode);
             setTemplatePath(path);
+            setOriginalTemplatePath(path);
+            setDefaultTemplatePath(defaultPath);
             await loadConfigContent(selectedMode);
         } catch (err) {
             toast.error(err instanceof Error ? err.message : String(err));
@@ -83,14 +88,13 @@ export default function ConfigTemplate() {
             await setStoreValue(cacheKey, jsonString);
 
             return jsonString;
-        } else if (url.startsWith('file://') || url.startsWith('/')) {
-            const filePath = url.replace('file://', '');
-
-            if (!filePath.endsWith('.json') && !filePath.endsWith('.jsonc')) {
+        } else {
+            // 读取本地文件 (支持完整路径: Windows: C:\path\to\file.json, macOS/Linux: /path/to/file.json)
+            if (!url.endsWith('.json') && !url.endsWith('.jsonc')) {
                 throw new Error('Only JSON/JSONC files are supported');
             }
 
-            const text = await readTextFile(filePath);
+            const text = await readTextFile(url);
 
             if (!validateConfigFormat(text)) {
                 throw new Error('Invalid JSON/JSONC format');
@@ -103,8 +107,6 @@ export default function ConfigTemplate() {
             await setStoreValue(cacheKey, jsonString);
 
             return jsonString;
-        } else {
-            throw new Error('Only HTTPS URLs or local file paths are supported');
         }
     };
 
@@ -137,7 +139,10 @@ export default function ConfigTemplate() {
         }
 
         toast.promise(
-            setConfigTemplateURL(selectedMode, templatePath),
+            (async () => {
+                await setConfigTemplateURL(selectedMode, templatePath);
+                setOriginalTemplatePath(templatePath);
+            })(),
             {
                 loading: 'Saving template path...',
                 success: 'Template path saved successfully',
@@ -166,14 +171,35 @@ export default function ConfigTemplate() {
             const selected = await open({
                 multiple: false,
                 filters: [{
-                    name: 'Config Files',
+                    name: 'Config',
                     extensions: ['json', 'jsonc']
                 }]
             });
 
-            if (selected && typeof selected === 'string') {
-                setTemplatePath(selected);
+            if (!selected) return;
+
+            const text = await readTextFile(selected);
+
+            if (!validateConfigFormat(text)) {
+                throw new Error('Invalid JSON/JSONC format');
             }
+
+            const jsonRes = parse(text);
+            const jsonString = JSON.stringify(jsonRes);
+
+            const cacheKey = await getConfigTemplateCacheKey(selectedMode);
+            await setStoreValue(cacheKey, jsonString);
+
+            setConfigContent(JSON.stringify(JSON.parse(jsonString), null, 2));
+
+            // 保存完整的文件路径
+            setTemplatePath(selected);
+
+            // 自动保存本地文件路径
+            await setConfigTemplateURL(selectedMode, selected);
+            setOriginalTemplatePath(selected);
+
+            toast.success('File loaded successfully');
         } catch (err) {
             toast.error(err instanceof Error ? err.message : String(err));
         }
@@ -181,20 +207,23 @@ export default function ConfigTemplate() {
 
     const handleRestoreDefault = async () => {
         try {
-            const defaultPath = await getDefaultConfigTemplateURL(selectedMode);
-            setTemplatePath(defaultPath);
+            setTemplatePath(defaultTemplatePath);
+            setOriginalTemplatePath(defaultTemplatePath);
             toast.success('Restored to default template path');
         } catch (err) {
             toast.error(err instanceof Error ? err.message : String(err));
         }
     };
 
+    const hasPathChanged = templatePath !== originalTemplatePath;
+    const isDefaultPath = templatePath === defaultTemplatePath;
+
     return (
-        <div className="h-full flex flex-col gap-2 px-2">
+        <div className="h-full flex flex-col  px-2">
             <Toaster position="top-center" />
-            <div className="flex gap-2">
+            <div className="mt-1 flex gap-2  items-baseline">
                 <select
-                    className="select select-bordered w-auto select-xs"
+                    className="select select-bordered w-auto select-xs bg-blue-50/50 border-blue-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all duration-200 hover:bg-blue-50"
                     value={selectedMode}
                     onChange={(e) => setSelectedMode(e.target.value as configType)}
                 >
@@ -202,52 +231,61 @@ export default function ConfigTemplate() {
                         <option key={mode.value} value={mode.value}>{mode.label}</option>
                     ))}
                 </select>
-                <input
-                    type="text"
-                    className="input  input-xs input-bordered flex-1 text-sm"
-                    placeholder="https://... or /path/to/config.jsonc"
-                    value={templatePath}
-                    onChange={(e) => setTemplatePath(e.target.value)}
-                />
+                <div className="relative flex-1">
+                    <input
+                        type="text"
+                        className="input input-xs input-bordered w-full text-sm pr-8 bg-white border-gray-200 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-all duration-200"
+                        placeholder="https://... or /path/to/config.jsonc"
+                        value={templatePath}
+                        onChange={(e) => setTemplatePath(e.target.value)}
+                    />
+                    {hasPathChanged && (
+                        <button
+                            className="btn btn-xs btn-circle btn-ghost absolute right-1 top-1/2 -translate-y-1/2 hover:bg-blue-50 transition-all duration-200"
+                            onClick={handleSave}
+                            title={t('save') || 'Save'}
+                        >
+                            <Check className="text-blue-600" size={16} />
+                        </button>
+                    )}
+                </div>
                 <button
-                    className="btn btn-xs btn-square"
+                    className="btn btn-xs btn-square bg-white border-gray-200 hover:bg-blue-50 hover:border-blue-300 transition-all duration-200 hover:shadow-sm"
                     onClick={handleSelectFile}
                     title="Select local file"
                 >
-                    <Folder />
+                    <Folder className="text-gray-600" />
                 </button>
+                {!isDefaultPath && (
+                    <button
+                        className="btn btn-xs btn-square bg-white border-gray-200 hover:bg-blue-50 hover:border-blue-300 transition-all duration-200 hover:shadow-sm"
+                        onClick={handleRestoreDefault}
+                        title="Restore default"
+                    >
+                        <ArrowCounterclockwise className="text-gray-600" />
+                    </button>
+                )}
+
                 <button
-                    className="btn btn-xs btn-square"
-                    onClick={handleRestoreDefault}
-                    title="Restore default"
-                >
-                    <ArrowCounterclockwise />
-                </button>
-                <button
-                    className="btn btn-xs btn-primary"
-                    onClick={handleSave}
-                >
-                    {t('save') || 'Save'}
-                </button>
-                <button
-                    className="btn btn-xs  btn-secondary"
+                    className="btn btn-xs bg-blue-600 text-white border-0 hover:bg-blue-700 disabled:bg-gray-300 transition-all duration-200 hover:shadow-md hover:scale-105 disabled:scale-100"
                     onClick={handleSync}
                     disabled={loading}
                 >
                     <ArrowClockwise className={loading ? 'animate-spin' : ''} />
-                    {t('sync') || 'Sync'}
+                    {t('update') || '更新'}
                 </button>
+
             </div>
 
-            <pre className="relative bg-base-200 px-4 pb-4 pt-2 rounded-lg border border-base-300 overflow-auto flex-1 text-xs">
+            <pre className="mt-2  relative bg-gray-50 px-4 pb-4 pt-2 rounded-lg border border-gray-200 overflow-auto flex-1 text-xs shadow-inner">
                 <button
-                    className="btn btn-xs btn-ghost absolute top-2 right-2 z-10"
+                    className="btn btn-xs btn-ghost absolute top-2 right-2 z-10 bg-white/90 backdrop-blur-sm hover:bg-blue-50 border border-gray-200 hover:border-blue-300 transition-all duration-200 hover:shadow-sm disabled:opacity-40"
                     onClick={handleCopy}
                     disabled={!configContent}
                 >
-                    <Copy />
+                    <Copy className="text-blue-600" />
                 </button>
-                <div>
+                <div className="text-gray-700">
                     {configContent || t("loading") || "No content loaded. Click Sync to load template."}
                 </div>
             </pre>

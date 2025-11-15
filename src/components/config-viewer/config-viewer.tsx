@@ -47,15 +47,15 @@ export default function ConfigViewer() {
     }
 
     return (
-        <div className="h-full" >
+        <div className="h-full mt-2" >
             <Toaster position="top-center" />
-            <pre className="relative bg-base-200 px-4 pb-4 pt-2 rounded-lg border border-base-300 overflow-auto h-full text-xs"
+            <pre className="relative bg-gray-50 px-4 pb-4 pt-2 rounded-lg border border-gray-200 overflow-auto h-full text-xs shadow-inner"
             >
-                <button className="btn btn-xs btn-ghost absolute top-2 right-2 z-10"
+                <button className="btn btn-xs btn-ghost absolute top-2 right-2 z-10 bg-white/90 backdrop-blur-sm hover:bg-blue-50 border border-gray-200 hover:border-blue-300 transition-all duration-200 hover:shadow-sm disabled:opacity-40"
                     onClick={handleCopy}>
-                    <Copy />
+                    <Copy className="text-blue-600" />
                 </button>
-                <div>
+                <div className="text-gray-700">
                     {configContent || t("loading") || "Loading..."}
                 </div>
             </pre>

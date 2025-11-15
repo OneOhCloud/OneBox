@@ -24,23 +24,23 @@ export default function LogTabs({
     clearLogs
 }: LogTabsProps) {
     return (
-        <div className="sticky top-0 z-10 bg-gray-200 mb-2 rounded-md">
+        <div className="sticky top-0 z-10 bg-white mb-2 rounded-md border-b border-gray-200">
             <div className="tabs tabs-lifted">
                 <a
-                    className={`tab tab-md ${activeTab === 'logs' ? 'tab-active' : ''}`}
+                    className={`tab tab-md transition-all duration-200 ${activeTab === 'logs' ? 'tab-active bg-white border-b-2 border-blue-600 text-blue-600' : 'text-gray-600 hover:text-blue-600'}`}
                     onClick={() => setActiveTab('logs')}
                 >
                     {t("log_viewer")}
                 </a>
                 <a
-                    className={`tab tab-md ${activeTab === 'config' ? 'tab-active' : ''}`}
+                    className={`tab tab-md transition-all duration-200 ${activeTab === 'config' ? 'tab-active bg-white border-b-2 border-blue-600 text-blue-600' : 'text-gray-600 hover:text-blue-600'}`}
                     onClick={() => setActiveTab('config')}
                 >
                     {t("config_viewer") || "配置查看器"}
                 </a>
 
                 <a
-                    className={`tab tab-md ${activeTab === 'config-template' ? 'tab-active' : ''}`}
+                    className={`tab tab-md transition-all duration-200 ${activeTab === 'config-template' ? 'tab-active bg-white border-b-2 border-blue-600 text-blue-600' : 'text-gray-600 hover:text-blue-600'}`}
                     onClick={() => setActiveTab('config-template')}
                 >
                     {t("config_template") || "配置模版"}
