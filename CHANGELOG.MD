@@ -10,9 +10,9 @@ All significant changes in this version are documented here.
 
 
 ### ⚠ CHANGES
-- Support custom configuration file templates
+
+- Support custom configuration file templates, local files need to be dragged in
 - Default to fetching remote configuration file templates instead of built-in templates
-- Refactored the underlying logic for fetching configuration files, soon to support remote/local configuration files
 
 
 ## 自 v1.1.86 以来的变更
@@ -21,6 +21,6 @@ All significant changes in this version are documented here.
 
 
 ### ⚠ 变更
-- 支持自定义配置文件模板
+
+- 支持自定义配置文件模板, 本地文件需拖动
 - 默认读取远程配置文件模板，而非内置模板
-- 重构获取配置文件的底层逻辑，即将支持远程配置文件/本地配置文件
