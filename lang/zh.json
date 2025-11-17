@@ -90,6 +90,7 @@
     "load_rules_failed": "加载规则失败",
     "loading": "加载中...",
     "local_file_no_expire": "本地文件，无过期时间",
+    "local_file_warning": "本地文件只会在拖动进来的时候读取一次,sing-box 主要版本更新时会清空本地文件配置。",
     "log_viewer": "日志查看器",
     "menu_copy_env": "复制环境变量",
     "menu_dashboard": "仪表盘",

@@ -90,6 +90,7 @@
     "load_rules_failed": "Failed to load rules",
     "loading": "Loading...",
     "local_file_no_expire": "Local file, no expire",
+    "local_file_warning": "Local file will only be read once when dragged in, and local file config will be cleared when sing-box major version is updated.",
     "log_viewer": "Log viewer",
     "menu_copy_env": "Copy Env",
     "menu_dashboard": "Dashboard",

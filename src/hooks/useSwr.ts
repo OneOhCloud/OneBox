@@ -1,4 +1,3 @@
-import { readTextFile } from "@tauri-apps/plugin-fs";
 import { parse } from "jsonc-parser";
 import { configType, getConfigTemplateCacheKey } from "../config/common";
 import { getConfigTemplateURL, setStoreValue } from "../single/store";
@@ -12,7 +11,7 @@ async function setConfigTemplateCache(mode: configType, config: string) {
 
 async function syncRemoteConfig(mode: configType) {
     let url = await getConfigTemplateURL(mode);
-    console.log("Fetched config template URL:", url);
+    console.debug("Fetched config template URL:", url);
     if (url.startsWith("https://")) {
         // 读取 url 的 jsonc 文件并转为 json 字符串
         let controller = new AbortController();
@@ -31,25 +30,9 @@ async function syncRemoteConfig(mode: configType) {
         const jsonRes = parse(text);
         const jsonString = JSON.stringify(jsonRes);
         setConfigTemplateCache(mode, jsonString);
-        console.log(`Successfully synced config template for mode ${mode} from ${url}`);
+        console.debug(`Successfully synced config template for mode ${mode} from ${url}`);
     } else {
-        // 读取本地文件 (支持完整路径: Windows: C:\path\to\file.json, macOS/Linux: /path/to/file.json)
-        const filePath = url;
-
-        if (!filePath.endsWith('.json') && !filePath.endsWith('.jsonc')) {
-            console.error('Only JSON/JSONC files are supported');
-            return;
-        }
-
-        try {
-            const text = await readTextFile(filePath);
-            const jsonRes = parse(text);
-            const jsonString = JSON.stringify(jsonRes);
-            setConfigTemplateCache(mode, jsonString);
-            console.log(`Successfully synced config template for mode ${mode} from local file ${filePath}`);
-        } catch (err) {
-            console.error(`Failed to read local file ${filePath}:`, err);
-        }
+        console.warn(`Config template URL for mode ${mode} is not a valid HTTPS URL: ${url}`);
     }
 
 }

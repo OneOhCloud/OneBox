@@ -16,6 +16,7 @@ async function getConfigTemplate(mode: configType): Promise<any> {
     // 后面可以灵活更换配置模板的存储位置，比如定期从远程服务器/本地文件获取等方式写入缓存
     const cacheKey = await getConfigTemplateCacheKey(mode);
     let config = await getStoreValue(cacheKey, getDefaultConfigTemplate(mode, SING_BOX_VERSION));
+    console.debug(`Fetched config template for mode ${mode} from cache key ${cacheKey}`);
     return JSON.parse(config);
 }
 

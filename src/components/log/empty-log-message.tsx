@@ -6,7 +6,7 @@ interface EmptyLogMessageProps {
 
 export default function EmptyLogMessage({ filter }: EmptyLogMessageProps) {
     return (
-        <div className="hero h-full  rounded-md">
+        <div className="hero h-full">
             <div className="hero-content text-center">
                 <div>
                     {filter ? (

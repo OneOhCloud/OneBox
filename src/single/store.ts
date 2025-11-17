@@ -2,7 +2,7 @@ import { locale, type } from '@tauri-apps/plugin-os';
 import { LazyStore } from '@tauri-apps/plugin-store';
 import { toast } from 'sonner';
 import { configType, StageVersionType } from '../config/common';
-import { ALLOWLAN_STORE_KEY, ENABLE_BYPASS_ROUTER_STORE_KEY, ENABLE_TUN_STORE_KEY, SING_BOX_VERSION, STAGE_VERSION_STORE_KEY, USE_DHCP_STORE_KEY, USER_AGENT_STORE_KEY } from '../types/definition';
+import { ALLOWLAN_STORE_KEY, ENABLE_BYPASS_ROUTER_STORE_KEY, ENABLE_TUN_STORE_KEY, SING_BOX_MAJOR_VERSION, SING_BOX_VERSION, STAGE_VERSION_STORE_KEY, USE_DHCP_STORE_KEY, USER_AGENT_STORE_KEY } from '../types/definition';
 
 const OsType = type();
 export const LANGUAGE_STORE_KEY = 'language';
@@ -196,13 +196,20 @@ export async function setUserAgent(ua: string) {
     await store.save();
 }
 
+export async function getConfigTemplateURLKey(mode: configType): Promise<string> {
+    // zh: 返回配置模版 URL 的存储键，格式为 `key-sing-box-{主版本号}-{模式}-template-path`, 如非必要请勿更改此格式。
+    // en: Returns the storage key for the config template URL in the format `key-sing-box-{major-version}-{mode}-template-path`. Do not change this format unless necessary.
+    const cacheKey = `key-sing-box-${SING_BOX_MAJOR_VERSION}-${mode}-template-path`;
+    return cacheKey;
+}
+
 // 读取模版配置源
 export async function getConfigTemplateURL(mode: configType): Promise<string> {
     const remoteUrl = "https://jsdelivr.oneoh.cloud/gh/OneOhCloud/conf-template";
     let defaultTemplatePath = '';
     let stageVersion: StageVersionType = await getStoreValue(STAGE_VERSION_STORE_KEY)
 
-    const cacheKey = `key-sing-box-${mode}-template-path`;
+    const cacheKey = await getConfigTemplateURLKey(mode);
     let versionNumber = SING_BOX_VERSION.replace('v', '').split('.')
     let major = versionNumber[0];
     let minor = versionNumber[1];
@@ -229,7 +236,7 @@ export async function getConfigTemplateURL(mode: configType): Promise<string> {
 }
 
 export async function setConfigTemplateURL(mode: configType, url: string) {
-    const cacheKey = `key-sing-box-${mode}-template-path`;
+    const cacheKey = await getConfigTemplateURLKey(mode);
     await setStoreValue(cacheKey, url);
 }
 
