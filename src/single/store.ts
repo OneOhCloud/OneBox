@@ -207,7 +207,7 @@ export async function getConfigTemplateURLKey(mode: configType): Promise<string>
 export async function getConfigTemplateURL(mode: configType): Promise<string> {
     const remoteUrl = "https://jsdelivr.oneoh.cloud/gh/OneOhCloud/conf-template";
     let defaultTemplatePath = '';
-    let stageVersion: StageVersionType = await getStoreValue(STAGE_VERSION_STORE_KEY)
+    let stageVersion: StageVersionType = await getStoreValue(STAGE_VERSION_STORE_KEY, "stable")
 
     const cacheKey = await getConfigTemplateURLKey(mode);
     let versionNumber = SING_BOX_VERSION.replace('v', '').split('.')
