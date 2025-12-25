@@ -99,18 +99,18 @@ function getRemoteInfoBySubscriptionUserinfo(subscriptionUserinfo: string) {
         }, {} as Record<string, string>);
 
         return {
-            upload: info.upload || '0',
-            download: info.download || '0',
+            upload: info.upload || '1',
+            download: info.download || '1',
             total: info.total || '1',
-            expire: info.expire || '0',
+            expire: info.expire || '1',
         };
     } catch (error) {
         console.error('Error parsing subscription userinfo:', error);
         return {
-            upload: '0',
-            download: '0',
+            upload: '1',
+            download: '1',
             total: '1',
-            expire: '0',
+            expire: '1',
         };
     }
 }
@@ -139,7 +139,12 @@ export async function updateSubscription(identifier: string) {
         )
         await db.execute('UPDATE subscription_configs SET config_content = ? WHERE identifier = ?', [JSON.stringify(response.data), identifier])
         // toast.success('更新订阅成功')
-        toast.success(t('update_subscription_success'))
+        if (response.status !== 200) {
+            toast.warning(t('update_subscription_failed'))
+        } else {
+            toast.success(t('update_subscription_success'))
+
+        }
 
     } catch (error) {
         if (error instanceof FileError) {

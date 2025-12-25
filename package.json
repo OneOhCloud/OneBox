@@ -36,9 +36,9 @@
     "react-bootstrap-icons": "^1.11.6",
     "react-dom": "^19.2.3",
     "sonner": "^2.0.7",
-    "swr": "^2.3.7",
+    "swr": "^2.3.8",
     "tailwindcss": "^4.1.18",
-    "zod": "^4.1.13"
+    "zod": "^4.2.1"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.9.6",

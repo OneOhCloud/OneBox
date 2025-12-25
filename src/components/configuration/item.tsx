@@ -125,12 +125,16 @@ export const SubscriptionItem: React.FC<SubscriptionItemProps> = ({
         <li key={item.identifier}>
             <div className="list-row items-center">
                 <div onClick={handleWebsiteClick}>
-                    <Avatar url={item.official_website} />
+                    <Avatar url={item.official_website} danger={usage >= 100} />
                 </div>
-                <div className="max-w-[160px] flex flex-col gap-2">
+                <div className="max-w-40 flex flex-col gap-2">
                     <div className="truncate text-sm">{item.name}</div>
                     <div className="text-xs flex items-center">
-                        <progress className="progress h-1" value={usage} max="100" />
+                        <progress
+                            className={`progress h-1 ${usage >= 100 ? 'bg-red-400 [&::-webkit-progress-bar]:bg-red-200 [&::-webkit-progress-value]:bg-red-400' : ''}`}
+                            value={usage}
+                            max="100"
+                        />
                     </div>
                 </div>
                 <button
