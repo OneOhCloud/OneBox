@@ -12,6 +12,7 @@ All significant changes in this version are documented here.
 ### ⚠ CHANGES
 
 - Update dependencies
+- Upgrade sing-box core to v1.12.4
 - Improve UI details for invalid subscription links
 
 
@@ -24,4 +25,6 @@ All significant changes in this version are documented here.
 
 - 更新了依赖
 - 改进订阅链接无效的 UI 细节
+- 升级 sing-box 内核至 v1.12.4
+
 
