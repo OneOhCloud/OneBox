@@ -28,6 +28,9 @@
     "createUpdaterArtifacts": true,
     "active": true,
     "targets": "all",
+    "resources": [
+      "resources/*.db"
+    ],
     "externalBin": [
       "binaries/sing-box"
     ],

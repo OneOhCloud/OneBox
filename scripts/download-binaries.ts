@@ -14,7 +14,7 @@ const SYSPROXY_URL = "https://github.com/clash-verge-rev/sysproxy/releases/downl
 
 
 const SkipVersionList = [
-    "v1.12.5", //This version of sing - box has DNS issues, skip downloading
+    "v1.12.5", //This version of sing-box has DNS issues, skip downloading
 ];
 
 // Supported target architecture mapping
@@ -138,3 +138,30 @@ if (SkipVersionList.includes(SING_BOX_VERSION)) {
     downloadEmbeddingExternalBinaries().catch(console.error);
 
 }
+
+
+// 下载数据库文件到 src-tauri/resources 目录
+async function downloadDatabaseFiles(): Promise<void> {
+    const dbFiles = [
+        {
+            name: 'mixed-cache-rule-v1.db',
+            url: 'https://github.com/OneOhCloud/conf-template/raw/refs/heads/stable/database/1.12/zh-cn/mixed-cache-rule-v1.db'
+        },
+        {
+            name: 'tun-cache-rule-v1.db',
+            url: 'https://github.com/OneOhCloud/conf-template/raw/refs/heads/stable/database/1.12/zh-cn/tun-cache-rule-v1.db'
+        }
+    ];
+
+    const resourcesDir = 'src-tauri/resources';
+    !fs.existsSync(resourcesDir) && fs.mkdirSync(resourcesDir, { recursive: true });
+
+    for (const dbFile of dbFiles) {
+        const destPath = path.join(resourcesDir, dbFile.name);
+        console.log(`Downloading database file: ${dbFile.name}...`);
+        await downloadFile(dbFile.url, destPath);
+        console.log(`Downloaded database file to: ${destPath}`);
+    }
+}
+
+downloadDatabaseFiles().catch(console.error);

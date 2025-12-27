@@ -20,9 +20,6 @@ async function getConfigTemplate(mode: configType): Promise<any> {
     return JSON.parse(config);
 }
 
-
-
-
 async function updateExperimentalConfig(newConfig: any, dbCacheFilePath: string) {
 
     newConfig["experimental"]["clash_api"] = {
@@ -51,7 +48,7 @@ export async function setMixedConfig(identifier: string) {
     console.log("写入[规则]系统代理配置文件");
     let dbConfigData = await getSubscriptionConfig(identifier);
     const appConfigPath = await path.appConfigDir();
-    const dbCacheFilePath = await path.join(appConfigPath, 'mixed-cache-rule--v1.db');
+    const dbCacheFilePath = await path.join(appConfigPath, 'mixed-cache-rule-v1.db');
 
     let directCustomRuleSet = await getCustomRuleSet('direct');
     let proxyCustomRuleSet = await getCustomRuleSet('proxy');
@@ -67,7 +64,6 @@ export async function setMixedConfig(identifier: string) {
                 rule.ip_cidr.push(...directCustomRuleSet.ip_cidr);
                 break;
             }
-
         }
     }
 
