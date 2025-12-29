@@ -23,6 +23,9 @@
       "deb",
       "rpm"
     ],
+    "resources": [
+      "resources/*.so"
+    ],
     "externalBin": [
       "binaries/sing-box"
     ]

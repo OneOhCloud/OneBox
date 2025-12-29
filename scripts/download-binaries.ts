@@ -12,6 +12,10 @@ const GITHUB_RELEASE_URL = 'https://github.com/SagerNet/sing-box/releases/downlo
 // sysproxy download URL, only supports Windows x64 version.
 const SYSPROXY_URL = "https://github.com/clash-verge-rev/sysproxy/releases/download/x64/sysproxy.exe";
 
+// cronet-go repository URL
+const CRONET_REPO_API = 'https://api.github.com/repos/SagerNet/cronet-go/releases/latest';
+const CRONET_RELEASE_URL = 'https://github.com/SagerNet/cronet-go/releases/download/';
+
 
 const SkipVersionList = [
     "v1.12.5", //This version of sing-box has DNS issues, skip downloading
@@ -146,6 +150,47 @@ async function downloadEmbeddingExternalBinaries(): Promise<void> {
     await Promise.all(downloadTasks);
 }
 
+// 获取 cronet-go 最新版本 tag
+async function getCronetLatestVersion(): Promise<string> {
+    const response = await fetch(CRONET_REPO_API);
+    if (!response.ok) {
+        throw new Error(`Failed to fetch cronet-go latest release: ${response.status}`);
+    }
+    const data = await response.json();
+    return data.tag_name;
+}
+
+// 下载 cronet 库文件到 src-tauri/resources 目录
+async function downloadCronetLibraries(): Promise<void> {
+    const cronetVersion = await getCronetLatestVersion();
+    console.log(`Using cronet-go version: ${cronetVersion}`);
+
+    const cronetFiles = [
+        {
+            name: 'libcronet-linux-amd64.so',
+            url: `${CRONET_RELEASE_URL}${cronetVersion}/libcronet-linux-amd64.so`
+        },
+        {
+            name: 'libcronet-windows-amd64.dll',
+            url: `${CRONET_RELEASE_URL}${cronetVersion}/libcronet-windows-amd64.dll`
+        }
+    ];
+
+    const resourcesDir = 'src-tauri/resources';
+    !fs.existsSync(resourcesDir) && fs.mkdirSync(resourcesDir, { recursive: true });
+
+    const downloadTasks = cronetFiles.map(async (file) => {
+        const startTime = Date.now();
+        const destPath = path.join(resourcesDir, file.name);
+        console.log(`Downloading cronet library: ${file.name}...`);
+        await downloadFile(file.url, destPath);
+        const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
+        console.log(`Downloaded cronet library to: ${destPath} (${elapsed}s)`);
+    });
+
+    await Promise.all(downloadTasks);
+}
+
 // 下载数据库文件到 src-tauri/resources 目录
 async function downloadDatabaseFiles(): Promise<void> {
     const dbFiles = [
@@ -184,7 +229,8 @@ if (SkipVersionList.includes(SING_BOX_VERSION)) {
 
     Promise.all([
         downloadEmbeddingExternalBinaries(),
-        downloadDatabaseFiles()
+        downloadDatabaseFiles(),
+        downloadCronetLibraries()
     ]).then(() => {
         const totalElapsed = ((Date.now() - scriptStartTime) / 1000).toFixed(2);
         console.log(`\n✓ All downloads completed! Total time: ${totalElapsed}s`);

@@ -26,6 +26,8 @@ dist-ssr
 tmp
 src-tauri/binaries
 src-tauri/resources/*.db
+src-tauri/resources/*.so
+src-tauri/resources/*.dll
 
 
 src-tauri/*.db

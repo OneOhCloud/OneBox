@@ -14,6 +14,9 @@
                 "type": "embedBootstrapper"
             }
         },
+        "resources": [
+            "resources/*.dll"
+        ],
         "externalBin": [
             "binaries/sing-box",
             "binaries/sysproxy"
