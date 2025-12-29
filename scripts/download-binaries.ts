@@ -69,10 +69,12 @@ async function embeddingExternalBinaries(
     extension: string,
     targetTriple: string
 ): Promise<void> {
+    const startTime = Date.now();
     const fileExtension = platform === 'windows' ? 'zip' : 'tar.gz';
     const fileName = `${BINARY_NAME}-${platform}-${arch}.${fileExtension}`;
     const downloadUrl = `${GITHUB_RELEASE_URL}${SING_BOX_VERSION}/${BINARY_NAME}-${SING_BOX_VERSION.substring(1)}-${platform}-${arch}.${fileExtension}`;
-    const tmpDir = path.join(__dirname, 'tmp');
+    // 为每个任务创建唯一的临时目录s
+    const tmpDir = path.join(__dirname, 'tmp', `${platform}-${arch}-${Date.now()}-${Math.random().toString(36).substring(7)}`);
     const downloadPath = path.join(tmpDir, fileName);
 
     try {
@@ -96,49 +98,53 @@ async function embeddingExternalBinaries(
         fs.renameSync(extractedFilePath, targetPath);
         fs.rmSync(tmpDir, { recursive: true, force: true });
 
-        console.log(`${platform}-${arch} version processed successfully`);
+        const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
+        console.log(`${platform}-${arch} version processed successfully (${elapsed}s)`);
     } catch (error) {
-        console.error('Processing failed:', error);
+        const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
+        console.error(`Processing failed after ${elapsed}s:`, error);
         throw error;
     }
 }
 
 async function downloadEmbeddingExternalBinaries(): Promise<void> {
+    const downloadTasks: Promise<void>[] = [];
+
     for (const [platform, archs] of Object.entries(RUST_TARGET_TRIPLES)) {
         for (const [arch, targetTriple] of Object.entries(archs)) {
             const extension = platform === 'windows' ? '.exe' : '';
-            await embeddingExternalBinaries(
-                platform as Platform,
-                arch as Architecture,
-                extension,
-                targetTriple
+            downloadTasks.push(
+                embeddingExternalBinaries(
+                    platform as Platform,
+                    arch as Architecture,
+                    extension,
+                    targetTriple
+                )
             );
 
             // Download sysproxy for Windows amd64
             if (platform === 'windows' && arch === 'amd64') {
-                console.log('Downloading Windows sysproxy...');
-                const targetPath = `src-tauri/binaries/sysproxy-${targetTriple}${extension}`;
+                downloadTasks.push(
+                    (async () => {
+                        const startTime = Date.now();
+                        console.log('Downloading Windows sysproxy...');
+                        const targetPath = `src-tauri/binaries/sysproxy-${targetTriple}${extension}`;
 
-                // Ensure target directory exists
-                const targetDir = path.dirname(targetPath);
-                !fs.existsSync(targetDir) && fs.mkdirSync(targetDir, { recursive: true });
+                        // Ensure target directory exists
+                        const targetDir = path.dirname(targetPath);
+                        !fs.existsSync(targetDir) && fs.mkdirSync(targetDir, { recursive: true });
 
-                await downloadFile(SYSPROXY_URL, targetPath);
-                console.log('sysproxy download completed');
+                        await downloadFile(SYSPROXY_URL, targetPath);
+                        const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
+                        console.log(`sysproxy download completed (${elapsed}s)`);
+                    })()
+                );
             }
         }
     }
+
+    await Promise.all(downloadTasks);
 }
-
-if (SkipVersionList.includes(SING_BOX_VERSION)) {
-    console.log(`Skipping download for version ${SING_BOX_VERSION}`);
-    throw new Error(`Version ${SING_BOX_VERSION} is in the skip list.`);
-
-} else {
-    downloadEmbeddingExternalBinaries().catch(console.error);
-
-}
-
 
 // 下载数据库文件到 src-tauri/resources 目录
 async function downloadDatabaseFiles(): Promise<void> {
@@ -156,12 +162,34 @@ async function downloadDatabaseFiles(): Promise<void> {
     const resourcesDir = 'src-tauri/resources';
     !fs.existsSync(resourcesDir) && fs.mkdirSync(resourcesDir, { recursive: true });
 
-    for (const dbFile of dbFiles) {
+    const downloadTasks = dbFiles.map(async (dbFile) => {
+        const startTime = Date.now();
         const destPath = path.join(resourcesDir, dbFile.name);
         console.log(`Downloading database file: ${dbFile.name}...`);
         await downloadFile(dbFile.url, destPath);
-        console.log(`Downloaded database file to: ${destPath}`);
-    }
+        const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
+        console.log(`Downloaded database file to: ${destPath} (${elapsed}s)`);
+    });
+
+    await Promise.all(downloadTasks);
 }
 
-downloadDatabaseFiles().catch(console.error);
+// 并行执行所有下载任务
+if (SkipVersionList.includes(SING_BOX_VERSION)) {
+    console.log(`Skipping download for version ${SING_BOX_VERSION}`);
+    throw new Error(`Version ${SING_BOX_VERSION} is in the skip list.`);
+} else {
+    const scriptStartTime = Date.now();
+    console.log('Starting parallel downloads...\n');
+
+    Promise.all([
+        downloadEmbeddingExternalBinaries(),
+        downloadDatabaseFiles()
+    ]).then(() => {
+        const totalElapsed = ((Date.now() - scriptStartTime) / 1000).toFixed(2);
+        console.log(`\n✓ All downloads completed! Total time: ${totalElapsed}s`);
+    }).catch((error) => {
+        const totalElapsed = ((Date.now() - scriptStartTime) / 1000).toFixed(2);
+        console.error(`\n✗ Download failed after ${totalElapsed}s:`, error);
+    });
+}
