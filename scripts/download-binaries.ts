@@ -39,24 +39,46 @@ const RUST_TARGET_TRIPLES = {
 type Platform = keyof typeof RUST_TARGET_TRIPLES;
 type Architecture = keyof typeof RUST_TARGET_TRIPLES[Platform];
 
-async function downloadFile(url: string, dest: string): Promise<void> {
+async function downloadFile(url: string, dest: string, maxRetries: number = 3): Promise<void> {
     const streamPipeline = promisify(pipeline);
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 seconds timeout
+    let lastError: Error | null = null;
 
-    const response = await fetch(url, {
-        signal: controller.signal,
-    }).finally(() => clearTimeout(timeoutId));
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 seconds timeout
 
-    if (!response.ok) {
-        throw new Error(`Download failed: '${url}' (${response.status})`);
+            const response = await fetch(url, {
+                signal: controller.signal,
+            }).finally(() => clearTimeout(timeoutId));
+
+            if (!response.ok) {
+                throw new Error(`Download failed: '${url}' (${response.status})`);
+            }
+
+            if (!response.body) {
+                throw new Error('Response body is empty');
+            }
+
+            await streamPipeline(response.body as any, createWriteStream(dest));
+            return; // Success, exit function
+        } catch (error) {
+            lastError = error as Error;
+
+            // Clean up partial download if it exists
+            if (fs.existsSync(dest)) {
+                fs.unlinkSync(dest);
+            }
+
+            if (attempt < maxRetries) {
+                const waitTime = attempt * 1000; // Progressive delay: 1s, 2s, 3s
+                console.warn(`Download attempt ${attempt} failed for '${url}': ${lastError.message}. Retrying in ${waitTime}ms...`);
+                await new Promise(resolve => setTimeout(resolve, waitTime));
+            }
+        }
     }
 
-    if (!response.body) {
-        throw new Error('Response body is empty');
-    }
-
-    await streamPipeline(response.body as any, createWriteStream(dest));
+    throw new Error(`Download failed after ${maxRetries} attempts: '${url}'. Last error: ${lastError?.message}`);
 }
 
 async function extractFile(filePath: string, fileExtension: string, tmpDir: string): Promise<void> {
@@ -152,12 +174,33 @@ async function downloadEmbeddingExternalBinaries(): Promise<void> {
 
 // 获取 cronet-go 最新版本 tag
 async function getCronetLatestVersion(): Promise<string> {
-    const response = await fetch(CRONET_REPO_API);
-    if (!response.ok) {
-        throw new Error(`Failed to fetch cronet-go latest release: ${response.status}`);
+    let lastError: Error | null = null;
+    const maxRetries = 3;
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            const response = await fetch(CRONET_REPO_API, {
+                headers: {
+                    'User-Agent': 'OneBox-Download-Script',
+                    'Accept': 'application/vnd.github+json'
+                }
+            });
+            if (!response.ok) {
+                throw new Error(`Failed to fetch cronet-go latest release: ${response.status}`);
+            }
+            const data = await response.json();
+            return data.tag_name;
+        } catch (error) {
+            lastError = error as Error;
+            if (attempt < maxRetries) {
+                const waitTime = attempt * 1000;
+                console.warn(`Fetch attempt ${attempt} failed: ${lastError.message}. Retrying in ${waitTime}ms...`);
+                await new Promise(resolve => setTimeout(resolve, waitTime));
+            }
+        }
     }
-    const data = await response.json();
-    return data.tag_name;
+
+    throw new Error(`Failed to fetch cronet-go version after ${maxRetries} attempts. Last error: ${lastError?.message}`);
 }
 
 // 下载 cronet 库文件到 src-tauri/resources 目录
@@ -234,8 +277,10 @@ if (SkipVersionList.includes(SING_BOX_VERSION)) {
     ]).then(() => {
         const totalElapsed = ((Date.now() - scriptStartTime) / 1000).toFixed(2);
         console.log(`\n✓ All downloads completed! Total time: ${totalElapsed}s`);
+        process.exit(0);
     }).catch((error) => {
         const totalElapsed = ((Date.now() - scriptStartTime) / 1000).toFixed(2);
         console.error(`\n✗ Download failed after ${totalElapsed}s:`, error);
+        process.exit(1);
     });
 }

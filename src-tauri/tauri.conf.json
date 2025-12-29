@@ -1,6 +1,6 @@
 {
   "productName": "OneBox",
-  "version": "1.2.12",
+  "version": "1.2.13",
   "identifier": "cloud.oneoh.onebox",
   "build": {
     "beforeDevCommand": "bun run dev",
