@@ -231,7 +231,7 @@ export async function getConfigTemplateURL(mode: configType): Promise<string> {
     }
 
     let configPath = await getStoreValue(cacheKey, defaultTemplatePath);
-    console.log(`Config template path for mode "${mode}": ${configPath}`);
+    console.debug(`Config template path for mode "${mode}": ${configPath}`);
     return configPath;
 }
 

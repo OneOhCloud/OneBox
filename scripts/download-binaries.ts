@@ -210,11 +210,11 @@ async function downloadCronetLibraries(): Promise<void> {
 
     const cronetFiles = [
         {
-            name: 'libcronet-linux-amd64.so',
+            name: 'libcronet.so',
             url: `${CRONET_RELEASE_URL}${cronetVersion}/libcronet-linux-amd64.so`
         },
         {
-            name: 'libcronet-windows-amd64.dll',
+            name: 'libcronet.dll',
             url: `${CRONET_RELEASE_URL}${cronetVersion}/libcronet-windows-amd64.dll`
         }
     ];
