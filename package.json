@@ -29,7 +29,7 @@
     "@tauri-apps/plugin-window-state": "^2.4.1",
     "bytes": "^3.1.2",
     "clsx": "^2.1.1",
-    "framer-motion": "^12.23.26",
+    "framer-motion": "^12.24.10",
     "jsonc": "^2.0.0",
     "jsonc-parser": "^3.3.1",
     "react": "^19.2.3",
@@ -38,7 +38,7 @@
     "sonner": "^2.0.7",
     "swr": "^2.3.8",
     "tailwindcss": "^4.1.18",
-    "zod": "^4.2.1"
+    "zod": "^4.3.5"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.9.6",
