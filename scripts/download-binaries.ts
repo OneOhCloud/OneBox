@@ -273,7 +273,7 @@ if (SkipVersionList.includes(SING_BOX_VERSION)) {
     Promise.all([
         downloadEmbeddingExternalBinaries(),
         downloadDatabaseFiles(),
-        downloadCronetLibraries()
+        // downloadCronetLibraries()
     ]).then(() => {
         const totalElapsed = ((Date.now() - scriptStartTime) / 1000).toFixed(2);
         console.log(`\n✓ All downloads completed! Total time: ${totalElapsed}s`);

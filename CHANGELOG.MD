@@ -12,8 +12,7 @@ All significant changes in this version are documented here.
 ### ⚠ CHANGES
 
 - Update dependencies
-- Support naiveproxy protocol
-
+- Update sing-box core to v1.12.15
 
 ## 自 v1.2.12 以来的变更
 
@@ -23,6 +22,6 @@ All significant changes in this version are documented here.
 ### ⚠ 变更
 
 - 更新了依赖
-- 支持 naiveproxy 协议
+- 更新了 sing-box 内核至 v1.12.15
 
 
