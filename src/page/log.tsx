@@ -100,7 +100,7 @@ export default function LogPage() {
             />
 
             {/* 日志标签页内容 */}
-            <div className={`flex-1 flex flex-col ${activeTab === 'logs' ? '' : 'hidden'}`} role="tabpanel">
+            <div className={`max-h-[calc(100dvh-100px)]  flex-1 flex flex-col ${activeTab === 'logs' ? '' : 'hidden'}`} role="tabpanel">
 
 
                 <div
