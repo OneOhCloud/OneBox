@@ -40,7 +40,7 @@ export default function Body({ isRunning, onUpdate }: { isRunning: boolean, onUp
         <div className='w-full h-full flex flex-col space-y-6 justify-between ' >
             <div>
                 <div className="fieldset w-full">
-                    <div className="fieldset-legend min-w-[270px]">
+                    <div className="fieldset-legend min-w-67.5">
                         <div className="capitalize">
                             {
                                 t("current_subscription")
@@ -55,7 +55,7 @@ export default function Body({ isRunning, onUpdate }: { isRunning: boolean, onUp
                     <SelectSub onUpdate={handleUpdate} data={data} isLoading={isLoading} />
                 </div>
                 <div className="fieldset w-full">
-                    <div className="fieldset-legend min-w-[270px] capitalize">
+                    <div className="fieldset-legend min-w-67.5 capitalize">
                         {t("node_selection")}
                     </div>
                     <SelectNode isRunning={isRunning} />

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { invoke } from "@tauri-apps/api/core";
 import { fetch } from '@tauri-apps/plugin-http';
@@ -50,7 +50,6 @@ export default function SelectNode(props: SelectNodeProps) {
         return <>
             <div className="select select-sm  select-ghost border-[0.8px] border-gray-200  opacity-50 cursor-not-allowed">
                 {
-                    /* 未启动 */
                     t("not_started")
                 }
 
@@ -86,6 +85,7 @@ export function SelecItem(props: SelecItemProps) {
     const [isOpen, setIsOpen] = useState(false);
     const [showDelay, setShowDelay] = useState(false);
     const [lastRunning, setLastRunning] = useState(false);
+    const dropdownRef = useRef<HTMLDivElement>(null);
 
 
     useEffect(() => {
@@ -96,10 +96,14 @@ export function SelecItem(props: SelecItemProps) {
                 if (connected) {
                     await new Promise(resolve => setTimeout(resolve, 500));
                     setShowDelay(true);
-                    break; // 如果连接成功，退出循环
+                    // 如果连接成功，退出循环
+                    // en: If the connection is successful, exit the loop
+                    break;
+
                 }
 
                 // 连接失败，等待一段时间后重试
+                // en: Connection failed, wait for a while before retrying
                 await new Promise(resolve => setTimeout(resolve, 1000));
             }
         }
@@ -116,6 +120,24 @@ export function SelecItem(props: SelecItemProps) {
 
 
     }, [isRunning, lastRunning]);
+
+    // 处理点击外部区域关闭下拉菜单
+    // en: Handle clicking outside area to close dropdown menu
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+                setIsOpen(false);
+            }
+        };
+
+        if (isOpen) {
+            document.addEventListener('mousedown', handleClickOutside);
+        }
+
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [isOpen]);
 
 
 
@@ -144,7 +166,10 @@ export function SelecItem(props: SelecItemProps) {
     if (!nodeList || nodeList.length === 0) {
         return <div className="select select-sm  select-ghost border-[0.8px] border-gray-200 ">
             {
-                /* 当前配置没有节点 */
+                /* 
+                    当前配置没有节点 
+                    en: No nodes in the current configuration
+                */
                 t("no_node")
             }
         </div>
@@ -152,7 +177,7 @@ export function SelecItem(props: SelecItemProps) {
 
 
     return (
-        <div className="relative">
+        <div className="relative" ref={dropdownRef}>
             <div
                 className={`select select-sm  select-ghost border-[0.8px] border-gray-200  cursor-pointer `}
                 onClick={() => setIsOpen(!isOpen)}
