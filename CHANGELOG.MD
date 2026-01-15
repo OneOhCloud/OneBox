@@ -4,7 +4,7 @@
 
 Use development and beta versions only if you are aware of the potential risks.
 
-## Changes since v1.2.15
+## Changes since v1.2.16
 
 All significant changes in this version are documented here.
 
@@ -12,9 +12,10 @@ All significant changes in this version are documented here.
 ### ⚠ CHANGES
 
 - Update dependencies
-- Update sing-box core to v1.12.16
+- Improve UI interaction details
 
-## 自 v1.2.15 以来的变更
+
+## 自 v1.2.16 以来的变更
 
 本版本的所有重要变更将记录于此。
 
@@ -22,6 +23,6 @@ All significant changes in this version are documented here.
 ### ⚠ 变更
 
 - 更新了依赖
-- 更新了 sing-box 内核至 v1.12.16
+- 改进了 UI 交互细节
 
 
