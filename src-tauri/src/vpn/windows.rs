@@ -228,7 +228,22 @@ impl VpnProxy for WindowsVpnProxy {
     }
 
     async fn unset_proxy(app: &AppHandle) -> anyhow::Result<()> {
-        unset_proxy(app).await
+        // 在某些 Windows 使用 sysproxy 取消代理时可能失败，捕获错误并记录日志
+        // 但不阻止程序继续运行，因为代理根本不可能设置成功
+        // 此处捕获错误是让用户需要以 tun 模式运行时，仍然可以继续
+        //
+        // On some Windows systems, unsetting the proxy using sysproxy may fail.
+        // Capture the error and log it, but do not prevent the program from continuing to run
+        // because the proxy may not have been set successfully in the first place.
+        // Capturing the error here allows users who need to run in tun mode to continue.
+        if let Err(e) = unset_proxy(app).await {
+            log::warn!("Failed to unset proxy: {}", e);
+            let _ = app.emit(
+                EVENT_TAURI_LOG,
+                (2, format!("Failed to unset proxy: {}", e)),
+            );
+        }
+        Ok(())
     }
 
     fn create_privileged_command(
