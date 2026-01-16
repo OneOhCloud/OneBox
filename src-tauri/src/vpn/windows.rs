@@ -1,6 +1,8 @@
+use crate::vpn::EVENT_TAURI_LOG;
 use anyhow;
 use std::path::Path;
 use tauri::AppHandle;
+use tauri::Emitter;
 use tauri_plugin_shell::process::Command as TauriCommand;
 use tauri_plugin_shell::ShellExt;
 
@@ -41,37 +43,69 @@ pub async fn set_proxy(app: &AppHandle) -> anyhow::Result<()> {
         app.shell()
             .command(sidecar_path)
             .args(["global", &address, DEFAULT_BYPASS]);
+    app.emit(
+        EVENT_TAURI_LOG,
+        (
+            0,
+            format!("Start set system proxy using sysproxy: {}", address),
+        ),
+    )
+    .unwrap();
 
-    let output = sidecar_command
-        .output()
-        .await
-        .map_err(|e| anyhow::anyhow!("Failed to set proxy: {}", e))?;
+    let output = match sidecar_command.output().await {
+        Ok(o) => o,
+        Err(e) => {
+            let msg = format!("Failed to set proxy: {}", e);
+            app.emit(EVENT_TAURI_LOG, (1, msg.clone()));
+            return Err(anyhow::anyhow!(msg));
+        }
+    };
     if !output.status.success() {
-        return Err(anyhow::anyhow!(
+        let msg = format!(
             "Failed to set proxy: {}",
             String::from_utf8_lossy(&output.stderr)
-        ));
+        );
+        app.emit(EVENT_TAURI_LOG, (1, msg.clone()));
+        return Err(anyhow::anyhow!(msg));
     }
     log::info!("Proxy set to {}:{}", config.host, config.port);
     Ok(())
 }
 
 /// 取消系统代理
+
 pub async fn unset_proxy(app: &AppHandle) -> anyhow::Result<()> {
     let sidecar_path = helper::get_sidecar_path(Path::new("sysproxy"))?;
 
-    let sidecar_command = app.shell().command(sidecar_path).args(["set", "1"]);
+    let sidecar_command = app.shell().command(&sidecar_path).args(["set", "1"]);
+    app.emit(
+        EVENT_TAURI_LOG,
+        (0, "Start unset system proxy useing sysproxy"),
+    )
+    .unwrap();
 
-    let output = sidecar_command
-        .output()
-        .await
-        .map_err(|e| anyhow::anyhow!("Failed to unset proxy: {}", e))?;
+    let _ = app.emit(
+        EVENT_TAURI_LOG,
+        (0, format!("Unset proxy command: {} set 1", sidecar_path)),
+    );
+
+    let output = match sidecar_command.output().await {
+        Ok(o) => o,
+        Err(e) => {
+            let msg = format!("Failed to unset proxy: {}", e);
+            let _ = app.emit(EVENT_TAURI_LOG, (1, msg.clone()));
+            return Err(anyhow::anyhow!(msg));
+        }
+    };
     if !output.status.success() {
-        return Err(anyhow::anyhow!(
+        let msg = format!(
             "Failed to unset proxy: {}",
             String::from_utf8_lossy(&output.stderr)
-        ));
+        );
+        let _ = app.emit(EVENT_TAURI_LOG, (1, msg.clone()));
+        return Err(anyhow::anyhow!(msg));
     }
+
     log::info!("Proxy unset");
     Ok(())
 }

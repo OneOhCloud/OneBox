@@ -5,7 +5,6 @@ use tauri::{
 };
 use tauri_plugin_http::reqwest::{self, redirect::Policy};
 use tokio::process::Command;
-use webbrowser;
 
 const DEFAULT_CAPTIVE_URL: &str = "http://captive.oneoh.cloud";
 
@@ -109,7 +108,7 @@ pub async fn get_lan_ip() -> Result<String, String> {
 
             // 查找inet地址
             if line.trim().starts_with("inet ") && is_up && is_running {
-                let parts: Vec<&str> = line.trim().split_whitespace().collect();
+                let parts: Vec<&str> = line.split_whitespace().collect();
                 if parts.len() >= 2 {
                     let ip = parts[1];
 
@@ -128,8 +127,6 @@ pub async fn get_lan_ip() -> Result<String, String> {
                         // 优先级：en0 (以太网/WiFi) > en1 > 其他接口
                         if current_interface == "en0" {
                             return Ok(ip.to_string());
-                        } else if current_interface.starts_with("en") && best_ip.is_none() {
-                            best_ip = Some(ip.to_string());
                         } else if best_ip.is_none() {
                             best_ip = Some(ip.to_string());
                         }

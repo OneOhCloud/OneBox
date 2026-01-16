@@ -1,6 +1,9 @@
 use tauri::AppHandle;
 use tauri_plugin_shell::process::Command as TauriCommand;
 
+pub const EVENT_TAURI_LOG: &str = "tauri-log";
+pub const EVENT_STATUS_CHANGED: &str = "status-changed";
+
 /// VPN代理操作的trait定义
 pub trait VpnProxy {
     /// 设置系统代理

@@ -1,12 +1,13 @@
 use crate::vpn::VpnProxy;
+use crate::vpn::EVENT_TAURI_LOG;
 use anyhow;
 use std::process::Command;
 use sysproxy::Sysproxy;
 use tauri::AppHandle;
+use tauri::Emitter;
 use tauri_plugin_shell::process::Command as TauriCommand;
 use tauri_plugin_shell::ShellExt;
 use tauri_plugin_store::StoreExt;
-
 // 默认绕过列表
 pub static DEFAULT_BYPASS: &str =
     "127.0.0.1,192.168.0.0/16,10.0.0.0/8,172.16.0.0/12,172.29.0.0/16,localhost,*.local,*.crashlytics.com,<local>";
@@ -35,7 +36,7 @@ pub async fn set_proxy(_app: &AppHandle) -> anyhow::Result<()> {
     let sys = Sysproxy {
         enable: true,
         host: config.host.clone(),
-        port: config.port.clone(),
+        port: config.port,
         bypass: config.bypass,
     };
     sys.set_system_proxy().map_err(|e| anyhow::anyhow!(e))?;
@@ -44,11 +45,28 @@ pub async fn set_proxy(_app: &AppHandle) -> anyhow::Result<()> {
 }
 
 /// 取消系统代理
-pub async fn unset_proxy(_app: &AppHandle) -> anyhow::Result<()> {
+pub async fn unset_proxy(app: &AppHandle) -> anyhow::Result<()> {
     // 清理系统代理设置
-    let mut sysproxy = Sysproxy::get_system_proxy().map_err(|e| anyhow::anyhow!(e))?;
+    app.emit(EVENT_TAURI_LOG, (0, "Start unset system proxy"))
+        .unwrap();
+
+    let mut sysproxy = match Sysproxy::get_system_proxy() {
+        Ok(proxy) => proxy,
+        Err(e) => {
+            let msg = format!("Sysproxy::get_system_proxy failed: {}", e);
+            app.emit(EVENT_TAURI_LOG, (1, msg.clone())).unwrap();
+            return Err(anyhow::anyhow!(msg));
+        }
+    };
     sysproxy.enable = false;
-    sysproxy.set_system_proxy()?;
+    if let Err(e) = sysproxy.set_system_proxy() {
+        let msg = format!("Sysproxy::set_system_proxy failed: {}", e);
+        app.emit(EVENT_TAURI_LOG, (1, msg.clone())).unwrap();
+        return Err(anyhow::anyhow!(msg));
+    }
+
+    app.emit(EVENT_TAURI_LOG, (0, "System proxy unset successfully"))
+        .unwrap();
     log::info!("Proxy unset");
     Ok(())
 }

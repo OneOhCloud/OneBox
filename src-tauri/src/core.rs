@@ -8,7 +8,7 @@ use tauri_plugin_http::reqwest;
 use crate::app_status::{AppData, LogType};
 #[cfg(not(target_os = "windows"))]
 use crate::privilege;
-use crate::vpn::helper;
+use crate::vpn::{helper, EVENT_STATUS_CHANGED};
 use crate::vpn::{PlatformVpnProxy, VpnProxy};
 use tauri::Emitter;
 use tauri_plugin_shell::process::CommandChild;
@@ -216,8 +216,8 @@ pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Resu
                                                 }
 
                                                 // 通知前端状态已更改
-                                                if let Err(e) =
-                                                    cleanup_app.emit("status-changed", exit_code)
+                                                if let Err(e) = cleanup_app
+                                                    .emit(EVENT_STATUS_CHANGED, exit_code)
                                                 {
                                                     log::error!(
                                                         "Failed to emit status-changed event: {}",
@@ -229,7 +229,7 @@ pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Resu
                                             // 对于非系统代理模式，直接通知前端
                                             drop(manager);
                                             if let Err(e) =
-                                                app_handle.emit("status-changed", exit_code)
+                                                app_handle.emit(EVENT_STATUS_CHANGED, exit_code)
                                             {
                                                 log::error!(
                                                     "Failed to emit status-changed event: {}",
@@ -302,7 +302,7 @@ pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Resu
     std::thread::sleep(wait_time);
 
     log::info!("Proxy process started successfully");
-    if let Err(e) = app.emit("status-changed", ()) {
+    if let Err(e) = app.emit(EVENT_STATUS_CHANGED, ()) {
         log::error!("Failed to emit status-changed event: {}", e);
     }
 
@@ -386,7 +386,7 @@ pub async fn stop(app: tauri::AppHandle) -> Result<(), String> {
     }
 
     log::info!("Proxy process stopped");
-    app.emit("status-changed", ()).unwrap();
+    app.emit(EVENT_STATUS_CHANGED, ()).unwrap();
     Ok(())
 }
 

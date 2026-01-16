@@ -133,10 +133,7 @@ pub fn get_current_username() -> String {
 #[cfg(not(target_os = "windows"))]
 pub async fn get_privilege_password_from_keyring() -> String {
     match Entry::new(KEYRING_SERVICE, KEYRING_KEY_NAME) {
-        Ok(entry) => match entry.get_password() {
-            Ok(password) => password,
-            Err(_) => String::new(),
-        },
+        Ok(entry) => entry.get_password().unwrap_or_default(),
         Err(_) => String::new(),
     }
 }
@@ -149,10 +146,7 @@ pub async fn is_privileged(password: Option<String>) -> bool {
 #[tauri::command]
 pub async fn save_privilege_password_to_keyring(password: String) -> bool {
     match Entry::new(KEYRING_SERVICE, KEYRING_KEY_NAME) {
-        Ok(entry) => match entry.set_password(&password) {
-            Ok(_) => true,
-            Err(_) => false,
-        },
+        Ok(entry) => entry.set_password(&password).is_ok(),
         Err(_) => false,
     }
 }

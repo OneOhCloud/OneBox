@@ -190,7 +190,7 @@ pub fn run() {
             log::info!("app local data path: {:?}", app.path().app_local_data_dir());
 
             // 复制 resources 目录下的 .db 文件到 appConfigDir
-            if let Err(e) = copy_database_files(&app.handle()) {
+            if let Err(e) = copy_database_files(app.handle()) {
                 log::error!("Failed to copy database files: {}", e);
             }
 

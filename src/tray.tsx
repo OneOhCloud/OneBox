@@ -145,20 +145,21 @@ export async function setupTrayIcon() {
     }
 }
 
+
 export async function setupStatusListener() {
     await listen('status-changed', async (event) => {
         if (event == null) {
             return;
         }
-        console.log("Received status-changed event:", event);
+        console.log(event);
         // @ts-ignore
         if (event.payload && event.payload.code && event.payload.code === 1) {
             // await message(`${t('connect_failed')}`, { title: t('error'), kind: 'error' });
             //  连接失败，请稍等一分钟后重试。
             let info = await invoke<string>('read_logs', { isError: false });
             let error = await invoke<string>('read_logs', { isError: true });
-            console.log("Info logs:", info);
-            console.log("Error logs:", error);
+            console.info("Info logs:", info);
+            console.error("Error logs:", error);
             await message(
                 t('connect_failed_retry'),
                 { title: t('error'), kind: 'error' }
@@ -170,5 +171,25 @@ export async function setupStatusListener() {
         if (trayInstance) {
             await trayInstance.setMenu(newMenu);
         }
+    });
+}
+
+// 监听错误日志事件
+export async function setupTauriLogListener() {
+    await listen('tauri-log', async (event) => {
+        if (event == null) {
+            return;
+        }
+        // @ts-ignore
+        if (event.payload && event.payload.code && event.payload.code === 1) {
+            // @ts-ignore
+            console.error(event);
+
+        } else {
+            // 普通日志处理（如果需要）
+            // @ts-ignore
+            console.log(event);
+        }
+
     });
 }
