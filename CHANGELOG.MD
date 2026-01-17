@@ -11,8 +11,11 @@ All significant changes in this version are documented here.
 
 ### ⚠ CHANGES
 
-- Update dependencies
-- Improve UI interaction details
+- Updated dependencies
+- Fixed some known issues
+- Updated sing-box to v1.12.17
+- Improved UI interaction details
+
 
 
 ## 自 v1.2.16 以来的变更
@@ -23,6 +26,8 @@ All significant changes in this version are documented here.
 ### ⚠ 变更
 
 - 更新了依赖
+- 修复一些已知问题
 - 改进了 UI 交互细节
+- 更新 sing-box 至 v1.12.17
 
 
