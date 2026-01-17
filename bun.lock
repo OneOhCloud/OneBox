@@ -37,14 +37,14 @@
       "devDependencies": {
         "@tauri-apps/cli": "^2.9.6",
         "@types/bytes": "^3.1.5",
-        "@types/node": "^22.19.6",
+        "@types/node": "^22.19.7",
         "@types/react": "^19.2.8",
         "@types/react-dom": "^19.2.3",
         "@types/unzipper": "^0.10.11",
         "@vitejs/plugin-react": "^4.7.0",
         "daisyui": "^5.5.14",
         "husky": "^9.1.7",
-        "tar": "^7.5.2",
+        "tar": "^7.5.3",
         "typescript": "~5.6.3",
         "unzipper": "^0.12.3",
         "vite": "^6.4.1",
@@ -480,7 +480,7 @@
 
     "tapable": ["tapable@2.2.2", "", {}, "sha512-Re10+NauLTMCudc7T5WLFLAwDhQ0JWdrMK+9B2M8zR5hRExKmsRDCBA7/aV/pNJFltmBFO5BAMlQFi/vq3nKOg=="],
 
-    "tar": ["tar@7.5.2", "", { "dependencies": { "@isaacs/fs-minipass": "^4.0.0", "chownr": "^3.0.0", "minipass": "^7.1.2", "minizlib": "^3.1.0", "yallist": "^5.0.0" } }, "sha512-7NyxrTE4Anh8km8iEy7o0QYPs+0JKBTj5ZaqHg6B39erLg0qYXN3BijtShwbsNSvQ+LN75+KV+C4QR/f6Gwnpg=="],
+    "tar": ["tar@7.5.3", "", { "dependencies": { "@isaacs/fs-minipass": "^4.0.0", "chownr": "^3.0.0", "minipass": "^7.1.2", "minizlib": "^3.1.0", "yallist": "^5.0.0" } }, "sha512-ENg5JUHUm2rDD7IvKNFGzyElLXNjachNLp6RaGf4+JOgxXHkqA+gq81ZAMCUmtMtqBsoU62lcp6S27g1LCYGGQ=="],
 
     "tinyglobby": ["tinyglobby@0.2.14", "", { "dependencies": { "fdir": "^6.4.4", "picomatch": "^4.0.2" } }, "sha512-tX5e7OM1HnYr2+a2C/4V0htOcSQcoSTH9KgJnVvNm5zm/cyEWKJ7j7YutsH9CxMdtOkkLFy2AHrMci9IM8IPZQ=="],
 
