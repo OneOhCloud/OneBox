@@ -56,7 +56,7 @@ pub async fn set_proxy(app: &AppHandle) -> anyhow::Result<()> {
         Ok(o) => o,
         Err(e) => {
             let msg = format!("Failed to set proxy: {}", e);
-            app.emit(EVENT_TAURI_LOG, (1, msg.clone()));
+            let _ = app.emit(EVENT_TAURI_LOG, (1, msg.clone()));
             return Err(anyhow::anyhow!(msg));
         }
     };
@@ -65,7 +65,7 @@ pub async fn set_proxy(app: &AppHandle) -> anyhow::Result<()> {
             "Failed to set proxy: {}",
             String::from_utf8_lossy(&output.stderr)
         );
-        app.emit(EVENT_TAURI_LOG, (1, msg.clone()));
+        let _ = app.emit(EVENT_TAURI_LOG, (1, msg.clone()));
         return Err(anyhow::anyhow!(msg));
     }
     log::info!("Proxy set to {}:{}", config.host, config.port);
@@ -73,7 +73,6 @@ pub async fn set_proxy(app: &AppHandle) -> anyhow::Result<()> {
 }
 
 /// 取消系统代理
-
 pub async fn unset_proxy(app: &AppHandle) -> anyhow::Result<()> {
     let sidecar_path = helper::get_sidecar_path(Path::new("sysproxy"))?;
 
