@@ -2,8 +2,9 @@
 [![Dev Build](https://github.com/OneOhCloud/OneBox/actions/workflows/dev-release.yml/badge.svg)](https://github.com/OneOhCloud/OneBox/actions/workflows/dev-release.yml)
 [![Beta Build](https://github.com/OneOhCloud/OneBox/actions/workflows/beta-release.yml/badge.svg)](https://github.com/OneOhCloud/OneBox/actions/workflows/beta-release.yml)
 [![Stable Build](https://github.com/OneOhCloud/OneBox/actions/workflows/stable-release.yml/badge.svg)](https://github.com/OneOhCloud/OneBox/actions/workflows/stable-release.yml)
+[![sing-box](https://repology.org/badge/version-for-repo/homebrew/sing-box.svg?header=sing-box-latest-version)](https://github.com/SagerNet/sing-box)
 
-基于 sing-box 内核的跨平台 GUI 客户端。
+基于 [sing-box](https://github.com/SagerNet/sing-box) 内核的跨平台 GUI 客户端，目标群体为普通用户，喜欢复杂、折腾的用户请移步其他项目。
 
 
 ## 软件截图 
