@@ -129,7 +129,7 @@ export default function LogPage() {
             </div>
 
 
-            {/* 配置标签页内容 */}
+            {/* 模板标签页内容 */}
             <div className={`flex-1 ${activeTab === 'config-template' ? '' : 'hidden'}`} role="tabpanel">
                 <div className="h-[calc(100dvh-100px)] overflow-y-auto overflow-x-hidden">
                     <ConfigTemplate />
