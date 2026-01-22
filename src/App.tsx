@@ -98,7 +98,7 @@ function App() {
     return await syncAllConfigTemplates();
   }, {
     revalidateOnFocus: true,
-    dedupingInterval: 60000 * 5, // 5 minutes
+    dedupingInterval: 60000 * 30, // 30 minutes
   })
 
   const [language, setLanguage] = useState('unknown');
