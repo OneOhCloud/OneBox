@@ -11,6 +11,7 @@ All significant changes in this version are documented here.
 
 ### ⚠ CHANGES
 
+- Improved tray menu
 - Updated dependencies
 - Updated sing-box to v1.12.18
 
@@ -24,6 +25,7 @@ All significant changes in this version are documented here.
 ### ⚠ 变更
 
 - 更新了依赖
+- 改进了托盘菜单
 - 更新 sing-box 至 v1.12.18
 
 
