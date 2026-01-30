@@ -38,7 +38,7 @@ export default function Page() {
                         <SettingItem
                             icon={<Binoculars className="w-5 h-5 text-gray-500" />}
 
-                            title={t("open_log")}
+                            title={t("open_advanced_settings")}
                             subTitle={t("open_log_desc")}
                             disabled={false}
                             onPress={() => {
