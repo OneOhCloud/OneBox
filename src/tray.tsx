@@ -61,26 +61,95 @@ async function createTrayMenu() {
     }
     const developer_toggle_state: boolean = await getStoreValue(DEVELOPER_TOGGLE_STORE_KEY, false);
     if (developer_toggle_state) {
+        // 获取应用路径
+        const appPaths = await invoke<{
+            log_dir: string,
+            data_dir: string,
+            cache_dir: string,
+            config_dir: string,
+            local_data_dir: string
+        }>('get_app_paths');
+
         baseMenu.items?.push(
             {
-                id: 'open_log',
-                text: t("menu_open_log"),
-                action: async () => {
-                    await invoke('create_window', {
-                        app: appWindow,
-                        title: "Log",
-                        label: "sing-box-log",
-                        windowTag: "sing-box-log",
-                    })
-                },
-            },
-
-            {
-                id: 'devtools',
-                text: t("menu_devtools"),
-                action: async () => {
-                    await invoke("open_devtools");
-                },
+                id: 'developer_menu',
+                text: t("menu_developer") || "Developer",
+                items: [
+                    {
+                        id: 'open_log',
+                        text: t("menu_open_log"),
+                        action: async () => {
+                            await invoke('create_window', {
+                                app: appWindow,
+                                title: "Log",
+                                label: "sing-box-log",
+                                windowTag: "sing-box-log",
+                            })
+                        },
+                    },
+                    {
+                        id: 'devtools',
+                        text: t("menu_devtools"),
+                        action: async () => {
+                            await invoke("open_devtools");
+                        },
+                    },
+                    {
+                        id: 'open_log_dir',
+                        text: t("menu_log_dir") || "Log Directory",
+                        action: async () => {
+                            try {
+                                await invoke('open_directory', { path: appPaths.log_dir });
+                            } catch (e) {
+                                console.error('Failed to open log directory:', e);
+                            }
+                        },
+                    },
+                    {
+                        id: 'open_data_dir',
+                        text: t("menu_data_dir") || "Data Directory",
+                        action: async () => {
+                            try {
+                                await invoke('open_directory', { path: appPaths.data_dir });
+                            } catch (e) {
+                                console.error('Failed to open data directory:', e);
+                            }
+                        },
+                    },
+                    {
+                        id: 'open_cache_dir',
+                        text: t("menu_cache_dir") || "Cache Directory",
+                        action: async () => {
+                            try {
+                                await invoke('open_directory', { path: appPaths.cache_dir });
+                            } catch (e) {
+                                console.error('Failed to open cache directory:', e);
+                            }
+                        },
+                    },
+                    {
+                        id: 'open_config_dir',
+                        text: t("menu_config_dir") || "Config Directory",
+                        action: async () => {
+                            try {
+                                await invoke('open_directory', { path: appPaths.config_dir });
+                            } catch (e) {
+                                console.error('Failed to open config directory:', e);
+                            }
+                        },
+                    },
+                    {
+                        id: 'open_local_data_dir',
+                        text: t("menu_local_data_dir") || "Local Data Directory",
+                        action: async () => {
+                            try {
+                                await invoke('open_directory', { path: appPaths.local_data_dir });
+                            } catch (e) {
+                                console.error('Failed to open local data directory:', e);
+                            }
+                        },
+                    },
+                ],
             },
 
 

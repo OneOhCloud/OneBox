@@ -16,6 +16,49 @@ fn get_app_version(app: AppHandle) -> String {
 }
 
 #[tauri::command]
+fn get_app_paths(app: AppHandle) -> Result<serde_json::Value, String> {
+    let paths = serde_json::json!({
+        "log_dir": app.path().app_log_dir().map_err(|e| e.to_string())?,
+        "data_dir": app.path().app_data_dir().map_err(|e| e.to_string())?,
+        "cache_dir": app.path().app_cache_dir().map_err(|e| e.to_string())?,
+        "config_dir": app.path().app_config_dir().map_err(|e| e.to_string())?,
+        "local_data_dir": app.path().app_local_data_dir().map_err(|e| e.to_string())?,
+    });
+    Ok(paths)
+}
+
+#[tauri::command]
+fn open_directory(path: String) -> Result<(), String> {
+    use std::process::Command;
+
+    #[cfg(target_os = "macos")]
+    {
+        Command::new("open")
+            .arg(&path)
+            .spawn()
+            .map_err(|e| format!("Failed to open directory: {}", e))?;
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        Command::new("explorer")
+            .arg(&path)
+            .spawn()
+            .map_err(|e| format!("Failed to open directory: {}", e))?;
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        Command::new("xdg-open")
+            .arg(&path)
+            .spawn()
+            .map_err(|e| format!("Failed to open directory: {}", e))?;
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
 fn open_devtools(app: AppHandle) {
     let window = app.get_webview_window("main").unwrap();
     window.open_devtools();
@@ -158,6 +201,8 @@ pub fn run() {
             open_devtools,
             create_window,
             get_app_version,
+            get_app_paths,
+            open_directory,
             get_tray_icon,
             lan::get_lan_ip,
             lan::ping_google,
