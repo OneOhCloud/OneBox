@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
 import { ArrowRepeat } from "react-bootstrap-icons";
 import { mutate } from "swr";
-import { addSubscription, updateSubscription } from "../action/db";
+import { addSubscription } from "../action/db";
 import { SubscriptionItem } from "../components/configuration/item";
 import { AddSubConfigurationModal } from "../components/configuration/modal";
 import { useSubscriptions } from "../hooks/useDB";
@@ -98,15 +98,7 @@ export default function Configuration() {
     const { data } = useSubscriptions();
 
     const onUpdateAllSubscriptions = async () => {
-        if (data) {
-            for (const item of data) {
-                try {
-                    await updateSubscription(item.identifier);
-                } catch (err) {
-                    console.error(`Failed to update subscription ${item.identifier}:`, err);
-                }
-            }
-        }
+        window.dispatchEvent(new CustomEvent("update-all-subscriptions"));
     };
 
 

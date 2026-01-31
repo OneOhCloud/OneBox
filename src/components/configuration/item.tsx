@@ -151,7 +151,11 @@ const ItemDetails: React.FC<ItemDetailsProps> = ({
 
 
 
-function SubscriptionItemSkeleton() {
+type SubscriptionItemSkeletonProps = {
+    expanded: boolean
+}
+
+function SubscriptionItemSkeleton(props: SubscriptionItemSkeletonProps) {
     return (
         <li>
             <div className="list-row items-center">
@@ -173,7 +177,9 @@ function SubscriptionItemSkeleton() {
 
                 </button>
             </div>
-            <ItemDetailsSkeleton />
+            {
+                props.expanded && <ItemDetailsSkeleton />
+            }
         </li>
     )
 }
@@ -193,6 +199,8 @@ export const SubscriptionItem: React.FC<SubscriptionItemProps> = ({
     const handleWebsiteClick = () => openUrl(item.official_website)
     const { update, resetMessage, loading, message, messageType } = useUpdateSubscription()
 
+
+
     useEffect(() => {
         if (!loading) {
             const timer = setTimeout(() => {
@@ -202,13 +210,20 @@ export const SubscriptionItem: React.FC<SubscriptionItemProps> = ({
         }
     }, [loading, message]);
 
+    useEffect(() => {
+        const handleUpdateEvent = () => {
+            update(item.identifier)
+        }
+        window.addEventListener("update-all-subscriptions", handleUpdateEvent)
+        return () => {
+            window.removeEventListener("update-all-subscriptions", handleUpdateEvent)
+        }
+    }, [item.identifier])
+
 
     if (loading) {
-        return <SubscriptionItemSkeleton />
+        return <SubscriptionItemSkeleton expanded={expanded === item.identifier} />
     }
-
-
-
 
     const Title = () => {
         if (message && messageType) {
