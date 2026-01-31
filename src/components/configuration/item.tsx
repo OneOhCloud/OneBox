@@ -209,7 +209,7 @@ export const SubscriptionItem: React.FC<SubscriptionItemProps> = ({
     const handleDelete = async () => {
         setIsDeleting(true);
         await deleteSubscription(item.identifier)
-        await new Promise(resolve => setTimeout(resolve, 600));
+        await new Promise(resolve => setTimeout(resolve, 100));
         setIsDeleting(false);
         await mutate(GET_SUBSCRIPTIONS_LIST_SWR_KEY)
     }

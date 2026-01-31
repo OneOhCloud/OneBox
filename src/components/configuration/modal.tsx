@@ -133,7 +133,7 @@ const ResultStep: React.FC<ResultStepProps> = ({ message, messageType, onClose }
             IconComponent = InfoCircle;
     }
     return (
-        <div className="flex flex-col items-center justify-center min-h-30 py-8">
+        <div className="flex flex-col items-center justify-center min-h-30 py-2">
             <IconComponent className={iconClass} />
 
             <div className={`mt-4 text-sm font-medium tracking-wide ${textClass}`}>

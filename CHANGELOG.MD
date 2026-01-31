@@ -14,7 +14,7 @@ All significant changes in this version are documented here.
 - Improved tray menu
 - Updated dependencies
 - Updated sing-box to v1.12.18
-
+- Improved interaction experience on the configuration page
 
 
 ## 自 v1.2.19 以来的变更
@@ -26,6 +26,7 @@ All significant changes in this version are documented here.
 
 - 更新了依赖
 - 改进了托盘菜单
+- 改进配置页面的交互体验
 - 更新 sing-box 至 v1.12.18
 
 
