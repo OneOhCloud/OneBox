@@ -1,7 +1,7 @@
 import { openUrl } from "@tauri-apps/plugin-opener"
 import bytes from "bytes"
 import { AnimatePresence, motion } from "framer-motion"
-import { useEffect } from "react"
+import React, { useEffect, useState } from "react"
 import { ArrowClockwise, CaretDownFill, CaretUpFill, Trash } from "react-bootstrap-icons"
 import { mutate } from "swr"
 import { deleteSubscription } from "../../action/db"
@@ -23,6 +23,7 @@ interface ItemDetailsProps {
     remainingDays: string
     trafficDetails: string
     onUpdate: () => Promise<void>
+    onDelete: () => Promise<void>
     loading: boolean
 }
 
@@ -32,41 +33,7 @@ const ANIMATION_STYLES = {
 }
 
 
-function ItemDetailsSkeleton() {
-    return (
-        <AnimatePresence initial={true}>
-            <motion.div
-                variants={itemVariants}
-                initial="hidden"
-                animate="visible"
-                exit="exit"
-                className="overflow-hidden"
-                style={ANIMATION_STYLES}
-            >
-                <motion.div
-                    variants={contentVariants}
-                    className="flex flex-col gap-2 px-4 py-4 bg-gray-100 rounded-b"
-                >
-                    <div className="flex flex-col gap-2">
-                        <div className="flex items-center justify-between">
-                            <div className="flex gap-2">
-                                <div className="bg-gray-300 h-4 w-20 rounded animate-pulse" />
-                            </div>
-                            <div className="bg-gray-300 rounded-full size-6 animate-pulse" />
-                        </div>
 
-                        <div className="flex items-center justify-between">
-                            <div className="flex gap-2">
-                                <div className="bg-gray-300 h-4 w-20 rounded animate-pulse" />
-                            </div>
-                            <div className="bg-gray-300 rounded-full size-6 animate-pulse" />
-                        </div>
-                    </div>
-                </motion.div>
-            </motion.div>
-        </AnimatePresence>
-    )
-}
 
 const ItemDetails: React.FC<ItemDetailsProps> = ({
     identifier,
@@ -74,6 +41,7 @@ const ItemDetails: React.FC<ItemDetailsProps> = ({
     remainingDays,
     trafficDetails,
     onUpdate,
+    onDelete,
     loading
 }) => {
 
@@ -86,12 +54,6 @@ const ItemDetails: React.FC<ItemDetailsProps> = ({
         } finally {
         }
     }
-
-    const handleDelete = async () => {
-        await deleteSubscription(identifier)
-        await mutate(GET_SUBSCRIPTIONS_LIST_SWR_KEY)
-    }
-
 
 
     return (
@@ -136,7 +98,7 @@ const ItemDetails: React.FC<ItemDetailsProps> = ({
                                 </div>
                                 <button
                                     className="btn btn-xs btn-ghost btn-circle border-0 transition-colors"
-                                    onClick={handleDelete}
+                                    onClick={onDelete}
                                 >
                                     <Trash className="size-[0.8rem] text-gray-400" />
                                 </button>
@@ -152,6 +114,7 @@ const ItemDetails: React.FC<ItemDetailsProps> = ({
 
 
 type SubscriptionItemSkeletonProps = {
+    action: 'update' | 'delete'
     expanded: boolean
 }
 
@@ -161,7 +124,11 @@ function SubscriptionItemSkeleton(props: SubscriptionItemSkeletonProps) {
             <div className="list-row items-center">
                 <div className="bg-gray-300 rounded-full size-10 animate-pulse" />
                 <div className="max-w-40 flex flex-col gap-2">
-                    <div className=" truncate text-sm animate-pulse text-gray-500" >{t('updating')}</div>
+                    <div className=" truncate text-sm animate-pulse text-gray-500" >{
+
+                        props.action === 'delete' ? t("deleting_subscription") : t("updating_subscription")
+
+                    }</div>
                     <div className="bg-gray-300 text-xs flex items-center " >
                         <progress
                             className="progress h-1 animate-pulse"
@@ -178,7 +145,25 @@ function SubscriptionItemSkeleton(props: SubscriptionItemSkeletonProps) {
                 </button>
             </div>
             {
-                props.expanded && <ItemDetailsSkeleton />
+                props.expanded && <div
+                    className="flex flex-col gap-2 px-4 py-4 bg-gray-100 rounded-b"
+                >
+                    <div className="flex flex-col gap-2">
+                        <div className="flex items-center justify-between">
+                            <div className="flex gap-2">
+                                <div className="bg-gray-300 h-4 w-20 rounded animate-pulse" />
+                            </div>
+                            <div className="bg-gray-300 rounded-full size-6 animate-pulse" />
+                        </div>
+
+                        <div className="flex items-center justify-between">
+                            <div className="flex gap-2">
+                                <div className="bg-gray-300 h-4 w-20 rounded animate-pulse" />
+                            </div>
+                            <div className="bg-gray-300 rounded-full size-6 animate-pulse" />
+                        </div>
+                    </div>
+                </div>
             }
         </li>
     )
@@ -199,6 +184,7 @@ export const SubscriptionItem: React.FC<SubscriptionItemProps> = ({
     const handleWebsiteClick = () => openUrl(item.official_website)
     const { update, resetMessage, loading, message, messageType } = useUpdateSubscription()
 
+    const [isDeleting, setIsDeleting] = useState(false);
 
 
     useEffect(() => {
@@ -220,9 +206,20 @@ export const SubscriptionItem: React.FC<SubscriptionItemProps> = ({
         }
     }, [item.identifier])
 
+    const handleDelete = async () => {
+        setIsDeleting(true);
+        await deleteSubscription(item.identifier)
+        await new Promise(resolve => setTimeout(resolve, 600));
+        setIsDeleting(false);
+        await mutate(GET_SUBSCRIPTIONS_LIST_SWR_KEY)
+    }
 
-    if (loading) {
-        return <SubscriptionItemSkeleton expanded={expanded === item.identifier} />
+    if (loading || isDeleting) {
+
+        return <SubscriptionItemSkeleton
+            action={isDeleting ? 'delete' : 'update'}
+            expanded={expanded === item.identifier}
+        />
     }
 
     const Title = () => {
@@ -286,6 +283,7 @@ export const SubscriptionItem: React.FC<SubscriptionItemProps> = ({
 
             <ItemDetails
                 loading={loading}
+                onDelete={handleDelete}
                 onUpdate={async () => update(item.identifier)}
                 identifier={item.identifier}
                 visible={expanded === item.identifier}

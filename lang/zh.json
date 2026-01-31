@@ -45,6 +45,7 @@
     "custom_router_rules": "自定义路由规则",
     "custom_ua_placeholder": "输入自定义 User Agent",
     "days": "天",
+    "deleting_subscription": "删除配置文件中...",
     "delete_subscription_failed": "删除配置文件失败",
     "delete_subscription_success": "删除配置文件成功",
     "delete_success": "删除成功",

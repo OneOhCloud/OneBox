@@ -207,7 +207,6 @@ export async function deleteSubscription(identifier: string) {
         const db = await getDataBaseInstance();
         await db.execute('DELETE FROM subscriptions WHERE identifier = ?', [identifier])
         await db.execute('DELETE FROM subscription_configs WHERE identifier = ?', [identifier])
-        toast.success(t("delete_subscription_success"))
     } catch (error) {
         console.error('Error deleting subscription:', error)
         toast.error(t('delete_subscription_failed'))

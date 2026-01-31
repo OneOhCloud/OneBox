@@ -45,6 +45,7 @@
     "custom_router_rules": "Custom Router Rules",
     "custom_ua_placeholder": "Enter custom User Agent",
     "days": "Days",
+    "deleting_subscription": "Deleting config...",
     "delete_subscription_failed": "Delete config failed",
     "delete_subscription_success": "Delete config success",
     "delete_success": "Deleted successfully",
