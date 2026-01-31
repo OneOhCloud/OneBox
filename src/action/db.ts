@@ -7,27 +7,27 @@ import { Subscription, SubscriptionConfig } from '../types/definition';
 import { getSingBoxUserAgent, t } from '../utils/helper';
 
 
-interface ResponseHeaders {
+export interface ResponseHeaders {
     'subscription-userinfo': string;
     'official-website': string;
     'content-disposition': string;
     get?: (name: string) => string | null;
 }
 
-interface ConfigResponse {
+export interface ConfigResponse {
     data: any;
     headers: ResponseHeaders;
     status?: number;
 }
 
-class FileError extends Error {
+export class FileError extends Error {
     constructor(message: string) {
         super(message);
         this.name = "FileError";
     }
 }
 
-async function fetchConfigContent(url: string): Promise<ConfigResponse> {
+export async function fetchConfigContent(url: string): Promise<ConfigResponse> {
     if (url.startsWith('file://')) {
         const filePath = url.slice(7);
         try {
@@ -88,7 +88,7 @@ function getRemoteNameByContentDisposition(contentDisposition: string) {
 }
 
 
-function getRemoteInfoBySubscriptionUserinfo(subscriptionUserinfo: string) {
+export function getRemoteInfoBySubscriptionUserinfo(subscriptionUserinfo: string) {
     try {
         const info = subscriptionUserinfo.split('; ').reduce((acc, item) => {
             const [key, value] = item.split('=');
@@ -114,6 +114,7 @@ function getRemoteInfoBySubscriptionUserinfo(subscriptionUserinfo: string) {
         };
     }
 }
+
 
 export async function updateSubscription(identifier: string) {
     try {
