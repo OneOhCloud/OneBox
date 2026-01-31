@@ -87,26 +87,36 @@ export function useAddSubscription() {
         try {
             const response = await fetchConfigContent(url);
 
-            const officialWebsite = response.headers['official-website'] || 'https://sing-box.net'
+            if (response.status !== 200) {
+                // 从远程获取配置失败，错误代码：response.status
+                setMessage(t('fetch_subscription_failed', { code: response.status }));
+                setMessageType('error');
+            } else {
 
-            if (name === undefined || name === '' || name === "默认配置") {
-                name = getRemoteNameByContentDisposition(response.headers['content-disposition'] || '') || '订阅'
+                const officialWebsite = response.headers['official-website'] || 'https://sing-box.net'
+
+                if (name === undefined || name === '' || name === "默认配置") {
+                    name = getRemoteNameByContentDisposition(response.headers['content-disposition'] || '') || '订阅'
+                }
+
+                const { upload, download, total, expire } = getRemoteInfoBySubscriptionUserinfo(response.headers['subscription-userinfo'] || '')
+                const identifier = crypto.randomUUID().toString().replace(/-/g, '')
+                const used_traffic = parseInt(upload) + parseInt(download)
+                const total_traffic = parseInt(total)
+                const expire_time = parseInt(expire) * 1000
+                const last_update_time = Date.now()
+                const db = await getDataBaseInstance();
+                await db.execute('INSERT INTO subscriptions (identifier, name, subscription_url, official_website, used_traffic, total_traffic, expire_time, last_update_time) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                    [identifier, name, url, officialWebsite, used_traffic, total_traffic, expire_time, last_update_time])
+                await db.execute('INSERT INTO subscription_configs (identifier, config_content) VALUES (?, ?)', [identifier, JSON.stringify(response.data)])
+                setMessage(t('add_subscription_success'));
+                setMessageType('success');
             }
 
-            const { upload, download, total, expire } = getRemoteInfoBySubscriptionUserinfo(response.headers['subscription-userinfo'] || '')
-            const identifier = crypto.randomUUID().toString().replace(/-/g, '')
-            const used_traffic = parseInt(upload) + parseInt(download)
-            const total_traffic = parseInt(total)
-            const expire_time = parseInt(expire) * 1000
-            const last_update_time = Date.now()
-            const db = await getDataBaseInstance();
-            await db.execute('INSERT INTO subscriptions (identifier, name, subscription_url, official_website, used_traffic, total_traffic, expire_time, last_update_time) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-                [identifier, name, url, officialWebsite, used_traffic, total_traffic, expire_time, last_update_time])
-            await db.execute('INSERT INTO subscription_configs (identifier, config_content) VALUES (?, ?)', [identifier, JSON.stringify(response.data)])
-            setMessage(t('add_subscription_success'));
-            setMessageType('success');
+
         } catch (error) {
-            console.error('Error adding subscription:', error)
+
+            console.error(error);
             setMessage(t('add_subscription_failed'));
             setMessageType('error');
         } finally {

@@ -238,14 +238,30 @@ export const verifyPrivileged = async () => {
 };
 
 // 同步版本的翻译函数
-export const t = (id: string, defaultMessage?: string): string => {
-    const translation = languageOptions[currentLanguage][id];
-    if (translation) {
-        return translation;
+export function t(id: string, params?: Record<string, any> | string, defaultMessage?: string): string {
+    let translation = languageOptions[currentLanguage][id];
+
+    // 兼容 t('id', 'defaultMessage') 写法
+    let realParams: Record<string, any> | undefined;
+    let realDefaultMessage: string | undefined;
+
+    if (typeof params === 'string') {
+        realDefaultMessage = params;
     } else {
-        console.warn(`Translation for "${id}" not found in "${currentLanguage}"`);
-        return defaultMessage || id;
+        realParams = params;
+        realDefaultMessage = defaultMessage;
     }
+
+    if (!translation) {
+        console.warn(`Translation for "${id}" not found in "${currentLanguage}"`);
+        translation = realDefaultMessage || id;
+    }
+    if (realParams) {
+        Object.keys(realParams).forEach(key => {
+            translation = translation.replace(new RegExp(`{{\\s*${key}\\s*}}`, 'g'), realParams[key]);
+        });
+    }
+    return translation;
 }
 
 // 当用户更改语言时，需要更新当前语言
