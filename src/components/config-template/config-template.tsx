@@ -1,5 +1,6 @@
 import { listen } from '@tauri-apps/api/event';
 import { readTextFile } from '@tauri-apps/plugin-fs';
+import { fetch } from '@tauri-apps/plugin-http';
 import { parse } from 'jsonc-parser';
 import { useEffect, useState } from 'react';
 import { ArrowClockwise, ArrowCounterclockwise, Check, Copy, ExclamationCircle } from 'react-bootstrap-icons';
@@ -88,17 +89,19 @@ export default function ConfigTemplate() {
             throw new Error('Only HTTPS URLs are supported');
         }
 
+
+        console.debug('Syncing remote config from', url + '?t=' + Date.now());
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 60000);
 
         try {
-            const response = await fetch(url, { signal: controller.signal });
+            const response = await fetch(url + '?version=' + Date.now(), { signal: controller.signal, cache: 'no-store' });
             if (!response.ok) throw new Error(`Failed to fetch: ${response.statusText}`);
-
             const text = await response.text();
             if (!validateConfigFormat(text)) throw new Error('Invalid JSON/JSONC format');
-
             await saveConfigContent(text);
+            console.debug('Remote config fetched successfully');
+
         } finally {
             clearTimeout(timeoutId);
         }

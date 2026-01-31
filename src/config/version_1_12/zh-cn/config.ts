@@ -34,7 +34,11 @@ const mixedRulesConfig = {
                 "action": "reject"
             },
             {
+                "domain_suffix": [
+                    ".tiktok.com"
+                ],
                 "rule_set": [
+                    "geosite-tiktok",
                     "geosite-linkedin",
                     "geosite-linkedin-cn"
                 ],
@@ -140,7 +144,11 @@ const mixedRulesConfig = {
             },
             // 不可更改区域结束
             {
+                "domain_suffix": [
+                    ".tiktok.com"
+                ],
                 "rule_set": [
+                    "geosite-tiktok",
                     "geosite-linkedin",
                     "geosite-linkedin-cn"
                 ],
@@ -239,6 +247,12 @@ const mixedRulesConfig = {
                 "type": "remote",
                 "format": "binary",
                 "url": "https://jsdelivr.oneoh.cloud/gh/SagerNet/sing-geosite@rule-set/geosite-private.srs"
+            },
+            {
+                "tag": "geosite-tiktok",
+                "type": "remote",
+                "format": "binary",
+                "url": "https://jsdelivr.oneoh.cloud/gh/SagerNet/sing-geosite@rule-set/geosite-tiktok.srs"
             }
         ]
     },
@@ -447,7 +461,11 @@ const TunRulesConfig = {
                 "action": "reject"
             },
             {
+                "domain_suffix": [
+                    ".tiktok.com"
+                ],
                 "rule_set": [
+                    "geosite-tiktok",
                     "geosite-linkedin",
                     "geosite-linkedin-cn"
                 ],
@@ -570,7 +588,11 @@ const TunRulesConfig = {
             },
             // 不可更改区域结束
             {
+                "domain_suffix": [
+                    ".tiktok.com"
+                ],
                 "rule_set": [
+                    "geosite-tiktok",
                     "geosite-linkedin",
                     "geosite-linkedin-cn"
                 ],
@@ -671,6 +693,12 @@ const TunRulesConfig = {
                 "type": "remote",
                 "format": "binary",
                 "url": "https://jsdelivr.oneoh.cloud/gh/SagerNet/sing-geosite@rule-set/geosite-private.srs"
+            },
+            {
+                "tag": "geosite-tiktok",
+                "type": "remote",
+                "format": "binary",
+                "url": "https://jsdelivr.oneoh.cloud/gh/SagerNet/sing-geosite@rule-set/geosite-tiktok.srs"
             }
         ],
         "auto_detect_interface": true

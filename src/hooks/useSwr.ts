@@ -1,3 +1,4 @@
+import { fetch } from '@tauri-apps/plugin-http';
 import { parse } from "jsonc-parser";
 import { configType, getConfigTemplateCacheKey } from "../config/common";
 import { getConfigTemplateURL, setStoreValue } from "../single/store";
@@ -9,7 +10,7 @@ async function setConfigTemplateCache(mode: configType, config: string) {
 }
 
 
-async function syncRemoteConfig(mode: configType) {
+async function fetchSyncRemoteConfig(mode: configType) {
     let url = await getConfigTemplateURL(mode);
     console.debug("Fetched config template URL:", url);
     if (url.startsWith("https://")) {
@@ -39,10 +40,10 @@ async function syncRemoteConfig(mode: configType) {
 export async function syncAllConfigTemplates() {
 
     await Promise.all([
-        syncRemoteConfig('mixed'),
-        syncRemoteConfig('tun'),
-        syncRemoteConfig('mixed-global'),
-        syncRemoteConfig('tun-global'),
+        fetchSyncRemoteConfig('mixed'),
+        fetchSyncRemoteConfig('tun'),
+        fetchSyncRemoteConfig('mixed-global'),
+        fetchSyncRemoteConfig('tun-global'),
     ]);
     return "ok"
 }
