@@ -78,7 +78,7 @@ export async function fetchConfigContent(url: string): Promise<ConfigResponse> {
     }
 }
 
-function getRemoteNameByContentDisposition(contentDisposition: string) {
+export function getRemoteNameByContentDisposition(contentDisposition: string) {
     const filenameRegex = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/;
     const matches = filenameRegex.exec(contentDisposition);
     if (matches != null && matches[1]) {

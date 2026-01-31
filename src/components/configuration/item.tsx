@@ -126,7 +126,7 @@ function SubscriptionItemSkeleton(props: SubscriptionItemSkeletonProps) {
                 <div className="max-w-40 flex flex-col gap-2">
                     <div className=" truncate text-sm animate-pulse text-gray-500" >{
 
-                        props.action === 'delete' ? t("deleting_subscription") : t("updating_subscription")
+                        props.action === 'delete' ? t("deleting_subscription") : t("updating")
 
                     }</div>
                     <div className="bg-gray-300 text-xs flex items-center " >
