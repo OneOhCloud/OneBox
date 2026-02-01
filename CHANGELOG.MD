@@ -13,7 +13,7 @@ All significant changes in this version are documented here.
 
 - Improved tray menu
 - Updated dependencies
-- Updated sing-box to v1.12.18
+- Updated sing-box to v1.12.19
 - Improved template synchronization feature
 - Improved interaction experience on the configuration page
 
@@ -29,6 +29,6 @@ All significant changes in this version are documented here.
 - 改进了托盘菜单
 - 改进模板同步功能
 - 改进配置页面的交互体验
-- 更新 sing-box 至 v1.12.18
+- 更新 sing-box 至 v1.12.19
 
 
