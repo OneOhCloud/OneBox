@@ -209,6 +209,7 @@ pub fn run() {
             lan::open_browser,
             lan::get_captive_redirect_url,
             lan::check_captive_portal_status,
+            lan::get_optimal_dns_server,
             core::stop,
             core::start,
             core::version,

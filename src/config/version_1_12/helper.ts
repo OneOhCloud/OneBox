@@ -21,7 +21,7 @@ export async function updateDHCPSettings2Config(newConfig: any) {
                 delete server.server_port;
                 console.log("启用 DHCP DNS 模式");
             } else {
-                let directDNS = await getDirectDNS() || "119.29.29.29"
+                let directDNS = await getDirectDNS();
                 console.log("当前使用直连 DNS 地址：", directDNS);
                 server.type = "udp";
                 server.server = directDNS.trim();

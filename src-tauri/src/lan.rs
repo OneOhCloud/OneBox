@@ -8,6 +8,17 @@ use tokio::process::Command;
 
 const DEFAULT_CAPTIVE_URL: &str = "http://captive.oneoh.cloud";
 
+static DNSSERVERDICT: [&str; 8] = [
+    "223.6.6.6",
+    "223.5.5.5",
+    "119.29.29.29",
+    "114.114.114.114",
+    "180.184.1.1",
+    "180.184.2.2",
+    "8.8.8.8",
+    "1.1.1.1",
+];
+
 #[cfg(target_os = "macos")]
 fn is_private_ip(ip: &str) -> bool {
     let parts: Vec<&str> = ip.split('.').collect();
@@ -225,3 +236,114 @@ pub async fn ping_google() -> bool {
         Err(_) => false,
     }
 }
+
+async fn get_best_dns_server() -> Option<String> {
+    let dns_servers = DNSSERVERDICT;
+
+    if dns_servers.is_empty() {
+        return None;
+    }
+
+    println!("开始测试 DNS 服务器列表: {:?}", dns_servers);
+
+    let first_dns = dns_servers[0].to_string();
+    let mut tasks = vec![];
+
+    for dns in dns_servers {
+        let dns = dns.to_string();
+        let task = tokio::spawn(async move {
+            use std::net::SocketAddr;
+            use tokio::net::UdpSocket;
+            use tokio::time::{timeout, Duration};
+
+            let start = std::time::Instant::now();
+
+            // 构造 UDP 地址并绑定临时本地端口
+            let ns_addr: SocketAddr = format!("{}:53", dns).parse().ok()?;
+            let bind_addr = if ns_addr.is_ipv4() {
+                "0.0.0.0:0"
+            } else {
+                "[::]:0"
+            };
+            let socket = UdpSocket::bind(bind_addr).await.ok()?;
+            socket.connect(ns_addr).await.ok()?;
+
+            // 构造一个标准的 DNS 查询包（查询 www.baidu.com 的 A 记录）
+            // DNS Header (12 bytes) + Query Section
+            let mut payload = vec![
+                0x12, 0x34, // Transaction ID
+                0x01, 0x00, // Flags: standard query
+                0x00, 0x01, // Questions: 1
+                0x00, 0x00, // Answer RRs: 0
+                0x00, 0x00, // Authority RRs: 0
+                0x00, 0x00, // Additional RRs: 0
+            ];
+            // Query: www.baidu.com -> 3www5baidu3com0
+            payload.extend_from_slice(&[
+                3, b'w', b'w', b'w', 5, b'b', b'a', b'i', b'd', b'u', 3, b'c', b'o', b'm', 0,
+            ]);
+            payload.extend_from_slice(&[
+                0x00, 0x01, // Type: A
+                0x00, 0x01, // Class: IN
+            ]);
+
+            if socket.send(&payload).await.is_err() {
+                return None;
+            }
+
+            let mut buf = [0u8; 512];
+            match timeout(Duration::from_millis(500), socket.recv(&mut buf)).await {
+                Ok(Ok(len)) if len >= 12 => {
+                    // 验证这是一个有效的 DNS 响应（至少有 DNS header）
+                    // 检查 Transaction ID 是否匹配
+                    if buf[0] == 0x12 && buf[1] == 0x34 {
+                        let elapsed = start.elapsed();
+                        println!("✓ DNS {} 响应成功，延迟: {:?}", dns, elapsed);
+                        Some((dns, elapsed))
+                    } else {
+                        println!("✗ DNS {} 响应无效 (Transaction ID 不匹配)", dns);
+                        None
+                    }
+                }
+                Ok(Ok(len)) => {
+                    println!("✗ DNS {} 响应过短 (长度: {})", dns, len);
+                    None
+                }
+                Ok(Err(e)) => {
+                    println!("✗ DNS {} 接收失败: {}", dns, e);
+                    None
+                }
+                Err(_) => {
+                    println!("✗ DNS {} 超时", dns);
+                    None
+                }
+            }
+        });
+        tasks.push(task);
+    }
+
+    // 找出响应最快的 DNS 服务器
+    let mut fastest: Option<(String, std::time::Duration)> = None;
+    for task in tasks {
+        if let Ok(result) = task.await {
+            if let Some((dns, duration)) = result {
+                if fastest.is_none() || duration < fastest.as_ref().unwrap().1 {
+                    fastest = Some((dns, duration));
+                }
+            }
+        }
+    }
+
+    // 如果所有 DNS 都失败，返回第一个 DNS
+    let result = fastest.map(|(dns, _)| dns).unwrap_or(first_dns.clone());
+    println!("最终选择的 DNS: {}", result);
+    Some(result)
+}
+
+#[tauri::command]
+pub async fn get_optimal_dns_server() -> Option<String> {
+    get_best_dns_server().await
+}
+#[cfg(test)]
+#[path = "lan_tests.rs"]
+mod tests;

@@ -1,3 +1,4 @@
+import { invoke } from '@tauri-apps/api/core';
 import { locale, type } from '@tauri-apps/plugin-os';
 import { LazyStore } from '@tauri-apps/plugin-store';
 import { toast } from 'sonner';
@@ -174,11 +175,14 @@ export async function setDirectDNS(dnsServers: string) {
 }
 
 export async function getDirectDNS(): Promise<string> {
+
     let s = await store.get('direct_dns') as string | undefined;
     if (s) {
         return s;
     }
-    return '223.5.5.5';
+    let defaultValue = await invoke('get_optimal_dns_server') as string;
+    console.debug('最佳DNS服务器为:', defaultValue);
+    return defaultValue || '223.5.5.5';
 }
 
 // 获取用户设置的 User Agent
