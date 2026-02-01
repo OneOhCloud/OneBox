@@ -16,6 +16,7 @@ All significant changes in this version are documented here.
 - Updated sing-box to v1.12.19
 - Improved template synchronization feature
 - Improved interaction experience on the configuration page
+- Fixed an issue where Direct DNS settings were not applied
 
 
 ## 自 v1.2.19 以来的变更
@@ -30,5 +31,6 @@ All significant changes in this version are documented here.
 - 改进模板同步功能
 - 改进配置页面的交互体验
 - 更新 sing-box 至 v1.12.19
+- 修复直连 DNS 设置未生效的问题
 
 

@@ -79,6 +79,21 @@ export async function setMixedConfig(identifier: string) {
             }
         }
     }
+
+    // 设置 Direct DNS 服务器
+    // EN: Set Direct DNS servers
+    // const systemDNS = await getDirectDNS();
+    // if (systemDNS && systemDNS.trim().length > 0) {
+    //     for (let i = 0; i < newConfig.dns.servers.length; i++) {
+    //         let server = newConfig.dns.servers[i];
+    //         if (server.tag === 'system') {
+    //             server.server = systemDNS.trim();
+    //             console.log("设置 Direct DNS 服务器为:", systemDNS.trim());
+    //             break;
+    //         }
+    //     }
+    // }
+
     updateExperimentalConfig(newConfig, dbCacheFilePath);
     const allowLan = await getAllowLan();
 
@@ -134,6 +149,19 @@ export async function setTunConfig(identifier: string) {
         }
     }
 
+    // 设置 Direct DNS 服务器
+    // EN: Set Direct DNS servers
+    // const systemDNS = await getDirectDNS();
+    // if (systemDNS && systemDNS.trim().length > 0) {
+    //     for (let i = 0; i < newConfig.dns.servers.length; i++) {
+    //         let server = newConfig.dns.servers[i];
+    //         if (server.tag === 'system') {
+    //             server.server = systemDNS.trim();
+    //             console.log("设置 Direct DNS 服务器为:", systemDNS.trim());
+    //             break;
+    //         }
+    //     }
+    // }
 
 
     // Windows 使用 system stack 兼容性是最佳的。（弃用！！！）

@@ -151,7 +151,7 @@ export default function HomePage() {
         {(['rules', 'global'] as const).map((mode) => (
           <div key={mode} className='tooltip text-xs  tooltip-delayed'>
             <div className="tooltip-content">
-              <div className="text-xs max-w-[220px] whitespace-normal">
+              <div className="text-xs max-w-55 whitespace-normal">
                 {t(`${mode}_tip`)}
               </div>
             </div>

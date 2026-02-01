@@ -1,4 +1,4 @@
-import { getStoreValue, getUseDHCP } from "../../single/store";
+import { getDirectDNS, getUseDHCP } from "../../single/store";
 import { writeConfigFile } from "../helper";
 
 
@@ -12,7 +12,8 @@ type Item = {
 
 export async function updateDHCPSettings2Config(newConfig: any) {
     const useDHCP = await getUseDHCP();
-    newConfig.dns.servers.forEach(async (server: any) => {
+    for (let i = 0; i < newConfig.dns.servers.length; i++) {
+        const server = newConfig.dns.servers[i];
         if (server.tag === "system") {
             if (useDHCP) {
                 server.type = "dhcp";
@@ -20,7 +21,7 @@ export async function updateDHCPSettings2Config(newConfig: any) {
                 delete server.server_port;
                 console.log("启用 DHCP DNS 模式");
             } else {
-                let directDNS = await getStoreValue('direct_dns') || "119.29.29.29"
+                let directDNS = await getDirectDNS() || "119.29.29.29"
                 console.log("当前使用直连 DNS 地址：", directDNS);
                 server.type = "udp";
                 server.server = directDNS.trim();
@@ -28,7 +29,7 @@ export async function updateDHCPSettings2Config(newConfig: any) {
                 console.log("启用 UDP DNS 模式, 服务器地址：", server.server);
             }
         }
-    });
+    }
 }
 
 /**
