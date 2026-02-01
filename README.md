@@ -47,7 +47,7 @@ A cross-platform GUI client based on [sing-box](https://github.com/SagerNet/sing
 - **Security & Privacy**: Implements best practices for security and privacy, such as storing sensitive information like passwords in the system keychain.
 - **Trusted Installation**: The macOS version is notarized by Apple, allowing direct installation without complicated authorization.
 
-> [!DISCLAIMER]
+> [!WARNING]
 > While we have implemented multiple security measures, the security and vulnerability fixes of the underlying kernel depend on the sing-box project, and the associated risks and fixes are not directly controlled by this project.
 
 ---
