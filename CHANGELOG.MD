@@ -9,6 +9,9 @@ Use development and beta versions only if you are aware of the potential risks.
 All significant changes in this version are documented here.
 
 
+### New Features
+- In rule mode, automatically select the best DNS server to resolve direct connection and VPN server domain names
+
 ### ⚠ CHANGES
 
 - Improved tray menu
@@ -23,6 +26,9 @@ All significant changes in this version are documented here.
 
 本版本的所有重要变更将记录于此。
 
+### 新功能
+
+- 规则模式下，自动选择最佳 DNS 服务器解析直连以及VPN服务器域名
 
 ### ⚠ 变更
 
