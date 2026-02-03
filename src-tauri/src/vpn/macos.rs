@@ -143,6 +143,19 @@ pub fn stop_tun_process(password: &str) -> Result<(), String> {
         .arg(command)
         .output()
         .map_err(|e| e.to_string())?;
+
+    // ZH: 重启 mDNSResponder 服务以清除缓存的 DNS 记录
+    // EN: Restart the mDNSResponder service to clear cached DNS records
+    let command = format!("echo '{}' | sudo -S killall -HUP mDNSResponder", password);
+    log::info!(
+        "Restart mDNSResponder with command : {}",
+        command.replace(password, "******")
+    );
+    Command::new("sh")
+        .arg("-c")
+        .arg(command)
+        .output()
+        .map_err(|e| e.to_string())?;
     Ok(())
 }
 
