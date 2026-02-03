@@ -10,6 +10,34 @@ export const LANGUAGE_STORE_KEY = 'language';
 export const CLASH_API_SECRET = 'clash_api_secret_key';
 
 
+export const store = new LazyStore('settings.json', {
+    defaults: {},
+    autoSave: true
+});
+
+
+
+export const getLanguage = async () => {
+    const language = await getStoreValue(LANGUAGE_STORE_KEY) as string | undefined;
+    if (language) {
+        return language;
+    }
+    const osLocale = await locale();
+    if (osLocale) {
+        if (osLocale.startsWith('zh')) {
+            return 'zh';
+
+        } else {
+            return 'en';
+        }
+    }
+    return 'en';
+};
+
+export const setLanguage = async (language: string) => {
+    await setStoreValue(LANGUAGE_STORE_KEY, language);
+};
+
 
 export async function getStoreValue(key: string, defaultValue?: any): Promise<any> {
     let value = await store.get(key);
@@ -27,12 +55,6 @@ export async function setStoreValue(key: string, value: any) {
     await store.set(key, value);
     await store.save();
 }
-
-
-export const store = new LazyStore('settings.json', {
-    defaults: {},
-    autoSave: true
-});
 
 
 export async function getEnableTun(): Promise<boolean> {
@@ -84,26 +106,6 @@ export async function getClashApiSecret(): Promise<string> {
 }
 
 
-export const getLanguage = async () => {
-    const language = await getStoreValue(LANGUAGE_STORE_KEY) as string | undefined;
-    if (language) {
-        return language;
-    }
-    const osLocale = await locale();
-    if (osLocale) {
-        if (osLocale.startsWith('zh')) {
-            return 'zh';
-
-        } else {
-            return 'en';
-        }
-    }
-    return 'en';
-};
-
-export const setLanguage = async (language: string) => {
-    await setStoreValue(LANGUAGE_STORE_KEY, language);
-};
 
 
 export async function isBypassRouterEnabled(): Promise<boolean> {
@@ -209,31 +211,9 @@ export async function getConfigTemplateURLKey(mode: configType): Promise<string>
 
 // 读取模版配置源
 export async function getConfigTemplateURL(mode: configType): Promise<string> {
-    const remoteUrl = "https://jsdelivr.oneoh.cloud/gh/OneOhCloud/conf-template";
     let defaultTemplatePath = '';
-    let stageVersion: StageVersionType = await getStoreValue(STAGE_VERSION_STORE_KEY, "stable")
-
     const cacheKey = await getConfigTemplateURLKey(mode);
-    let versionNumber = SING_BOX_VERSION.replace('v', '').split('.')
-    let major = versionNumber[0];
-    let minor = versionNumber[1];
-    let ver = `${major}.${minor}`;
-
-    switch (mode) {
-        case 'mixed':
-            defaultTemplatePath = `${remoteUrl}@${stageVersion}/conf/${ver}/zh-cn/mixed-rules.jsonc`;
-            break;
-        case 'tun':
-            defaultTemplatePath = `${remoteUrl}@${stageVersion}/conf/${ver}/zh-cn/tun-rules.jsonc`;
-            break;
-        case 'mixed-global':
-            defaultTemplatePath = `${remoteUrl}@${stageVersion}/conf/${ver}/zh-cn/mixed-global.jsonc`;
-            break;
-        case 'tun-global':
-            defaultTemplatePath = `${remoteUrl}@${stageVersion}/conf/${ver}/zh-cn/tun-global.jsonc`;
-            break;
-    }
-
+    defaultTemplatePath = await getDefaultConfigTemplateURL(mode);
     let configPath = await getStoreValue(cacheKey, defaultTemplatePath);
     console.debug(`Config template path for mode "${mode}": ${configPath}`);
     return configPath;
@@ -245,8 +225,9 @@ export async function setConfigTemplateURL(mode: configType, url: string) {
 }
 
 export async function getDefaultConfigTemplateURL(mode: configType): Promise<string> {
-    const remoteUrl = "https://jsdelivr.oneoh.cloud/gh/OneOhCloud/conf-template";
+    const remoteUrl = "https://onebox-updater.oneoh.cloud/conf-template";
     let stageVersion: StageVersionType = await getStoreValue(STAGE_VERSION_STORE_KEY)
+
     let versionNumber = SING_BOX_VERSION.replace('v', '').split('.')
     let major = versionNumber[0];
     let minor = versionNumber[1];
@@ -254,13 +235,15 @@ export async function getDefaultConfigTemplateURL(mode: configType): Promise<str
 
     switch (mode) {
         case 'mixed':
-            return `${remoteUrl}@${stageVersion}/conf/${ver}/zh-cn/mixed-rules.jsonc`;
+            return `${remoteUrl}/raw/refs/heads/${stageVersion}/conf/${ver}/zh-cn/mixed-rules.jsonc`;
         case 'tun':
-            return `${remoteUrl}@${stageVersion}/conf/${ver}/zh-cn/tun-rules.jsonc`;
+            return `${remoteUrl}/raw/refs/heads/${stageVersion}/conf/${ver}/zh-cn/tun-rules.jsonc`;
         case 'mixed-global':
-            return `${remoteUrl}@${stageVersion}/conf/${ver}/zh-cn/mixed-global.jsonc`;
+            return `${remoteUrl}/raw/refs/heads/${stageVersion}/conf/${ver}/zh-cn/mixed-global.jsonc`;
         case 'tun-global':
-            return `${remoteUrl}@${stageVersion}/conf/${ver}/zh-cn/tun-global.jsonc`;
+            return `${remoteUrl}/raw/refs/heads/${stageVersion}/conf/${ver}/zh-cn/tun-global.jsonc`;
+        default:
+            return '';
     }
 }
 
