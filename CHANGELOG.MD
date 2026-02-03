@@ -13,6 +13,7 @@ All significant changes in this version are documented here.
 - Speeded up automatic optimal DNS fetching
 - Fixed inconsistent tray menu status issue
 - Changed default URL for fetching template config files
+- Fixed DNS caching issue after stopping Tun mode on macOS
 
 
 
@@ -27,6 +28,7 @@ All significant changes in this version are documented here.
 - 加快自动获取最优DNS的速度
 - 变更获取模板配置文件的默认网址
 - 修复托盘菜单状态不一致的问题
+- 修复在 macOS 上停止 Tun 模式后 DNS 缓存的问题
 
 
 ---
