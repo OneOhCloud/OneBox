@@ -45,13 +45,3 @@ impl AppData {
         }
     }
 }
-
-#[tauri::command]
-pub fn read_logs(app_data: tauri::State<AppData>, is_error: bool) -> String {
-    let log_type = if is_error {
-        LogType::Error
-    } else {
-        LogType::Info
-    };
-    app_data.read(log_type)
-}

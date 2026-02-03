@@ -40,17 +40,6 @@ lazy_static! {
     }));
 }
 
-#[tauri::command]
-pub async fn version(app: tauri::AppHandle) -> Result<String, String> {
-    let sidecar_command = app.shell().sidecar("sing-box").map_err(|e| e.to_string())?;
-    let output = sidecar_command
-        .arg("version")
-        .output()
-        .await
-        .map_err(|e| e.to_string())?;
-    String::from_utf8(output.stdout).map_err(|e| e.to_string())
-}
-
 async fn get_password_for_mode(mode: &ProxyMode) -> Result<String, String> {
     #[cfg(any(target_os = "linux", target_os = "macos"))]
     {

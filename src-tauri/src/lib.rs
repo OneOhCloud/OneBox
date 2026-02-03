@@ -1,191 +1,14 @@
-use std::fs;
-use tauri::{AppHandle, Manager, Window, WindowEvent};
+use tauri::{Manager, Window, WindowEvent};
 use tauri_plugin_http::reqwest;
 mod app_status;
+mod command;
 mod core;
 mod database;
 mod lan;
 mod plugins;
 mod privilege;
+mod utils;
 mod vpn;
-
-#[tauri::command]
-fn get_app_version(app: AppHandle) -> String {
-    let package_info = app.package_info();
-    package_info.version.to_string() // 返回版本号，如 "1.0.0"
-}
-
-#[tauri::command]
-fn get_app_paths(app: AppHandle) -> Result<serde_json::Value, String> {
-    let paths = serde_json::json!({
-        "log_dir": app.path().app_log_dir().map_err(|e| e.to_string())?,
-        "data_dir": app.path().app_data_dir().map_err(|e| e.to_string())?,
-        "cache_dir": app.path().app_cache_dir().map_err(|e| e.to_string())?,
-        "config_dir": app.path().app_config_dir().map_err(|e| e.to_string())?,
-        "local_data_dir": app.path().app_local_data_dir().map_err(|e| e.to_string())?,
-    });
-    Ok(paths)
-}
-
-#[tauri::command]
-fn open_directory(path: String) -> Result<(), String> {
-    use std::process::Command;
-
-    #[cfg(target_os = "macos")]
-    {
-        Command::new("open")
-            .arg(&path)
-            .spawn()
-            .map_err(|e| format!("Failed to open directory: {}", e))?;
-    }
-
-    #[cfg(target_os = "windows")]
-    {
-        Command::new("explorer")
-            .arg(&path)
-            .spawn()
-            .map_err(|e| format!("Failed to open directory: {}", e))?;
-    }
-
-    #[cfg(target_os = "linux")]
-    {
-        Command::new("xdg-open")
-            .arg(&path)
-            .spawn()
-            .map_err(|e| format!("Failed to open directory: {}", e))?;
-    }
-
-    Ok(())
-}
-
-#[tauri::command]
-fn open_devtools(app: AppHandle) {
-    let window = app.get_webview_window("main").unwrap();
-    window.open_devtools();
-}
-
-#[tauri::command]
-async fn quit(app: AppHandle) {
-    // 退出应用并清理资源
-    log::info!("Quitting application...");
-    if let Err(e) = core::stop(app.clone()).await {
-        log::error!("Failed to stop proxy: {}", e);
-    } else {
-        log::info!("Proxy stopped successfully.");
-        log::info!("Application stopped successfully.");
-        app.exit(0);
-    }
-}
-
-fn sync_quit(app: AppHandle) {
-    // 同步退出应用
-    tauri::async_runtime::block_on(quit(app));
-}
-
-#[tauri::command]
-fn get_tray_icon(app: AppHandle) -> Vec<u8> {
-    #[cfg(target_os = "macos")]
-    {
-        log::info!("macos tray icon for app: {:?}", app.package_info().name);
-        include_bytes!("../icons/macos.png").to_vec()
-    }
-    #[cfg(not(target_os = "macos"))]
-    {
-        let icon = app.default_window_icon().unwrap();
-        let rgba = icon.rgba();
-        let width = icon.width();
-        let height = icon.height();
-        // 将 RGBA 数据转换为 PNG 格式
-        let mut png_data = Vec::new();
-        {
-            let mut encoder = png::Encoder::new(&mut png_data, width, height);
-            encoder.set_color(png::ColorType::Rgba);
-            encoder.set_depth(png::BitDepth::Eight);
-            let mut writer = encoder.write_header().unwrap();
-            writer.write_image_data(rgba).unwrap();
-        }
-        png_data
-    }
-}
-
-#[tauri::command]
-async fn create_window(app: tauri::AppHandle, label: String, window_tag: String, title: String) {
-    // 检查窗口是否已存在
-    if let Some(existing_window) = app.get_webview_window(&label) {
-        // 如果窗口已存在，则切换到该窗口
-        existing_window.show().unwrap_or_else(|e| {
-            log::error!("Failed to show existing window: {}", e);
-        });
-        existing_window.set_focus().unwrap_or_else(|e| {
-            log::error!("Failed to focus existing window: {}", e);
-        });
-        existing_window.unminimize().unwrap_or_else(|e| {
-            log::error!("Failed to unminimize existing window: {}", e);
-        });
-        return;
-    }
-
-    // 如果窗口不存在，则创建新窗口
-    let _webview_window = tauri::WebviewWindowBuilder::new(
-        &app,
-        label,
-        tauri::WebviewUrl::App(format!("index.html?windowTag={}", window_tag).into()),
-    )
-    .title(title)
-    .inner_size(800.0, 600.0) // 设置窗口大小，宽度800，高度600
-    .resizable(true) // 允许用户调整窗口大小
-    .build()
-    .map_err(|e| {
-        log::error!("Failed to create window: {}", e);
-    });
-}
-
-/// 复制 resources 目录下的 .db 文件到 appConfigDir
-fn copy_database_files(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
-    // 获取 resource 目录路径
-    let resource_dir = app.path().resource_dir()?;
-    let resources_path = resource_dir.join("resources");
-
-    // 获取 appConfigDir 路径
-    let config_dir = app.path().app_config_dir()?;
-
-    // 确保 appConfigDir 存在
-    fs::create_dir_all(&config_dir)?;
-
-    log::info!(
-        "Copying database files from {:?} to {:?}",
-        resources_path,
-        config_dir
-    );
-
-    // 检查 resources 目录是否存在
-    if !resources_path.exists() {
-        log::warn!("Resources directory does not exist: {:?}", resources_path);
-        return Ok(());
-    }
-
-    // 读取 resources 目录下的所有文件
-    for entry in fs::read_dir(&resources_path)? {
-        let entry = entry?;
-        let path = entry.path();
-
-        // 只处理 .db 文件
-        if path.is_file() && path.extension().and_then(|s| s.to_str()) == Some("db") {
-            let file_name = path.file_name().ok_or("Failed to get file name")?;
-            let dest_path = config_dir.join(file_name);
-
-            // 只在目标文件不存在时复制（避免覆盖用户数据）
-            if !dest_path.exists() {
-                log::info!("Copying {:?} to {:?}", path, dest_path);
-                fs::copy(&path, &dest_path)?;
-            } else {
-                log::info!("Database file already exists, skipping: {:?}", dest_path);
-            }
-        }
-    }
-
-    Ok(())
-}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -197,13 +20,6 @@ pub fn run() {
     let builder = plugins::register_plugins(builder, migrations);
     builder
         .invoke_handler(tauri::generate_handler![
-            quit,
-            open_devtools,
-            create_window,
-            get_app_version,
-            get_app_paths,
-            open_directory,
-            get_tray_icon,
             lan::get_lan_ip,
             lan::ping_google,
             lan::open_browser,
@@ -212,10 +28,16 @@ pub fn run() {
             lan::get_optimal_dns_server,
             core::stop,
             core::start,
-            core::version,
             core::is_running,
             core::reload_config,
-            app_status::read_logs,
+            command::version,
+            command::read_logs,
+            command::open_devtools,
+            command::get_app_paths,
+            command::get_tray_icon,
+            command::create_window,
+            command::open_directory,
+            command::get_app_version,
             privilege::is_privileged,
             privilege::save_privilege_password_to_keyring,
         ])
@@ -227,14 +49,9 @@ pub fn run() {
             }
 
             app.manage(app_status::AppData::new());
-            log::info!("app log path: {:?}", app.path().app_log_dir());
-            log::info!("app data path: {:?}", app.path().app_data_dir());
-            log::info!("app cache path: {:?}", app.path().app_cache_dir());
-            log::info!("app config path: {:?}", app.path().app_config_dir());
-            log::info!("app local data path: {:?}", app.path().app_local_data_dir());
 
             // 复制 resources 目录下的 .db 文件到 appConfigDir
-            if let Err(e) = copy_database_files(app.handle()) {
+            if let Err(e) = utils::copy_database_files(app.handle()) {
                 log::error!("Failed to copy database files: {}", e);
             }
 
@@ -287,7 +104,7 @@ pub fn run() {
                 }
             }
             "quit" => {
-                sync_quit(app.clone());
+                command::sync_quit(app.clone());
             }
 
             "enable" => {
@@ -315,7 +132,7 @@ pub fn run() {
                 if window.label() == "main" {
                     log::info!("主窗口被销毁，应用将退出");
                     let app_clone = window.app_handle().clone();
-                    sync_quit(app_clone);
+                    command::sync_quit(app_clone);
                 }
 
                 log::info!("Destroyed");
