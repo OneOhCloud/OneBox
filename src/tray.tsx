@@ -56,6 +56,13 @@ async function createTrayMenu() {
                     }
                 },
             },
+            {
+                id: 'copy_proxy',
+                text: t("menu_copy_env"),
+                action: async () => {
+                    await copyEnvToClipboard("127.0.0.1", "6789");
+                },
+            },
 
         ],
     }
@@ -125,13 +132,7 @@ async function createTrayMenu() {
     }
 
     baseMenu.items?.push(
-        {
-            id: 'copy_proxy',
-            text: t("menu_copy_env"),
-            action: async () => {
-                await copyEnvToClipboard("127.0.0.1", "6789");
-            },
-        },
+
         {
             id: 'quit',
             text: t("menu_quit")
@@ -182,6 +183,12 @@ export async function setupTrayIcon() {
     }
 }
 
+export async function updateTrayMenu() {
+    const newMenu = await createTrayMenu();
+    if (trayInstance) {
+        await trayInstance.setMenu(newMenu);
+    }
+}
 
 export async function setupStatusListener() {
     await listen('status-changed', async (event) => {

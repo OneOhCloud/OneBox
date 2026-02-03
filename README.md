@@ -23,11 +23,6 @@ A cross-platform GUI client based on [sing-box](https://github.com/SagerNet/sing
 
 ---
 
-## Introduction
-
-A cross-platform GUI client based on [sing-box](https://github.com/SagerNet/sing-box) kernel, targeting ordinary users. For those who prefer complex configurations and tinkering, please refer to other projects.
-
-
 ## Screenshots
 
 |![Home](./docs/image/en/Home.png)|![Config](./docs/image/en/Config.png)|![Settings](./docs/image/en/Settings.png)|
@@ -65,6 +60,14 @@ A cross-platform GUI client based on [sing-box](https://github.com/SagerNet/sing
 Please visit our [releases page](https://github.com/OneOhCloud/OneBox/releases) to get the latest version.
 
 ---
+
+## Test 
+
+To run tests with output displayed in the console, use the following command:
+
+```rust
+cargo test  -- --nocapture 
+```
 
 ## Support Level Explanation
 

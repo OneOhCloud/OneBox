@@ -314,12 +314,12 @@ async fn get_best_dns_server() -> Option<String> {
             match timeout(Duration::from_millis(500), socket.recv(&mut buf)).await {
                 Ok(Ok(len)) if len >= 12 && buf[0] == 0x12 && buf[1] == 0x34 => {
                     let elapsed = start.elapsed();
-                    println!("✓ DNS {} 响应成功，延迟: {:?}", dns, elapsed);
+                    log::info!("✓ DNS {} 响应成功，延迟: {:?}", dns, elapsed);
                     // 发不进去也无所谓，说明已经有人先占了
                     let _ = tx.try_send((dns, elapsed));
                 }
                 _ => {
-                    println!("✗ DNS {} 失败或超时", dns);
+                    log::info!("✗ DNS {} 失败或超时", dns);
                 }
             }
             // tx 在这里自动 drop
@@ -332,12 +332,12 @@ async fn get_best_dns_server() -> Option<String> {
     // 等待第一个成功响应
     match rx.recv().await {
         Some((dns, _)) => {
-            println!("最终选择的 DNS: {}", dns);
+            log::info!("最终选择的 DNS: {}", dns);
             Some(dns)
         }
         None => {
             // 所有 sender 都 drop 了，即全部任务失败
-            println!("所有 DNS 均失败，回退到: {}", first_dns);
+            log::info!("所有 DNS 均失败，回退到: {}", first_dns);
             Some(first_dns)
         }
     }
@@ -347,6 +347,25 @@ async fn get_best_dns_server() -> Option<String> {
 pub async fn get_optimal_dns_server() -> Option<String> {
     get_best_dns_server().await
 }
+
 #[cfg(test)]
-#[path = "lan_tests.rs"]
-mod tests;
+mod tests {
+    use super::*;
+    use tokio;
+    // 若需要其它测试（如文件相关），也可以在此处加入相关 use
+
+    #[test]
+    fn test_is_private_ip_basic() {
+        assert!(is_private_ip("10.0.0.1"));
+        assert!(is_private_ip("192.168.1.1"));
+        assert!(!is_private_ip("8.8.8.8"));
+    }
+
+    #[test]
+    fn test_get_best_dns_server_returns_some() {
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let res = rt.block_on(get_best_dns_server());
+        println!("Best DNS server: {:?}", res);
+        assert!(res.is_some());
+    }
+}

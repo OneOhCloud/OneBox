@@ -21,11 +21,6 @@
 
 ---
 
-## 简介
-
-基于 [sing-box](https://github.com/SagerNet/sing-box) 内核的跨平台 GUI 客户端，专为追求简洁易用的普通用户设计。如果你偏好复杂配置和深度折腾，建议选择其他项目。
-
-
 
 ## 软件截图
 
@@ -65,6 +60,13 @@
 请访问我们的 [发布页面](https://github.com/OneOhCloud/OneBox/releases) 获取最新版本。
 
 ---
+
+## 测试
+
+要在控制台显示输出运行测试，请使用以下命令：
+```rust
+cargo test  -- --nocapture 
+```
 
 ## 支持级别说明
 
