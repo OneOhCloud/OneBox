@@ -5,18 +5,38 @@ use tauri::{
 };
 use tauri_plugin_http::reqwest::{self, redirect::Policy};
 use tokio::process::Command;
+use tokio::sync::mpsc;
 
 const DEFAULT_CAPTIVE_URL: &str = "http://captive.oneoh.cloud";
 
-static DNSSERVERDICT: [&str; 8] = [
-    "223.6.6.6",
-    "223.5.5.5",
-    "119.29.29.29",
+static DNSSERVERDICT: [&str; 27] = [
+    "1.0.0.1",
+    "1.1.1.1",
+    "1.2.4.8",
+    "101.101.101.101",
+    "101.102.103.104",
     "114.114.114.114",
+    "114.114.115.115",
+    "119.29.29.29",
+    "149.112.112.112",
+    "149.112.112.9",
     "180.184.1.1",
     "180.184.2.2",
+    "180.76.76.76",
+    "202.175.3.3",
+    "202.175.3.8",
+    "208.67.220.220",
+    "208.67.220.222",
+    "208.67.222.220",
+    "208.67.222.222",
+    "210.2.4.8",
+    "223.5.5.5",
+    "223.6.6.6",
+    "77.88.8.1",
+    "77.88.8.8",
+    "8.8.4.4",
     "8.8.8.8",
-    "1.1.1.1",
+    "9.9.9.9",
 ];
 
 #[cfg(target_os = "macos")]
@@ -244,100 +264,83 @@ async fn get_best_dns_server() -> Option<String> {
         return None;
     }
 
-    println!("开始测试 DNS 服务器列表: {:?}", dns_servers);
-
     let first_dns = dns_servers[0].to_string();
-    let mut tasks = vec![];
+
+    // buffer 设 1，第一个成功的 send 立刻送进去，主流程立刻收到
+    let (tx, mut rx) = mpsc::channel::<(String, std::time::Duration)>(1);
 
     for dns in dns_servers {
         let dns = dns.to_string();
-        let task = tokio::spawn(async move {
+        let tx: mpsc::Sender<(String, std::time::Duration)> = tx.clone();
+
+        tokio::spawn(async move {
             use std::net::SocketAddr;
             use tokio::net::UdpSocket;
             use tokio::time::{timeout, Duration};
 
             let start = std::time::Instant::now();
 
-            // 构造 UDP 地址并绑定临时本地端口
-            let ns_addr: SocketAddr = format!("{}:53", dns).parse().ok()?;
+            let ns_addr: SocketAddr = match format!("{}:53", dns).parse() {
+                Ok(addr) => addr,
+                Err(_) => return,
+            };
             let bind_addr = if ns_addr.is_ipv4() {
                 "0.0.0.0:0"
             } else {
                 "[::]:0"
             };
-            let socket = UdpSocket::bind(bind_addr).await.ok()?;
-            socket.connect(ns_addr).await.ok()?;
 
-            // 构造一个标准的 DNS 查询包（查询 www.baidu.com 的 A 记录）
-            // DNS Header (12 bytes) + Query Section
+            let socket = match UdpSocket::bind(bind_addr).await {
+                Ok(s) => s,
+                Err(_) => return,
+            };
+            if socket.connect(ns_addr).await.is_err() {
+                return;
+            }
+
             let mut payload = vec![
-                0x12, 0x34, // Transaction ID
-                0x01, 0x00, // Flags: standard query
-                0x00, 0x01, // Questions: 1
-                0x00, 0x00, // Answer RRs: 0
-                0x00, 0x00, // Authority RRs: 0
-                0x00, 0x00, // Additional RRs: 0
+                0x12, 0x34, 0x01, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             ];
-            // Query: www.baidu.com -> 3www5baidu3com0
             payload.extend_from_slice(&[
                 3, b'w', b'w', b'w', 5, b'b', b'a', b'i', b'd', b'u', 3, b'c', b'o', b'm', 0,
             ]);
-            payload.extend_from_slice(&[
-                0x00, 0x01, // Type: A
-                0x00, 0x01, // Class: IN
-            ]);
+            payload.extend_from_slice(&[0x00, 0x01, 0x00, 0x01]);
 
             if socket.send(&payload).await.is_err() {
-                return None;
+                return;
             }
 
             let mut buf = [0u8; 512];
             match timeout(Duration::from_millis(500), socket.recv(&mut buf)).await {
-                Ok(Ok(len)) if len >= 12 => {
-                    // 验证这是一个有效的 DNS 响应（至少有 DNS header）
-                    // 检查 Transaction ID 是否匹配
-                    if buf[0] == 0x12 && buf[1] == 0x34 {
-                        let elapsed = start.elapsed();
-                        println!("✓ DNS {} 响应成功，延迟: {:?}", dns, elapsed);
-                        Some((dns, elapsed))
-                    } else {
-                        println!("✗ DNS {} 响应无效 (Transaction ID 不匹配)", dns);
-                        None
-                    }
+                Ok(Ok(len)) if len >= 12 && buf[0] == 0x12 && buf[1] == 0x34 => {
+                    let elapsed = start.elapsed();
+                    println!("✓ DNS {} 响应成功，延迟: {:?}", dns, elapsed);
+                    // 发不进去也无所谓，说明已经有人先占了
+                    let _ = tx.try_send((dns, elapsed));
                 }
-                Ok(Ok(len)) => {
-                    println!("✗ DNS {} 响应过短 (长度: {})", dns, len);
-                    None
-                }
-                Ok(Err(e)) => {
-                    println!("✗ DNS {} 接收失败: {}", dns, e);
-                    None
-                }
-                Err(_) => {
-                    println!("✗ DNS {} 超时", dns);
-                    None
+                _ => {
+                    println!("✗ DNS {} 失败或超时", dns);
                 }
             }
+            // tx 在这里自动 drop
         });
-        tasks.push(task);
     }
 
-    // 找出响应最快的 DNS 服务器
-    let mut fastest: Option<(String, std::time::Duration)> = None;
-    for task in tasks {
-        if let Ok(result) = task.await {
-            if let Some((dns, duration)) = result {
-                if fastest.is_none() || duration < fastest.as_ref().unwrap().1 {
-                    fastest = Some((dns, duration));
-                }
-            }
+    // 原始的 tx 必须 drop，否则 rx.recv() 永远不会返回 None
+    drop(tx);
+
+    // 等待第一个成功响应
+    match rx.recv().await {
+        Some((dns, _)) => {
+            println!("最终选择的 DNS: {}", dns);
+            Some(dns)
+        }
+        None => {
+            // 所有 sender 都 drop 了，即全部任务失败
+            println!("所有 DNS 均失败，回退到: {}", first_dns);
+            Some(first_dns)
         }
     }
-
-    // 如果所有 DNS 都失败，返回第一个 DNS
-    let result = fastest.map(|(dns, _)| dns).unwrap_or(first_dns.clone());
-    println!("最终选择的 DNS: {}", result);
-    Some(result)
 }
 
 #[tauri::command]
