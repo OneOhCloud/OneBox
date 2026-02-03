@@ -14,6 +14,9 @@ import { copyEnvToClipboard, initLanguage, t, vpnServiceManager } from './utils/
 const appWindow = getCurrentWindow();
 
 let trayInstance: TrayIcon | null = null;
+let lastStatus: boolean | null = null;
+let statusPollerId: number | null = null;
+let statusPollInFlight = false;
 
 // 创建托盘菜单
 async function createTrayMenu() {
@@ -21,6 +24,7 @@ async function createTrayMenu() {
     await initLanguage();
     let secret = await getClashApiSecret();
     const status = await invoke<boolean>("is_running", { secret: secret });
+    lastStatus = status;
 
     document
         .getElementById('titlebar-minimize')
@@ -44,7 +48,11 @@ async function createTrayMenu() {
                 checked: status,
                 enabled: true,
                 action: async () => {
-                    if (status) {
+                    // 实时读取当前状态，避免使用闭包中已过期的 status
+                    const secretNow = await getClashApiSecret();
+                    const current = await invoke<boolean>("is_running", { secret: secretNow });
+                    console.log("Toggling VPN status from tray menu. Current status:", current);
+                    if (current) {
                         await vpnServiceManager.stop();
                     } else {
                         await vpnServiceManager.syncConfig({});
@@ -142,6 +150,37 @@ async function createTrayMenu() {
     return await Menu.new(baseMenu);
 }
 
+// 每秒轮询状态，如有变化则更新托盘菜单
+function startStatusPolling() {
+    if (statusPollerId !== null) {
+        return;
+    }
+
+    statusPollerId = window.setInterval(async () => {
+        if (statusPollInFlight) {
+            return;
+        }
+        statusPollInFlight = true;
+        try {
+            const secret = await getClashApiSecret();
+            const status = await invoke<boolean>("is_running", { secret });
+            if (lastStatus === null) {
+                lastStatus = status;
+            } else if (status !== lastStatus) {
+                lastStatus = status;
+                const newMenu = await createTrayMenu();
+                if (trayInstance) {
+                    await trayInstance.setMenu(newMenu);
+                }
+            }
+        } catch (error) {
+            console.error('Failed to poll running status:', error);
+        } finally {
+            statusPollInFlight = false;
+        }
+    }, 500);
+}
+
 // 初始化托盘
 export async function setupTrayIcon() {
     const osType = type()
@@ -175,6 +214,7 @@ export async function setupTrayIcon() {
             trayInstance = await TrayIcon.new(options);
         }
 
+        startStatusPolling();
         return trayInstance;
     } catch (error) {
         console.error('Error setting up tray icon:', error);
