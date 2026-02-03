@@ -1,6 +1,6 @@
 # Changelog
 
-Version 1.2.26 (2026-02-03)
+Version 1.2.27 (2026-02-03)
 
 ## Changes since v1.2.25
 
@@ -12,6 +12,8 @@ All significant changes in this version are documented here.
 - Updated dependencies
 - Speeded up automatic optimal DNS fetching
 - Fixed inconsistent tray menu status issue
+- Changed default URL for fetching template config files
+
 
 
 ## 自 v1.2.25 以来的变更
@@ -23,6 +25,7 @@ All significant changes in this version are documented here.
 
 - 更新了依赖项
 - 加快自动获取最优DNS的速度
+- 变更获取模板配置文件的默认网址
 - 修复托盘菜单状态不一致的问题
 
 
