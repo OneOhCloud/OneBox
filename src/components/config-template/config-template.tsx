@@ -90,12 +90,12 @@ export default function ConfigTemplate() {
         }
 
 
-        console.debug('Syncing remote config from', url + '?t=' + Date.now());
+        console.debug('Syncing remote config from ', url);
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 60000);
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
 
         try {
-            const response = await fetch(url + '?version=' + Date.now(), { signal: controller.signal, cache: 'no-store' });
+            const response = await fetch(url, { signal: controller.signal });
             if (!response.ok) throw new Error(`Failed to fetch: ${response.statusText}`);
             const text = await response.text();
             if (!validateConfigFormat(text)) throw new Error('Invalid JSON/JSONC format');
