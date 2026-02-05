@@ -261,72 +261,81 @@ pub async fn ping_google() -> bool {
     }
 }
 
-async fn get_best_dns_server() -> Option<String> {
-    let dns_servers = DNSSERVERDICT;
+async fn probe_dns_server(dns: String, tx: Option<mpsc::Sender<(String, std::time::Duration)>>) {
+    use std::net::SocketAddr;
+    use tokio::net::UdpSocket;
+    use tokio::time::{timeout, Duration};
 
-    if dns_servers.is_empty() {
-        return None;
+    let start = std::time::Instant::now();
+
+    let ns_addr: SocketAddr = match format!("{}:53", dns).parse() {
+        Ok(addr) => addr,
+        Err(_) => return,
+    };
+    let bind_addr = if ns_addr.is_ipv4() {
+        "0.0.0.0:0"
+    } else {
+        "[::]:0"
+    };
+
+    let socket = match UdpSocket::bind(bind_addr).await {
+        Ok(s) => s,
+        Err(_) => return,
+    };
+    if socket.connect(ns_addr).await.is_err() {
+        return;
     }
 
-    let first_dns = dns_servers[0].to_string();
+    let mut payload = vec![
+        0x12, 0x34, 0x01, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    ];
+    payload.extend_from_slice(&[
+        3, b'w', b'w', b'w', 5, b'b', b'a', b'i', b'd', b'u', 3, b'c', b'o', b'm', 0,
+    ]);
+    payload.extend_from_slice(&[0x00, 0x01, 0x00, 0x01]);
+
+    if socket.send(&payload).await.is_err() {
+        return;
+    }
+
+    let mut buf = [0u8; 512];
+    match timeout(Duration::from_millis(500), socket.recv(&mut buf)).await {
+        Ok(Ok(len)) if len >= 12 && buf[0] == 0x12 && buf[1] == 0x34 => {
+            let elapsed = start.elapsed();
+            let padded_dns: String = format!("{:<20}", dns);
+            log::info!(
+                "✓ DNS {} responded successfully, latency: {:?}",
+                padded_dns,
+                elapsed
+            );
+
+            // 如果发送通道存在，尝试发送结果
+            if let Some(tx) = tx {
+                // 发不进去也无所谓，说明已经有人先占了
+                let _ = tx.try_send((dns, elapsed));
+            }
+        }
+        _ => {
+            // log::info!("✗ DNS {} 失败或超时", dns);
+            let padded_dns: String = format!("{:<20}", dns);
+            log::info!("✗ DNS {} failed or timed out", padded_dns);
+        }
+    }
+    // tx 在这里自动 drop
+}
+
+async fn get_best_dns_server() -> Option<String> {
+    let first_dns = DNSSERVERDICT[0].to_string();
 
     // buffer 设 1，第一个成功的 send 立刻送进去，主流程立刻收到
     let (tx, mut rx) = mpsc::channel::<(String, std::time::Duration)>(1);
 
-    for dns in dns_servers {
+    for dns in DNSSERVERDICT {
         let dns = dns.to_string();
         let tx: mpsc::Sender<(String, std::time::Duration)> = tx.clone();
 
         tokio::spawn(async move {
-            use std::net::SocketAddr;
-            use tokio::net::UdpSocket;
-            use tokio::time::{timeout, Duration};
-
-            let start = std::time::Instant::now();
-
-            let ns_addr: SocketAddr = match format!("{}:53", dns).parse() {
-                Ok(addr) => addr,
-                Err(_) => return,
-            };
-            let bind_addr = if ns_addr.is_ipv4() {
-                "0.0.0.0:0"
-            } else {
-                "[::]:0"
-            };
-
-            let socket = match UdpSocket::bind(bind_addr).await {
-                Ok(s) => s,
-                Err(_) => return,
-            };
-            if socket.connect(ns_addr).await.is_err() {
-                return;
-            }
-
-            let mut payload = vec![
-                0x12, 0x34, 0x01, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            ];
-            payload.extend_from_slice(&[
-                3, b'w', b'w', b'w', 5, b'b', b'a', b'i', b'd', b'u', 3, b'c', b'o', b'm', 0,
-            ]);
-            payload.extend_from_slice(&[0x00, 0x01, 0x00, 0x01]);
-
-            if socket.send(&payload).await.is_err() {
-                return;
-            }
-
-            let mut buf = [0u8; 512];
-            match timeout(Duration::from_millis(500), socket.recv(&mut buf)).await {
-                Ok(Ok(len)) if len >= 12 && buf[0] == 0x12 && buf[1] == 0x34 => {
-                    let elapsed = start.elapsed();
-                    log::info!("✓ DNS {} 响应成功，延迟: {:?}", dns, elapsed);
-                    // 发不进去也无所谓，说明已经有人先占了
-                    let _ = tx.try_send((dns, elapsed));
-                }
-                _ => {
-                    log::info!("✗ DNS {} 失败或超时", dns);
-                }
-            }
-            // tx 在这里自动 drop
+            probe_dns_server(dns, Some(tx)).await;
         });
     }
 
@@ -336,12 +345,16 @@ async fn get_best_dns_server() -> Option<String> {
     // 等待第一个成功响应
     match rx.recv().await {
         Some((dns, _)) => {
-            log::info!("最终选择的 DNS: {}", dns);
+            // log::info!("最终选择的 DNS: {}", dns);
+            let padded_dns: String = format!("{:<20}", dns);
+            log::info!("✓ DNS {} is selected as the optimal server", padded_dns);
             Some(dns)
         }
         None => {
             // 所有 sender 都 drop 了，即全部任务失败
-            log::info!("所有 DNS 均失败，回退到: {}", first_dns);
+            // log::info!("所有 DNS 均失败，回退到: {}", first_dns);
+            let padded_dns: String = format!("{:<20}", first_dns);
+            log::info!("✗ All DNS servers failed, falling back to: {}", padded_dns);
             Some(first_dns)
         }
     }
@@ -358,8 +371,16 @@ mod tests {
     use tokio;
     // 若需要其它测试（如文件相关），也可以在此处加入相关 use
 
+    // 添加日志初始化
+    fn init_logger() {
+        let _ = env_logger::builder()
+            .is_test(true)
+            .filter_level(log::LevelFilter::Info)
+            .try_init();
+    }
     #[test]
     fn test_is_private_ip_basic() {
+        init_logger();
         assert!(is_private_ip("10.0.0.1"));
         assert!(is_private_ip("192.168.1.1"));
         assert!(!is_private_ip("8.8.8.8"));
@@ -367,9 +388,31 @@ mod tests {
 
     #[test]
     fn test_get_best_dns_server_returns_some() {
+        init_logger();
+
         let rt = tokio::runtime::Runtime::new().unwrap();
         let res = rt.block_on(get_best_dns_server());
-        println!("Best DNS server: {:?}", res);
         assert!(res.is_some());
+    }
+
+    #[test]
+    fn test_all_dns_servers() {
+        init_logger();
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        std::thread::sleep(std::time::Duration::from_secs(1));
+        rt.block_on(async {
+            let mut handles = Vec::new();
+            for dns in DNSSERVERDICT {
+                let dns = dns.to_string();
+                let handle = tokio::spawn(async move {
+                    probe_dns_server(dns, None).await;
+                });
+                handles.push(handle);
+            }
+            // 等待所有任务完成
+            for handle in handles {
+                let _ = handle.await;
+            }
+        });
     }
 }
