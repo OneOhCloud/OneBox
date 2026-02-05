@@ -24,9 +24,9 @@ Additional Terms
 3. License Retention Requirement  
    This copyright notice, along with the original Apache 2.0 license terms and these additional terms, must be retained in all copies and derivative works of this software.  
 
-4. Compliance with US and Wyoming Law  
-   OneOh Cloud LLC strictly prohibits the use, distribution, or deployment of this software in any manner that violates the laws of the United States or the State of Wyoming. Any such unauthorized use is the sole responsibility of the user or distributor. OneOh Cloud LLC reserves the right to take legal action to the fullest extent permitted by law.  
-
+4. Compliance and Limitation of Liability
+   Users are solely responsible for ensuring that their use, distribution, or deployment of this software complies with all applicable laws and regulations, including those of the United States and the State of Wyoming. OneOh Cloud LLC disclaims any liability arising from your non-compliance with such laws.
+   
 5. Governing Law and Jurisdiction  
    This Agreement shall be governed by and construed in accordance with the laws of the State of Wyoming, USA, without regard to its conflict of law principles. Any disputes arising under this Agreement shall be subject to the exclusive jurisdiction of the state or federal courts located in Wyoming, USA.  
 `
