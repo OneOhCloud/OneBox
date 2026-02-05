@@ -48,27 +48,21 @@ A cross-platform GUI client based on [sing-box](https://github.com/SagerNet/sing
 
 ## Platform Support
 
-- **Tier 1 (Fully Supported)**: macOS
-- **Tier 2 (Community Supported)**: Windows
-- **Tier 3 (Experimental)**: Linux
-
+| Tier      | Platform | Status & Maintenance                                                                 |
+|-----------|----------|--------------------------------------------------------------------------------------|
+| **Tier 1: Official**      | macOS    | Production-ready. Fully maintained by the core team with priority bug fixes.        |
+| **Tier 2: Community**     | Windows，Ubuntu | Stable. Maintained by the community; features and fixes may lag behind Tier 1.     |
+| **Tier 3: Experimental**  | Linux    | Beta. Unstable or incomplete. Use at your own risk; no guaranteed fixes.           |
 
 
 ## Download and Installation
 
-Please visit our [releases page](https://github.com/OneOhCloud/OneBox/releases) to get the latest version.
-
-
-## Support Level Explanation
-
-- **Tier 1 (Fully Supported)**: Officially and actively maintained by the core team. All features are available, and issues are prioritized for fixes. Best user experience.
-- **Tier 2 (Community Supported)**: Mainly maintained by community contributors. Some features may be limited, and official support is not guaranteed. Issues are addressed as community resources allow.
-- **Tier 3 (Experimental)**: Early or experimental support. Features may be incomplete or unstable, and there is no guarantee of timely fixes or updates.
+Please visit our [official website](https://sing-box.net) or the [Releases page](https://github.com/OneOhCloud/OneBox/releases) to get the latest version.
 
 
 
 
-## Test 
+## Test Instructions
 
 To run tests with output displayed in the console, use the following command:
 

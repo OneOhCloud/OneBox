@@ -44,28 +44,29 @@
 
 ## 平台支持
 
-- **Tier 1（完全支持）**：macOS
-- **Tier 2（社区支持）**：Windows
-- **Tier 3（实验性）**：Linux
 
+<!-- | Tier      | Platform | Status & Maintenance                                                                 |
+|-----------|----------|--------------------------------------------------------------------------------------|
+| **Tier 1: Official**      | macOS    | Production-ready. Fully maintained by the core team with priority bug fixes.        |
+| **Tier 2: Community**     | Windows，Ubuntu | Stable. Maintained by the community; features and fixes may lag behind Tier 1.     |
+| **Tier 3: Experimental**  | Linux    | Beta. Unstable or incomplete. Use at your own risk; no guaranteed fixes.           | -->
+
+| 支持级别      | 平台 | 状态与维护                                                                 |
+|-----------|----------|--------------------------------------------------------------------------------------|
+| **Tier 1：官方支持**      | macOS    | 生产就绪。由核心团队全面维护，优先修复问题。        |
+| **Tier 2：社区支持**     | Windows，Ubuntu | 稳定。由社区贡献者维护；功能和修复可能落后于一级支持。     |
+| **Tier 3：实验性支持**  | Linux    | 测试版。不稳定或不完整。请自行承担风险使用；不保证修复。           |
 
 ## 下载安装
 
-请访问我们的 [发布页面](https://github.com/OneOhCloud/OneBox/releases) 获取最新版本。
-
-
-## 支持级别说明
-
-- **Tier 1（完全支持）**：由核心团队官方维护，功能最完整，遇到问题会优先修复，用户体验最佳。
-- **Tier 2（社区支持）**：主要由社区成员维护，部分功能可能有限，官方不保证全部支持，问题修复依赖社区资源。
-- **Tier 3（实验性）**：处于早期或实验阶段，功能可能不完整或不稳定，不保证及时修复和更新。
+请访问我们的[官方网站](https://sing-box.net)或[发布页面](https://github.com/OneOhCloud/OneBox/releases)获取最新版本。
 
 
 
+## 测试说明
 
-## 测试
+要运行测试并在控制台显示输出，请使用以下命令：
 
-要在控制台显示输出运行测试，请使用以下命令：
 ```rust
 cargo test  -- --nocapture 
 ```
