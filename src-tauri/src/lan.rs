@@ -310,24 +310,25 @@ async fn probe_dns_server(dns: String, tx: Option<mpsc::Sender<(String, std::tim
             );
 
             // 如果发送通道存在，尝试发送结果
+            // If the sending channel exists, try to send the result
             if let Some(tx) = tx {
                 // 发不进去也无所谓，说明已经有人先占了
+                // If it can't be sent, it doesn't matter, someone else has taken it
                 let _ = tx.try_send((dns, elapsed));
             }
         }
         _ => {
-            // log::info!("✗ DNS {} 失败或超时", dns);
             let padded_dns: String = format!("{:<20}", dns);
             log::info!("✗ DNS {} failed or timed out", padded_dns);
         }
     }
-    // tx 在这里自动 drop
 }
 
 async fn get_best_dns_server() -> Option<String> {
     let first_dns = DNSSERVERDICT[0].to_string();
 
     // buffer 设 1，第一个成功的 send 立刻送进去，主流程立刻收到
+    // Set the buffer to 1, the first successful send goes in immediately, and the main process receives it immediately
     let (tx, mut rx) = mpsc::channel::<(String, std::time::Duration)>(1);
 
     for dns in DNSSERVERDICT {
@@ -340,19 +341,18 @@ async fn get_best_dns_server() -> Option<String> {
     }
 
     // 原始的 tx 必须 drop，否则 rx.recv() 永远不会返回 None
+    // The original tx must be dropped, otherwise rx.recv() will never return None
     drop(tx);
 
-    // 等待第一个成功响应
+    // wait for the first successful DNS server or all to fail
     match rx.recv().await {
         Some((dns, _)) => {
-            // log::info!("最终选择的 DNS: {}", dns);
             let padded_dns: String = format!("{:<20}", dns);
             log::info!("✓ DNS {} is selected as the optimal server", padded_dns);
             Some(dns)
         }
         None => {
-            // 所有 sender 都 drop 了，即全部任务失败
-            // log::info!("所有 DNS 均失败，回退到: {}", first_dns);
+            // All DNS servers failed, fall back to the first one
             let padded_dns: String = format!("{:<20}", first_dns);
             log::info!("✗ All DNS servers failed, falling back to: {}", padded_dns);
             Some(first_dns)
@@ -369,9 +369,6 @@ pub async fn get_optimal_dns_server() -> Option<String> {
 mod tests {
     use super::*;
     use tokio;
-    // 若需要其它测试（如文件相关），也可以在此处加入相关 use
-
-    // 添加日志初始化
     fn init_logger() {
         let _ = env_logger::builder()
             .is_test(true)
@@ -409,7 +406,7 @@ mod tests {
                 });
                 handles.push(handle);
             }
-            // 等待所有任务完成
+            // wait for all tasks to complete
             for handle in handles {
                 let _ = handle.await;
             }
