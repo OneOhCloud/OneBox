@@ -10,6 +10,7 @@ All significant changes in this version are documented here.
 ### ⚠ CHANGES
 
 - Updated dependencies
+- Updated sing-box to v1.12.20
 - Follow cache control headers to optimize remote config sync
 
 
@@ -22,6 +23,7 @@ All significant changes in this version are documented here.
 ### ⚠ 变更
 
 - 更新了依赖项
+- 更新 sing-box 至 v1.12.20
 - 遵循缓存控制头以优化远程配置同步
 
 
