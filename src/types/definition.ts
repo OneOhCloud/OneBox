@@ -2,7 +2,7 @@ import { Arch, OsType } from "@tauri-apps/plugin-os";
 
 
 export const SING_BOX_MAJOR_VERSION = "1.12";
-export const SING_BOX_MINOR_VERSION = "19";
+export const SING_BOX_MINOR_VERSION = "20";
 export const SING_BOX_VERSION = `v${SING_BOX_MAJOR_VERSION}.${SING_BOX_MINOR_VERSION}`;
 
 export const GITHUB_URL = 'https://github.com/OneOhCloud/OneBox'
