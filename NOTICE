@@ -1,0 +1,56 @@
+OneBox
+Copyright 2024–2026 OneOh Cloud LLC
+
+This product includes software developed at OneOh Cloud LLC.
+The source code is licensed under the Apache License, Version 2.0.
+
+--------------------------------------------------------------------------------
+PRODUCT NAME, BRANDING, AND ICON USAGE POLICY
+--------------------------------------------------------------------------------
+
+The Apache License, Version 2.0 governs the use, reproduction, modification, and
+distribution of the source code contained in this repository. However, the
+Apache License does NOT grant any rights to use the product name, logos, icons,
+or other branding assets associated with this project.
+
+Accordingly, the following terms apply solely to the product name, logos, icons,
+and other non-code assets associated with this project:
+
+1. Product Name and Branding Usage
+
+   Without the explicit prior written consent of OneOh Cloud LLC, you may not use,
+   reproduce, modify, distribute, or display the product name "OneBox", any
+   confusingly similar name, or any logos, icons, or branding elements associated
+   with this project (including but not limited to the icons located in the
+   'src-tauri/icons' directory) in any manner that implies endorsement,
+   affiliation, or sponsorship by OneOh Cloud LLC.
+
+2. Naming Restrictions for Redistributed Versions
+
+   Any redistributed version, fork, or derivative distribution of this software
+   must use a different product name and must not use "OneBox" or any confusingly
+   similar name as a product name, application name, repository name, or branding
+   identifier.
+
+3. Retention of Legal Notices
+
+   This NOTICE file and the original Apache License, Version 2.0 must be retained
+   in all redistributions of this software, in accordance with the terms of the
+   Apache License. This branding and naming policy must be retained when
+   redistributing any branding materials, documentation, or non-code assets
+   associated with this project.
+
+4. Compliance with Law
+
+   You are solely responsible for ensuring that your use, distribution, or
+   deployment of this software and any associated assets complies with all
+   applicable laws and regulations. OneOh Cloud LLC disclaims any liability
+   arising from unlawful or non-compliant use.
+
+5. Governing Law and Jurisdiction
+
+   This policy shall be governed by and construed in accordance with the laws of
+   the State of Wyoming, United States of America, without regard to its conflict
+   of law principles. Any disputes arising under this policy shall be subject to
+   the exclusive jurisdiction of the state or federal courts located in Wyoming,
+   USA.

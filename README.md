@@ -45,6 +45,7 @@ A cross-platform GUI client based on [sing-box](https://github.com/SagerNet/sing
 
 
 
+
 ## Platform Support
 
 - **Tier 1 (Fully Supported)**: macOS
@@ -74,3 +75,8 @@ To run tests with output displayed in the console, use the following command:
 ```rust
 cargo test  -- --nocapture 
 ```
+
+## License & Brand Usage
+This software is licensed under the **Apache License 2.0**. 
+
+Please note: The **OneBox** name, logos, and icons are proprietary assets of OneOh Cloud LLC. The Apache License does **not** grant permission to use these branding elements in derivative works. Any use of these assets or the product name must comply with our [NOTICE](./NOTICE) policy.
