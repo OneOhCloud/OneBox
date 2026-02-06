@@ -40,10 +40,10 @@ lazy_static! {
     }));
 }
 
-async fn get_password_for_mode(mode: &ProxyMode) -> Result<String, String> {
+async fn get_password_for_mode(mode: ProxyMode) -> Result<String, String> {
     #[cfg(any(target_os = "linux", target_os = "macos"))]
     {
-        if *mode == ProxyMode::TunProxy {
+        if mode == ProxyMode::TunProxy {
             let pwd = privilege::get_privilege_password_from_keyring().await;
             // 如果密码为空，返回特殊错误标识，而不是直接失败
             if pwd.is_empty() {
@@ -70,7 +70,7 @@ pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Resu
     log::info!("Starting proxy process in mode: {:?}", mode);
 
     // 检查是否需要权限验证 (异步调用)
-    let password = match get_password_for_mode(&mode).await {
+    let password = match get_password_for_mode(mode.clone()).await {
         Ok(pwd) => pwd,
         Err(err) if err == "REQUIRE_PRIVILEGE" => return Err(err),
         Err(err) => {
