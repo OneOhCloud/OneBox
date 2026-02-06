@@ -44,4 +44,19 @@ impl AppData {
             String::new()
         }
     }
+
+    pub fn read_cleared(&self, log_type: LogType) -> String {
+        let buffer = match log_type {
+            LogType::Info => &self.log_buffer,
+            LogType::Error => &self.error_log_buffer,
+        };
+
+        if let Ok(mut buffer) = buffer.lock() {
+            let logs = buffer.join("\n");
+            buffer.clear();
+            logs
+        } else {
+            String::new()
+        }
+    }
 }

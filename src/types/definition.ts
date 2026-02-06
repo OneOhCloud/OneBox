@@ -55,3 +55,10 @@ export type SubscriptionConfig = {
 
 // 获取订阅列表的 SWR 键
 export const GET_SUBSCRIPTIONS_LIST_SWR_KEY = 'get-subscriptions-list'
+
+export interface TerminatedPayload {
+    code: number | null;
+    signal: number | null;
+}
+
+export type StatusChangedPayload = void | TerminatedPayload;

@@ -151,7 +151,7 @@ pub fn read_logs(app_data: tauri::State<AppData>, is_error: bool) -> String {
     } else {
         LogType::Info
     };
-    app_data.read(log_type)
+    app_data.read_cleared(log_type)
 }
 
 #[tauri::command]

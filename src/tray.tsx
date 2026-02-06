@@ -7,7 +7,7 @@ import { getCurrentWindow } from '@tauri-apps/api/window';
 import { message } from '@tauri-apps/plugin-dialog';
 import { type } from '@tauri-apps/plugin-os';
 import { getClashApiSecret, getStoreValue } from './single/store';
-import { DEVELOPER_TOGGLE_STORE_KEY } from './types/definition';
+import { DEVELOPER_TOGGLE_STORE_KEY, StatusChangedPayload, TerminatedPayload } from './types/definition';
 import { copyEnvToClipboard, initLanguage, t, vpnServiceManager } from './utils/helper';
 
 
@@ -230,30 +230,65 @@ export async function updateTrayMenu() {
     }
 }
 
+
 export async function setupStatusListener() {
-    await listen('status-changed', async (event) => {
-        if (event == null) {
-            return;
-        }
-        console.log(event);
-        // @ts-ignore
-        if (event.payload && event.payload.code && event.payload.code === 1) {
-            // await message(`${t('connect_failed')}`, { title: t('error'), kind: 'error' });
-            //  连接失败，请稍等一分钟后重试。
-            let info = await invoke<string>('read_logs', { isError: false });
-            let error = await invoke<string>('read_logs', { isError: true });
-            console.info("Info logs:", info);
-            console.error("Error logs:", error);
-            await message(
-                t('connect_failed_retry'),
-                { title: t('error'), kind: 'error' }
-            )
+    await listen<StatusChangedPayload>('status-changed', async (event) => {
+        try {
+            console.log('Status changed:', event);
+
+            // 类型守卫：检查是否是 TerminatedPayload
+            const isTerminated = (payload: unknown): payload is TerminatedPayload => {
+                return payload != null
+                    && typeof payload === 'object'
+                    && 'code' in payload;
+            };
+
+            if (isTerminated(event.payload)) {
+                const { code, signal } = event.payload;
+
+                // 记录详细信息
+                console.log(`Process terminated - Code: ${code}, Signal: ${signal}`);
+
+                // 只在错误退出时显示消息
+                if (code != null && code !== 0) {
+                    try {
+                        const [info, error] = await Promise.all([
+                            invoke<string>('read_logs', { isError: false }),
+                            invoke<string>('read_logs', { isError: true })
+                        ]);
+
+                        console.info("Info logs:", info);
+                        console.error("Error logs:", error);
+
+                        let msg = t('connect_failed_retry');
+
+                        if (info && info.trim().length > 0) {
+                            msg += `\n\n${info}`;
+                        }
+
+                        if (error && error.trim().length > 0) {
+                            msg += `\n\n${error}`;
+                        }
 
 
-        }
-        const newMenu = await createTrayMenu();
-        if (trayInstance) {
-            await trayInstance.setMenu(newMenu);
+
+                        await message(
+                            msg,
+                            { title: t('error'), kind: 'error' }
+                        );
+                    } catch (err) {
+                        console.error('Failed to read logs:', err);
+                    }
+                }
+            }
+
+            // 更新托盘菜单
+            const newMenu = await createTrayMenu();
+            if (trayInstance) {
+                await trayInstance.setMenu(newMenu);
+            }
+        } catch (err) {
+            console.error('Error in status listener:', err);
         }
     });
 }
