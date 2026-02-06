@@ -317,11 +317,6 @@ pub async fn stop(app: tauri::AppHandle) -> Result<(), String> {
         let password = manager.tun_password.clone();
         let child = manager.child.take();
 
-        // 提前清理状态，避免后续await时仍持有锁
-        manager.current_mode = None;
-        manager.tun_password = None;
-        manager.config_path = None;
-
         (mode, password, child)
     }; // MutexGuard在此作用域结束时释放
 
@@ -372,6 +367,20 @@ pub async fn stop(app: tauri::AppHandle) -> Result<(), String> {
                 }
             }
         }
+    }
+
+    // 成功执行清理操作后，才清理状态
+    {
+        let mut manager = match PROCESS_MANAGER.lock() {
+            Ok(m) => m,
+            Err(e) => {
+                log::error!("Mutex lock error during state cleanup: {:?}", e);
+                e.into_inner()
+            }
+        };
+        manager.current_mode = None;
+        manager.tun_password = None;
+        manager.config_path = None;
     }
 
     log::info!("Proxy process stopped");

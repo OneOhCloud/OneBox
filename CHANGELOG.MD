@@ -2,7 +2,7 @@
 
 Version 1.2.dev (2026-02-04)
 
-## Changes since v1.2.29
+## Changes since v1.2.28
 
 All significant changes in this version are documented here.
 
@@ -15,7 +15,7 @@ All significant changes in this version are documented here.
 
 
 
-## 自 v1.2.29 以来的变更
+## 自 v1.2.28 以来的变更
 
 本版本的所有重要变更将记录于此。
 
