@@ -14,7 +14,6 @@ import { copyEnvToClipboard, initLanguage, t, vpnServiceManager } from './utils/
 const appWindow = getCurrentWindow();
 
 let trayInstance: TrayIcon | null = null;
-let lastStatus: boolean | null = null;
 let statusPollerId: number | null = null;
 let statusPollInFlight = false;
 
@@ -24,7 +23,6 @@ async function createTrayMenu() {
     await initLanguage();
     let secret = await getClashApiSecret();
     const status = await invoke<boolean>("is_running", { secret: secret });
-    lastStatus = status;
 
     document
         .getElementById('titlebar-minimize')
