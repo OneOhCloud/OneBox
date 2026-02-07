@@ -182,7 +182,7 @@ export async function getDirectDNS(): Promise<string> {
     if (s) {
         return s;
     }
-    let defaultValue = await invoke('get_optimal_dns_server') as string;
+    let defaultValue = await invoke('get_optimal_local_dns_server') as string;
     console.debug('最佳DNS服务器为:', defaultValue);
     return defaultValue || '223.5.5.5';
 }

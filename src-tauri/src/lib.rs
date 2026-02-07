@@ -25,7 +25,7 @@ pub fn run() {
             lan::open_browser,
             lan::get_captive_redirect_url,
             lan::check_captive_portal_status,
-            lan::get_optimal_dns_server,
+            lan::get_optimal_local_dns_server,
             core::stop,
             core::start,
             core::is_running,
@@ -164,7 +164,7 @@ mod tests {
     #[test]
     fn test_get_optimal_dns_server() {
         tauri::async_runtime::block_on(async {
-            let res = lan::get_optimal_dns_server().await;
+            let res = lan::get_best_dns_server().await;
             assert!(res.is_some());
             let dns = res.unwrap();
             assert!(is_valid_ipv4(&dns));

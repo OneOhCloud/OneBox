@@ -1,7 +1,7 @@
-use crate::core::stop;
+use crate::core::{is_running, stop};
 use tauri::{
     http::{header::LOCATION, StatusCode},
-    AppHandle,
+    AppHandle, Manager,
 };
 use tauri_plugin_http::reqwest::{self, redirect::Policy};
 use tokio::process::Command;
@@ -324,7 +324,7 @@ async fn probe_dns_server(dns: String, tx: Option<mpsc::Sender<(String, std::tim
     }
 }
 
-async fn get_best_dns_server() -> Option<String> {
+pub async fn get_best_dns_server() -> Option<String> {
     let first_dns = DNSSERVERDICT[0].to_string();
 
     // buffer 设 1，第一个成功的 send 立刻送进去，主流程立刻收到
@@ -360,9 +360,33 @@ async fn get_best_dns_server() -> Option<String> {
     }
 }
 
+// 获取最佳本地 DNS 服务器的命令
+// Command to get the optimal local DNS server
 #[tauri::command]
-pub async fn get_optimal_dns_server() -> Option<String> {
-    get_best_dns_server().await
+pub async fn get_optimal_local_dns_server(app: AppHandle) -> Option<String> {
+    use crate::app_status::AppData;
+
+    let app_data = app.state::<AppData>();
+    let running = { is_running(app.clone(), app_data.get_clash_secret().unwrap()).await };
+
+    if running {
+        // sing-box 运行中，尝试使用缓存的 DNS 结果，避免探测走代理导致误判。
+        // When sing-box is running, try to use the cached DNS result to avoid misjudgment caused by probing through the proxy.
+        if let Some(cached) = app_data.get_cached_dns() {
+            log::info!("sing-box is running, using cached DNS: {}", cached);
+            return Some(cached);
+        }
+    }
+    // sing-box 未运行或无缓存，获取最佳本地 DNS 并更新缓存
+    // sing-box is not running or no cache, get the optimal local DNS and update the cache
+    log::info!("Fetching best DNS server...");
+    let best_dns = get_best_dns_server().await;
+    if let Some(ref dns) = best_dns {
+        app_data.set_cached_dns(Some(dns.clone()));
+        log::info!("Updated cached DNS: {}", dns);
+    }
+
+    best_dns
 }
 
 #[cfg(test)]
