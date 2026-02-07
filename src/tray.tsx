@@ -150,8 +150,8 @@ async function createTrayMenu() {
     return await Menu.new(baseMenu);
 }
 
-// 每秒轮询状态，如有变化则更新托盘菜单
-function startStatusPolling() {
+// 每秒轮询状态
+function startTrayStatusPolling() {
     if (statusPollerId !== null) {
         return;
     }
@@ -162,23 +162,16 @@ function startStatusPolling() {
         }
         statusPollInFlight = true;
         try {
-            const secret = await getClashApiSecret();
-            const status = await invoke<boolean>("is_running", { secret });
-            if (lastStatus === null) {
-                lastStatus = status;
-            } else if (status !== lastStatus) {
-                lastStatus = status;
-                const newMenu = await createTrayMenu();
-                if (trayInstance) {
-                    await trayInstance.setMenu(newMenu);
-                }
+            const newMenu = await createTrayMenu();
+            if (trayInstance) {
+                await trayInstance.setMenu(newMenu);
             }
         } catch (error) {
             console.error('Failed to poll running status:', error);
         } finally {
             statusPollInFlight = false;
         }
-    }, 500);
+    }, 1000);
 }
 
 // 初始化托盘
@@ -214,7 +207,7 @@ export async function setupTrayIcon() {
             trayInstance = await TrayIcon.new(options);
         }
 
-        startStatusPolling();
+        startTrayStatusPolling();
         return trayInstance;
     } catch (error) {
         console.error('Error setting up tray icon:', error);
