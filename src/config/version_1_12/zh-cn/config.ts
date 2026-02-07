@@ -986,7 +986,7 @@ const TunGlobalConfig = {
 
 
 export function getDefaultConfigTemplate(mode: configType, version: string): string {
-    if (version.startsWith("v1.12")) {
+    if (version.startsWith("v1.12") || version.startsWith("v1.13")) {
         switch (mode) {
             case 'mixed':
                 return JSON.stringify(mixedRulesConfig)
@@ -998,7 +998,7 @@ export function getDefaultConfigTemplate(mode: configType, version: string): str
                 return JSON.stringify(TunGlobalConfig);
         }
     } else {
-        alert("Only version 1.12.x is supported at the moment.")
+        alert("Only version 1.12.x and 1.13.x is supported at the moment.")
         throw new Error("Unsupported version")
     }
 }
