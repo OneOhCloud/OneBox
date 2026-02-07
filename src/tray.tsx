@@ -237,11 +237,22 @@ async function handleConnectionError() {
         invoke<string>('read_logs', { isError: true }),
     ]);
 
-    console.info("Info logs:", info);
-    console.error("Error logs:", error);
+    console.debug({
+        info,
+        error,
+    })
+    let msg = t('connect_failed_retry');
+
+    if (info && info.trim().length > 0) {
+        msg += `\n\n${info}`;
+    }
+
+    if (error && error.trim().length > 0) {
+        msg += `\n\n${error}`;
+    }
 
     await message(
-        t('connect_failed_retry'),
+        msg,
         { title: t('error'), kind: 'error' }
     );
 }
