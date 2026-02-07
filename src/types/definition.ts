@@ -1,6 +1,6 @@
 import { Arch, OsType } from "@tauri-apps/plugin-os";
 
-
+// 当前项目完全兼容 v1.13，若是 sing-box 发布正式版时，可以直接将版本号改为 1.13 即可
 export const SING_BOX_MAJOR_VERSION = "1.12";
 export const SING_BOX_MINOR_VERSION = "20";
 export const SING_BOX_VERSION = `v${SING_BOX_MAJOR_VERSION}.${SING_BOX_MINOR_VERSION}`;
