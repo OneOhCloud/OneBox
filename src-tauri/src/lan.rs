@@ -364,7 +364,7 @@ pub async fn get_best_dns_server() -> Option<String> {
 // Command to get the optimal local DNS server
 #[tauri::command]
 pub async fn get_optimal_local_dns_server(app: AppHandle) -> Option<String> {
-    use crate::app_status::AppData;
+    use crate::state::AppData;
 
     let app_data = app.state::<AppData>();
     let running = { is_running(app.clone(), app_data.get_clash_secret().unwrap()).await };

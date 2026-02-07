@@ -5,9 +5,9 @@ use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Manager};
 use tauri_plugin_http::reqwest;
 
-use crate::app_status::{AppData, LogType};
 #[cfg(not(target_os = "windows"))]
 use crate::privilege;
+use crate::state::{AppData, LogType};
 use crate::vpn::{helper, EVENT_STATUS_CHANGED};
 use crate::vpn::{PlatformVpnProxy, VpnProxy};
 use tauri::Emitter;
@@ -332,7 +332,7 @@ pub async fn stop(app: tauri::AppHandle) -> Result<(), String> {
 /// 判断代理进程是否运行中
 #[tauri::command]
 pub async fn is_running(app: AppHandle, secret: String) -> bool {
-    use crate::app_status::AppData;
+    use crate::state::AppData;
     use tokio::net::TcpStream;
     use tokio::time::{timeout, Duration};
 

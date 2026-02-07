@@ -1,6 +1,6 @@
 use crate::{
-    app_status::{AppData, LogType},
     core::stop,
+    state::{AppData, LogType},
 };
 
 use tauri::AppHandle;

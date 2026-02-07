@@ -1,12 +1,12 @@
 use tauri::{Manager, Window, WindowEvent};
 use tauri_plugin_http::reqwest;
-mod app_status;
 mod command;
 mod core;
 mod database;
 mod lan;
 mod plugins;
 mod privilege;
+mod state;
 mod utils;
 mod vpn;
 
@@ -48,7 +48,7 @@ pub fn run() {
                     .plugin(tauri_plugin_updater::Builder::new().build())?;
             }
 
-            app.manage(app_status::AppData::new());
+            app.manage(state::AppData::new());
 
             // 复制 resources 目录下的 .db 文件到 appConfigDir
             if let Err(e) = utils::copy_database_files(app.handle()) {
