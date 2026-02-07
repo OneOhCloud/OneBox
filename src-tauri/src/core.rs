@@ -2,7 +2,7 @@ use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
-use tauri::Manager;
+use tauri::{AppHandle, Manager};
 use tauri_plugin_http::reqwest;
 
 use crate::app_status::{AppData, LogType};
@@ -73,6 +73,7 @@ pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Resu
 
     // 检查是否需要权限验证
     let password = get_password_for_mode(&mode).await?;
+
     let is_system_proxy = matches!(mode, ProxyMode::SystemProxy);
 
     // 准备命令
@@ -199,6 +200,7 @@ pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Resu
     tokio::time::sleep(tokio::time::Duration::from_millis(wait_time)).await;
 
     log::info!("Proxy process started successfully");
+
     app.emit(EVENT_STATUS_CHANGED, ()).ok();
 
     Ok(())
@@ -322,15 +324,20 @@ pub async fn stop(app: tauri::AppHandle) -> Result<(), String> {
     }
 
     log::info!("Proxy process stopped");
+
     app.emit(EVENT_STATUS_CHANGED, ()).ok();
     Ok(())
 }
 
 /// 判断代理进程是否运行中
 #[tauri::command]
-pub async fn is_running(secret: String) -> bool {
+pub async fn is_running(app: AppHandle, secret: String) -> bool {
+    use crate::app_status::AppData;
     use tokio::net::TcpStream;
     use tokio::time::{timeout, Duration};
+
+    let app_data = app.state::<AppData>();
+    app_data.set_clash_secret(Some(secret.clone()));
 
     // 先快速检查端口是否开放
     if timeout(
@@ -360,25 +367,18 @@ pub async fn is_running(secret: String) -> bool {
 
 // 重载配置
 #[tauri::command]
-pub async fn reload_config(is_tun: bool) -> Result<String, String> {
+pub async fn reload_config(app: tauri::AppHandle, is_tun: bool) -> Result<String, String> {
     #[cfg(unix)]
     {
         use std::process::Command;
 
-        let (is_privileged, password_str) = {
+        let (is_privileged, password_str, needs_proxy_reset) = {
             let manager = PROCESS_MANAGER.lock().unwrap_or_else(|e| e.into_inner());
 
+            // 验证模式匹配
             match (manager.mode.as_ref().map(|m| m.as_ref()), is_tun) {
-                (Some(ProxyMode::TunProxy), true) => {
-                    let pwd = manager
-                        .tun_password
-                        .as_ref()
-                        .map(|p| p.as_str())
-                        .unwrap_or("")
-                        .to_string();
-                    (true, pwd)
-                }
-                (Some(ProxyMode::SystemProxy), false) => (false, String::new()),
+                (Some(ProxyMode::TunProxy), true) => {}
+                (Some(ProxyMode::SystemProxy), false) => {}
                 (Some(ProxyMode::TunProxy), false) => {
                     return Err("Current mode is TUN mode, not System Proxy mode".to_string());
                 }
@@ -389,31 +389,74 @@ pub async fn reload_config(is_tun: bool) -> Result<String, String> {
                     return Err("No running process found".to_string());
                 }
             }
+
+            let pwd = manager
+                .tun_password
+                .as_ref()
+                .map(|p| p.as_str())
+                .unwrap_or("")
+                .to_string();
+
+            // SystemProxy 模式需要在重载后重新设置代理
+            let needs_reset = matches!(
+                manager.mode.as_ref().map(|m| m.as_ref()),
+                Some(ProxyMode::SystemProxy)
+            );
+
+            (is_tun, pwd, needs_reset)
         };
 
+        log::info!("Reloading config using pkill -HUP sing-box");
+
+        // 使用 pkill 发送 SIGHUP 信号（兼容原始代码行为）
         let output = if is_privileged && !password_str.is_empty() {
+            // TUN 模式需要 sudo 权限
             let command = format!("echo '{}' | sudo -S pkill -HUP sing-box", password_str);
             Command::new("sh")
                 .arg("-c")
                 .arg(&command)
                 .output()
-                .map_err(|e| format!("Failed to send SIGHUP signal with sudo: {}", e))?
+                .map_err(|e| {
+                    log::error!("Failed to execute sudo pkill command: {}", e);
+                    format!("Failed to send SIGHUP with sudo: {}", e)
+                })?
         } else {
+            // System Proxy 模式直接发送信号
             Command::new("pkill")
                 .arg("-HUP")
                 .arg("sing-box")
                 .output()
-                .map_err(|e| format!("Failed to send SIGHUP signal: {}", e))?
+                .map_err(|e| {
+                    log::error!("Failed to execute pkill command: {}", e);
+                    format!("Failed to send SIGHUP: {}", e)
+                })?
         };
 
-        if output.status.success() {
-            Ok("Configuration reloaded successfully".to_string())
-        } else {
-            Err(format!(
-                "Failed to reload config: {}",
-                String::from_utf8_lossy(&output.stderr)
-            ))
+        if !output.status.success() {
+            let error = String::from_utf8_lossy(&output.stderr);
+            log::error!("Failed to send SIGHUP: {}", error);
+            return Err(format!("Failed to reload config: {}", error));
         }
+
+        log::info!("SIGHUP sent successfully");
+
+        // 如果是 SystemProxy 模式，需要等待进程重载后重新设置系统代理
+        if needs_proxy_reset {
+            log::info!("SystemProxy mode detected, waiting for reload and resetting proxy");
+
+            // 等待进程重载配置（通常很快）
+            tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+
+            // 重新设置系统代理，确保代理配置生效
+            if let Err(e) = PlatformVpnProxy::set_proxy(&app).await {
+                log::error!("Failed to reset system proxy after reload: {}", e);
+                return Err(format!("Config reloaded but failed to reset proxy: {}", e));
+            }
+
+            log::info!("System proxy reset successfully after reload");
+        }
+
+        Ok("Configuration reloaded successfully".to_string())
     }
 
     #[cfg(target_os = "windows")]
@@ -431,7 +474,6 @@ pub async fn reload_config(is_tun: bool) -> Result<String, String> {
             .map_err(|e| format!("Failed to get sidecar path: {}", e))?;
 
         PlatformVpnProxy::restart(sidecar_path, config_path);
-
         Ok("Configuration reload attempted by restarting process".to_string())
     }
 
