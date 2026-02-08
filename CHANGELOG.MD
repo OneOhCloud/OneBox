@@ -1,6 +1,6 @@
 # Changelog
 
-Version 1.2.31 (2026-02-07)
+Version 1.3.0 (2026-02-08)
 
 ## Changes since v1.2.28
 
@@ -8,12 +8,8 @@ All significant changes in this version are documented here.
 
 
 ### ⚠ CHANGES
-- Updated dependencies
-- Updated sing-box to v1.12.20
-- Fixed a bug in Tun mode on Windows
-- Refactored code for managing the kernel
-- Followed cache control headers to optimize remote configuration synchronization
-- Improved the command for getting the optimal local DNS server to avoid misjudgment caused by probing through the proxy when sing-box is running
+
+- Update sing-box core to v1.13.*
 
 ## 自 v1.2.28 以来的变更
 
@@ -22,12 +18,7 @@ All significant changes in this version are documented here.
 
 ### ⚠ 变更
 
-- 更新了依赖项
-- 重构了管理内核的代码
-- 更新 sing-box 至 v1.12.20
-- 遵循缓存控制头以优化远程配置同步
-- 修复 Tun 模式在 Windows 上的 bug 
-- 改进本地最佳 DNS 服务器的命令避免探测走代理导致误判
+- 更新 sing-box 内核至 v1.13.*
 
 
 
