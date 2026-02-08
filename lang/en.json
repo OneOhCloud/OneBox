@@ -31,7 +31,7 @@
     "config_viewer": "Config viewer",
     "configuration": "Config",
     "confirm": "Confirm",
-    "connect_failed_retry": "Connection failed, please quit the program and try again in a minute.",
+    "connect_failed_retry": "Connect failed, please restart your computer if the issue persists",
     "connect_failed": "Connect failed",
     "connected": "Connected",
     "connecting": "Connecting",

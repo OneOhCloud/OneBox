@@ -33,6 +33,7 @@ struct ProcessManager {
     mode: Option<Arc<ProxyMode>>,      // 使用 Arc 避免 clone
     tun_password: Option<Arc<String>>, // 使用 Arc 避免 clone
     config_path: Option<Arc<String>>,  // 使用 Arc 避免 clone
+    is_stopping: bool,                 // 标记是否正在执行stop操作
 }
 
 // 全局进程管理器
@@ -42,6 +43,7 @@ lazy_static! {
         mode: None,
         tun_password: None,
         config_path: None,
+        is_stopping: false,
     }));
 }
 
@@ -154,7 +156,32 @@ pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Resu
                             payload.code
                         );
 
-                        handle_process_termination(&app_handle, &mode_for_task, payload).await;
+                        // 在Windows平台下，如果正在执行stop操作，将退出码1重写为0
+                        let adjusted_payload = {
+                            #[cfg(target_os = "windows")]
+                            {
+                                let is_stopping = {
+                                    let manager =
+                                        PROCESS_MANAGER.lock().unwrap_or_else(|e| e.into_inner());
+                                    manager.is_stopping
+                                };
+
+                                if is_stopping && payload.code == Some(1) {
+                                    tauri_plugin_shell::process::TerminatedPayload {
+                                        code: Some(0),
+                                        signal: payload.signal,
+                                    }
+                                } else {
+                                    payload
+                                }
+                            }
+
+                            #[cfg(not(target_os = "windows"))]
+                            payload
+                        };
+
+                        handle_process_termination(&app_handle, &mode_for_task, adjusted_payload)
+                            .await;
                     }
                     _ => {}
                 }
@@ -180,6 +207,7 @@ pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Resu
             None
         };
         manager.child = child_opt;
+        manager.is_stopping = false;
     }
 
     // 设置或取消系统代理
@@ -231,6 +259,7 @@ async fn handle_process_termination(
             manager.mode = None;
             manager.config_path = None;
             manager.tun_password = None;
+            manager.is_stopping = false;
         }
         matches
     };
@@ -257,6 +286,15 @@ async fn handle_process_termination(
 #[tauri::command]
 pub async fn stop(app: tauri::AppHandle) -> Result<(), String> {
     log::info!("Stopping proxy process");
+
+    // 设置停止标志
+    {
+        let mut manager = PROCESS_MANAGER.lock().unwrap_or_else(|e| {
+            log::error!("Mutex lock error during stop flag setting: {:?}", e);
+            e.into_inner()
+        });
+        manager.is_stopping = true;
+    }
 
     let (mode, password, child) = {
         let mut manager = PROCESS_MANAGER.lock().unwrap_or_else(|e| {
@@ -321,6 +359,7 @@ pub async fn stop(app: tauri::AppHandle) -> Result<(), String> {
         manager.mode = None;
         manager.tun_password = None;
         manager.config_path = None;
+        manager.is_stopping = false;
     }
 
     log::info!("Proxy process stopped");
