@@ -115,7 +115,9 @@ export default function Configuration() {
 }
 
 
+
 export function ConfigurationBody() {
+
     const [expanded, setExpanded] = useState("")
     const { data, error, isLoading } = useSubscriptions()
 
@@ -156,6 +158,11 @@ export function ConfigurationBody() {
                             item={item}
                             expanded={expanded}
                             setExpanded={setExpanded}
+                            onUpdateDone={async () => {
+                                // 订阅更新完成后，重新拉取订阅列表数据
+                                await mutate(GET_SUBSCRIPTIONS_LIST_SWR_KEY)
+                            }}
+
                         ></SubscriptionItem>
                     })
                 }
