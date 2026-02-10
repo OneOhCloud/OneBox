@@ -9,6 +9,7 @@ All significant changes in this version are documented here.
 
 ### ⚠ CHANGES
 - Updated dependencies
+- Updated sing-box to v1.12.21
 - Fixed bugs on Windows platform
 
 ## 自 v1.2.32 以来的变更
@@ -20,6 +21,7 @@ All significant changes in this version are documented here.
 
 - 更新了依赖项
 - 修复 Windows 平台上的 bug
+- 更新 sing-box 至 v1.12.21
 
 
 
