@@ -140,9 +140,35 @@ https://v2.tauri.app/learn/window-customization/
   background-color: rgba(75, 85, 99, 0.5);
 }
 
+
+/* 
+ZH: 禁止全局选中
+EN: Disable global text selection 
+*/
+:root {
+  /*
+  ZH: 针对 Tauri 使用的 WebKit/WebView2 内核 
+  EN: For Tauri's WebKit/WebView2 engine
+  */
+  -webkit-user-select: none; 
+  user-select: none;
+}
+
+/* 
+ZH: 允许输入框和可编辑内容被选中
+EN: Allow text selection in input fields and contenteditable elements
+*/
+input, textarea, [contenteditable="true"] {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
 @import "tailwindcss";
 @plugin "daisyui" {
    themes: light --default, light --prefersdark;
  }
 
 :root { text-autospace: normal; }
+
+
+

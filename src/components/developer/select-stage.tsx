@@ -62,7 +62,7 @@ export default function StageSetting() {
 
             {modalOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm h-[100.2dvh]">
-                    <div className="flex flex-col justify-between bg-white  p-6 rounded-xl w-[95dvw] min-h-[304px] max-w-md shadow-xl border border-gray-200 ">
+                    <div className="flex flex-col justify-between bg-white  p-6 rounded-xl w-[95dvw] min-h-76 max-w-md shadow-xl border border-gray-200 ">
                         <h3 className="text-center text-lg font-medium mb-4 dark:text-white">{t("")}</h3>
 
                         <div className="bg-[#F2F2F7]  rounded-xl overflow-hidden ">
