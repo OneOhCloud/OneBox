@@ -31,7 +31,7 @@ export function TabContent({ rules, addRule, removeRule, domainInput, setDomainI
         <div>
             <HelpModal isOpen={showHelp} onClose={() => setShowHelp(false)} />
 
-            <div className="px-4 py-2 space-y-6  h-[400px] overflow-y-auto  ">
+            <div className="px-4 py-2 space-y-6  h-100 overflow-y-auto  ">
                 {/* 域名规则 */}
 
                 <div className="space-y-3">

@@ -11,6 +11,8 @@ import { UpdateProvider } from './components/settings/update-context';
 import { syncAllConfigTemplates } from "./hooks/useSwr";
 import HomePage from "./page/home";
 import { ActiveScreenType, NavContext } from './single/context';
+import { getStoreValue } from "./single/store";
+import { DEVELOPER_TOGGLE_STORE_KEY } from "./types/definition";
 import { initLanguage, t } from './utils/helper';
 
 const ConfigurationPage = React.lazy(() => import('./page/config'));
@@ -18,6 +20,8 @@ const DevPage = React.lazy(() => import('./page/developer'));
 const SettingsPage = React.lazy(() => import('./page/settings'));
 const RouterSettingsPage = React.lazy(() => import('./page/router'));
 const UpdaterButton = React.lazy(() => import('./components/settings/updater-button'));
+
+
 
 
 type BodyProps = {
@@ -86,6 +90,7 @@ function Body({ lang, activeScreen }: BodyProps) {
 }
 
 
+
 function App() {
   const [activeScreen, setActiveScreen] = useState<ActiveScreenType>('home');
   const [isSettingsHovered, setIsSettingsHovered] = useState(false);
@@ -103,6 +108,28 @@ function App() {
 
   const [language, setLanguage] = useState('unknown');
 
+
+  useEffect(() => {
+    let isDeveloperMode = false;
+
+    // 初始化时获取一次
+    getStoreValue(DEVELOPER_TOGGLE_STORE_KEY, false).then((val) => {
+      isDeveloperMode = val;
+    });
+
+    const handler = (e: MouseEvent) => {
+      if (!isDeveloperMode) {
+        e.preventDefault();
+      }
+    };
+
+    document.addEventListener('contextmenu', handler);
+
+    // 清理事件
+    return () => {
+      document.removeEventListener('contextmenu', handler);
+    };
+  }, []);
 
   useEffect(() => {
     const handleLanguageChange = () => {

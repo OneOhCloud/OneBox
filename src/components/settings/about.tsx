@@ -100,7 +100,7 @@ function About({ onClose }: AboutProps) {
             </dialog>
 
             <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center pointer-events-none">
-                <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-none max-w-md w-full max-h-[100vh] overflow-hidden flex flex-col pointer-events-auto">
+                <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-none max-w-md w-full max-h-screen overflow-hidden flex flex-col pointer-events-auto">
                     {/* 标题栏 */}
                     <div className="flex justify-between items-center px-4 py-3 border-b border-gray-100">
                         <div className="text-lg font-semibold capitalize">{t("about")}</div>
@@ -134,7 +134,7 @@ function About({ onClose }: AboutProps) {
                             </div>
 
                             <div className='w-full flex justify-center'>
-                                <div className="overflow-x-auto  max-w-[260px] py-2 rounded-md">
+                                <div className="overflow-x-auto  max-w-65 py-2 rounded-md">
                                     <p className="text-gray-500/50 text-[0.8rem] mt-1 whitespace-nowrap  cursor-pointer" onClick={async () => {
                                         const handleCopy = async (ua: string) => {
                                             await navigator.clipboard.writeText(ua);

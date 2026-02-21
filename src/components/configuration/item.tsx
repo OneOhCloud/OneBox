@@ -15,6 +15,7 @@ interface SubscriptionItemProps {
     item: Subscription
     expanded: string
     setExpanded: (id: string) => void
+    onUpdateDone: () => void
 }
 
 interface ItemDetailsProps {
@@ -173,7 +174,8 @@ function SubscriptionItemSkeleton(props: SubscriptionItemSkeletonProps) {
 export const SubscriptionItem: React.FC<SubscriptionItemProps> = ({
     item,
     expanded,
-    setExpanded
+    setExpanded,
+    onUpdateDone
 }) => {
 
     const usage = Math.floor((item.used_traffic / item.total_traffic) * 100)
@@ -197,8 +199,9 @@ export const SubscriptionItem: React.FC<SubscriptionItemProps> = ({
     }, [loading, message]);
 
     useEffect(() => {
-        const handleUpdateEvent = () => {
-            update(item.identifier)
+        const handleUpdateEvent = async () => {
+            await update(item.identifier)
+            onUpdateDone()
         }
         window.addEventListener("update-all-subscriptions", handleUpdateEvent)
         return () => {

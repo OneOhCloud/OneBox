@@ -9,7 +9,6 @@ use tauri_plugin_shell::ShellExt;
 use std::ffi::OsStr;
 use std::os::windows::ffi::OsStrExt;
 use windows::core::PCWSTR;
-use windows::Win32::Foundation::HWND;
 use windows::Win32::UI::Shell::ShellExecuteW;
 
 use crate::vpn::helper;
@@ -129,7 +128,7 @@ pub fn create_privileged_command(
         .collect::<Vec<u16>>();
     let res = unsafe {
         ShellExecuteW(
-            HWND(0),
+            None,
             PCWSTR(verb.as_ptr()),
             PCWSTR(sidecar_wide.as_ptr()),
             PCWSTR(args_wide.as_ptr()),
@@ -161,7 +160,7 @@ pub fn stop_tun_process(_password: &str) -> Result<(), String> {
         .collect::<Vec<u16>>();
     let res = unsafe {
         ShellExecuteW(
-            HWND(0),
+            None,
             PCWSTR(verb.as_ptr()),
             PCWSTR(taskkill.as_ptr()),
             PCWSTR(args.as_ptr()),
@@ -201,7 +200,7 @@ pub fn restart_privileged_command(sidecar_path: String, path: String) -> Result<
 
     let res = unsafe {
         ShellExecuteW(
-            HWND(0),
+            None,
             PCWSTR(verb.as_ptr()),
             PCWSTR(powershell.as_ptr()),
             PCWSTR(args_wide.as_ptr()),

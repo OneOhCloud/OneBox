@@ -123,7 +123,7 @@ function DownloadProgress({
     return (
         <div className="animate-fadeIn">
             <div
-                className="h-[2px] bg-primary rounded-2xl transition-all duration-300 ease-out"
+                className="h-0.5 bg-primary rounded-2xl transition-all duration-300 ease-out"
                 style={{ width: `${downloadProgress}%` }}
             />
         </div>
