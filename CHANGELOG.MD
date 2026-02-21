@@ -10,6 +10,7 @@ All significant changes in this version are documented here.
 ### ⚠ CHANGES
 - Updated dependencies
 - Fixed bugs on Windows platform
+- Fixed bug #25 on macOS platform
 - Updated sing-box core to v1.13.*
 - Fixed issue where subscription items did not refresh the list after updating
 
@@ -21,6 +22,7 @@ All significant changes in this version are documented here.
 ### ⚠ 变更
 
 - 更新了依赖项
+- 修复 macOS 平台上的 bug #25
 - 修复 Windows 平台上的 bug
 - 更新 sing-box 内核至 v1.13.*
 - 修复订阅项更新后未刷新列表的问题
