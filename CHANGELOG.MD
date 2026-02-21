@@ -1,6 +1,6 @@
 # Changelog
 
-Version 1.3.2 (2026-02-08)
+Version 1.3.4 (2026-02-21)
 
 ## Changes since v1.2.28
 
