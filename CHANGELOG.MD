@@ -1,6 +1,6 @@
 # Changelog
 
-Version 1.3.4 (2026-02-21)
+{{version-tag-date}}
 
 ## Changes since v1.2.32
 

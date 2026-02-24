@@ -42,34 +42,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Read CHANGELOG
-        id: changelog
-        shell: bash
-        run: |
-          if [[ "$OSTYPE" == "darwin"* ]]; then
-            # macOS
-            content=$(base64 < CHANGELOG.MD | tr -d '\n')
-          else
-            # Linux
-            content=$(base64 -w 0 CHANGELOG.MD)
-          fi
-          echo "content=${content}" >> $GITHUB_OUTPUT
-
-      - name: Decode CHANGELOG
-        id: decode
-        shell: bash
-        run: |
-          if [[ "$OSTYPE" == "darwin"* ]]; then
-            # macOS
-            content=$(echo "${{ steps.changelog.outputs.content }}" | base64 -D)
-          else
-            # Linux
-            content=$(echo "${{ steps.changelog.outputs.content }}" | base64 -d)
-          fi
-          echo "content<<EOF" >> $GITHUB_OUTPUT
-          echo "$content" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-
       - name: Get Tauri Version
         id: tauri_version
         run: echo "version=$(node -p "require('./src-tauri/tauri.conf.json').version")" >> $GITHUB_OUTPUT
@@ -103,6 +75,18 @@ jobs:
 
       - name: Install Frontend Dependencies
         run: bun install
+
+      - name: Process CHANGELOG
+        run: bun run scripts/process-changelog.ts
+
+      - name: Read CHANGELOG
+        id: decode
+        run: |
+          content=$(cat CHANGELOG.MD)
+          echo "content<<EOF" >> $GITHUB_OUTPUT
+          echo "$content" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+        shell: bash
 
       - name: Download Binaries
         run: bun run scripts/download-binaries.ts
