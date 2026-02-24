@@ -30,7 +30,7 @@ function processChangelog(): void {
 
     const version = getAppVersion();
     const date = getCurrentDate();
-    const replacement = `Version ${version} (${date})`;
+    const replacement = `Version ${version} (${date} UTC)`;
 
     // 替换占位符
     content = content.replace(/\{\{version-tag-date\}\}/g, replacement);
