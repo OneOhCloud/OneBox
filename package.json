@@ -29,7 +29,7 @@
     "@tauri-apps/plugin-window-state": "^2.4.1",
     "bytes": "^3.1.2",
     "clsx": "^2.1.1",
-    "framer-motion": "^12.34.3",
+    "framer-motion": "^12.35.2",
     "jsonc": "^2.0.0",
     "jsonc-parser": "^3.3.1",
     "react": "^19.2.4",
@@ -41,16 +41,16 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@tauri-apps/cli": "^2.10.0",
+    "@tauri-apps/cli": "^2.10.1",
     "@types/bytes": "^3.1.5",
-    "@types/node": "^25.3.2",
+    "@types/node": "^25.3.5",
     "@types/unzipper": "^0.10.11",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.4",
     "daisyui": "^5.5.19",
     "husky": "^9.1.7",
-    "tar": "^7.5.9",
+    "tar": "^7.5.11",
     "typescript": "~5.9.3",
     "unzipper": "^0.12.3",
     "vite": "^7.3.1"
