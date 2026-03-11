@@ -5,6 +5,8 @@ pub struct AppData {
     pub log_buffer: Mutex<Vec<String>>,
     pub error_log_buffer: Mutex<Vec<String>>,
     pub clash_secret: Mutex<Option<String>>,
+    /// 冷启动时通过 deep link 携带的待处理数据（已 URL-decode），前端就绪后主动拉取
+    pub pending_deep_link: Mutex<Option<String>>,
 }
 
 pub enum LogType {
@@ -19,6 +21,7 @@ impl AppData {
             error_log_buffer: Mutex::new(Vec::new()),
             cached_dns: Mutex::new(None),
             clash_secret: Mutex::new(None),
+            pending_deep_link: Mutex::new(None),
         }
     }
 

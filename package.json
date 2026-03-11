@@ -15,6 +15,7 @@
     "@tauri-apps/api": "^2.10.1",
     "@tauri-apps/plugin-autostart": "^2.5.1",
     "@tauri-apps/plugin-clipboard-manager": "~2.3.2",
+    "@tauri-apps/plugin-deep-link": "~2.4.7",
     "@tauri-apps/plugin-dialog": "^2.6.0",
     "@tauri-apps/plugin-fs": "~2.4.5",
     "@tauri-apps/plugin-http": "~2.5.7",
@@ -43,7 +44,7 @@
   "devDependencies": {
     "@tauri-apps/cli": "^2.10.1",
     "@types/bytes": "^3.1.5",
-    "@types/node": "^25.3.5",
+    "@types/node": "^25.4.0",
     "@types/unzipper": "^0.10.11",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",

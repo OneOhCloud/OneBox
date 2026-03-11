@@ -47,3 +47,12 @@ pub fn copy_database_files(app: &AppHandle) -> Result<(), Box<dyn std::error::Er
 
     Ok(())
 }
+
+pub fn show_dashboard(app: AppHandle) {
+    if let Some(w) = app.get_webview_window("main") {
+        #[cfg(any(target_os = "windows", target_os = "linux"))]
+        w.unminimize().unwrap();
+        w.show().unwrap();
+        w.set_focus().unwrap();
+    }
+}

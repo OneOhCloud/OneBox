@@ -13,10 +13,7 @@ mod vpn;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let migrations = database::get_migrations();
-    let builder = tauri::Builder::default()
-        .plugin(tauri_plugin_log::Builder::new().build())
-        .plugin(tauri_plugin_clipboard_manager::init())
-        .plugin(tauri_plugin_http::init());
+    let builder = tauri::Builder::default();
 
     plugins::register_plugins(builder, migrations)
         .invoke_handler(tauri::generate_handler![
@@ -38,6 +35,7 @@ pub fn run() {
             command::create_window,
             command::open_directory,
             command::get_app_version,
+            command::get_pending_deep_link,
             privilege::is_privileged,
             privilege::save_privilege_password_to_keyring,
         ])

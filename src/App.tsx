@@ -1,5 +1,7 @@
 import "./App.css";
 
+import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
 import { motion } from 'framer-motion';
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import { GearWideConnected, House, Layers } from 'react-bootstrap-icons';
@@ -107,6 +109,36 @@ function App() {
   })
 
   const [language, setLanguage] = useState('unknown');
+  const [deepLinkUrl, setDeepLinkUrl] = useState<string>('');
+
+  useEffect(() => {
+    const unlistenPromise = listen<string>('deep_link_config', (event) => {
+      if (!event?.payload) return;
+      try {
+        const decoded = atob(event.payload);
+        setDeepLinkUrl(decoded);
+        setActiveScreen('configuration');
+      } catch (e) {
+        console.error('Failed to decode deep_link_config payload:', e);
+      }
+    });
+
+    // 冷启动时前端未就绪，事件已被错过，主动拉取 Rust 侧缓存的 pending deep link
+    invoke<string | null>('get_pending_deep_link').then((value) => {
+      if (!value) return;
+      try {
+        const decoded = atob(value);
+        setDeepLinkUrl(decoded);
+        setActiveScreen('configuration');
+      } catch (e) {
+        console.error('Failed to decode pending deep link:', e);
+      }
+    });
+
+    return () => {
+      unlistenPromise.then(fn => fn());
+    };
+  }, []);
 
 
   useEffect(() => {
@@ -160,7 +192,7 @@ function App() {
 
 
   return (
-    <NavContext.Provider value={{ activeScreen, setActiveScreen, handleLanguageChange }}>
+    <NavContext.Provider value={{ activeScreen, setActiveScreen, handleLanguageChange, deepLinkUrl, setDeepLinkUrl }}>
       <UpdateProvider>
         <Toaster position="top-center" toastOptions={{ duration: 2000 }} />
 

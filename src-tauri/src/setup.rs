@@ -1,5 +1,9 @@
+use tauri::Emitter;
 use tauri::Manager;
+use tauri_plugin_deep_link::DeepLinkExt;
 use tauri_plugin_http::reqwest;
+
+use crate::utils::show_dashboard;
 
 /// App 初始化逻辑，对应 Builder::setup 闭包
 pub fn app_setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
@@ -41,6 +45,7 @@ pub fn app_setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>>
     });
 
     // macOS：以无 Dock 图标的附件模式运行，启动时直接显示主窗口
+    // 此模式下，访达点击已运行 App 图标时触发 Reopen 事件，需要监听此事件将隐藏的主窗口重新显示
     #[cfg(target_os = "macos")]
     {
         app.set_activation_policy(tauri::ActivationPolicy::Accessory);
@@ -49,6 +54,49 @@ pub fn app_setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>>
             w.set_focus().unwrap();
         }
     }
+    #[cfg(any(target_os = "linux", all(debug_assertions, windows)))]
+    {
+        app.deep_link().register_all()?;
+    }
+
+    let handle = app.handle().clone();
+    app.deep_link().on_open_url(move |event| {
+        let urls = event.urls();
+        log::info!("Received deep link: {:#?}", urls);
+        show_dashboard(handle.clone());
+
+        if let Some(url) = urls.first() {
+            if url.scheme() == "oneoh-networktools" && url.host_str() == Some("config") {
+                if let Some(query) = url.query() {
+                    let params: Vec<(&str, &str)> = query
+                        .split('&')
+                        .filter_map(|pair| {
+                            let mut iter = pair.splitn(2, '=');
+                            if let (Some(key), Some(value)) = (iter.next(), iter.next()) {
+                                Some((key, value))
+                            } else {
+                                None
+                            }
+                        })
+                        .collect();
+                    for (key, value) in params {
+                        if key == "data" {
+                            log::info!("Received config data: {}", value);
+                            // 先写入 state，前端就绪后可主动拉取（冷启动场景）
+                            let app_data = handle.state::<crate::state::AppData>();
+                            if let Ok(mut pending) = app_data.pending_deep_link.lock() {
+                                *pending = Some(value.to_string());
+                            }
+                            // 同时尝试 emit，热启动（前端已就绪）时直接触发
+                            handle.emit("deep_link_config", value).unwrap_or_else(|e| {
+                                log::error!("Failed to emit deep_link_config event: {}", e);
+                            });
+                        }
+                    }
+                }
+            }
+        }
+    });
 
     Ok(())
 }

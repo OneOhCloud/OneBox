@@ -11,6 +11,7 @@ All significant changes in this version are documented here.
 
 - Updated dependencies
 - Updated sing-box core to v1.13.0
+- Added support for deep-linking, allowing configuration files to be imported via URL
 
 
 ## 自 v1.3.5 以来的变更
@@ -22,8 +23,7 @@ All significant changes in this version are documented here.
 
 - 更新了依赖项
 - 更新 sing-box 内核至 v1.13.0
-
-
+- 支持 deep-linking，允许通过 URL 导入配置文件
 
 
 ---

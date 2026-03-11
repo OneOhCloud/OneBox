@@ -29,6 +29,7 @@
     "shell:allow-stdin-write",
     "shell:default",
     "updater:default",
-    "clipboard-manager:allow-write-text"
+    "clipboard-manager:allow-write-text",
+    "deep-link:default"
   ]
 }

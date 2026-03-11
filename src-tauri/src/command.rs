@@ -155,6 +155,15 @@ pub fn read_logs(app_data: tauri::State<AppData>, is_error: bool) -> String {
 }
 
 #[tauri::command]
+pub fn get_pending_deep_link(app_data: tauri::State<AppData>) -> Option<String> {
+    if let Ok(mut pending) = app_data.pending_deep_link.lock() {
+        pending.take()
+    } else {
+        None
+    }
+}
+
+#[tauri::command]
 pub async fn version(app: tauri::AppHandle) -> Result<String, String> {
     let sidecar_command = app.shell().sidecar("sing-box").map_err(|e| e.to_string())?;
     let output = sidecar_command

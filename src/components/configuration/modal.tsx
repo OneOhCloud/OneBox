@@ -1,24 +1,8 @@
 import { motion } from "framer-motion";
 import { useState } from "react";
 import { CheckCircle, CloudArrowDown, ExclamationTriangle, InfoCircle, Plus, XCircle } from "react-bootstrap-icons";
-import { mutate } from "swr";
-import { z } from "zod";
-import { useAddSubscription } from "../../action/subscription-hooks";
-import { GET_SUBSCRIPTIONS_LIST_SWR_KEY } from "../../types/definition";
+import { MessageType, ValidationErrors, useModalState } from "../../action/modal-state-hook";
 import { t } from "../../utils/helper";
-
-type Step = 'form' | 'loading' | 'result';
-
-// 定义验证模式
-const subscriptionSchema = z.object({
-    name: z.string().optional(),
-    url: z.url(t("please_input_valid_url")).min(1, t("url_cannot_empty"))
-});
-
-type ValidationErrors = {
-    name?: string;
-    url?: string;
-};
 
 interface FormStepProps {
     name: string;
@@ -33,8 +17,6 @@ interface FormStepProps {
 interface LoadingStepProps {
     loading: boolean;
 }
-
-type MessageType = 'success' | 'error' | 'warning' | undefined;
 
 interface ResultStepProps {
     message: string;
@@ -152,66 +134,8 @@ const ResultStep: React.FC<ResultStepProps> = ({ message, messageType, onClose }
 
 
 export function AddSubConfigurationModal() {
-    const [showModal, setShowModal] = useState<boolean>(false);
-    const [isHovering, setIsHovering] = useState<boolean>(false);
-    const [name, setName] = useState<string>("");
-    const [url, setUrl] = useState<string>("");
-    const [errors, setErrors] = useState<ValidationErrors>({});
-    const [step, setStep] = useState<Step>('form');
-
-    const { add, resetMessage, loading, message, messageType } = useAddSubscription();
-    const handleItemClick = (): void => {
-        setName("");
-        setUrl("");
-        setErrors({});
-        setStep('form');
-        resetMessage();
-        setShowModal(true);
-    };
-
-
-    const handleClose = (): void => {
-        setShowModal(false);
-        setStep('form');
-        resetMessage();
-    };
-
-    const validateForm = (): boolean => {
-        try {
-            subscriptionSchema.parse({ name, url });
-            setErrors({});
-            return true;
-        } catch (error) {
-            if (error instanceof z.ZodError) {
-                const newErrors: ValidationErrors = {};
-                error.issues.forEach(err => {
-                    const path = err.path[0] as keyof ValidationErrors;
-                    newErrors[path] = err.message;
-                });
-                setErrors(newErrors);
-            }
-            return false;
-        }
-    };
-
-    const handleAdd = async (): Promise<void> => {
-        if (validateForm()) {
-            setStep('loading');
-            await add(url, name);
-            mutate(GET_SUBSCRIPTIONS_LIST_SWR_KEY);
-            setStep('result');
-        }
-    };
-
-    const handleNameChange = (value: string): void => {
-        setName(value);
-        if (errors.name) validateForm();
-    };
-
-    const handleUrlChange = (value: string): void => {
-        setUrl(value);
-        if (errors.url) validateForm();
-    };
+    const [isHovering, setIsHovering] = useState(false);
+    const { open, step, name, url, errors, message, messageType, loading, openModal, closeModal, onNameChange, onUrlChange, submit } = useModalState();
 
     return (
         <>
@@ -219,7 +143,7 @@ export function AddSubConfigurationModal() {
                 className="p-1 rounded-full hover:bg-gray-100 transition-colors border-0 bg-transparent cursor-pointer"
                 onMouseEnter={() => setIsHovering(true)}
                 onMouseLeave={() => setIsHovering(false)}
-                onClick={handleItemClick}
+                onClick={() => openModal()}
             >
                 <motion.div
                     animate={{ rotate: isHovering ? 90 : 0 }}
@@ -229,35 +153,27 @@ export function AddSubConfigurationModal() {
                 </motion.div>
             </button>
 
-            {showModal && (
+            {open && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
-                    {/* 背景遮罩 */}
-                    <div
-                        className="absolute inset-0 bg-gray-400/60"
-                        onClick={handleClose}
-                    />
-
-                    {/* 模态框内容 */}
+                    <div className="absolute inset-0 bg-gray-400/60" onClick={closeModal} />
                     <div className="relative bg-white rounded-lg p-3 w-80 max-w-full min-h-45 flex flex-col justify-center">
                         {step === 'form' && (
                             <FormStep
                                 name={name}
                                 url={url}
                                 errors={errors}
-                                onNameChange={handleNameChange}
-                                onUrlChange={handleUrlChange}
-                                onClose={handleClose}
-                                onAdd={handleAdd}
+                                onNameChange={onNameChange}
+                                onUrlChange={onUrlChange}
+                                onClose={closeModal}
+                                onAdd={submit}
                             />
                         )}
-                        {step === 'loading' && (
-                            <LoadingStep loading={loading} />
-                        )}
+                        {step === 'loading' && <LoadingStep loading={loading} />}
                         {step === 'result' && (
                             <ResultStep
                                 message={message}
                                 messageType={messageType}
-                                onClose={handleClose}
+                                onClose={closeModal}
                             />
                         )}
                     </div>

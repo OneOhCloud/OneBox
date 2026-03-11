@@ -52,6 +52,7 @@ webbrowser = "1.0.4"
 keyring = { version = "3", features = ["apple-native", "windows-native", "sync-secret-service"] }
 rand = "0.10.0"
 png = "0.18.1"
+tauri-plugin-deep-link = "2"
 
 
 [target.'cfg(target_os = "windows")'.dependencies]

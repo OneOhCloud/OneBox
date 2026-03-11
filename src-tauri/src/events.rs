@@ -1,15 +1,12 @@
 use tauri::{AppHandle, Manager, RunEvent, Window, WindowEvent};
 
+use crate::utils::show_dashboard;
+
 /// Builder::on_menu_event 处理器
 pub fn on_menu_event(app: &AppHandle, event: tauri::menu::MenuEvent) {
     match event.id.as_ref() {
         "show" => {
-            if let Some(w) = app.get_webview_window("main") {
-                #[cfg(any(target_os = "windows", target_os = "linux"))]
-                w.unminimize().unwrap();
-                w.show().unwrap();
-                w.set_focus().unwrap();
-            }
+            show_dashboard(app.clone());
         }
         "quit" => {
             crate::command::sync_quit(app.clone());
