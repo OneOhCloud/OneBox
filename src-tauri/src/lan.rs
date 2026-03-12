@@ -10,8 +10,7 @@ use tokio::sync::mpsc;
 const DEFAULT_CAPTIVE_URL: &str = "http://captive.oneoh.cloud";
 
 // Global DNS server list for performance testing
-static DNSSERVERDICT: [&str; 30] = [
-    "1.0.0.1", // Cloudflare DNS
+static DNSSERVERDICT: [&str; 29] = [
     "1.1.1.1", // Cloudflare DNS
     "1.2.4.8", // CN DNS
     "101.101.101.101",
@@ -43,7 +42,7 @@ static DNSSERVERDICT: [&str; 30] = [
     "9.9.9.9", // Quad9 DNS
 ];
 
-#[cfg(target_os = "macos")]
+#[allow(dead_code)]
 fn is_private_ip(ip: &str) -> bool {
     let parts: Vec<&str> = ip.split('.').collect();
     if parts.len() != 4 {

@@ -406,6 +406,7 @@ pub async fn is_running(app: AppHandle, secret: String) -> bool {
 
 // 重载配置
 #[tauri::command]
+#[allow(unused_variables)]
 pub async fn reload_config(app: tauri::AppHandle, is_tun: bool) -> Result<String, String> {
     #[cfg(unix)]
     {

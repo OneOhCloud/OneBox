@@ -60,7 +60,8 @@ pub fn app_setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>>
     }
 
     let handle = app.handle().clone();
-    app.deep_link().on_open_url(move |event| {
+    let deep_link = app.deep_link();
+    deep_link.on_open_url(move |event| {
         let urls = event.urls();
         log::info!("Received deep link: {:#?}", urls);
         show_dashboard(handle.clone());
@@ -97,6 +98,31 @@ pub fn app_setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>>
             }
         }
     });
+
+    // Cold-start on Windows/Linux: handle_cli_arguments() ran during plugin init,
+    // before on_open_url was registered, so the event was missed.
+    // Directly write to pending_deep_link now so the frontend can retrieve it
+    // synchronously via get_pending_deep_link once the webview is ready.
+    #[cfg(any(windows, target_os = "linux"))]
+    if let Ok(Some(urls)) = deep_link.get_current() {
+        if let Some(url) = urls.first() {
+            if url.scheme() == "oneoh-networktools" && url.host_str() == Some("config") {
+                if let Some(query) = url.query() {
+                    for pair in query.split('&') {
+                        let mut iter = pair.splitn(2, '=');
+                        if let (Some("data"), Some(value)) = (iter.next(), iter.next()) {
+                            log::info!("Cold-start deep link config data: {}", value);
+                            let app_data = app.state::<crate::state::AppData>();
+                            if let Ok(mut pending) = app_data.pending_deep_link.lock() {
+                                *pending = Some(value.to_string());
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     Ok(())
 }

@@ -3,10 +3,21 @@ use tauri::{AppHandle, Builder, Manager, Wry};
 use tauri_plugin_autostart::MacosLauncher;
 use tauri_plugin_sql::Migration;
 
+#[allow(unused_variables)]
 pub fn register_plugins(builder: Builder<Wry>, migrations: Vec<Migration>) -> Builder<Wry> {
     builder
         .plugin(tauri_plugin_single_instance::init(
-            |app: &AppHandle, _args, _cwd| {
+            |app: &AppHandle, args, _cwd| {
+                // On Windows, deep links arrive as CLI args to a new process.
+                // single_instance kills that process and gives us its args here.
+                // We must forward the URL manually so on_open_url fires.
+                #[cfg(windows)]
+                {
+                    use tauri::Emitter;
+                    if let Some(url_str) = args.iter().skip(1).find(|a| a.contains("://")) {
+                        let _ = app.emit("deep-link://new-url", vec![url_str.as_str()]);
+                    }
+                }
                 show_window(app);
             },
         ))
