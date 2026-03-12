@@ -324,7 +324,7 @@ async fn probe_dns_server(dns: String, tx: Option<mpsc::Sender<(String, std::tim
 }
 
 pub async fn get_best_dns_server() -> Option<String> {
-    let first_dns = DNSSERVERDICT[0].to_string();
+    let backup_dns = "223.5.5.5".to_string();
 
     // buffer 设 1，第一个成功的 send 立刻送进去，主流程立刻收到
     // Set the buffer to 1, the first successful send goes in immediately, and the main process receives it immediately
@@ -352,9 +352,9 @@ pub async fn get_best_dns_server() -> Option<String> {
         }
         None => {
             // All DNS servers failed, fall back to the first one
-            let padded_dns: String = format!("{:<20}", first_dns);
+            let padded_dns: String = format!("{:<20}", backup_dns);
             log::info!("✗ All DNS servers failed, falling back to: {}", padded_dns);
-            Some(first_dns)
+            Some(backup_dns)
         }
     }
 }
