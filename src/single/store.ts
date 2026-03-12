@@ -226,7 +226,7 @@ export async function setConfigTemplateURL(mode: configType, url: string) {
 
 export async function getDefaultConfigTemplateURL(mode: configType): Promise<string> {
     const remoteUrl = "https://onebox-updater.oneoh.cloud/conf-template";
-    let stageVersion: StageVersionType = await getStoreValue(STAGE_VERSION_STORE_KEY)
+    let stageVersion: StageVersionType = await getStoreValue(STAGE_VERSION_STORE_KEY, "stable")
 
     let versionNumber = SING_BOX_VERSION.replace('v', '').split('.')
     let major = versionNumber[0];
