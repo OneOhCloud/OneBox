@@ -124,5 +124,35 @@ pub fn app_setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>>
         }
     }
 
+    // 生命周期事件监听：仅 Windows / macOS 支持
+    #[cfg(any(target_os = "windows", target_os = "macos"))]
+    {
+        use crate::vpn::{PlatformVpnProxy, VpnProxy};
+
+        let handle = app.handle().clone();
+        let rx = onebox_lifecycle::Sentinel::start().into_receiver();
+
+        std::thread::Builder::new()
+            .name("lifecycle-events".into())
+            .spawn(move || {
+                while let Some(event) = rx.recv() {
+                    use onebox_lifecycle::SystemEvent;
+                    match event {
+                        SystemEvent::ShuttingDown(shutdown_handle) => {
+                            let h = handle.clone();
+                            std::thread::spawn(move || {
+                                tauri::async_runtime::block_on(async {
+                                    PlatformVpnProxy::unset_proxy(&h).await.ok();
+                                });
+                                shutdown_handle.allow();
+                            });
+                        }
+                        _ => {}
+                    }
+                }
+            })
+            .expect("failed to spawn lifecycle thread");
+    }
+
     Ok(())
 }

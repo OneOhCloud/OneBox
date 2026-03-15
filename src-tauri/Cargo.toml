@@ -55,6 +55,9 @@ png = "0.18.1"
 tauri-plugin-deep-link = "2"
 
 
+[target.'cfg(any(target_os = "windows", target_os = "macos"))'.dependencies]
+onebox_lifecycle = { git = "https://github.com/OneOhCloud/onebox-lifecycle" }
+
 [target.'cfg(target_os = "windows")'.dependencies]
 winapi = { version = "0.3", features = ["winbase"] }
 windows = { version = "0.62.2", features = ["Win32_Foundation", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging"] }
