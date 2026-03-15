@@ -143,6 +143,7 @@ pub fn app_setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>>
                             std::thread::spawn(move || {
                                 tauri::async_runtime::block_on(async {
                                     PlatformVpnProxy::unset_proxy(&h).await.ok();
+                                    log::info!("Handled system shutdown event, VPN proxy unset if it was set")
                                 });
                                 shutdown_handle.allow();
                             });
