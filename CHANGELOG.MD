@@ -2,7 +2,7 @@
 
 {{version-tag-date}}
 
-## Changes since v1.3.5
+## Changes since v1.3.8
 
 All significant changes in this version are documented here.
 
@@ -10,11 +10,10 @@ All significant changes in this version are documented here.
 ### ⚠ CHANGES
 
 - Updated dependencies
-- Updated sing-box core to v1.13.0
-- Added support for deep-linking, allowing configuration files to be imported via URL
+- Support clearing proxy settings on shutdown
 
 
-## 自 v1.3.5 以来的变更
+## 自 v1.3.8 以来的变更
 
 本版本的所有重要变更将记录于此。
 
@@ -22,8 +21,7 @@ All significant changes in this version are documented here.
 ### ⚠ 变更
 
 - 更新了依赖项
-- 更新 sing-box 内核至 v1.13.0
-- 支持 deep-linking，允许通过 URL 导入配置文件
+- 支持关机清理代理设置
 
 
 ---
