@@ -127,9 +127,9 @@ pub fn app_setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>>
     // 生命周期事件监听：仅 Windows / macOS 支持
     #[cfg(any(target_os = "windows", target_os = "macos"))]
     {
-        use crate::vpn::{PlatformVpnProxy, VpnProxy};
-
+        #[cfg(target_os = "macos")]
         let handle = app.handle().clone();
+
         let rx = onebox_lifecycle::Sentinel::start().into_receiver();
 
         std::thread::Builder::new()
@@ -139,14 +139,28 @@ pub fn app_setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>>
                     use onebox_lifecycle::SystemEvent;
                     match event {
                         SystemEvent::ShuttingDown(shutdown_handle) => {
-                            let h = handle.clone();
-                            std::thread::spawn(move || {
+                            // Windows：关机时 DLL 加载器已开始卸载，不能启动新进程，
+                            // 直接写注册表清除代理
+                            #[cfg(target_os = "windows")]
+                            {
+                                use crate::vpn::windows::unset_proxy_on_shutdown;
+                                if let Err(e) = unset_proxy_on_shutdown() {
+                                    log::warn!("Failed to unset proxy on shutdown: {}", e);
+                                } else {
+                                    log::info!("Handled system shutdown event, VPN proxy unset via registry");
+                                }
+                            }
+                            // macOS：无 DLL 限制，正常走 networksetup 命令行清除代理
+                            #[cfg(target_os = "macos")]
+                            {
+                                use crate::vpn::{PlatformVpnProxy, VpnProxy};
+                                let h = handle.clone();
                                 tauri::async_runtime::block_on(async {
                                     PlatformVpnProxy::unset_proxy(&h).await.ok();
-                                    log::info!("Handled system shutdown event, VPN proxy unset if it was set")
+                                    log::info!("Handled system shutdown event, VPN proxy unset");
                                 });
-                                shutdown_handle.allow();
-                            });
+                            }
+                            shutdown_handle.allow();
                         }
                         _ => {}
                     }
