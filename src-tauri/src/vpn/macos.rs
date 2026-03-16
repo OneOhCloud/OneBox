@@ -2,7 +2,7 @@ use crate::vpn::VpnProxy;
 use crate::vpn::EVENT_TAURI_LOG;
 use anyhow;
 use std::process::Command;
-use sysproxy::Sysproxy;
+use onebox_sysproxy_rs::Sysproxy;
 use tauri::AppHandle;
 use tauri::Emitter;
 use tauri_plugin_shell::process::Command as TauriCommand;

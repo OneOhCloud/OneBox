@@ -1,10 +1,9 @@
 use crate::vpn::EVENT_TAURI_LOG;
 use anyhow;
-use std::path::Path;
+use onebox_sysproxy_rs::Sysproxy;
 use tauri::AppHandle;
 use tauri::Emitter;
 use tauri_plugin_shell::process::Command as TauriCommand;
-use tauri_plugin_shell::ShellExt;
 
 use std::ffi::OsStr;
 use std::os::windows::ffi::OsStrExt;
@@ -21,6 +20,7 @@ pub static DEFAULT_BYPASS: &str = "localhost;127.*;192.168.*;10.*;172.16.*;172.1
 pub struct ProxyConfig {
     pub host: String,
     pub port: u16,
+    pub bypass: String,
 }
 
 impl Default for ProxyConfig {
@@ -28,82 +28,59 @@ impl Default for ProxyConfig {
         Self {
             host: "127.0.0.1".to_string(),
             port: 6789,
+            bypass: DEFAULT_BYPASS.to_string(),
         }
     }
 }
 
-/// 设置系统代理
+/// 设置系统代理（直接调用 onebox-sysproxy-rs 库，无需外部二进制）
 pub async fn set_proxy(app: &AppHandle) -> anyhow::Result<()> {
     let config = ProxyConfig::default();
-    let address = format!("{}:{}", config.host, config.port);
-    let sidecar_path = helper::get_sidecar_path(Path::new("sysproxy"))?;
-
-    let sidecar_command =
-        app.shell()
-            .command(sidecar_path)
-            .args(["global", &address, DEFAULT_BYPASS]);
     app.emit(
         EVENT_TAURI_LOG,
         (
             0,
-            format!("Start set system proxy using sysproxy: {}", address),
+            format!("Start set system proxy: {}:{}", config.host, config.port),
         ),
     )
     .unwrap();
 
-    let output = match sidecar_command.output().await {
-        Ok(o) => o,
-        Err(e) => {
-            let msg = format!("Failed to set proxy: {}", e);
-            let _ = app.emit(EVENT_TAURI_LOG, (1, msg.clone()));
-            return Err(anyhow::anyhow!(msg));
-        }
+    let sys = Sysproxy {
+        enable: true,
+        host: config.host.clone(),
+        port: config.port,
+        bypass: config.bypass,
     };
-    if !output.status.success() {
-        let msg = format!(
-            "Failed to set proxy: {}",
-            String::from_utf8_lossy(&output.stderr)
-        );
-        let _ = app.emit(EVENT_TAURI_LOG, (1, msg.clone()));
-        return Err(anyhow::anyhow!(msg));
-    }
+    sys.set_system_proxy().map_err(|e| anyhow::anyhow!(e))?;
     log::info!("Proxy set to {}:{}", config.host, config.port);
     Ok(())
 }
 
-/// 取消系统代理（通过 sysproxy 二进制，兼容旧系统）
+/// 取消系统代理（直接调用 onebox-sysproxy-rs 库，无需外部二进制）
 pub async fn unset_proxy(app: &AppHandle) -> anyhow::Result<()> {
-    let sidecar_path = helper::get_sidecar_path(Path::new("sysproxy"))?;
-
-    let sidecar_command = app.shell().command(&sidecar_path).args(["set", "1"]);
     app.emit(
         EVENT_TAURI_LOG,
-        (0, "Start unset system proxy using sysproxy"),
+        (0, "Start unset system proxy"),
     )
     .unwrap();
 
-    let _ = app.emit(
-        EVENT_TAURI_LOG,
-        (0, format!("Unset proxy command: {} set 1", sidecar_path)),
-    );
-
-    let output = match sidecar_command.output().await {
-        Ok(o) => o,
+    let mut sysproxy = match Sysproxy::get_system_proxy() {
+        Ok(proxy) => proxy,
         Err(e) => {
-            let msg = format!("Failed to unset proxy: {}", e);
+            let msg = format!("Sysproxy::get_system_proxy failed: {}", e);
             let _ = app.emit(EVENT_TAURI_LOG, (1, msg.clone()));
             return Err(anyhow::anyhow!(msg));
         }
     };
-    if !output.status.success() {
-        let msg = format!(
-            "Failed to unset proxy: {}",
-            String::from_utf8_lossy(&output.stderr)
-        );
+    sysproxy.enable = false;
+    if let Err(e) = sysproxy.set_system_proxy() {
+        let msg = format!("Sysproxy::set_system_proxy failed: {}", e);
         let _ = app.emit(EVENT_TAURI_LOG, (1, msg.clone()));
         return Err(anyhow::anyhow!(msg));
     }
 
+    app.emit(EVENT_TAURI_LOG, (0, "System proxy unset successfully"))
+        .unwrap();
     log::info!("Proxy unset");
     Ok(())
 }

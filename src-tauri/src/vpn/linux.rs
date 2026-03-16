@@ -1,6 +1,6 @@
 use anyhow;
 use std::process::Command;
-use sysproxy::Sysproxy;
+use onebox_sysproxy_rs::Sysproxy;
 use tauri::AppHandle;
 use tauri_plugin_shell::process::Command as TauriCommand;
 use tauri_plugin_shell::ShellExt;

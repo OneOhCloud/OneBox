@@ -9,8 +9,6 @@ import { SING_BOX_VERSION } from '../src/types/definition';
 const BINARY_NAME = 'sing-box';
 const GITHUB_RELEASE_URL = 'https://github.com/SagerNet/sing-box/releases/download/';
 
-// sysproxy download URL, only supports Windows x64 version.
-const SYSPROXY_URL = "https://github.com/clash-verge-rev/sysproxy/releases/download/x64/sysproxy.exe";
 
 // cronet-go repository URL
 const CRONET_REPO_API = 'https://api.github.com/repos/SagerNet/cronet-go/releases/latest';
@@ -147,25 +145,6 @@ async function downloadEmbeddingExternalBinaries(): Promise<void> {
                     targetTriple
                 )
             );
-
-            // Download sysproxy for Windows amd64
-            if (platform === 'windows' && arch === 'amd64') {
-                downloadTasks.push(
-                    (async () => {
-                        const startTime = Date.now();
-                        console.log('Downloading Windows sysproxy...');
-                        const targetPath = `src-tauri/binaries/sysproxy-${targetTriple}${extension}`;
-
-                        // Ensure target directory exists
-                        const targetDir = path.dirname(targetPath);
-                        !fs.existsSync(targetDir) && fs.mkdirSync(targetDir, { recursive: true });
-
-                        await downloadFile(SYSPROXY_URL, targetPath);
-                        const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
-                        console.log(`sysproxy download completed (${elapsed}s)`);
-                    })()
-                );
-            }
         }
     }
 

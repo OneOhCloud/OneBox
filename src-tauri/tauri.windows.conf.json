@@ -15,8 +15,7 @@
             }
         },
         "externalBin": [
-            "binaries/sing-box",
-            "binaries/sysproxy"
+            "binaries/sing-box"
         ]
     }
 }
