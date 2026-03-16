@@ -2658,9 +2658,9 @@ dependencies = [
 
 [[package]]
 name = "jni"
-version = "0.22.3"
+version = "0.22.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "295dc9997acda1562fdf8d299f56063c936443b60f078e63a5d8d3c34ef2642b"
+checksum = "5efd9a482cf3a427f00d6b35f14332adc7902ce91efb778580e180ff90fa3498"
 dependencies = [
  "cfg-if",
  "combine",
@@ -2675,9 +2675,9 @@ dependencies = [
 
 [[package]]
 name = "jni-macros"
-version = "0.22.2"
+version = "0.22.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1c3d1da60c95c98847b26b9d45f4360fee718b31de746df016d9cd6de916a7ef"
+checksum = "a00109accc170f0bdb141fed3e393c565b6f5e072365c3bd58f5b062591560a3"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -3506,8 +3506,8 @@ dependencies = [
 
 [[package]]
 name = "onebox_lifecycle"
-version = "0.1.0"
-source = "git+https://github.com/OneOhCloud/onebox-lifecycle?tag=v0.0.1#ec85cd389d8da5708cb3a31d038cc88f3841a389"
+version = "0.0.2"
+source = "git+https://github.com/OneOhCloud/onebox-lifecycle?tag=v0.0.2#0829c17f575c1c1fff7f24c38da5661c8efea58a"
 dependencies = [
  "block2",
  "objc2",
@@ -7298,7 +7298,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fe985f41e291eecef5e5c0770a18d28390addb03331c043964d9e916453d6f16"
 dependencies = [
  "core-foundation 0.10.1",
- "jni 0.22.3",
+ "jni 0.22.4",
  "log",
  "ndk-context",
  "objc2",

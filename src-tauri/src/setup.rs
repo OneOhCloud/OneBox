@@ -83,14 +83,16 @@ pub fn app_setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>>
                     for (key, value) in params {
                         if key == "data" {
                             log::info!("Received config data: {}", value);
-                            // 先写入 state，前端就绪后可主动拉取（冷启动场景）
+                            // 写入 state（冷/热启动都靠前端主动拉取，保证可靠）
                             let app_data = handle.state::<crate::state::AppData>();
                             if let Ok(mut pending) = app_data.pending_deep_link.lock() {
                                 *pending = Some(value.to_string());
                             }
-                            // 同时尝试 emit，热启动（前端已就绪）时直接触发
-                            handle.emit("deep_link_config", value).unwrap_or_else(|e| {
-                                log::error!("Failed to emit deep_link_config event: {}", e);
+                            // 发送无 payload 的信号：前端收到后主动 invoke get_pending_deep_link。
+                            // 若 WebView 尚未就绪（窗口从隐藏恢复时），信号可能丢失，
+                            // 但前端同时监听 tauri://focus 作为兜底，数据不会丢。
+                            handle.emit("deep_link_pending", ()).unwrap_or_else(|e| {
+                                log::error!("Failed to emit deep_link_pending signal: {}", e);
                             });
                         }
                     }

@@ -2,6 +2,7 @@ import "./App.css";
 
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import { motion } from 'framer-motion';
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import { GearWideConnected, House, Layers } from 'react-bootstrap-icons';
@@ -112,31 +113,32 @@ function App() {
   const [deepLinkUrl, setDeepLinkUrl] = useState<string>('');
 
   useEffect(() => {
-    const unlistenPromise = listen<string>('deep_link_config', (event) => {
-      if (!event?.payload) return;
-      try {
-        const decoded = atob(event.payload);
-        setDeepLinkUrl(decoded);
-        setActiveScreen('configuration');
-      } catch (e) {
-        console.error('Failed to decode deep_link_config payload:', e);
-      }
-    });
+    // 统一入口：从 Rust 拉取并消费 pending deep link（take() 保证幂等）
+    const processPending = () => {
+      invoke<string | null>('get_pending_deep_link').then((value) => {
+        if (!value) return;
+        try {
+          const decoded = atob(value);
+          setDeepLinkUrl(decoded);
+          setActiveScreen('configuration');
+        } catch (e) {
+          console.error('Failed to decode pending deep link:', e);
+        }
+      });
+    };
 
-    // 冷启动时前端未就绪，事件已被错过，主动拉取 Rust 侧缓存的 pending deep link
-    invoke<string | null>('get_pending_deep_link').then((value) => {
-      if (!value) return;
-      try {
-        const decoded = atob(value);
-        setDeepLinkUrl(decoded);
-        setActiveScreen('configuration');
-      } catch (e) {
-        console.error('Failed to decode pending deep link:', e);
-      }
-    });
+    // 冷启动：前端就绪后立即拉取一次
+    processPending();
+
+    // 热启动信号：on_open_url 存入 pending 后发出，WebView 就绪时收到
+    const unlistenSignal = listen('deep_link_pending', () => processPending());
+
+    // 兜底：窗口获焦时再拉一次（信号在 WebView 从隐藏恢复过程中可能丢失）
+    const unlistenFocus = getCurrentWindow().listen('tauri://focus', () => processPending());
 
     return () => {
-      unlistenPromise.then(fn => fn());
+      unlistenSignal.then(fn => fn());
+      unlistenFocus.then(fn => fn());
     };
   }, []);
 
