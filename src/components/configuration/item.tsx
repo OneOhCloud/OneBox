@@ -76,7 +76,7 @@ const ItemDetails: React.FC<ItemDetailsProps> = ({
                         <div className="flex flex-col gap-2">
                             <div className="flex items-center justify-between">
                                 <div className="flex gap-2">
-                                    <span className="text-xs text-gray-400 capitalize">{t("remaining_traffic")}</span>
+                                    <span className="text-xs text-gray-400 capitalize">{t("traffic_detail")}</span>
                                     <span className="text-xs text-blue-500">{trafficDetails}</span>
                                 </div>
                                 <button

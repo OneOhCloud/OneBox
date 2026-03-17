@@ -137,7 +137,7 @@
     "reconnect_failed": "重新连接失败，请检查网络",
     "release_success_stop_vpn": "资源释放成功，VPN服务已停止",
     "remaining_days": "剩余天数",
-    "remaining_traffic": "剩余流量",
+    "traffic_detail": "流量详情",
     "router_settings": "路由",
     "rule_exists": "规则已存在",
     "rule_info_title": "规则说明",

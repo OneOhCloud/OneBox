@@ -137,7 +137,7 @@
     "reconnect_failed": "Reconnect failed, please check network",
     "release_success_stop_vpn": "Resources released, vpn service stopped",
     "remaining_days": "Remaining days",
-    "remaining_traffic": "Available traffic",
+    "traffic_detail": "Traffic detail",
     "router_settings": "Router",
     "rule_exists": "Rule already exists",
     "rule_info_title": "Rule Information",
