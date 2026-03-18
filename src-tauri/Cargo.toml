@@ -56,7 +56,7 @@ tauri-plugin-deep-link = "2"
 
 
 [target.'cfg(any(target_os = "windows", target_os = "macos"))'.dependencies]
-onebox_lifecycle = { git = "https://github.com/OneOhCloud/onebox-lifecycle", tag = "v0.0.2" }
+onebox_lifecycle = { git = "https://github.com/OneOhCloud/onebox-lifecycle", tag = "v0.0.3" }
 
 [target.'cfg(target_os = "windows")'.dependencies]
 winapi = { version = "0.3", features = ["winbase"] }

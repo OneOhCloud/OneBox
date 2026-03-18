@@ -404,6 +404,15 @@ pub async fn is_running(app: AppHandle, secret: String) -> bool {
         .unwrap_or(false)
 }
 
+/// 获取当前运行中的代理配置（模式 + 配置路径），用于睡眠前保存恢复状态
+pub fn get_running_config() -> Option<(ProxyMode, String)> {
+    let manager = PROCESS_MANAGER.lock().unwrap_or_else(|e| e.into_inner());
+    match (manager.mode.as_ref(), manager.config_path.as_ref()) {
+        (Some(mode), Some(path)) => Some(((**mode).clone(), (**path).clone())),
+        _ => None,
+    }
+}
+
 // 重载配置
 #[tauri::command]
 #[allow(unused_variables)]

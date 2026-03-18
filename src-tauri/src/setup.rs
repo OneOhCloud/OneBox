@@ -137,6 +137,15 @@ pub fn app_setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>>
         std::thread::Builder::new()
             .name("lifecycle-events".into())
             .spawn(move || {
+                // 记录系统进入睡眠的墙钟时间（仅 macOS 使用）
+                // 注意：必须用 SystemTime 而非 Instant，因为 macOS 单调时钟在休眠期间不计时
+                #[cfg(target_os = "macos")]
+                let mut sleep_started: Option<std::time::SystemTime> = None;
+                // 睡眠超过此时长后触发 VPN 重启（默认 1 小时）
+                #[cfg(target_os = "macos")]
+                const SLEEP_RESTART_THRESHOLD: std::time::Duration =
+                    std::time::Duration::from_secs(3600);
+
                 while let Some(event) = rx.recv() {
                     use onebox_lifecycle::SystemEvent;
                     match event {
@@ -163,6 +172,62 @@ pub fn app_setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>>
                                 });
                             }
                             shutdown_handle.allow();
+                        }
+                        SystemEvent::WillSleep => {
+                            log::info!("System will sleep");
+                            #[cfg(target_os = "macos")]
+                            {
+                                // 仅记录睡眠时刻，不中断 VPN，避免短暂休眠的无效操作
+                                sleep_started = Some(std::time::SystemTime::now());
+                            }
+                        }
+                        SystemEvent::DidWake => {
+                            log::info!("System did wake");
+                            #[cfg(target_os = "macos")]
+                            {
+                                // 计算实际睡眠时长，超过阈值且 VPN 正在运行时才重启
+                                if let Some(started) = sleep_started.take() {
+                                    let elapsed = started.elapsed().unwrap_or_default();
+                                    let total_secs = elapsed.as_secs();
+                                    log::info!(
+                                        "System was asleep for {}h {}m {}s (threshold: {}h)",
+                                        total_secs / 3600,
+                                        (total_secs % 3600) / 60,
+                                        total_secs % 60,
+                                        SLEEP_RESTART_THRESHOLD.as_secs() / 3600,
+                                    );
+                                    if elapsed >= SLEEP_RESTART_THRESHOLD {
+                                        if let Some((mode, path)) =
+                                            crate::core::get_running_config()
+                                        {
+                                            log::info!(
+                                                "Sleep exceeded threshold ({:?}), restarting VPN (mode: {:?})",
+                                                SLEEP_RESTART_THRESHOLD,
+                                                mode
+                                            );
+                                            let h = handle.clone();
+                                            tauri::async_runtime::block_on(async {
+                                                if let Err(e) = crate::core::stop(h.clone()).await
+                                                {
+                                                    log::error!(
+                                                        "Failed to stop VPN for sleep restart: {}",
+                                                        e
+                                                    );
+                                                } else if let Err(e) =
+                                                    crate::core::start(h, path, mode).await
+                                                {
+                                                    log::error!(
+                                                        "Failed to restart VPN after sleep: {}",
+                                                        e
+                                                    );
+                                                } else {
+                                                    log::info!("VPN restarted after long sleep");
+                                                }
+                                            });
+                                        }
+                                    }
+                                }
+                            }
                         }
                         _ => {}
                     }

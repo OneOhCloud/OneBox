@@ -3561,8 +3561,8 @@ dependencies = [
 
 [[package]]
 name = "onebox_lifecycle"
-version = "0.0.2"
-source = "git+https://github.com/OneOhCloud/onebox-lifecycle?tag=v0.0.2#0829c17f575c1c1fff7f24c38da5661c8efea58a"
+version = "0.0.3"
+source = "git+https://github.com/OneOhCloud/onebox-lifecycle?tag=v0.0.3#7230e67f1951105ca1af23b62c1cd6cbb76dc3c0"
 dependencies = [
  "block2",
  "objc2",
