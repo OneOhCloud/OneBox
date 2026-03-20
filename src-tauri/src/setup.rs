@@ -52,10 +52,6 @@ pub fn app_setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>>
         }
     }
 
-    // 生命周期事件监听：仅 Windows / macOS 支持
-    #[cfg(any(target_os = "windows", target_os = "macos"))]
-    spawn_lifecycle_listener(app);
-
     Ok(())
 }
 
@@ -130,13 +126,17 @@ fn report_captive(app: &tauri::App) {
 
 // ── Lifecycle ──────────────────────────────────────────────────────
 
+/// 生命周期事件监听：仅 Windows / macOS 支持。
+///
+/// **macOS**：必须在 `RunEvent::Ready` 时调用，确保 delegate 安装在 Tauri/WRY 之后，
+/// 不会被覆盖。
 #[cfg(any(target_os = "windows", target_os = "macos"))]
-fn spawn_lifecycle_listener(app: &tauri::App) {
+pub(crate) fn spawn_lifecycle_listener(app_handle: &tauri::AppHandle) {
     #[cfg(target_os = "macos")]
-    let handle = app.handle().clone();
+    let handle = app_handle.clone();
     // suppress unused warning on Windows
     #[cfg(not(target_os = "macos"))]
-    let _ = app;
+    let _ = app_handle;
 
     let rx = onebox_lifecycle::Sentinel::start().into_receiver();
 
