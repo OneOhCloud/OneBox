@@ -150,6 +150,7 @@ pub fn app_setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>>
                     use onebox_lifecycle::SystemEvent;
                     match event {
                         SystemEvent::ShuttingDown(shutdown_handle) => {
+                            log::info!("[lifecycle] received ShuttingDown event");
                             // Windows：关机时 DLL 加载器已开始卸载，不能启动新进程，
                             // 直接写注册表清除代理
                             #[cfg(target_os = "windows")]
@@ -161,18 +162,19 @@ pub fn app_setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>>
                                     log::info!("Handled system shutdown event, VPN proxy unset via registry");
                                 }
                             }
-                            // macOS：无 DLL 限制，正常走 networksetup 命令行清除代理
+                            // macOS：使用轻量级同步函数直接关闭所有代理状态。
+                            // 不走 get_system_proxy() + set_system_proxy()（共 12 次子进程），
+                            // 而是仅执行 3 条 -set*proxystate off 命令（每个服务）。
+                            // 原因：关机时 tokio runtime 可能已在拆除，app.emit() 可能 panic，
+                            // 子进程数量越少越可靠。
                             #[cfg(target_os = "macos")]
                             {
-                                use crate::vpn::{PlatformVpnProxy, VpnProxy};
-                                let h = handle.clone();
-                                tauri::async_runtime::block_on(async {
-                                    PlatformVpnProxy::unset_proxy(&h).await.ok();
-                                    log::info!("Handled system shutdown event, VPN proxy unset");
-                                });
+                                crate::vpn::macos::unset_proxy_on_shutdown();
                             }
                             shutdown_handle.allow();
+                            log::info!("[lifecycle] shutdown allowed");
                         }
+                        
                         SystemEvent::WillSleep => {
                             log::info!("System will sleep");
                             #[cfg(target_os = "macos")]
