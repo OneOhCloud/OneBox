@@ -2630,9 +2630,9 @@ checksum = "a6cb138bb79a146c1bd460005623e142ef0181e3d0219cb493e02f7d08a35695"
 
 [[package]]
 name = "itoa"
-version = "1.0.17"
+version = "1.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "92ecc6618181def0457392ccd0ee51198e065e016d1d527a7ac1b6dc7c1f09d2"
+checksum = "8f42a60cbdf9a97f5d2305f08a87dc4e09308d1276d28c869c684d7777685682"
 
 [[package]]
 name = "javascriptcore-rs"
@@ -3539,6 +3539,7 @@ dependencies = [
  "tauri-plugin-updater",
  "tauri-plugin-window-state",
  "tokio",
+ "url",
  "uuid",
  "webbrowser",
  "winapi",
@@ -3562,8 +3563,8 @@ dependencies = [
 
 [[package]]
 name = "onebox_lifecycle"
-version = "0.0.4"
-source = "git+https://github.com/OneOhCloud/onebox-lifecycle?tag=v0.0.4#993f8b4b66a6597507172b4f4d870ea899cf8770"
+version = "0.1.0"
+source = "git+https://github.com/OneOhCloud/onebox-lifecycle?tag=v0.1.0#994c24778ab9095e619ea513fbece1851a4b8291"
 dependencies = [
  "block2",
  "objc2",

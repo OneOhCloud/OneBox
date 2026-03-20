@@ -58,11 +58,8 @@ pub async fn set_proxy(app: &AppHandle) -> anyhow::Result<()> {
 
 /// 取消系统代理（直接调用 onebox-sysproxy-rs 库，无需外部二进制）
 pub async fn unset_proxy(app: &AppHandle) -> anyhow::Result<()> {
-    app.emit(
-        EVENT_TAURI_LOG,
-        (0, "Start unset system proxy"),
-    )
-    .unwrap();
+    app.emit(EVENT_TAURI_LOG, (0, "Start unset system proxy"))
+        .unwrap();
 
     let mut sysproxy = match Sysproxy::get_system_proxy() {
         Ok(proxy) => proxy,
@@ -82,62 +79,6 @@ pub async fn unset_proxy(app: &AppHandle) -> anyhow::Result<()> {
     app.emit(EVENT_TAURI_LOG, (0, "System proxy unset successfully"))
         .unwrap();
     log::info!("Proxy unset");
-    Ok(())
-}
-
-/// 关机专用：直接写注册表清除代理，无需启动子进程。
-///
-/// 关机时 Windows DLL 加载器已开始卸载，任何 CreateProcess 调用都会得到
-/// 0xc0000142（DLL 初始化失败）。Win32 Registry API 是内核级调用，
-/// 不依赖用户态运行库，在关机序列中始终可用。
-pub fn unset_proxy_on_shutdown() -> anyhow::Result<()> {
-    use windows::Win32::System::Registry::{
-        RegCloseKey, RegOpenKeyExW, RegSetValueExW, HKEY, HKEY_CURRENT_USER, KEY_SET_VALUE,
-        REG_DWORD,
-    };
-
-    log::info!("Unsetting system proxy via registry (shutdown path)");
-
-    unsafe {
-        let key_path: Vec<u16> =
-            OsStr::new("Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings")
-                .encode_wide()
-                .chain(Some(0))
-                .collect();
-
-        let mut hkey = HKEY::default();
-        RegOpenKeyExW(
-            HKEY_CURRENT_USER,
-            windows::core::PCWSTR(key_path.as_ptr()),
-            None,
-            KEY_SET_VALUE,
-            &mut hkey,
-        )
-        .ok()
-        .map_err(|e| anyhow::anyhow!("RegOpenKeyExW failed: {}", e))?;
-
-        let value_name: Vec<u16> = OsStr::new("ProxyEnable")
-            .encode_wide()
-            .chain(Some(0))
-            .collect();
-        let disabled: u32 = 0;
-        let result = RegSetValueExW(
-            hkey,
-            windows::core::PCWSTR(value_name.as_ptr()),
-            None,
-            REG_DWORD,
-            Some(std::slice::from_raw_parts(
-                &disabled as *const u32 as *const u8,
-                4,
-            )),
-        );
-        let _ = RegCloseKey(hkey);
-        result
-            .ok()
-            .map_err(|e| anyhow::anyhow!("RegSetValueExW failed: {}", e))?;
-    }
-
-    log::info!("Proxy unset via registry (ProxyEnable=0)");
     Ok(())
 }
 

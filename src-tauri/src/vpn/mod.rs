@@ -45,3 +45,21 @@ pub use linux::LinuxVpnProxy as PlatformVpnProxy;
 pub use macos::MacOSVpnProxy as PlatformVpnProxy;
 #[cfg(target_os = "windows")]
 pub use windows::WindowsVpnProxy as PlatformVpnProxy;
+
+pub fn unset_proxy_on_shutdown() {
+    use onebox_sysproxy_rs::Sysproxy;
+    // 关机前先清理系统代理设置，避免下次开机网络
+    let mut sysproxy = match Sysproxy::get_system_proxy() {
+        Ok(proxy) => proxy,
+        Err(e) => {
+            log::error!("Sysproxy::get_system_proxy failed during shutdown: {}", e);
+            return;
+        }
+    };
+    sysproxy.enable = false;
+    if let Err(e) = sysproxy.set_system_proxy() {
+        log::error!("Failed to unset system proxy during shutdown: {}", e);
+    } else {
+        log::info!("System proxy unset during shutdown");
+    }
+}

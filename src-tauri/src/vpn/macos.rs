@@ -1,8 +1,8 @@
 use crate::vpn::VpnProxy;
 use crate::vpn::EVENT_TAURI_LOG;
 use anyhow;
-use std::process::Command;
 use onebox_sysproxy_rs::Sysproxy;
+use std::process::Command;
 use tauri::AppHandle;
 use tauri::Emitter;
 use tauri_plugin_shell::process::Command as TauriCommand;
@@ -160,97 +160,7 @@ pub fn stop_tun_process(password: &str) -> Result<(), String> {
     Ok(())
 }
 
-/// 关机/退出路径专用：轻量级同步取消代理。
-///
-/// 与 `unset_proxy()` 的区别：
-/// - 不依赖 Tauri AppHandle / async runtime（关机时可能已拆除）
-/// - 不调用 `get_system_proxy()`（省掉 5 次子进程调用）
-/// - 仅执行 3 条 `-set*proxystate off` 命令 + 1 条服务发现
-/// - **所有命令并行执行**，避免关机时被系统杀死前来不及完成
-/// - 每条命令独立执行，任何一条失败不影响其余
-pub fn unset_proxy_on_shutdown() {
-    let services = list_active_network_services();
-    if services.is_empty() {
-        log::warn!("[shutdown] no active network services found, skipping proxy cleanup");
-        return;
-    }
 
-    log::info!("[shutdown] unsetting proxy on {} service(s): {:?}", services.len(), services);
-
-    let flags = [
-        "-setsocksfirewallproxystate",
-        "-setsecurewebproxystate",
-        "-setwebproxystate",
-    ];
-
-    // 并行启动所有 networksetup 命令，避免顺序执行导致关机超时
-    let mut children: Vec<(&str, &str, std::process::Child)> = Vec::new();
-    for service in &services {
-        for flag in &flags {
-            match Command::new("networksetup")
-                .args([*flag, service.as_str(), "off"])
-                .spawn()
-            {
-                Ok(child) => {
-                    children.push((flag, service.as_str(), child));
-                }
-                Err(e) => {
-                    log::warn!("[shutdown] {} {} off -> spawn error: {}", flag, service, e);
-                }
-            }
-        }
-    }
-
-    // 等待所有子进程完成
-    for (flag, service, mut child) in children {
-        match child.wait() {
-            Ok(s) if s.success() => {
-                log::info!("[shutdown] {} {} off -> ok", flag, service);
-            }
-            Ok(s) => {
-                log::warn!("[shutdown] {} {} off -> exit {}", flag, service, s);
-            }
-            Err(e) => {
-                log::warn!("[shutdown] {} {} off -> wait error: {}", flag, service, e);
-            }
-        }
-    }
-}
-
-/// 列出所有可用的网络服务名称（如 "Wi-Fi"、"Ethernet"）。
-///
-/// 仅需 1 次子进程调用，跳过已禁用（带 * 前缀）的服务。
-fn list_active_network_services() -> Vec<String> {
-    let output = match Command::new("networksetup")
-        .arg("-listallnetworkservices")
-        .output()
-    {
-        Ok(o) => o,
-        Err(e) => {
-            log::warn!("[shutdown] failed to list network services: {}", e);
-            return vec![];
-        }
-    };
-    let stdout = match std::str::from_utf8(&output.stdout) {
-        Ok(s) => s,
-        Err(_) => return vec![],
-    };
-
-    // 跳过第一行提示 "An asterisk (*) denotes..."
-    // 跳过带 * 前缀的已禁用服务
-    stdout
-        .lines()
-        .skip(1)
-        .filter_map(|line| {
-            let trimmed = line.trim();
-            if !trimmed.is_empty() && !trimmed.starts_with('*') {
-                Some(trimmed.to_string())
-            } else {
-                None
-            }
-        })
-        .collect()
-}
 
 /// macOS平台的VPN代理实现
 pub struct MacOSVpnProxy;
