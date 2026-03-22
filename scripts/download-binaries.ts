@@ -218,11 +218,11 @@ async function downloadDatabaseFiles(): Promise<void> {
     const dbFiles = [
         {
             name: 'mixed-cache-rule-v1.db',
-            url: 'https://github.com/OneOhCloud/conf-template/raw/refs/heads/stable/database/1.12/zh-cn/mixed-cache-rule-v1.db'
+            url: 'https://github.com/OneOhCloud/conf-template/raw/refs/heads/database/database/stable/1.13/zh-cn/mixed-cache-rule-v1.db',
         },
         {
             name: 'tun-cache-rule-v1.db',
-            url: 'https://github.com/OneOhCloud/conf-template/raw/refs/heads/stable/database/1.12/zh-cn/tun-cache-rule-v1.db'
+            url: 'https://github.com/OneOhCloud/conf-template/raw/refs/heads/database/database/stable/1.13/zh-cn/tun-cache-rule-v1.db'
         }
     ];
 
