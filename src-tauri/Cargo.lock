@@ -3510,6 +3510,7 @@ version = "1.0.0"
 dependencies = [
  "anyhow",
  "env_logger",
+ "filetime",
  "keyring",
  "lazy_static",
  "libc",
@@ -3538,6 +3539,7 @@ dependencies = [
  "tauri-plugin-store",
  "tauri-plugin-updater",
  "tauri-plugin-window-state",
+ "tempfile",
  "tokio",
  "url",
  "uuid",

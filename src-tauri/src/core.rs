@@ -1,5 +1,6 @@
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
+use std::io::Write;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Manager};
@@ -13,6 +14,77 @@ use crate::vpn::{PlatformVpnProxy, VpnProxy};
 use tauri::Emitter;
 use tauri_plugin_shell::process::CommandChild;
 use tauri_plugin_shell::ShellExt;
+
+/// 获取当天日期字符串（格式：YYYY-MM-DD）
+fn today_date_string() -> String {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let secs = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+    // Howard Hinnant's algorithm: Unix days -> civil date (UTC)
+    let z = secs as i64 / 86400 + 719468;
+    let era = (if z >= 0 { z } else { z - 146096 }) / 146097;
+    let doe = z - era * 146097;
+    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+    let y = yoe + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let day = doy - (153 * mp + 2) / 5 + 1;
+    let month = if mp < 10 { mp + 3 } else { mp - 9 };
+    let year = if month <= 2 { y + 1 } else { y };
+    format!("{:04}-{:02}-{:02}", year, month, day)
+}
+
+/// 清理超过 keep_days 天的 sing-box 日志文件
+fn cleanup_old_singbox_logs(log_dir: &Path, keep_days: u64) {
+    let entries = match std::fs::read_dir(log_dir) {
+        Ok(e) => e,
+        Err(_) => return,
+    };
+
+    let cutoff = std::time::SystemTime::now()
+        - std::time::Duration::from_secs(keep_days * 86400);
+
+    for entry in entries.flatten() {
+        let name = entry.file_name();
+        let name_str = name.to_string_lossy();
+        if name_str.starts_with("sing-box-") && name_str.ends_with(".log") {
+            if let Ok(meta) = entry.metadata() {
+                let modified = meta.modified().unwrap_or(std::time::SystemTime::now());
+                if modified < cutoff {
+                    let _ = std::fs::remove_file(entry.path());
+                    log::info!("Removed old sing-box log: {}", name_str);
+                }
+            }
+        }
+    }
+}
+
+/// 创建 sing-box 专用日志文件写入器（按天轮转，保留 7 天）
+fn create_singbox_log_writer(app: &AppHandle) -> Option<std::fs::File> {
+    let log_dir = app.path().app_log_dir().ok()?;
+    std::fs::create_dir_all(&log_dir).ok()?;
+
+    // 清理 7 天前的旧日志
+    cleanup_old_singbox_logs(&log_dir, 7);
+
+    let date = today_date_string();
+    let log_path = log_dir.join(format!("sing-box-{}.log", date));
+    std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&log_path)
+        .map_err(|e| log::error!("Failed to open {}: {}", log_path.display(), e))
+        .ok()
+}
+
+/// 向 sing-box 日志文件写入一行
+fn write_singbox_log(writer: &mut Option<std::fs::File>, line: &str) {
+    if let Some(ref mut file) = writer {
+        let _ = writeln!(file, "{}", line);
+    }
+}
 
 /// 代理模式
 #[derive(Clone, PartialEq, Serialize, Deserialize, Debug)]
@@ -118,6 +190,9 @@ pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Resu
         let process_mode = Arc::new(mode.clone());
         let mode_for_task = Arc::clone(&process_mode);
 
+        // 创建 sing-box 专用日志写入器
+        let mut singbox_log = create_singbox_log_writer(&app_handle);
+
         // 监听子进程输出
         tokio::spawn(async move {
             let mut terminated = false;
@@ -128,25 +203,25 @@ pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Resu
                     if let tauri_plugin_shell::process::CommandEvent::Stdout(line)
                     | tauri_plugin_shell::process::CommandEvent::Stderr(line) = event
                     {
-                        log::info!(
-                            "Post-terminate output: {:?}",
-                            String::from_utf8_lossy(&line)
-                        );
+                        let line_str = String::from_utf8_lossy(&line);
+                        write_singbox_log(&mut singbox_log, &line_str);
                     }
                     continue;
                 }
 
                 match event {
                     tauri_plugin_shell::process::CommandEvent::Stdout(line) => {
-                        log::info!("sing-box stdout: {:?}", String::from_utf8_lossy(&line));
+                        let line_str = String::from_utf8_lossy(&line);
+                        write_singbox_log(&mut singbox_log, &line_str);
                     }
                     tauri_plugin_shell::process::CommandEvent::Stderr(line) => {
                         let line_str = String::from_utf8_lossy(&line);
-                        print!("{}", line_str);
+                        write_singbox_log(&mut singbox_log, &line_str);
                         app_status_data.write(line_str.to_string(), LogType::Info);
                     }
                     tauri_plugin_shell::process::CommandEvent::Error(err) => {
                         log::error!("sing-box process error: {}", err);
+                        write_singbox_log(&mut singbox_log, &format!("[ERROR] {}", err));
                         app_status_data.write(err.to_string(), LogType::Error);
                     }
                     tauri_plugin_shell::process::CommandEvent::Terminated(payload) => {
@@ -529,5 +604,102 @@ pub async fn reload_config(app: tauri::AppHandle, is_tun: bool) -> Result<String
     #[cfg(not(any(unix, target_os = "windows")))]
     {
         Err("SIGHUP signal is not supported on this platform".to_string())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use std::io::Write;
+    use tempfile::TempDir;
+
+    #[test]
+    fn test_today_date_string_format() {
+        let date = today_date_string();
+        // 格式应为 YYYY-MM-DD
+        assert_eq!(date.len(), 10);
+        assert_eq!(date.as_bytes()[4], b'-');
+        assert_eq!(date.as_bytes()[7], b'-');
+
+        let parts: Vec<&str> = date.split('-').collect();
+        assert_eq!(parts.len(), 3);
+
+        let year: i32 = parts[0].parse().expect("year should be a number");
+        let month: i32 = parts[1].parse().expect("month should be a number");
+        let day: i32 = parts[2].parse().expect("day should be a number");
+
+        assert!(year >= 2024 && year <= 2100);
+        assert!((1..=12).contains(&month));
+        assert!((1..=31).contains(&day));
+    }
+
+    #[test]
+    fn test_cleanup_old_singbox_logs_removes_old_files() {
+        let tmp = TempDir::new().unwrap();
+
+        // 创建一个"旧"日志文件，将修改时间设为 10 天前
+        let old_file = tmp.path().join("sing-box-2020-01-01.log");
+        fs::write(&old_file, "old log").unwrap();
+        let ten_days_ago =
+            std::time::SystemTime::now() - std::time::Duration::from_secs(10 * 86400);
+        filetime::set_file_mtime(
+            &old_file,
+            filetime::FileTime::from_system_time(ten_days_ago),
+        )
+        .unwrap();
+
+        // 创建一个"新"日志文件（刚创建，修改时间为现在）
+        let new_file = tmp.path().join("sing-box-2099-01-01.log");
+        fs::write(&new_file, "new log").unwrap();
+
+        // 创建一个不匹配命名模式的文件，不应被清理
+        let other_file = tmp.path().join("other.log");
+        fs::write(&other_file, "other").unwrap();
+
+        cleanup_old_singbox_logs(tmp.path(), 7);
+
+        assert!(!old_file.exists(), "old log should be removed");
+        assert!(new_file.exists(), "new log should be kept");
+        assert!(other_file.exists(), "non-matching file should be kept");
+    }
+
+    #[test]
+    fn test_cleanup_old_singbox_logs_nonexistent_dir() {
+        // 不应 panic
+        cleanup_old_singbox_logs(Path::new("/nonexistent/dir/abc123"), 7);
+    }
+
+    #[test]
+    fn test_write_singbox_log() {
+        let tmp = TempDir::new().unwrap();
+        let log_path = tmp.path().join("test.log");
+
+        let mut writer = Some(
+            std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(&log_path)
+                .unwrap(),
+        );
+
+        write_singbox_log(&mut writer, "hello line 1");
+        write_singbox_log(&mut writer, "hello line 2");
+
+        // 确保 flush
+        drop(writer);
+
+        let content = fs::read_to_string(&log_path).unwrap();
+        let lines: Vec<&str> = content.lines().collect();
+        assert_eq!(lines.len(), 2);
+        assert_eq!(lines[0], "hello line 1");
+        assert_eq!(lines[1], "hello line 2");
+    }
+
+    #[test]
+    fn test_write_singbox_log_none_writer() {
+        // writer 为 None 时不应 panic
+        let mut writer: Option<std::fs::File> = None;
+        write_singbox_log(&mut writer, "should not panic");
     }
 }
