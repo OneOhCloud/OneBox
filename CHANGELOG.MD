@@ -2,7 +2,7 @@
 
 {{version-tag-date}}
 
-## Changes since v1.3.8
+## Changes since v1.3.14
 
 All significant changes in this version are documented here.
 
@@ -10,11 +10,10 @@ All significant changes in this version are documented here.
 ### ⚠ CHANGES
 
 - Updated dependencies
-- Support clearing proxy settings on shutdown
-- Fixed occasional network issues after macOS wakes from sleep
+- Support separating sing-box subprocess logs into daily rotated log files
 
 
-## 自 v1.3.8 以来的变更
+## 自 v1.3.14 以来的变更
 
 本版本的所有重要变更将记录于此。
 
@@ -22,8 +21,7 @@ All significant changes in this version are documented here.
 ### ⚠ 变更
 
 - 更新了依赖项
-- 支持关机清理代理设置
-- 修复 macOS 睡眠恢复后偶发网络异常的问题
+- 支持将 sing-box 子进程日志分离到每天轮换的日志文件中
 
 
 ---
