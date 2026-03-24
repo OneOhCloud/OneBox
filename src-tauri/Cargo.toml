@@ -56,11 +56,13 @@ tauri-plugin-deep-link = "2"
 url = "2"
 
 
-[target.'cfg(any(target_os = "windows", target_os = "macos"))'.dependencies]
+[target.'cfg(target_os = "macos")'.dependencies]
 onebox_lifecycle = { git = "https://github.com/OneOhCloud/onebox-lifecycle", tag = "v0.1.0" }
 #onebox_lifecycle = { path = "../../../oneohProjects/onebox-lifecycle" }
 
 [target.'cfg(target_os = "windows")'.dependencies]
+onebox_lifecycle = { git = "https://github.com/OneOhCloud/onebox-lifecycle", tag = "v0.1.0", default-features = false, features = ["shutdown", "sleep"] }
+#onebox_lifecycle = { path = "../../../oneohProjects/onebox-lifecycle", default-features = false, features = ["shutdown", "sleep"] }
 winapi = { version = "0.3", features = ["winbase"] }
 windows = { version = "0.62.2", features = ["Win32_Foundation", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging", "Win32_System_Registry"] }
 
