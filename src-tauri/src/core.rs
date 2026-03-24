@@ -43,8 +43,7 @@ fn cleanup_old_singbox_logs(log_dir: &Path, keep_days: u64) {
         Err(_) => return,
     };
 
-    let cutoff = std::time::SystemTime::now()
-        - std::time::Duration::from_secs(keep_days * 86400);
+    let cutoff = std::time::SystemTime::now() - std::time::Duration::from_secs(keep_days * 86400);
 
     for entry in entries.flatten() {
         let name = entry.file_name();
@@ -480,6 +479,7 @@ pub async fn is_running(app: AppHandle, secret: String) -> bool {
 }
 
 /// 获取当前运行中的代理配置（模式 + 配置路径），用于睡眠前保存恢复状态
+#[cfg(target_os = "macos")]
 pub fn get_running_config() -> Option<(ProxyMode, String)> {
     let manager = PROCESS_MANAGER.lock().unwrap_or_else(|e| e.into_inner());
     match (manager.mode.as_ref(), manager.config_path.as_ref()) {
@@ -611,7 +611,6 @@ pub async fn reload_config(app: tauri::AppHandle, is_tun: bool) -> Result<String
 mod tests {
     use super::*;
     use std::fs;
-    use std::io::Write;
     use tempfile::TempDir;
 
     #[test]
