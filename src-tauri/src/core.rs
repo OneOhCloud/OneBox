@@ -86,16 +86,11 @@ fn write_singbox_log(writer: &mut Option<std::fs::File>, line: &str) {
 }
 
 /// 代理模式
-#[derive(Clone, PartialEq, Serialize, Deserialize, Debug)]
+#[derive(Clone, Default, PartialEq, Serialize, Deserialize, Debug)]
 pub enum ProxyMode {
+    #[default]
     SystemProxy,
     TunProxy,
-}
-
-impl Default for ProxyMode {
-    fn default() -> Self {
-        Self::SystemProxy
-    }
 }
 
 /// 进程管理器，记录当前代理进程及模式
@@ -105,6 +100,11 @@ struct ProcessManager {
     tun_password: Option<Arc<String>>, // 使用 Arc 避免 clone
     config_path: Option<Arc<String>>,  // 使用 Arc 避免 clone
     is_stopping: bool,                 // 标记是否正在执行stop操作
+    // Watchdog 主动发起重启时置 true，防止 handle_process_termination 误清状态
+    #[cfg(target_os = "macos")]
+    bypass_router_restarting: bool,
+    #[cfg(target_os = "macos")]
+    bypass_router_watchdog_abort: Option<tokio::task::AbortHandle>,
 }
 
 // 全局进程管理器
@@ -115,7 +115,200 @@ lazy_static! {
         tun_password: None,
         config_path: None,
         is_stopping: false,
+        #[cfg(target_os = "macos")]
+        bypass_router_restarting: false,
+        #[cfg(target_os = "macos")]
+        bypass_router_watchdog_abort: None,
     }));
+}
+
+/// 启动 sing-box 进程监控任务。
+///
+/// 将 rx 事件循环放入独立 tokio 任务，避免阻塞调用方。
+/// 此函数本身是同步的（无 await），因此调用方的 Send 约束不受影响。
+fn spawn_process_monitor(
+    app: tauri::AppHandle,
+    mut rx: tauri::async_runtime::Receiver<tauri_plugin_shell::process::CommandEvent>,
+    mode: Arc<ProxyMode>,
+) {
+    let mut singbox_log = create_singbox_log_writer(&app);
+    tokio::spawn(async move {
+        let mut terminated = false;
+        let app_status_data = app.state::<AppData>();
+
+        while let Some(event) = rx.recv().await {
+            if terminated {
+                if let tauri_plugin_shell::process::CommandEvent::Stdout(line)
+                | tauri_plugin_shell::process::CommandEvent::Stderr(line) = event
+                {
+                    let line_str = String::from_utf8_lossy(&line);
+                    write_singbox_log(&mut singbox_log, &line_str);
+                }
+                continue;
+            }
+            match event {
+                tauri_plugin_shell::process::CommandEvent::Stdout(line) => {
+                    let line_str = String::from_utf8_lossy(&line);
+                    write_singbox_log(&mut singbox_log, &line_str);
+                }
+                tauri_plugin_shell::process::CommandEvent::Stderr(line) => {
+                    let line_str = String::from_utf8_lossy(&line);
+                    write_singbox_log(&mut singbox_log, &line_str);
+                    app_status_data.write(line_str.to_string(), LogType::Info);
+                }
+                tauri_plugin_shell::process::CommandEvent::Error(err) => {
+                    log::error!("sing-box process error: {}", err);
+                    write_singbox_log(&mut singbox_log, &format!("[ERROR] {}", err));
+                    app_status_data.write(err.to_string(), LogType::Error);
+                }
+                tauri_plugin_shell::process::CommandEvent::Terminated(payload) => {
+                    terminated = true;
+                    log::info!(
+                        "sing-box process terminated with exit code: {:?}",
+                        payload.code
+                    );
+                    // Windows stop 操作会使进程以 exit code 1 退出，重写为 0 避免误报
+                    let adjusted_payload = {
+                        #[cfg(target_os = "windows")]
+                        {
+                            let is_stopping = {
+                                let manager =
+                                    PROCESS_MANAGER.lock().unwrap_or_else(|e| e.into_inner());
+                                manager.is_stopping
+                            };
+                            if is_stopping && payload.code == Some(1) {
+                                tauri_plugin_shell::process::TerminatedPayload {
+                                    code: Some(0),
+                                    signal: payload.signal,
+                                }
+                            } else {
+                                payload
+                            }
+                        }
+                        #[cfg(not(target_os = "windows"))]
+                        payload
+                    };
+                    handle_process_termination(&app, &mode, adjusted_payload).await;
+                }
+                _ => {}
+            }
+        }
+    });
+}
+
+/// watchdog 重启 sing-box 的内部函数（macOS 专用，Send-safe）。
+///
+/// 跳过 keychain 读取和系统代理切换（均为非 Send 的异步调用），
+/// 直接使用已存的 password/path 重新拉起进程。
+#[cfg(target_os = "macos")]
+async fn restart_tun_send_safe(
+    app: tauri::AppHandle,
+    path: Arc<String>,
+    password: Arc<String>,
+) -> Result<(), String> {
+    let sidecar_path = helper::get_sidecar_path(Path::new("sing-box"))
+        .map_err(|e| e.to_string())?;
+
+    // create_privileged_command 会在 bypass_router 启用时重新执行 sysctl ip.forwarding=1
+    let cmd = PlatformVpnProxy::create_privileged_command(
+        &app,
+        sidecar_path,
+        path.as_ref().clone(),
+        password.as_ref().clone(),
+    )
+    .ok_or_else(|| "create_privileged_command returned None".to_string())?;
+
+    let (rx, child) = cmd.spawn().map_err(|e| e.to_string())?;
+    let process_mode = Arc::new(ProxyMode::TunProxy);
+    spawn_process_monitor(app.clone(), rx, Arc::clone(&process_mode));
+
+    {
+        let mut manager = PROCESS_MANAGER.lock().unwrap_or_else(|e| e.into_inner());
+        manager.mode = Some(process_mode);
+        manager.config_path = Some(Arc::clone(&path));
+        manager.tun_password = Some(Arc::clone(&password));
+        manager.child = Some(child);
+        manager.is_stopping = false;
+    }
+
+    tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
+    app.emit(EVENT_STATUS_CHANGED, ()).ok();
+
+    Ok(())
+}
+
+/// 旁路由模式定时重启间隔（4 小时）。
+/// sing-box 的 auto_detect_interface 会在物理网卡事件（睡眠/唤醒、DHCP 续租）时
+/// 更新路由表，长时间运行可能导致路由表状态污染，引起局域网其他设备无法上网。
+/// 定时重启可清除 sing-box 的路由表状态，恢复正常转发。
+#[cfg(target_os = "macos")]
+const BYPASS_ROUTER_RESTART_INTERVAL: std::time::Duration =
+    std::time::Duration::from_secs(4 * 3600);
+
+/// 旁路由模式定时重启 watchdog（loop 驱动，Send-safe）。
+///
+/// 每隔 BYPASS_ROUTER_RESTART_INTERVAL 停止并重新启动 sing-box，
+/// 清除 auto_detect_interface 引起的路由表状态污染。
+/// 由 stop() 或 handle_process_termination() 通过 bypass_router_watchdog_abort 取消。
+#[cfg(target_os = "macos")]
+async fn bypass_router_watchdog(
+    app: tauri::AppHandle,
+    password: Arc<String>,
+    path: Arc<String>,
+) {
+    loop {
+        tokio::time::sleep(BYPASS_ROUTER_RESTART_INTERVAL).await;
+
+        // 检查是否仍处于 TUN 模式（用户手动停止时 abort 会在 sleep 处取消，
+        // 此处作为防御性检查）
+        let still_tun = {
+            let manager = PROCESS_MANAGER.lock().unwrap_or_else(|e| e.into_inner());
+            manager
+                .mode
+                .as_ref()
+                .map(|m| **m == ProxyMode::TunProxy)
+                .unwrap_or(false)
+        };
+
+        if !still_tun {
+            log::info!("[bypass_router_watchdog] TUN mode no longer active, exiting");
+            return;
+        }
+
+        log::info!(
+            "[bypass_router_watchdog] Scheduled restart after {}h to refresh routing table",
+            BYPASS_ROUTER_RESTART_INTERVAL.as_secs() / 3600
+        );
+
+        // 标记 watchdog 主动重启，防止 handle_process_termination 清除进程状态
+        {
+            let mut manager = PROCESS_MANAGER.lock().unwrap_or_else(|e| e.into_inner());
+            manager.bypass_router_restarting = true;
+        }
+
+        if let Err(e) = PlatformVpnProxy::stop_tun_process(password.as_str()) {
+            log::error!("[bypass_router_watchdog] stop_tun_process failed: {}", e);
+            let mut manager = PROCESS_MANAGER.lock().unwrap_or_else(|e| e.into_inner());
+            manager.bypass_router_restarting = false;
+            continue; // 下一个间隔重试
+        }
+
+        // 等待 TUN 接口和路由条目完全释放
+        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+
+        {
+            let mut manager = PROCESS_MANAGER.lock().unwrap_or_else(|e| e.into_inner());
+            manager.bypass_router_restarting = false;
+        }
+
+        // 重启（Send-safe：不调用 start，规避 macOS keychain/代理 API 的非 Send 约束）
+        if let Err(e) =
+            restart_tun_send_safe(app.clone(), Arc::clone(&path), Arc::clone(&password)).await
+        {
+            log::error!("[bypass_router_watchdog] restart failed: {}", e);
+            // 继续 loop，下一个间隔重试
+        }
+    }
 }
 
 async fn get_password_for_mode(mode: &ProxyMode) -> Result<String, String> {
@@ -179,109 +372,66 @@ pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Resu
     // 启动进程
     let child_opt = if let Some(sidecar_command) = sidecar_command_opt {
         log::info!("Spawning sidecar command");
-        let (mut rx, child) = sidecar_command.spawn().map_err(|e| {
+        let (rx, child) = sidecar_command.spawn().map_err(|e| {
             log::error!("Failed to spawn sidecar command: {}", e);
             e.to_string()
         })?;
-
-        // 使用 Arc 避免 clone
-        let app_handle = app.clone();
-        let process_mode = Arc::new(mode.clone());
-        let mode_for_task = Arc::clone(&process_mode);
-
-        // 创建 sing-box 专用日志写入器
-        let mut singbox_log = create_singbox_log_writer(&app_handle);
-
-        // 监听子进程输出
-        tokio::spawn(async move {
-            let mut terminated = false;
-            let app_status_data = app_handle.state::<AppData>();
-
-            while let Some(event) = rx.recv().await {
-                if terminated {
-                    if let tauri_plugin_shell::process::CommandEvent::Stdout(line)
-                    | tauri_plugin_shell::process::CommandEvent::Stderr(line) = event
-                    {
-                        let line_str = String::from_utf8_lossy(&line);
-                        write_singbox_log(&mut singbox_log, &line_str);
-                    }
-                    continue;
-                }
-
-                match event {
-                    tauri_plugin_shell::process::CommandEvent::Stdout(line) => {
-                        let line_str = String::from_utf8_lossy(&line);
-                        write_singbox_log(&mut singbox_log, &line_str);
-                    }
-                    tauri_plugin_shell::process::CommandEvent::Stderr(line) => {
-                        let line_str = String::from_utf8_lossy(&line);
-                        write_singbox_log(&mut singbox_log, &line_str);
-                        app_status_data.write(line_str.to_string(), LogType::Info);
-                    }
-                    tauri_plugin_shell::process::CommandEvent::Error(err) => {
-                        log::error!("sing-box process error: {}", err);
-                        write_singbox_log(&mut singbox_log, &format!("[ERROR] {}", err));
-                        app_status_data.write(err.to_string(), LogType::Error);
-                    }
-                    tauri_plugin_shell::process::CommandEvent::Terminated(payload) => {
-                        terminated = true;
-                        log::info!(
-                            "sing-box process terminated with exit code: {:?}",
-                            payload.code
-                        );
-
-                        // 在Windows平台下，如果正在执行stop操作，将退出码1重写为0
-                        let adjusted_payload = {
-                            #[cfg(target_os = "windows")]
-                            {
-                                let is_stopping = {
-                                    let manager =
-                                        PROCESS_MANAGER.lock().unwrap_or_else(|e| e.into_inner());
-                                    manager.is_stopping
-                                };
-
-                                if is_stopping && payload.code == Some(1) {
-                                    tauri_plugin_shell::process::TerminatedPayload {
-                                        code: Some(0),
-                                        signal: payload.signal,
-                                    }
-                                } else {
-                                    payload
-                                }
-                            }
-
-                            #[cfg(not(target_os = "windows"))]
-                            payload
-                        };
-
-                        handle_process_termination(&app_handle, &mode_for_task, adjusted_payload)
-                            .await;
-                    }
-                    _ => {}
-                }
-            }
-        });
+        spawn_process_monitor(app.clone(), rx, Arc::new(mode.clone()));
         Some(child)
     } else {
         None
     };
 
-    // 更新进程管理器状态
+    // 更新进程管理器状态；提前构造 Arc 供 watchdog 直接使用，避免写入后再读回
+    let tun_password_arc = if !is_system_proxy {
+        Some(Arc::new(password))
+    } else {
+        None
+    };
+    let config_path_arc = Arc::new(path);
     {
         let mut manager = PROCESS_MANAGER.lock().unwrap_or_else(|e| {
             log::error!("Mutex lock error during process setup: {:?}", e);
             e.into_inner()
         });
-
         manager.mode = Some(Arc::new(mode.clone()));
-        manager.config_path = Some(Arc::new(path));
-        manager.tun_password = if !is_system_proxy {
-            Some(Arc::new(password))
-        } else {
-            None
-        };
+        manager.config_path = Some(Arc::clone(&config_path_arc));
+        manager.tun_password = tun_password_arc.clone();
         manager.child = child_opt;
         manager.is_stopping = false;
+    }
+
+    // 旁路由模式：启动定时重启 watchdog（仅 macOS）
+    #[cfg(target_os = "macos")]
+    if matches!(mode, ProxyMode::TunProxy) {
+        use tauri_plugin_store::StoreExt;
+        let bypass_router_enabled = app
+            .get_store("settings.json")
+            .and_then(|store| store.get("enable_bypass_router_key"))
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false);
+
+        if bypass_router_enabled {
+            if let Some(pw) = tun_password_arc {
+                let pa = Arc::clone(&config_path_arc);
+                // 终止旧 watchdog，防止重叠
+                {
+                    let mut manager = PROCESS_MANAGER.lock().unwrap_or_else(|e| e.into_inner());
+                    if let Some(abort) = manager.bypass_router_watchdog_abort.take() {
+                        abort.abort();
+                    }
+                }
+                let task = tokio::spawn(bypass_router_watchdog(app.clone(), pw, pa));
+                {
+                    let mut manager = PROCESS_MANAGER.lock().unwrap_or_else(|e| e.into_inner());
+                    manager.bypass_router_watchdog_abort = Some(task.abort_handle());
+                    log::info!(
+                        "[bypass_router_watchdog] Started, next restart in {}h",
+                        BYPASS_ROUTER_RESTART_INTERVAL.as_secs() / 3600
+                    );
+                }
+            }
+        }
     }
 
     // 设置或取消系统代理
@@ -314,6 +464,22 @@ async fn handle_process_termination(
     process_mode: &Arc<ProxyMode>,
     payload: tauri_plugin_shell::process::TerminatedPayload,
 ) {
+    // watchdog 主动发起重启时，sing-box 的退出是预期行为，跳过清理
+    // 由 watchdog 自行调用 start() 完成状态重建
+    #[cfg(target_os = "macos")]
+    {
+        let is_watchdog_restart = {
+            let manager = PROCESS_MANAGER.lock().unwrap_or_else(|e| e.into_inner());
+            manager.bypass_router_restarting
+        };
+        if is_watchdog_restart {
+            log::info!(
+                "[handle_process_termination] bypass_router_watchdog restart in progress, skipping cleanup"
+            );
+            return;
+        }
+    }
+
     let should_cleanup = {
         let mut manager = PROCESS_MANAGER.lock().unwrap_or_else(|e| {
             log::error!("Failed to lock process manager: {:?}", e);
@@ -334,6 +500,11 @@ async fn handle_process_termination(
             manager.config_path = None;
             manager.tun_password = None;
             manager.is_stopping = false;
+            // sing-box 意外退出时终止 watchdog，避免其在进程已停止后无效重启
+            #[cfg(target_os = "macos")]
+            if let Some(abort) = manager.bypass_router_watchdog_abort.take() {
+                abort.abort();
+            }
         }
         matches
     };
@@ -434,6 +605,14 @@ pub async fn stop(app: tauri::AppHandle) -> Result<(), String> {
         manager.tun_password = None;
         manager.config_path = None;
         manager.is_stopping = false;
+        // 用户主动停止时终止 watchdog
+        #[cfg(target_os = "macos")]
+        {
+            if let Some(abort) = manager.bypass_router_watchdog_abort.take() {
+                abort.abort();
+            }
+            manager.bypass_router_restarting = false;
+        }
     }
 
     log::info!("Proxy process stopped");

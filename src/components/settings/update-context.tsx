@@ -1,6 +1,12 @@
 import { type Update } from '@tauri-apps/plugin-updater';
 import { createContext, ReactNode, useContext, useEffect, useRef, useState } from 'react';
-import { checkUpdate } from '../../utils/update';
+import {
+    checkUpdate,
+    downloadUpdateIfNeeded,
+    getLastUpdateCheckTime,
+    getUpdateInterval,
+    setLastUpdateCheckTime,
+} from '../../utils/update';
 
 interface UpdateContextType {
     updateInfo: Update | null;
@@ -10,10 +16,12 @@ interface UpdateContextType {
     downloadProgress: number;
     downloadComplete: boolean;
     checkAndDownloadUpdate: () => Promise<Update | null>;
-
+    // Call after switching update channel. Reads the new channel's interval and
+    // the persisted last-check timestamp; triggers an immediate check only if
+    // the interval has elapsed.
+    triggerImmediateCheck: () => Promise<void>;
 }
 
-const UPDATE_CHECK_INTERVAL = 1000 * 60 * 60; // 每小时检查一次
 const UpdateContext = createContext<UpdateContextType | undefined>(undefined);
 
 export function UpdateProvider({ children }: { children: ReactNode }) {
@@ -23,21 +31,34 @@ export function UpdateProvider({ children }: { children: ReactNode }) {
     const [downloadProgress, setDownloadProgress] = useState(0);
     const [lastCheckTime, setLastCheckTime] = useState<number | null>(null);
     const [isSimulating] = useState(false); // 设置为 true 可以进行模拟测试
+
     const checkingRef = useRef(false);
+    // Refs mirror state so async closures always read current values,
+    // avoiding stale captures in setTimeout callbacks.
+    const downloadingRef = useRef(false);
+    const downloadCompleteRef = useRef(false);
+
+    const setDownloadingSync = (v: boolean) => {
+        downloadingRef.current = v;
+        setDownloading(v);
+    };
+    const setDownloadCompleteSync = (v: boolean) => {
+        downloadCompleteRef.current = v;
+        setDownloadComplete(v);
+    };
 
     const checkAndDownloadUpdate = async () => {
-        // 防止重复检查
         if (checkingRef.current) {
             console.log('Already checking for updates...');
             return updateInfo;
         }
 
-        if (downloadComplete) {
+        if (downloadCompleteRef.current) {
             console.log('Update already downloaded');
             return updateInfo;
         }
 
-        if (downloading) {
+        if (downloadingRef.current) {
             console.log('Update is downloading...');
             return updateInfo;
         }
@@ -48,8 +69,7 @@ export function UpdateProvider({ children }: { children: ReactNode }) {
         try {
             if (isSimulating) {
                 // 模拟更新检查和下载过程
-                // 创建模拟更新对象
-                setDownloading(true);
+                setDownloadingSync(true);
                 console.log("开始 mock 下载，已设置 downloading 为 true");
                 const mockUpdate = {
                     version: '2.0.0',
@@ -62,10 +82,7 @@ export function UpdateProvider({ children }: { children: ReactNode }) {
                     install: async () => { console.log('模拟安装更新'); },
                     download: async (onEvent?: (event: any) => void) => {
                         if (onEvent) {
-                            onEvent({
-                                event: 'Started',
-                                data: { contentLength: 1000000 }
-                            });
+                            onEvent({ event: 'Started', data: { contentLength: 1000000 } });
                         }
                         console.log('模拟下载更新开始');
                     }
@@ -77,83 +94,116 @@ export function UpdateProvider({ children }: { children: ReactNode }) {
                     setDownloadProgress(progress);
                     if (progress >= 100) {
                         clearInterval(simulateDownload);
-                        setDownloadComplete(true);
-                        setDownloading(false);
+                        setDownloadCompleteSync(true);
+                        setDownloadingSync(false);
                     }
                 }, 100);
 
                 return mockUpdate;
             } else {
-                // 真实更新检查和下载过程
                 const checkResult = await checkUpdate();
                 if (checkResult) {
                     setUpdateInfo(checkResult);
-                    setDownloading(true);
-                    let downloaded = 0;
-                    let contentLength = 0;
+                    setDownloadingSync(true);
 
                     try {
-                        await checkResult.download((event) => {
-                            switch (event.event) {
-                                case 'Started':
-                                    contentLength = event.data.contentLength || 0;
-                                    break;
-                                case 'Progress':
-                                    downloaded += event.data.chunkLength;
-                                    const progress = Math.round((downloaded / contentLength) * 100);
-                                    setDownloadProgress(progress);
-                                    break;
-                                case 'Finished':
-                                    console.log('Download finished');
-                                    break;
-                            }
-                        });
-
-                        setDownloadComplete(true);
+                        await downloadUpdateIfNeeded(checkResult, setDownloadProgress);
+                        setDownloadCompleteSync(true);
                         return checkResult;
                     } catch (error) {
                         console.error('Download error:', error);
                         throw error;
                     } finally {
-                        setDownloading(false);
+                        setDownloadingSync(false);
                     }
                 }
             }
 
-
             return null;
         } catch (error) {
             console.error('Error during update:', error);
-            setDownloading(false);
+            setDownloadingSync(false);
             return null;
         } finally {
             checkingRef.current = false;
-            setLastCheckTime(Date.now());
+            const now = Date.now();
+            setLastCheckTime(now);
+            await setLastUpdateCheckTime(now);
+        }
+    };
+
+    // Called after the user switches update channel. Reads the new channel's
+    // interval and the persisted last-check timestamp. If the interval has
+    // elapsed, resets download state and triggers an immediate check.
+    const triggerImmediateCheck = async () => {
+        const [lastCheck, interval] = await Promise.all([
+            getLastUpdateCheckTime(),
+            getUpdateInterval(), // reads the newly saved stage from store
+        ]);
+        if (Date.now() - lastCheck >= interval) {
+            setDownloadCompleteSync(false);
+            setDownloadingSync(false);
+            setUpdateInfo(null);
+            setDownloadProgress(0);
+            await checkAndDownloadUpdate();
         }
     };
 
     useEffect(() => {
-        // 初始检查
-        const initialCheck = async () => {
-            await checkAndDownloadUpdate();
-        };
-        initialCheck();
+        let cancelled = false;
+        let timeoutId: ReturnType<typeof setTimeout>;
 
-        // 设置定期检查
-        const interval = setInterval(() => {
-            if (!downloading && !downloadComplete) {
-                checkAndDownloadUpdate();
+        // Poll every minute. Each tick re-reads lastCheckTime and the current
+        // channel's interval from the store, so channel switches are picked up
+        // automatically without needing to reschedule timers.
+        const POLL_INTERVAL_MS = 60 * 1000;
+
+        const poll = async () => {
+            if (cancelled) return;
+
+            if (!downloadingRef.current && !downloadCompleteRef.current) {
+                const [lastCheck, interval] = await Promise.all([
+                    getLastUpdateCheckTime(),
+                    getUpdateInterval(),
+                ]);
+
+                if (lastCheck === 0) {
+                    // No previous check recorded — first run ever.
+                    await checkAndDownloadUpdate();
+                } else {
+                    const elapsed = Date.now() - lastCheck;
+                    if (elapsed >= interval) {
+                        await checkAndDownloadUpdate();
+                    }
+                }
             }
-        }, UPDATE_CHECK_INTERVAL);
 
-        return () => clearInterval(interval);
-    }, []); // 移除依赖项，避免无限循环
+            if (!cancelled) {
+                timeoutId = setTimeout(poll, POLL_INTERVAL_MS);
+            }
+        };
+
+        // Restore persisted last-check time for UI display, then start polling.
+        getLastUpdateCheckTime().then((lastCheck) => {
+            if (!cancelled && lastCheck > 0) {
+                setLastCheckTime(lastCheck);
+            }
+        });
+
+        poll();
+
+        return () => {
+            cancelled = true;
+            clearTimeout(timeoutId);
+        };
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     return (
         <UpdateContext.Provider value={{
             updateInfo,
             downloadComplete,
             checkAndDownloadUpdate,
+            triggerImmediateCheck,
             downloading,
             downloadProgress,
             lastCheckTime,

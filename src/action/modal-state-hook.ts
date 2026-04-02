@@ -45,7 +45,7 @@ export function useModalState() {
         resetMessage();
     }
 
-    // 收到 deep link 时自动预填 URL 并打开弹窗
+    // 收到 apply=0 的 deep link 时，自动预填 URL 并打开弹窗
     useEffect(() => {
         if (!deepLinkUrl) return;
         openModal(deepLinkUrl);

@@ -46,9 +46,9 @@ pub fn app_setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>>
     // synchronously via get_pending_deep_link once the webview is ready.
     #[cfg(any(windows, target_os = "linux"))]
     if let Ok(Some(urls)) = app.deep_link().get_current() {
-        if let Some(data) = urls.first().and_then(extract_deep_link_data) {
-            log::info!("Cold-start deep link config data: {}", data);
-            store_pending_deep_link(&app.state::<crate::state::AppData>(), &data);
+        if let Some(payload) = urls.first().and_then(extract_deep_link_data) {
+            log::info!("Cold-start deep link config data: {} apply={}", payload.data, payload.apply);
+            store_pending_deep_link(&app.state::<crate::state::AppData>(), payload);
         }
     }
 
@@ -57,20 +57,24 @@ pub fn app_setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>>
 
 // ── Deep Link ──────────────────────────────────────────────────────
 
-/// 从 `oneoh-networktools://config?data=...` 中提取 data 参数值
-fn extract_deep_link_data(url: &Url) -> Option<String> {
+/// 从 `oneoh-networktools://config?data=...&apply=1` 中提取参数
+fn extract_deep_link_data(url: &Url) -> Option<crate::state::DeepLinkPayload> {
     if url.scheme() != "oneoh-networktools" || url.host_str() != Some("config") {
         return None;
     }
-    url.query_pairs()
-        .find(|(k, _)| k == "data")
-        .map(|(_, v)| v.into_owned())
+    let params: std::collections::HashMap<_, _> = url.query_pairs().collect();
+    let data = params.get("data")?.to_string();
+    let apply = params
+        .get("apply")
+        .map(|v| v == "1")
+        .unwrap_or(false);
+    Some(crate::state::DeepLinkPayload { data, apply })
 }
 
-/// 将 deep link data 写入 pending state
-fn store_pending_deep_link(app_data: &crate::state::AppData, data: &str) {
+/// 将 deep link payload 写入 pending state
+fn store_pending_deep_link(app_data: &crate::state::AppData, payload: crate::state::DeepLinkPayload) {
     if let Ok(mut pending) = app_data.pending_deep_link.lock() {
-        *pending = Some(data.to_string());
+        *pending = Some(payload);
     }
 }
 
@@ -82,10 +86,10 @@ fn register_deep_link(app: &tauri::App) {
         log::info!("Received deep link: {:#?}", urls);
         show_dashboard(handle.clone());
 
-        if let Some(data) = urls.first().and_then(extract_deep_link_data) {
-            log::info!("Received config data: {}", data);
+        if let Some(payload) = urls.first().and_then(extract_deep_link_data) {
+            log::info!("Received config data: {} apply={}", payload.data, payload.apply);
             // 写入 state（冷/热启动都靠前端主动拉取，保证可靠）
-            store_pending_deep_link(&handle.state::<crate::state::AppData>(), &data);
+            store_pending_deep_link(&handle.state::<crate::state::AppData>(), payload);
             // 发送无 payload 的信号：前端收到后主动 invoke get_pending_deep_link。
             // 若 WebView 尚未就绪（窗口从隐藏恢复时），信号可能丢失，
             // 但前端同时监听 tauri://focus 作为兜底，数据不会丢。

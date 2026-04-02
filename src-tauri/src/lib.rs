@@ -23,6 +23,7 @@ pub fn run() {
             lan::get_captive_redirect_url,
             lan::check_captive_portal_status,
             lan::get_optimal_local_dns_server,
+            lan::fetch_config_with_optimal_dns,
             core::stop,
             core::start,
             core::is_running,

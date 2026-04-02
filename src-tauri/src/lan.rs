@@ -359,6 +359,215 @@ pub async fn get_best_dns_server() -> Option<String> {
     }
 }
 
+fn build_dns_a_query(hostname: &str) -> Option<Vec<u8>> {
+    let mut payload = vec![
+        0xAB, 0xCD, // Transaction ID
+        0x01, 0x00, // Flags: standard query, recursion desired
+        0x00, 0x01, // QDCOUNT = 1
+        0x00, 0x00, // ANCOUNT = 0
+        0x00, 0x00, // NSCOUNT = 0
+        0x00, 0x00, // ARCOUNT = 0
+    ];
+    for label in hostname.split('.') {
+        let bytes = label.as_bytes();
+        if bytes.is_empty() || bytes.len() > 63 {
+            return None;
+        }
+        payload.push(bytes.len() as u8);
+        payload.extend_from_slice(bytes);
+    }
+    payload.push(0x00); // null terminator
+    payload.extend_from_slice(&[0x00, 0x01]); // QTYPE = A
+    payload.extend_from_slice(&[0x00, 0x01]); // QCLASS = IN
+    Some(payload)
+}
+
+fn skip_dns_name(buf: &[u8], mut pos: usize) -> Option<usize> {
+    loop {
+        if pos >= buf.len() {
+            return None;
+        }
+        let len = buf[pos] as usize;
+        if len == 0 {
+            return Some(pos + 1);
+        }
+        // Compression pointer: top two bits set
+        if (len & 0xC0) == 0xC0 {
+            return Some(pos + 2);
+        }
+        pos += 1 + len;
+    }
+}
+
+fn parse_dns_a_record(buf: &[u8]) -> Option<std::net::Ipv4Addr> {
+    if buf.len() < 12 {
+        return None;
+    }
+    let ancount = u16::from_be_bytes([buf[6], buf[7]]) as usize;
+    if ancount == 0 {
+        return None;
+    }
+    // Skip question section
+    let mut pos = skip_dns_name(buf, 12)?;
+    pos += 4; // QTYPE + QCLASS
+
+    for _ in 0..ancount {
+        pos = skip_dns_name(buf, pos)?;
+        if pos + 10 > buf.len() {
+            return None;
+        }
+        let rtype = u16::from_be_bytes([buf[pos], buf[pos + 1]]);
+        let rdlength = u16::from_be_bytes([buf[pos + 8], buf[pos + 9]]) as usize;
+        pos += 10;
+        if rtype == 1 && rdlength == 4 && pos + 4 <= buf.len() {
+            return Some(std::net::Ipv4Addr::new(
+                buf[pos],
+                buf[pos + 1],
+                buf[pos + 2],
+                buf[pos + 3],
+            ));
+        }
+        pos += rdlength;
+    }
+    None
+}
+
+async fn resolve_a_record(hostname: &str, dns_server: &str) -> Option<std::net::Ipv4Addr> {
+    use std::net::SocketAddr;
+    use tokio::net::UdpSocket;
+    use tokio::time::{timeout, Duration};
+
+    let ns_addr: SocketAddr = format!("{}:53", dns_server).parse().ok()?;
+    let bind_addr = if ns_addr.is_ipv4() { "0.0.0.0:0" } else { "[::]:0" };
+
+    let payload = build_dns_a_query(hostname)?;
+    let socket = UdpSocket::bind(bind_addr).await.ok()?;
+    socket.connect(ns_addr).await.ok()?;
+    socket.send(&payload).await.ok()?;
+
+    let mut buf = [0u8; 512];
+    let len = timeout(Duration::from_secs(5), socket.recv(&mut buf))
+        .await
+        .ok()?  // timeout elapsed -> None
+        .ok()?; // io::Error -> None
+
+    parse_dns_a_record(&buf[..len])
+}
+
+fn is_ip_address(s: &str) -> bool {
+    s.parse::<std::net::IpAddr>().is_ok()
+}
+
+#[derive(serde::Serialize)]
+pub struct FetchConfigResponse {
+    data: Option<serde_json::Value>,
+    headers: std::collections::HashMap<String, String>,
+    status: u16,
+}
+
+#[tauri::command]
+pub async fn fetch_config_with_optimal_dns(
+    app: AppHandle,
+    url: String,
+    user_agent: String,
+) -> Result<FetchConfigResponse, String> {
+    use crate::state::AppData;
+    use std::net::{IpAddr, SocketAddr};
+    use url::Url;
+
+    let parsed_url = Url::parse(&url).map_err(|e| e.to_string())?;
+    let hostname = parsed_url
+        .host_str()
+        .ok_or("missing host in URL")?
+        .to_string();
+    let port = parsed_url.port_or_known_default().unwrap_or(443);
+
+    // Retrieve or fetch the optimal DNS server (reuses existing cache logic)
+    let app_data = app.state::<AppData>();
+    let dns_server = {
+        let running = is_running(app.clone(), app_data.get_clash_secret().unwrap()).await;
+        if running {
+            app_data.get_cached_dns()
+        } else {
+            None
+        }
+    };
+    let dns_server = match dns_server {
+        Some(d) => d,
+        None => {
+            let best = get_best_dns_server()
+                .await
+                .unwrap_or_else(|| "223.5.5.5".to_string());
+            app_data.set_cached_dns(Some(best.clone()));
+            best
+        }
+    };
+
+    let client_builder = reqwest::ClientBuilder::new()
+        .timeout(std::time::Duration::from_secs(30))
+        .no_proxy();
+
+    let client = if !is_ip_address(&hostname) {
+        match resolve_a_record(&hostname, &dns_server).await {
+            Some(ip) => {
+                let addr = SocketAddr::new(IpAddr::V4(ip), port);
+                log::info!(
+                    "Resolved {} -> {} via DNS {}",
+                    hostname,
+                    ip,
+                    dns_server
+                );
+                client_builder
+                    .resolve(&hostname, addr)
+                    .build()
+                    .map_err(|e| e.to_string())?
+            }
+            None => {
+                log::warn!(
+                    "DNS resolution failed for {} via {}, falling back to system DNS",
+                    hostname,
+                    dns_server
+                );
+                client_builder.build().map_err(|e| e.to_string())?
+            }
+        }
+    } else {
+        client_builder.build().map_err(|e| e.to_string())?
+    };
+
+    let response = client
+        .get(&url)
+        .header("User-Agent", &user_agent)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let status = response.status().as_u16();
+
+    let mut headers = std::collections::HashMap::new();
+    for (name, value) in response.headers() {
+        if let Ok(v) = value.to_str() {
+            headers.insert(name.to_string(), v.to_string());
+        }
+    }
+
+    let data = if status == 200 {
+        response
+            .bytes()
+            .await
+            .ok()
+            .and_then(|b| serde_json::from_slice(&b).ok())
+    } else {
+        None
+    };
+
+    Ok(FetchConfigResponse {
+        data,
+        headers,
+        status,
+    })
+}
+
 // 获取最佳本地 DNS 服务器的命令
 // Command to get the optimal local DNS server
 #[tauri::command]

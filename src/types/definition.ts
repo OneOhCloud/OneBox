@@ -17,6 +17,9 @@ export const SUPPORT_LOCAL_FILE_STORE_KEY = 'support_local_file_key'
 // User Agent 配置键
 export const USER_AGENT_STORE_KEY = 'user_agent_key'
 
+// 上次检查更新的时间戳（ms），跨会话持久化
+export const LAST_UPDATE_CHECK_TIME_KEY = 'last_update_check_time_key'
+
 // 允许局域网连接
 export const ALLOWLAN_STORE_KEY = 'allow_lan_key'
 // 是否启用 tun 模式

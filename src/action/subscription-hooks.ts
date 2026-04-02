@@ -2,7 +2,7 @@ import { useCallback, useState } from "react";
 import { getDataBaseInstance } from "../single/db";
 import { Subscription } from "../types/definition";
 import { t } from "../utils/helper";
-import { fetchConfigContent, FileError, getRemoteInfoBySubscriptionUserinfo, getRemoteNameByContentDisposition } from "./db";
+import { fetchConfigContent, FileError, getRemoteInfoBySubscriptionUserinfo, insertSubscription } from "./db";
 
 
 type MessageType = 'success' | 'error' | 'warning' | undefined;
@@ -80,45 +80,25 @@ export function useAddSubscription() {
         setMessageType(undefined);
     };
 
-    const add = useCallback(async (url: string, name: string | undefined) => {
+    const add = useCallback(async (url: string, name?: string): Promise<string | undefined> => {
         setLoading(true);
         setMessage('');
         setMessageType(undefined);
         try {
-            const response = await fetchConfigContent(url);
-
-            if (response.status !== 200) {
-                // 从远程获取配置失败，错误代码：response.status
-                setMessage(t('fetch_subscription_failed', { code: response.status }));
+            const identifier = await insertSubscription(url, name);
+            if (!identifier) {
+                setMessage(t('add_subscription_failed'));
                 setMessageType('error');
-            } else {
-
-                const officialWebsite = response.headers['official-website'] || 'https://sing-box.net'
-
-                if (name === undefined || name === '' || name === "默认配置") {
-                    name = getRemoteNameByContentDisposition(response.headers['content-disposition'] || '') || '订阅'
-                }
-
-                const { upload, download, total, expire } = getRemoteInfoBySubscriptionUserinfo(response.headers['subscription-userinfo'] || '')
-                const identifier = crypto.randomUUID().toString().replace(/-/g, '')
-                const used_traffic = parseInt(upload) + parseInt(download)
-                const total_traffic = parseInt(total)
-                const expire_time = parseInt(expire) * 1000
-                const last_update_time = Date.now()
-                const db = await getDataBaseInstance();
-                await db.execute('INSERT INTO subscriptions (identifier, name, subscription_url, official_website, used_traffic, total_traffic, expire_time, last_update_time) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-                    [identifier, name, url, officialWebsite, used_traffic, total_traffic, expire_time, last_update_time])
-                await db.execute('INSERT INTO subscription_configs (identifier, config_content) VALUES (?, ?)', [identifier, JSON.stringify(response.data)])
-                setMessage(t('add_subscription_success'));
-                setMessageType('success');
+                return undefined;
             }
-
-
+            setMessage(t('add_subscription_success'));
+            setMessageType('success');
+            return identifier;
         } catch (error) {
-
             console.error(error);
             setMessage(t('add_subscription_failed'));
             setMessageType('error');
+            return undefined;
         } finally {
             setLoading(false);
         }

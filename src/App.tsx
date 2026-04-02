@@ -11,6 +11,7 @@ import { Toaster } from 'sonner';
 import React from 'react';
 import useSWR from "swr";
 import { UpdateProvider } from './components/settings/update-context';
+import { deduplicateSubscriptionsByUrl } from "./action/db";
 import { syncAllConfigTemplates } from "./hooks/useSwr";
 import HomePage from "./page/home";
 import { ActiveScreenType, NavContext } from './single/context';
@@ -111,16 +112,22 @@ function App() {
 
   const [language, setLanguage] = useState('unknown');
   const [deepLinkUrl, setDeepLinkUrl] = useState<string>('');
+  const [deepLinkApplyUrl, setDeepLinkApplyUrl] = useState<string>('');
 
   useEffect(() => {
     // 统一入口：从 Rust 拉取并消费 pending deep link（take() 保证幂等）
     const processPending = () => {
-      invoke<string | null>('get_pending_deep_link').then((value) => {
-        if (!value) return;
+      invoke<{ data: string; apply: boolean } | null>('get_pending_deep_link').then((payload) => {
+        if (!payload) return;
         try {
-          const decoded = atob(value);
-          setDeepLinkUrl(decoded);
-          setActiveScreen('configuration');
+          const decoded = atob(payload.data);
+          if (payload.apply) {
+            setActiveScreen('home');
+            setDeepLinkApplyUrl(decoded);
+          } else {
+            setDeepLinkUrl(decoded);
+            setActiveScreen('configuration');
+          }
         } catch (e) {
           console.error('Failed to decode pending deep link:', e);
         }
@@ -181,6 +188,7 @@ function App() {
   }
 
   useEffect(() => {
+    deduplicateSubscriptionsByUrl();
     initLanguage().then(() => {
       setDockLang({
         home: t("home"),
@@ -194,7 +202,7 @@ function App() {
 
 
   return (
-    <NavContext.Provider value={{ activeScreen, setActiveScreen, handleLanguageChange, deepLinkUrl, setDeepLinkUrl }}>
+    <NavContext.Provider value={{ activeScreen, setActiveScreen, handleLanguageChange, deepLinkUrl, setDeepLinkUrl, deepLinkApplyUrl, setDeepLinkApplyUrl }}>
       <UpdateProvider>
         <Toaster position="top-center" toastOptions={{ duration: 2000 }} />
 

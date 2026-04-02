@@ -1,12 +1,22 @@
+use serde::Serialize;
 use std::sync::Mutex;
+
+/// deep link 解析结果
+#[derive(Serialize, Clone)]
+pub struct DeepLinkPayload {
+    /// Base64 编码的配置 URL（原始值，未解码）
+    pub data: String,
+    /// 是否在导入后立即应用并启动/重启服务
+    pub apply: bool,
+}
 
 pub struct AppData {
     pub cached_dns: Mutex<Option<String>>,
     pub log_buffer: Mutex<Vec<String>>,
     pub error_log_buffer: Mutex<Vec<String>>,
     pub clash_secret: Mutex<Option<String>>,
-    /// 冷启动时通过 deep link 携带的待处理数据（已 URL-decode），前端就绪后主动拉取
-    pub pending_deep_link: Mutex<Option<String>>,
+    /// 冷启动时通过 deep link 携带的待处理数据，前端就绪后主动拉取
+    pub pending_deep_link: Mutex<Option<DeepLinkPayload>>,
 }
 
 pub enum LogType {

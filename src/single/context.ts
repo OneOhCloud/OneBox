@@ -12,6 +12,8 @@ interface NavContextType {
     handleLanguageChange: (lang: string) => void;
     deepLinkUrl: string;
     setDeepLinkUrl: (url: string) => void;
+    deepLinkApplyUrl: string;
+    setDeepLinkApplyUrl: (url: string) => void;
 }
 
 export const NavContext = createContext<NavContextType>({
@@ -20,4 +22,6 @@ export const NavContext = createContext<NavContextType>({
     handleLanguageChange: (_: string) => { },
     deepLinkUrl: '',
     setDeepLinkUrl: () => { },
+    deepLinkApplyUrl: '',
+    setDeepLinkApplyUrl: () => { },
 });

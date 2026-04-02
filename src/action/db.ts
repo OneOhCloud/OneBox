@@ -1,6 +1,6 @@
 
 import { readTextFile } from '@tauri-apps/plugin-fs';
-import { fetch } from '@tauri-apps/plugin-http';
+import { invoke } from '@tauri-apps/api/core';
 import { toast } from 'sonner';
 import { getDataBaseInstance } from '../single/db';
 import { Subscription, SubscriptionConfig } from '../types/definition';
@@ -45,35 +45,23 @@ export async function fetchConfigContent(url: string): Promise<ConfigResponse> {
             throw new FileError(`${error}`);
         }
     } else {
-        const response = await fetch(url, {
-            method: 'GET',
-            // @ts-ignore
-            timeout: 30,
-            headers: {
-                'User-Agent': await getSingBoxUserAgent(),
-            }
+        const result = await invoke<{
+            data: unknown;
+            headers: Record<string, string>;
+            status: number;
+        }>('fetch_config_with_optimal_dns', {
+            url,
+            userAgent: await getSingBoxUserAgent(),
         });
 
-        if (response.status !== 200) {
-            return {
-                data: null,
-                headers: {
-                    'subscription-userinfo': '',
-                    'official-website': 'https://sing-box.net',
-                    'content-disposition': ''
-                },
-                status: response.status
-            };
-        }
-
         return {
-            data: await response.json(),
+            data: result.data ?? null,
             headers: {
-                'subscription-userinfo': response.headers.get('subscription-userinfo') || '',
-                'official-website': response.headers.get('official-website') || 'https://sing-box.net',
-                'content-disposition': response.headers.get('content-disposition') || ''
+                'subscription-userinfo': result.headers['subscription-userinfo'] || '',
+                'official-website': result.headers['official-website'] || 'https://sing-box.net',
+                'content-disposition': result.headers['content-disposition'] || '',
             },
-            status: response.status
+            status: result.status,
         };
     }
 }
@@ -161,6 +149,82 @@ export async function updateSubscription(identifier: string) {
 }
 
 
+
+/**
+ * Removes duplicate subscription rows by URL, keeping the oldest entry (MIN id) per URL.
+ * Orphaned subscription_configs rows are removed automatically via CASCADE.
+ * Intended to be called once on every app startup.
+ */
+export async function deduplicateSubscriptionsByUrl(): Promise<void> {
+    const db = await getDataBaseInstance();
+    await db.execute(`
+        DELETE FROM subscriptions
+        WHERE id NOT IN (
+            SELECT MAX(id) FROM subscriptions
+            WHERE subscription_url IS NOT NULL
+            GROUP BY subscription_url
+        )
+        AND subscription_url IS NOT NULL
+    `);
+}
+
+/**
+ * Upserts a subscription by URL. If the URL already exists, updates config + traffic + name
+ * and returns the existing identifier. If not, inserts a new row.
+ * Returns the identifier on success, undefined on failure. No UI side-effects.
+ */
+export async function insertSubscription(url: string, name?: string): Promise<string | undefined> {
+    try {
+        const response = await fetchConfigContent(url);
+        if (response.status !== 200) return undefined;
+
+        const db = await getDataBaseInstance();
+        const resolvedName = (!name || name === '默认配置')
+            ? getRemoteNameByContentDisposition(response.headers['content-disposition'] || '') || '订阅'
+            : name;
+        const { upload, download, total, expire } = getRemoteInfoBySubscriptionUserinfo(
+            response.headers['subscription-userinfo'] || ''
+        );
+        const usedTraffic = parseInt(upload) + parseInt(download);
+        const totalTraffic = parseInt(total);
+        const expireTime = parseInt(expire) * 1000;
+
+        const existing: { identifier: string }[] = await db.select(
+            'SELECT identifier FROM subscriptions WHERE subscription_url = ? ORDER BY id DESC LIMIT 1',
+            [url]
+        );
+
+        if (existing.length > 0) {
+            const identifier = existing[0].identifier;
+            await db.execute(
+                'UPDATE subscriptions SET name = ?, used_traffic = ?, total_traffic = ?, expire_time = ?, last_update_time = ? WHERE identifier = ?',
+                [resolvedName, usedTraffic, totalTraffic, expireTime, Date.now(), identifier]
+            );
+            await db.execute(
+                'UPDATE subscription_configs SET config_content = ? WHERE identifier = ?',
+                [JSON.stringify(response.data), identifier]
+            );
+            return identifier;
+        }
+
+        const identifier = crypto.randomUUID().toString().replace(/-/g, '');
+        await db.execute(
+            'INSERT INTO subscriptions (identifier, name, subscription_url, official_website, used_traffic, total_traffic, expire_time, last_update_time) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+            [
+                identifier, resolvedName, url,
+                response.headers['official-website'] || 'https://sing-box.net',
+                usedTraffic, totalTraffic, expireTime, Date.now(),
+            ]
+        );
+        await db.execute(
+            'INSERT INTO subscription_configs (identifier, config_content) VALUES (?, ?)',
+            [identifier, JSON.stringify(response.data)]
+        );
+        return identifier;
+    } catch {
+        return undefined;
+    }
+}
 
 export async function addSubscription(url: string, name: string | undefined) {
     const toastId = toast.loading(t('adding_subscription'))

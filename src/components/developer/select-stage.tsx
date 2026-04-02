@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Git } from "react-bootstrap-icons";
 import { StageVersionType } from "../../config/common";
+import { useUpdate } from "../../components/settings/update-context";
 import { getStoreValue, setStoreValue } from "../../single/store";
 import { STAGE_VERSION_STORE_KEY } from "../../types/definition";
 import { t } from "../../utils/helper";
@@ -13,13 +14,17 @@ export default function StageSetting() {
     const [selectedVersion, setSelectedVersion] = useState<StageVersionType>("stable");
     const [modalOpen, setModalOpen] = useState(false);
     const [allowDev, setAllowDev] = useState(false);
-
+    const { triggerImmediateCheck } = useUpdate();
 
     const handleSave = async () => {
         try {
             await setStoreValue(STAGE_VERSION_STORE_KEY, selectedVersion);
+            const channelChanged = selectedVersion !== stageVersion;
             setStageVersion(selectedVersion);
             setModalOpen(false);
+            if (channelChanged) {
+                triggerImmediateCheck();
+            }
         } catch (error) {
             console.error("Failed to save stage version:", error);
         }

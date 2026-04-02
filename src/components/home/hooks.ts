@@ -2,11 +2,12 @@ import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { confirm, message } from '@tauri-apps/plugin-dialog';
 import { useContext, useEffect, useRef, useState } from "react";
-import useSWR from "swr";
+import useSWR, { mutate as swrMutate } from "swr";
+import { insertSubscription } from "../../action/db";
 import { useIsRunning } from "../../hooks/useVersion";
 import { NavContext } from "../../single/context";
 import { getStoreValue, setStoreValue } from "../../single/store";
-import { RULE_MODE_STORE_KEY } from "../../types/definition";
+import { GET_SUBSCRIPTIONS_LIST_SWR_KEY, RULE_MODE_STORE_KEY, SSI_STORE_KEY } from "../../types/definition";
 import { t, vpnServiceManager } from "../../utils/helper";
 
 
@@ -130,7 +131,7 @@ export const useVPNOperations = () => {
     const [privilegedDialog, setPrivilegedDialog] = useState(false);
 
     const { isRunning, isLoading: serviceLoading, mutate } = useIsRunning();
-    const { setActiveScreen } = useContext(NavContext);
+    const { setActiveScreen, deepLinkApplyUrl, setDeepLinkApplyUrl } = useContext(NavContext);
 
     // 合并所有loading状态
     const isLoading = isOperating || serviceLoading;
@@ -142,6 +143,70 @@ export const useVPNOperations = () => {
         setOperationStatus('idle');
     };
 
+    // Shared syncConfig → start flow. onSyncError differs: startService stops the VPN on
+    // config failure; the deep-link path already stopped before calling this.
+    const performSyncAndStart = (onSyncError: (error: any) => Promise<void>) => {
+        vpnServiceManager.syncConfig({
+            onSuccess: async () => {
+                try {
+                    await vpnServiceManager.start();
+                    mutate();
+                } catch (error: any) {
+                    if (error?.message?.includes('REQUIRE_PRIVILEGE')) {
+                        setPrivilegedDialog(true);
+                    } else {
+                        console.error('启动服务失败:', error);
+                        await message(t('connect_failed'), { title: t('error'), kind: 'error' });
+                    }
+                } finally {
+                    setIsOperating(false);
+                    setOperationStatus('idle');
+                }
+            },
+            onError: async (error) => {
+                await onSyncError(error);
+                setIsOperating(false);
+                setOperationStatus('idle');
+            },
+            onRequirePrivileged: () => {
+                setPrivilegedDialog(true);
+                setIsOperating(false);
+                setOperationStatus('idle');
+            },
+        });
+    };
+
+    // apply=1 deep link: import subscription, switch to it, then start — all under button loading state
+    useEffect(() => {
+        if (!deepLinkApplyUrl) return;
+        const url = deepLinkApplyUrl;
+        setDeepLinkApplyUrl('');
+        setIsOperating(true);
+        setOperationStatus('starting');
+
+        (async () => {
+            try {
+                const id = await insertSubscription(url);
+                if (!id) throw new Error(t('add_subscription_failed'));
+                await setStoreValue(SSI_STORE_KEY, id);
+                // refresh subscription list and stop current VPN in parallel
+                await Promise.all([
+                    swrMutate(GET_SUBSCRIPTIONS_LIST_SWR_KEY),
+                    vpnServiceManager.stop().catch(() => {}),
+                ]);
+            } catch {
+                await message(t('add_subscription_failed'), { title: t('error'), kind: 'error' });
+                setIsOperating(false);
+                setOperationStatus('idle');
+                return;
+            }
+
+            performSyncAndStart(async () => {
+                await message(t('connect_failed'), { title: t('error'), kind: 'error' });
+            });
+        })();
+    }, [deepLinkApplyUrl]);
+
     const startService = async (isEmpty: boolean) => {
         if (isEmpty) {
             setActiveScreen('configuration');
@@ -150,39 +215,9 @@ export const useVPNOperations = () => {
 
         setIsOperating(true);
         setOperationStatus('starting');
-
-        vpnServiceManager.syncConfig({
-            onSuccess: async () => {
-                try {
-                    await vpnServiceManager.start();
-                    mutate();
-                } catch (error: any) {
-                    // 检查是否是权限问题
-                    if (error?.message?.includes('REQUIRE_PRIVILEGE')) {
-                        console.log('需要权限验证，显示权限对话框');
-                        setPrivilegedDialog(true);
-                        setIsOperating(false);
-                        setOperationStatus('idle');
-                        return;
-                    }
-                    console.error('启动服务失败:', error);
-                    await message(t('connect_failed'), { title: t('error'), kind: 'error' });
-                } finally {
-                    setIsOperating(false);
-                    setOperationStatus('idle');
-                }
-            },
-            onError: async (error) => {
-                console.error('同步配置失败:', error);
-                await stopService();
-                setIsOperating(false);
-                setOperationStatus('idle');
-            },
-            onRequirePrivileged: () => {
-                setPrivilegedDialog(true);
-                setIsOperating(false);
-                setOperationStatus('idle');
-            }
+        performSyncAndStart(async (error) => {
+            console.error('同步配置失败:', error);
+            await stopService();
         });
     };
 

@@ -155,7 +155,9 @@ pub fn read_logs(app_data: tauri::State<AppData>, is_error: bool) -> String {
 }
 
 #[tauri::command]
-pub fn get_pending_deep_link(app_data: tauri::State<AppData>) -> Option<String> {
+pub fn get_pending_deep_link(
+    app_data: tauri::State<AppData>,
+) -> Option<crate::state::DeepLinkPayload> {
     if let Ok(mut pending) = app_data.pending_deep_link.lock() {
         pending.take()
     } else {
