@@ -10,8 +10,10 @@ All significant changes in this version are documented here.
 ### ⚠ CHANGES
 
 - Updated dependencies
-- Support separating sing-box subprocess logs into daily rotated log files
-- Windows: only enable shutdown and sleep features for onebox-lifecycle
+- Reduced the frequency of update checks
+- Supported new parameters for deep link protocol
+- Introduced scheduled restarts to enhance the usability of bypass routing
+- Used optimal local DNS server to resolve subscription URLs, improving update reliability
 
 
 ## 自 v1.3.14 以来的变更
@@ -22,8 +24,11 @@ All significant changes in this version are documented here.
 ### ⚠ 变更
 
 - 更新了依赖项
-- 支持将 sing-box 子进程日志分离到每天轮换的日志文件中
-- Windows：onebox-lifecycle 仅启用关机和睡眠功能
+- 降低检查更新的频率
+- 支持深度链接协议新的参数
+- 引入定时重启来增强旁路由的可用性
+- 使用最佳本地 DNS 服务器解析订阅链接，提升更新可靠性
+
 
 
 ---
