@@ -11,6 +11,7 @@ All significant changes in this version are documented here.
 
 - Updated dependencies
 - Reduced the frequency of update checks
+- Deduplicated identical subscription links
 - Supported new parameters for deep link protocol
 - Introduced scheduled restarts to enhance the usability of bypass routing
 - Used optimal local DNS server to resolve subscription URLs, improving update reliability
@@ -24,6 +25,7 @@ All significant changes in this version are documented here.
 ### ⚠ 变更
 
 - 更新了依赖项
+- 去重相同的订阅链接
 - 降低检查更新的频率
 - 支持深度链接协议新的参数
 - 引入定时重启来增强旁路由的可用性
