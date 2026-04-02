@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Shield } from "react-bootstrap-icons";
 import { useSubscriptions } from "../../hooks/useDB";
-import { Subscription } from "../../types/definition";
+import { getStoreValue } from "../../single/store";
+import { SSI_STORE_KEY, Subscription } from "../../types/definition";
 import { t, vpnServiceManager } from "../../utils/helper";
 import { AppleNetworkStatus, GoogleNetworkStatus } from "./network-check";
 import SelectSub from "./select-config";
@@ -21,6 +22,12 @@ export default function Body({ isRunning, onUpdate }: { isRunning: boolean, onUp
     const [sub, setSub] = useState<Subscription>();
     const { data, isLoading } = useSubscriptions();
 
+    useEffect(() => {
+        if (!data?.length) return;
+        getStoreValue(SSI_STORE_KEY).then(savedId => {
+            setSub(data.find(i => i.identifier === savedId) ?? data[0]);
+        });
+    }, [data]);
 
     const handleUpdate = async (identifier: string, isUpdate: boolean) => {
         try {

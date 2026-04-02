@@ -13,18 +13,24 @@ export default function SelectSub({ data, isLoading, onUpdate }: SubscriptionPro
     const [selected, setSelected] = useState<string>('');
 
     useEffect(() => {
-        const init = async () => {
+        const syncDisplay = async () => {
             if (!data?.length) return;
             const savedId = await getStoreValue(SSI_STORE_KEY);
-            const item = data.find(item => item.identifier === savedId) || data[0];
-            await updateSubscription(item);
+            const item = data.find(i => i.identifier === savedId);
+            if (item) {
+                setSelected(item.identifier);
+            } else {
+                // Saved subscription was deleted or no prior selection — fall back to first item
+                setSelected(data[0].identifier);
+                await setStoreValue(SSI_STORE_KEY, data[0].identifier);
+            }
         };
-        init();
+        syncDisplay();
     }, [data]);
 
     const updateSubscription = async (item: Subscription) => {
         const prevId = await getStoreValue(SSI_STORE_KEY);
-        setSelected(item.name);
+        setSelected(item.identifier);
         await setStoreValue(SSI_STORE_KEY, item.identifier);
         onUpdate(item.identifier, prevId !== item.identifier);
     }
@@ -52,13 +58,13 @@ export default function SelectSub({ data, isLoading, onUpdate }: SubscriptionPro
         <select
             value={selected}
             onChange={e => {
-                const item = data.find(item => item.name === e.target.value);
+                const item = data.find(item => item.identifier === e.target.value);
                 if (item) updateSubscription(item);
             }}
             className="select select-sm  select-ghost border-[0.8px] border-gray-200 "
         >
             {data.map(item => (
-                <option key={item.identifier} className="py-1">{item.name}</option>
+                <option key={item.identifier} value={item.identifier} className="py-1">{item.name}</option>
             ))}
         </select>
     );
