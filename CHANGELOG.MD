@@ -2,7 +2,7 @@
 
 {{version-tag-date}}
 
-## Changes since v1.3.14
+## Changes since v1.3.16
 
 All significant changes in this version are documented here.
 
@@ -16,7 +16,7 @@ All significant changes in this version are documented here.
 - Used optimal local DNS server to resolve subscription URLs, improving update reliability
 
 
-## 自 v1.3.14 以来的变更
+## 自 v1.3.16 以来的变更
 
 本版本的所有重要变更将记录于此。
 
