@@ -2,7 +2,7 @@
 
 {{version-tag-date}}
 
-## Changes since v1.3.16
+## Changes since v1.3.24
 
 All significant changes in this version are documented here.
 
@@ -10,14 +10,11 @@ All significant changes in this version are documented here.
 ### ⚠ CHANGES
 
 - Updated dependencies
-- Reduced the frequency of update checks
-- Deduplicated identical subscription links
-- Supported new parameters for deep link protocol
-- Introduced scheduled restarts to enhance the usability of bypass routing
-- Used optimal local DNS server to resolve subscription URLs, improving update reliability
+- Improved stability of importing authenticated subscription links
+- Fixed potential issue of duplicate outbound when importing subscription links rapidly
 
 
-## 自 v1.3.16 以来的变更
+## 自 v1.3.24 以来的变更
 
 本版本的所有重要变更将记录于此。
 
@@ -25,11 +22,9 @@ All significant changes in this version are documented here.
 ### ⚠ 变更
 
 - 更新了依赖项
-- 去重相同的订阅链接
-- 降低检查更新的频率
-- 支持深度链接协议新的参数
-- 引入定时重启来增强旁路由的可用性
-- 使用最佳本地 DNS 服务器解析订阅链接，提升更新可靠性
+- 增加对经过认证的订阅链接的导入稳定性
+- 解决快速导入订阅链接时可能出现 outbound 重复的问题
+
 
 
 

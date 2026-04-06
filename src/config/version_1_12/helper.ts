@@ -45,7 +45,8 @@ export async function updateVPNServerConfigFromDB(fileName: string, dbConfigData
     const outboundsUrltest = outbound_groups[outboundsUrltestIndex]["outbounds"];
 
 
-    let vpnServerList = dbConfigData.outbounds.filter((item: Item) => {
+    const seenTags = new Set<string>();
+    const vpnServerList = dbConfigData.outbounds.filter((item: Item) => {
         // zh: 只找VPN服务器的节点配置
         // en: Only find the node configuration of the VPN server
         let flag = item.type !== "selector" && item.type !== "urltest" && item.type !== "direct" && item.type !== "block";
@@ -53,20 +54,24 @@ export async function updateVPNServerConfigFromDB(fileName: string, dbConfigData
         // zh: sing-box 1.12 版本开始，dns 类型的节点不再需要
         // en: From sing-box version 1.12, dns type nodes are no longer
         flag = flag && item.type !== "dns";
+
+        // Deduplicate by tag: skip any server whose tag has already been seen.
+        // This guards against duplicate tags in the remote subscription config and
+        // any concurrent-write edge case that could produce the same tag twice.
+        if (flag && seenTags.has(item.tag)) {
+            console.warn(`[CONFIG] Skipping duplicate outbound tag: ${item.tag}`);
+            return false;
+        }
+        if (flag) seenTags.add(item.tag);
         return flag;
     });
-
 
     for (let i = 0; i < vpnServerList.length; i++) {
         vpnServerList[i]["domain_resolver"] = "system";
         outboundsSelector.push(vpnServerList[i].tag);
-
     }
 
-    const urltestNameList: string[] = [];
-    vpnServerList.forEach((item: any) => {
-        urltestNameList.push(item.tag);
-    })
+    const urltestNameList: string[] = vpnServerList.map((item: any) => item.tag);
 
     outboundsUrltest.push(...urltestNameList);
 

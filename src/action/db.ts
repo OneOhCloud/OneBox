@@ -168,12 +168,31 @@ export async function deduplicateSubscriptionsByUrl(): Promise<void> {
     `);
 }
 
+// Tracks in-flight insertSubscription calls by URL.
+// A second call for the same URL reuses the existing Promise instead of
+// racing to INSERT a duplicate record into the database.
+const inflightInsertions = new Map<string, Promise<string | undefined>>();
+
 /**
  * Upserts a subscription by URL. If the URL already exists, updates config + traffic + name
  * and returns the existing identifier. If not, inserts a new row.
  * Returns the identifier on success, undefined on failure. No UI side-effects.
+ *
+ * Concurrent calls for the same URL are collapsed into a single operation to
+ * prevent the TOCTOU race that would otherwise create duplicate DB records.
  */
-export async function insertSubscription(url: string, name?: string): Promise<string | undefined> {
+export function insertSubscription(url: string, name?: string): Promise<string | undefined> {
+    const inflight = inflightInsertions.get(url);
+    if (inflight) return inflight;
+
+    const promise = _insertSubscription(url, name).finally(() => {
+        inflightInsertions.delete(url);
+    });
+    inflightInsertions.set(url, promise);
+    return promise;
+}
+
+async function _insertSubscription(url: string, name?: string): Promise<string | undefined> {
     try {
         const response = await fetchConfigContent(url);
         if (response.status !== 200) return undefined;
