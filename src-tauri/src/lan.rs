@@ -575,17 +575,16 @@ pub async fn fetch_config_with_optimal_dns(
     let port = parsed_url.port_or_known_default().unwrap_or(443);
 
     // --- Domain SHA256 verification ---
+    // Verification failure only disables the accelerator fallback; the primary
+    // request is always attempted regardless of the outcome.
     let domain_sha256 = compute_sha256_hex(&hostname);
-    if !verify_domain_sha256(&domain_sha256).await {
+    let domain_verified = verify_domain_sha256(&domain_sha256).await;
+    if !domain_verified {
         log::warn!(
-            "[CONFIG_LOAD] 方式=VERIFICATION_FAILED, 域名={}, 域名SHA256={}",
+            "[CONFIG_LOAD] 方式=VERIFICATION_FAILED, 域名={}, 域名SHA256={}, 加速地址已禁用",
             hostname,
             domain_sha256
         );
-        return Err(format!(
-            "[CONFIG_LOAD] VERIFICATION_FAILED: domain SHA256 {} not in verified list",
-            domain_sha256
-        ));
     }
 
     // --- Build primary client with optimal DNS ---
@@ -675,13 +674,25 @@ pub async fn fetch_config_with_optimal_dns(
             };
             log::warn!("[CONFIG_LOAD] 主地址失败: {}, URL={}", primary_reason, url);
 
-            // Check accelerator availability before attempting fallback
+            // Check accelerator availability before attempting fallback.
+            // Three conditions must all hold: accelerator URL compiled in,
+            // domain verification passed, and TCP:443 reachable.
             if ACCELERATE_URL.is_empty() {
                 log::warn!(
                     "[CONFIG_LOAD] 方式=ACCELERATOR_UNAVAILABLE, 原因=未配置加速地址, 回退中止"
                 );
                 return Err(format!(
                     "[CONFIG_LOAD] PRIMARY_FAILED: {}, no accelerator configured",
+                    primary_reason
+                ));
+            }
+
+            if !domain_verified {
+                log::warn!(
+                    "[CONFIG_LOAD] 方式=ACCELERATOR_UNAVAILABLE, 原因=域名未通过验证, 回退中止"
+                );
+                return Err(format!(
+                    "[CONFIG_LOAD] PRIMARY_FAILED: {}, domain not verified, accelerator disabled",
                     primary_reason
                 ));
             }
