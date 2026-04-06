@@ -458,6 +458,98 @@ fn is_ip_address(s: &str) -> bool {
     s.parse::<std::net::IpAddr>().is_ok()
 }
 
+// Compile-time accelerator URL — injected from ACCELERATE_URL env var via build.rs.
+// Empty string when not configured.
+const ACCELERATE_URL: &str = env!("ACCELERATE_URL");
+
+// Hardcoded SHA256 of the known-good subscription host (next-sub.n2ray.dev).
+const KNOWN_HOST_SHA256: &str =
+    "183a5526e76751b07cd57236bc8f253d5424e02a3fc7da7c30f80919e975125a";
+
+fn compute_sha256_hex(s: &str) -> String {
+    use sha2::{Digest, Sha256};
+    let hash = Sha256::digest(s.as_bytes());
+    hash.iter().map(|b| format!("{:02x}", b)).collect()
+}
+
+/// Returns true if domain_sha256 matches the local constant OR appears in the
+/// remote verified-subscriptions list. Either condition is sufficient.
+async fn verify_domain_sha256(domain_sha256: &str) -> bool {
+    // Method A: local constant
+    if domain_sha256 == KNOWN_HOST_SHA256 {
+        return true;
+    }
+    // Method B: fetch the official whitelist (no proxy, 10 s timeout)
+    let client = match reqwest::ClientBuilder::new()
+        .timeout(std::time::Duration::from_secs(10))
+        .no_proxy()
+        .build()
+    {
+        Ok(c) => c,
+        Err(_) => return false,
+    };
+    match client
+        .get("https://www.sing-box.net/verified_subscriptions_sha256.txt")
+        .send()
+        .await
+    {
+        Ok(resp) if resp.status().is_success() => match resp.text().await {
+            Ok(text) => text.lines().any(|line| line.trim() == domain_sha256),
+            Err(_) => false,
+        },
+        _ => false,
+    }
+}
+
+/// Probes TCP:443 reachability of the compiled-in ACCELERATE_URL (5 s timeout).
+async fn check_accelerator_tcp() -> bool {
+    if ACCELERATE_URL.is_empty() {
+        return false;
+    }
+    let Ok(parsed) = url::Url::parse(ACCELERATE_URL) else {
+        return false;
+    };
+    let Some(host) = parsed.host_str() else {
+        return false;
+    };
+    let addr = format!("{}:443", host);
+    matches!(
+        tokio::time::timeout(
+            std::time::Duration::from_secs(5),
+            tokio::net::TcpStream::connect(&addr),
+        )
+        .await,
+        Ok(Ok(_))
+    )
+}
+
+/// Rewrites `original_url` into its accelerated form:
+///   <ACCELERATE_URL>/<domain_sha256><path>?<query>
+fn build_accelerated_url(original_url: &str, domain_sha256: &str) -> Option<String> {
+    if ACCELERATE_URL.is_empty() {
+        return None;
+    }
+    let parsed = url::Url::parse(original_url).ok()?;
+    let path = parsed.path().to_string();
+    let query_part = parsed
+        .query()
+        .map(|q| format!("?{}", q))
+        .unwrap_or_default();
+    let base = ACCELERATE_URL.trim_end_matches('/');
+    Some(format!("{}/{}{}{}", base, domain_sha256, path, query_part))
+}
+
+fn collect_headers(
+    headers: &reqwest::header::HeaderMap,
+) -> std::collections::HashMap<String, String> {
+    headers
+        .iter()
+        .filter_map(|(name, value)| {
+            value.to_str().ok().map(|v| (name.to_string(), v.to_string()))
+        })
+        .collect()
+}
+
 #[derive(serde::Serialize)]
 pub struct FetchConfigResponse {
     data: Option<serde_json::Value>,
@@ -482,7 +574,21 @@ pub async fn fetch_config_with_optimal_dns(
         .to_string();
     let port = parsed_url.port_or_known_default().unwrap_or(443);
 
-    // Retrieve or fetch the optimal DNS server (reuses existing cache logic)
+    // --- Domain SHA256 verification ---
+    let domain_sha256 = compute_sha256_hex(&hostname);
+    if !verify_domain_sha256(&domain_sha256).await {
+        log::warn!(
+            "[CONFIG_LOAD] 方式=VERIFICATION_FAILED, 域名={}, 域名SHA256={}",
+            hostname,
+            domain_sha256
+        );
+        return Err(format!(
+            "[CONFIG_LOAD] VERIFICATION_FAILED: domain SHA256 {} not in verified list",
+            domain_sha256
+        ));
+    }
+
+    // --- Build primary client with optimal DNS ---
     let app_data = app.state::<AppData>();
     let dns_server = {
         let running = is_running(app.clone(), app_data.get_clash_secret().unwrap()).await;
@@ -507,7 +613,7 @@ pub async fn fetch_config_with_optimal_dns(
         .timeout(std::time::Duration::from_secs(30))
         .no_proxy();
 
-    let client = if !is_ip_address(&hostname) {
+    let primary_client = if !is_ip_address(&hostname) {
         match resolve_a_record(&hostname, &dns_server).await {
             Some(ip) => {
                 let addr = SocketAddr::new(IpAddr::V4(ip), port);
@@ -535,37 +641,133 @@ pub async fn fetch_config_with_optimal_dns(
         client_builder.build().map_err(|e| e.to_string())?
     };
 
-    let response = client
+    // --- Try primary URL ---
+    match primary_client
         .get(&url)
         .header("User-Agent", &user_agent)
         .send()
         .await
-        .map_err(|e| e.to_string())?;
-
-    let status = response.status().as_u16();
-
-    let mut headers = std::collections::HashMap::new();
-    for (name, value) in response.headers() {
-        if let Ok(v) = value.to_str() {
-            headers.insert(name.to_string(), v.to_string());
+    {
+        Ok(response) => {
+            let status = response.status().as_u16();
+            let headers = collect_headers(response.headers());
+            let data = if status == 200 {
+                response
+                    .bytes()
+                    .await
+                    .ok()
+                    .and_then(|b| serde_json::from_slice(&b).ok())
+            } else {
+                None
+            };
+            log::info!("[CONFIG_LOAD] 方式=PRIMARY, URL={}", url);
+            Ok(FetchConfigResponse {
+                data,
+                headers,
+                status,
+            })
         }
+        Err(primary_err) if primary_err.is_connect() || primary_err.is_timeout() => {
+            let primary_reason = if primary_err.is_timeout() {
+                "TIMEOUT".to_string()
+            } else {
+                format!("CONNECT_ERROR({})", primary_err)
+            };
+            log::warn!("[CONFIG_LOAD] 主地址失败: {}, URL={}", primary_reason, url);
+
+            // Check accelerator availability before attempting fallback
+            if ACCELERATE_URL.is_empty() {
+                log::warn!(
+                    "[CONFIG_LOAD] 方式=ACCELERATOR_UNAVAILABLE, 原因=未配置加速地址, 回退中止"
+                );
+                return Err(format!(
+                    "[CONFIG_LOAD] PRIMARY_FAILED: {}, no accelerator configured",
+                    primary_reason
+                ));
+            }
+
+            if !check_accelerator_tcp().await {
+                log::warn!(
+                    "[CONFIG_LOAD] 方式=ACCELERATOR_UNAVAILABLE, 原因=不可达:443, 回退中止"
+                );
+                return Err(format!(
+                    "[CONFIG_LOAD] PRIMARY_FAILED: {}, accelerator unreachable",
+                    primary_reason
+                ));
+            }
+
+            let Some(accelerated_url) = build_accelerated_url(&url, &domain_sha256) else {
+                return Err(format!(
+                    "[CONFIG_LOAD] PRIMARY_FAILED: {}, cannot build accelerated URL",
+                    primary_reason
+                ));
+            };
+
+            // --- Fallback to accelerator ---
+            let fallback_client = reqwest::ClientBuilder::new()
+                .timeout(std::time::Duration::from_secs(30))
+                .no_proxy()
+                .build()
+                .map_err(|e| e.to_string())?;
+
+            match fallback_client
+                .get(&accelerated_url)
+                .header("User-Agent", &user_agent)
+                .send()
+                .await
+            {
+                Ok(response) => {
+                    let status = response.status().as_u16();
+                    let headers = collect_headers(response.headers());
+                    if status == 200 {
+                        let data = response
+                            .bytes()
+                            .await
+                            .ok()
+                            .and_then(|b| serde_json::from_slice(&b).ok());
+                        log::info!(
+                            "[CONFIG_LOAD] 方式=FALLBACK_ACCELERATOR, 原因={}, 加速URL={}",
+                            primary_reason,
+                            accelerated_url
+                        );
+                        Ok(FetchConfigResponse {
+                            data,
+                            headers,
+                            status,
+                        })
+                    } else {
+                        log::warn!(
+                            "[CONFIG_LOAD] 方式=BOTH_FAILED, 主地址原因={}, 加速地址原因=HTTP_{}",
+                            primary_reason,
+                            status
+                        );
+                        Ok(FetchConfigResponse {
+                            data: None,
+                            headers,
+                            status,
+                        })
+                    }
+                }
+                Err(acc_err) => {
+                    let acc_reason = if acc_err.is_timeout() {
+                        "TIMEOUT".to_string()
+                    } else {
+                        format!("CONNECT_ERROR({})", acc_err)
+                    };
+                    log::error!(
+                        "[CONFIG_LOAD] 方式=BOTH_FAILED, 主地址原因={}, 加速地址原因={}",
+                        primary_reason,
+                        acc_reason
+                    );
+                    Err(format!(
+                        "[CONFIG_LOAD] BOTH_FAILED: primary={}, accelerator={}",
+                        primary_reason, acc_reason
+                    ))
+                }
+            }
+        }
+        Err(e) => Err(e.to_string()),
     }
-
-    let data = if status == 200 {
-        response
-            .bytes()
-            .await
-            .ok()
-            .and_then(|b| serde_json::from_slice(&b).ok())
-    } else {
-        None
-    };
-
-    Ok(FetchConfigResponse {
-        data,
-        headers,
-        status,
-    })
 }
 
 // 获取最佳本地 DNS 服务器的命令

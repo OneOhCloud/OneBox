@@ -112,6 +112,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+          # 加速地址（机密，编译时注入，不会出现在日志中）
+          ACCELERATE_URL: ${{ secrets.ACCELERATE_URL }}
           # 作者签名
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
           # 苹果签名
