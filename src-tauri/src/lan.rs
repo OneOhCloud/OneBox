@@ -1,9 +1,11 @@
 use crate::core::{is_running, stop};
+use serde_json::json;
 use tauri::{
     http::{header::LOCATION, StatusCode},
-    AppHandle, Manager,
+    AppHandle, Manager, Wry,
 };
 use tauri_plugin_http::reqwest::{self, redirect::Policy};
+use tauri_plugin_store::StoreExt;
 use tokio::process::Command;
 use tokio::sync::mpsc;
 
@@ -462,9 +464,126 @@ fn is_ip_address(s: &str) -> bool {
 // Empty string when not configured.
 const ACCELERATE_URL: &str = env!("ACCELERATE_URL");
 
-// Hardcoded SHA256 of the known-good subscription host (next-sub.n2ray.dev).
-const KNOWN_HOST_SHA256: &str =
-    "183a5526e76751b07cd57236bc8f253d5424e02a3fc7da7c30f80919e975125a";
+// Compile-time known-good SHA256 list for subscription hosts.
+// Add new entries here as additional hosts are approved.
+const KNOWN_HOST_SHA256_LIST: &[&str] =
+    &["183a5526e76751b07cd57236bc8f253d5424e02a3fc7da7c30f80919e975125a"];
+
+const WHITELIST_REMOTE_URL: &str =
+    "https://www.sing-box.net/verified_subscriptions_sha256.txt";
+const WHITELIST_STORE_NAME: &str = "whitelist_cache.json";
+const WHITELIST_KEY_HASHES: &str = "hashes";
+const WHITELIST_KEY_UPDATED_AT: &str = "updated_at";
+/// Minimum age (seconds) before the cache is considered stale and re-fetched.
+const WHITELIST_TTL_SECS: u64 = 24 * 3600;
+/// How often the background task wakes up to check staleness.
+const WHITELIST_CHECK_INTERVAL_SECS: u64 = 6 * 3600;
+
+fn now_unix_secs() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs()
+}
+
+async fn fetch_whitelist_from_remote() -> Option<Vec<String>> {
+    let client = match reqwest::ClientBuilder::new()
+        .timeout(std::time::Duration::from_secs(10))
+        .no_proxy()
+        .build()
+    {
+        Ok(c) => c,
+        Err(e) => {
+            log::warn!("[WHITELIST] Failed to build HTTP client: {}", e);
+            return None;
+        }
+    };
+    match client.get(WHITELIST_REMOTE_URL).send().await {
+        Ok(resp) if resp.status().is_success() => match resp.text().await {
+            Ok(text) => {
+                let hashes: Vec<String> = text
+                    .lines()
+                    .map(|l| l.trim().to_string())
+                    .filter(|l| !l.is_empty())
+                    .collect();
+                log::info!("[WHITELIST] Fetched {} entries from remote", hashes.len());
+                Some(hashes)
+            }
+            Err(e) => {
+                log::warn!("[WHITELIST] Failed to read response body: {}", e);
+                None
+            }
+        },
+        Ok(resp) => {
+            log::warn!("[WHITELIST] Remote returned unexpected status {}", resp.status());
+            None
+        }
+        Err(e) => {
+            log::warn!("[WHITELIST] Remote fetch failed: {}", e);
+            None
+        }
+    }
+}
+
+fn open_whitelist_store(app: &AppHandle<Wry>) -> Option<std::sync::Arc<tauri_plugin_store::Store<Wry>>> {
+    match app.store(WHITELIST_STORE_NAME) {
+        Ok(s) => Some(s),
+        Err(e) => {
+            log::warn!("[WHITELIST] Failed to open store: {}", e);
+            None
+        }
+    }
+}
+
+fn load_whitelist_hashes(app: &AppHandle<Wry>) -> Vec<String> {
+    open_whitelist_store(app)
+        .and_then(|s| s.get(WHITELIST_KEY_HASHES))
+        .and_then(|v| serde_json::from_value::<Vec<String>>(v).ok())
+        .unwrap_or_default()
+}
+
+fn load_whitelist_timestamp(app: &AppHandle<Wry>) -> Option<u64> {
+    open_whitelist_store(app)
+        .and_then(|s| s.get(WHITELIST_KEY_UPDATED_AT))
+        .and_then(|v| v.as_u64())
+}
+
+fn save_whitelist_cache(app: &AppHandle<Wry>, hashes: &[String]) {
+    let Some(store) = open_whitelist_store(app) else { return };
+    store.set(WHITELIST_KEY_HASHES, json!(hashes));
+    store.set(WHITELIST_KEY_UPDATED_AT, json!(now_unix_secs()));
+    if let Err(e) = store.save() {
+        log::warn!("[WHITELIST] Failed to persist store to disk: {}", e);
+    }
+}
+
+async fn refresh_whitelist_if_stale(app: &AppHandle<Wry>) {
+    let stale = match load_whitelist_timestamp(app) {
+        None => true,
+        Some(ts) => now_unix_secs().saturating_sub(ts) >= WHITELIST_TTL_SECS,
+    };
+    if !stale {
+        log::debug!("[WHITELIST] Cache is fresh, skipping refresh");
+        return;
+    }
+    log::info!("[WHITELIST] Cache is stale, fetching from remote...");
+    match fetch_whitelist_from_remote().await {
+        Some(hashes) => save_whitelist_cache(app, &hashes),
+        None => log::warn!("[WHITELIST] Remote fetch failed, retaining existing cache"),
+    }
+}
+
+/// Call once during app setup. Refreshes the remote whitelist every 24 h via a
+/// background loop that wakes every `WHITELIST_CHECK_INTERVAL_SECS`.
+pub fn spawn_whitelist_refresh_task(app: AppHandle<Wry>) {
+    tauri::async_runtime::spawn(async move {
+        loop {
+            refresh_whitelist_if_stale(&app).await;
+            tokio::time::sleep(std::time::Duration::from_secs(WHITELIST_CHECK_INTERVAL_SECS))
+                .await;
+        }
+    });
+}
 
 fn compute_sha256_hex(s: &str) -> String {
     use sha2::{Digest, Sha256};
@@ -472,33 +591,16 @@ fn compute_sha256_hex(s: &str) -> String {
     hash.iter().map(|b| format!("{:02x}", b)).collect()
 }
 
-/// Returns true if domain_sha256 matches the local constant OR appears in the
-/// remote verified-subscriptions list. Either condition is sufficient.
-async fn verify_domain_sha256(domain_sha256: &str) -> bool {
-    // Method A: local constant
-    if domain_sha256 == KNOWN_HOST_SHA256 {
+/// Returns true if `domain_sha256` matches any compile-time constant OR any entry
+/// in the locally-cached whitelist (refreshed in the background every 24 h).
+/// Never performs a network request.
+fn verify_domain_sha256(domain_sha256: &str, app: &AppHandle<Wry>) -> bool {
+    // Method A: compile-time list
+    if KNOWN_HOST_SHA256_LIST.iter().any(|&h| h == domain_sha256) {
         return true;
     }
-    // Method B: fetch the official whitelist (no proxy, 10 s timeout)
-    let client = match reqwest::ClientBuilder::new()
-        .timeout(std::time::Duration::from_secs(10))
-        .no_proxy()
-        .build()
-    {
-        Ok(c) => c,
-        Err(_) => return false,
-    };
-    match client
-        .get("https://www.sing-box.net/verified_subscriptions_sha256.txt")
-        .send()
-        .await
-    {
-        Ok(resp) if resp.status().is_success() => match resp.text().await {
-            Ok(text) => text.lines().any(|line| line.trim() == domain_sha256),
-            Err(_) => false,
-        },
-        _ => false,
-    }
+    // Method B: persisted whitelist cache (refreshed in background every 24 h)
+    load_whitelist_hashes(app).iter().any(|h| h == domain_sha256)
 }
 
 /// Probes TCP:443 reachability of the compiled-in ACCELERATE_URL (5 s timeout).
@@ -578,7 +680,7 @@ pub async fn fetch_config_with_optimal_dns(
     // Verification failure only disables the accelerator fallback; the primary
     // request is always attempted regardless of the outcome.
     let domain_sha256 = compute_sha256_hex(&hostname);
-    let domain_verified = verify_domain_sha256(&domain_sha256).await;
+    let domain_verified = verify_domain_sha256(&domain_sha256, &app);
     if !domain_verified {
         log::warn!(
             "[CONFIG_LOAD] 方式=VERIFICATION_FAILED, 域名={}, 域名SHA256={}, 加速地址已禁用",

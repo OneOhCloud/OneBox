@@ -23,6 +23,8 @@ pub fn app_setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>>
 
     report_captive(app);
 
+    crate::lan::spawn_whitelist_refresh_task(app.handle().clone());
+
     // macOS：以无 Dock 图标的附件模式运行，启动时直接显示主窗口
     // 此模式下，访达点击已运行 App 图标时触发 Reopen 事件，需要监听此事件将隐藏的主窗口重新显示
     #[cfg(target_os = "macos")]
