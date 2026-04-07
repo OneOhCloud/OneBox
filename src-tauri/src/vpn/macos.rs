@@ -8,7 +8,7 @@ use tauri::Emitter;
 use tauri_plugin_shell::process::Command as TauriCommand;
 use tauri_plugin_shell::ShellExt;
 use tauri_plugin_store::StoreExt;
-pub const TUN_INTERFACE_NAME: &str = "oneboxtun";
+pub const TUN_INTERFACE_NAME: &str = "utun233";
 
 // 默认绕过列表
 pub static DEFAULT_BYPASS: &str =
@@ -119,9 +119,9 @@ pub fn create_privileged_command(
     Some(app.shell().command("sh").args(vec!["-c", &command]))
 }
 
-/// 停止TUN模式下的进程，并清理 `oneboxtun` 接口的路由。
+/// 停止TUN模式下的进程，并清理 `utun233` 接口的路由。
 ///
-/// 配置写入时固定 `interface_name = "oneboxtun"`，停止后枚举该接口的路由并逐条删除，
+/// 配置写入时固定 `interface_name = "utun233"`，停止后枚举该接口的路由并逐条删除，
 /// 再 down 掉接口，让 macOS configd 从物理网卡重建默认路由。
 pub fn stop_tun_process(password: &str) -> Result<(), String> {
     let command = format!("echo '{}' | sudo -S pkill -15 -f sing-box", password);
@@ -186,8 +186,6 @@ pub fn stop_tun_process(password: &str) -> Result<(), String> {
         .map_err(|e| e.to_string())?;
     Ok(())
 }
-
-
 
 /// macOS平台的VPN代理实现
 pub struct MacOSVpnProxy;
