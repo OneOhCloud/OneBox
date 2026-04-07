@@ -8,6 +8,8 @@ use tauri::Emitter;
 use tauri_plugin_shell::process::Command as TauriCommand;
 use tauri_plugin_shell::ShellExt;
 use tauri_plugin_store::StoreExt;
+pub const TUN_INTERFACE_NAME: &str = "oneboxtun";
+
 // 默认绕过列表
 pub static DEFAULT_BYPASS: &str =
     "127.0.0.1,192.168.0.0/16,10.0.0.0/8,172.16.0.0/12,172.29.0.0/16,localhost,*.local,*.crashlytics.com,<local>";
@@ -117,7 +119,10 @@ pub fn create_privileged_command(
     Some(app.shell().command("sh").args(vec!["-c", &command]))
 }
 
-/// 停止TUN模式下的进程
+/// 停止TUN模式下的进程，并清理 `oneboxtun` 接口的路由。
+///
+/// 配置写入时固定 `interface_name = "oneboxtun"`，停止后枚举该接口的路由并逐条删除，
+/// 再 down 掉接口，让 macOS configd 从物理网卡重建默认路由。
 pub fn stop_tun_process(password: &str) -> Result<(), String> {
     let command = format!("echo '{}' | sudo -S pkill -15 -f sing-box", password);
     log::info!(
@@ -130,6 +135,8 @@ pub fn stop_tun_process(password: &str) -> Result<(), String> {
         .output()
         .map_err(|e| e.to_string())?;
 
+    std::thread::sleep(std::time::Duration::from_millis(500));
+
     // 关闭IP转发
     let command = format!(
         "echo '{}' | sudo -S sysctl -w net.inet.ip.forwarding=0",
@@ -139,6 +146,26 @@ pub fn stop_tun_process(password: &str) -> Result<(), String> {
         "Disable IP forwarding with command : {}",
         command.replace(password, "******")
     );
+    Command::new("sh")
+        .arg("-c")
+        .arg(command)
+        .output()
+        .map_err(|e| e.to_string())?;
+
+    let command = format!(
+        "echo '{}' | sudo -S sh -c '\
+            netstat -rn -f inet 2>/dev/null \
+                | awk \"NR>4 && \\$NF==\\\"{iface}\\\"{{print \\$1}}\" \
+                | while read dest; do route -q delete \"$dest\" 2>/dev/null; done; \
+            netstat -rn -f inet6 2>/dev/null \
+                | awk \"NR>4 && \\$NF==\\\"{iface}\\\"{{print \\$1}}\" \
+                | while read dest; do route -q delete -inet6 \"$dest\" 2>/dev/null; done; \
+            ifconfig {iface} down 2>/dev/null; \
+            true'",
+        password,
+        iface = TUN_INTERFACE_NAME
+    );
+    log::info!("Removing routes for {} interface", TUN_INTERFACE_NAME);
     Command::new("sh")
         .arg("-c")
         .arg(command)

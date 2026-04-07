@@ -177,9 +177,9 @@ export function SelecItem(props: SelecItemProps) {
 
 
     return (
-        <div className="relative" ref={dropdownRef}>
+        <div className="relative w-full" ref={dropdownRef}>
             <div
-                className={`select select-sm  select-ghost border-[0.8px] border-gray-200  cursor-pointer `}
+                className={`select select-sm  select-ghost border-[0.8px] border-gray-200  cursor-pointer w-full`}
                 onClick={() => setIsOpen(!isOpen)}
             >
                 <NodeOption nodeName={currentNode} showDelay={showDelay} />

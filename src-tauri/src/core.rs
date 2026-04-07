@@ -546,7 +546,6 @@ pub async fn stop(app: tauri::AppHandle) -> Result<(), String> {
             log::error!("Mutex lock error during stop: {:?}", e);
             e.into_inner()
         });
-
         (
             manager.mode.clone(),
             manager.tun_password.clone(),

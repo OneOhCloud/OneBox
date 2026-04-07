@@ -29,7 +29,7 @@ interface NodeOptionProps {
 // 样式常量
 const STYLES = {
     container: 'flex justify-between items-center w-full',
-    nodeName: 'truncate font-medium',
+    nodeName: 'truncate font-medium flex-1 min-w-0',
     delayContainer: 'ml-2 text-sm font-medium transition-all duration-300 ease flex items-center gap-1.5',
     delayDot: 'inline-block w-2 h-2 rounded-full transition-all duration-300 ease',
     loading: 'loading loading-dots loading-xs',

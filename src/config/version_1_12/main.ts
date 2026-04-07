@@ -2,10 +2,9 @@ import * as path from '@tauri-apps/api/path';
 import { getSubscriptionConfig } from '../../action/db';
 import { getAllowLan, getClashApiSecret, getCustomRuleSet, getStoreValue } from '../../single/store';
 import { STAGE_VERSION_STORE_KEY } from '../../types/definition';
-import { updateDHCPSettings2Config, updateVPNServerConfigFromDB } from './helper';
+import { configureMixedInbound, configureTunInbound, updateDHCPSettings2Config, updateVPNServerConfigFromDB } from './helper';
 
-import { type } from '@tauri-apps/plugin-os';
-import { SING_BOX_VERSION, TUN_STACK_STORE_KEY } from '../../types/definition';
+import { SING_BOX_VERSION } from '../../types/definition';
 import { configType, getConfigTemplateCacheKey } from '../common';
 import { getDefaultConfigTemplate } from './zh-cn/config';
 
@@ -82,12 +81,7 @@ export async function setMixedConfig(identifier: string) {
 
     updateExperimentalConfig(newConfig, dbCacheFilePath);
     const allowLan = await getAllowLan();
-
-    if (allowLan) {
-        newConfig["inbounds"][0]["listen"] = "0.0.0.0";
-    } else {
-        newConfig["inbounds"][0]["listen"] = "127.0.0.1";
-    }
+    configureMixedInbound(newConfig, allowLan);
 
     await updateDHCPSettings2Config(newConfig);
     await updateVPNServerConfigFromDB('config.json', dbConfigData, newConfig);
@@ -135,35 +129,11 @@ export async function setTunConfig(identifier: string) {
         }
     }
 
-    // Windows 使用 system stack 兼容性是最佳的。（弃用！！！）
-    // if (type() === "windows" || type() === "linux") {
-    //     newConfig.inbounds[0].stack = "system";
-    // }
+    await configureTunInbound(newConfig);
 
-    // 2025年8月17日经过测试，
-    // 在 sing-box 1.12.1 内核中
-    // 使用 system 栈节点延迟比 gvisor 高
-    // 所以使用在 macOS 和 Windows 系统中使用默认值（gVisor），
-    // linux 中默认使用 system 栈，除非有实际证据表明性能也不如 gVisor。
-
-    if (type() === "linux") {
-        newConfig.inbounds[0].stack = "system";
-    }
-
-    // 如果用户在设置中选择了 TUN Stack，则使用用户选择的 stack
-    // macOS 强制默认使用 gvisor stack，因为经过测试 system stack 无法正常运作。
-    if (type() !== "macos" && await getStoreValue(TUN_STACK_STORE_KEY)) {
-        newConfig.inbounds[0].stack = await getStoreValue(TUN_STACK_STORE_KEY);
-    }
-
-    console.log("当前 TUN Stack:", newConfig.inbounds[0].stack);
-    updateExperimentalConfig(newConfig, dbCacheFilePath); const allowLan = await getAllowLan();
-
-    if (allowLan) {
-        newConfig["inbounds"][1]["listen"] = "0.0.0.0";
-    } else {
-        newConfig["inbounds"][1]["listen"] = "127.0.0.1";
-    }
+    updateExperimentalConfig(newConfig, dbCacheFilePath);
+    const allowLan = await getAllowLan();
+    configureMixedInbound(newConfig, allowLan);
 
     await updateDHCPSettings2Config(newConfig);
     await updateVPNServerConfigFromDB('config.json', dbConfigData, newConfig);
@@ -183,20 +153,12 @@ export async function setGlobalMixedConfig(identifier: string) {
     const appConfigPath = await path.appConfigDir();
     const dbCacheFilePath = await path.join(appConfigPath, 'mixed-cache-gloabl-v1.db');
 
-
-
     updateExperimentalConfig(newConfig, dbCacheFilePath);
     const allowLan = await getAllowLan();
-
-    if (allowLan) {
-        newConfig["inbounds"][0]["listen"] = "0.0.0.0";
-    } else {
-        newConfig["inbounds"][0]["listen"] = "127.0.0.1";
-    }
+    configureMixedInbound(newConfig, allowLan);
 
     await updateDHCPSettings2Config(newConfig);
     await updateVPNServerConfigFromDB('config.json', dbConfigData, newConfig);
-
 
 }
 
@@ -208,43 +170,17 @@ export default async function setGlobalTunConfig(identifier: string) {
     let level = await getStoreValue(STAGE_VERSION_STORE_KEY) === "dev" ? "debug" : "info";
     newConfig.log.level = level;
 
-
     console.log("写入[全局]TUN代理配置文件");
     let dbConfigData = await getSubscriptionConfig(identifier);
     const appConfigPath = await path.appConfigDir();
     const dbCacheFilePath = await path.join(appConfigPath, 'tun-cache-global-v1.db');
 
-    // Windows 使用 system stack 兼容性是最佳的。（弃用！！！）
-    // if (type() === "windows" || type() === "linux") {
-    //     newConfig.inbounds[0].stack = "system";
-    // }
-
-    // 2025年8月17日经过测试，
-    // 在 sing-box 1.12.1 内核中
-    // 使用 system 栈节点延迟比 gvisor 高
-    // 所以使用在 macOS 和 Windows 系统中使用默认值（gVisor），
-    // linux 中默认使用 system 栈，除非有实际证据表明性能也不如 gVisor。
-
-    if (type() === "linux") {
-        newConfig.inbounds[0].stack = "system";
-    }
-
-    // 如果用户在设置中选择了 TUN Stack，则使用用户选择的 stack
-    // macOS 强制默认使用 gvisor stack，因为经过测试 system stack 无法正常运作。
-    if (type() !== "macos" && await getStoreValue(TUN_STACK_STORE_KEY)) {
-        newConfig.inbounds[0].stack = await getStoreValue(TUN_STACK_STORE_KEY);
-    }
-
-    console.log("当前 TUN Stack:", newConfig.inbounds[0].stack);
+    await configureTunInbound(newConfig);
 
     updateExperimentalConfig(newConfig, dbCacheFilePath);
 
     const allowLan = await getAllowLan();
-    if (allowLan) {
-        newConfig["inbounds"][1]["listen"] = "0.0.0.0";
-    } else {
-        newConfig["inbounds"][1]["listen"] = "127.0.0.1";
-    }
+    configureMixedInbound(newConfig, allowLan);
 
     await updateDHCPSettings2Config(newConfig);
     await updateVPNServerConfigFromDB('config.json', dbConfigData, newConfig);

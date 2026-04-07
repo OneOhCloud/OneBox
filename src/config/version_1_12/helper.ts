@@ -1,4 +1,6 @@
-import { getDirectDNS, getUseDHCP } from "../../single/store";
+import { type } from '@tauri-apps/plugin-os';
+import { getDirectDNS, getStoreValue, getUseDHCP } from "../../single/store";
+import { TUN_INTERFACE_NAME, TUN_STACK_STORE_KEY } from "../../types/definition";
 import { writeConfigFile } from "../helper";
 
 
@@ -81,6 +83,31 @@ export async function updateVPNServerConfigFromDB(fileName: string, dbConfigData
     await writeConfigFile(fileName, new TextEncoder().encode(JSON.stringify(newConfig)));
 
 
+}
+
+export async function configureTunInbound(newConfig: any): Promise<void> {
+    const tunInbound = newConfig.inbounds.find((ib: Item) => ib.type === "tun" && ib.tag === "tun");
+    if (!tunInbound) return;
+
+    const osType = type();
+    if (osType === "linux") {
+        tunInbound.stack = "system";
+    }
+    // macOS 强制使用 gvisor stack，经过测试 system stack 无法正常运作
+    if (osType !== "macos" && await getStoreValue(TUN_STACK_STORE_KEY)) {
+        tunInbound.stack = await getStoreValue(TUN_STACK_STORE_KEY);
+    }
+    // macOS 固定接口名，退出时可精确清理该接口的路由
+    if (osType === "macos") {
+        tunInbound.interface_name = TUN_INTERFACE_NAME;
+    }
+
+    console.log("当前 TUN Stack:", tunInbound.stack);
+}
+
+export function configureMixedInbound(newConfig: any, allowLan: boolean): void {
+    const mixedInbound = newConfig.inbounds.find((ib: Item) => ib.type === "mixed" && ib.tag === "mixed");
+    if (mixedInbound) mixedInbound.listen = allowLan ? "0.0.0.0" : "127.0.0.1";
 }
 
 
