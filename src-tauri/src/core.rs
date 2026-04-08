@@ -206,8 +206,8 @@ async fn restart_tun_send_safe(
     path: Arc<String>,
     password: Arc<String>,
 ) -> Result<(), String> {
-    let sidecar_path = helper::get_sidecar_path(Path::new("sing-box"))
-        .map_err(|e| e.to_string())?;
+    let sidecar_path =
+        helper::get_sidecar_path(Path::new("sing-box")).map_err(|e| e.to_string())?;
 
     // create_privileged_command 会在 bypass_router 启用时重新执行 sysctl ip.forwarding=1
     let cmd = PlatformVpnProxy::create_privileged_command(
@@ -251,11 +251,7 @@ const BYPASS_ROUTER_RESTART_INTERVAL: std::time::Duration =
 /// 清除 auto_detect_interface 引起的路由表状态污染。
 /// 由 stop() 或 handle_process_termination() 通过 bypass_router_watchdog_abort 取消。
 #[cfg(target_os = "macos")]
-async fn bypass_router_watchdog(
-    app: tauri::AppHandle,
-    password: Arc<String>,
-    path: Arc<String>,
-) {
+async fn bypass_router_watchdog(app: tauri::AppHandle, password: Arc<String>, path: Arc<String>) {
     loop {
         tokio::time::sleep(BYPASS_ROUTER_RESTART_INTERVAL).await;
 
@@ -657,7 +653,6 @@ pub async fn is_running(app: AppHandle, secret: String) -> bool {
 }
 
 /// 获取当前运行中的代理配置（模式 + 配置路径），用于睡眠前保存恢复状态
-#[cfg(target_os = "macos")]
 pub fn get_running_config() -> Option<(ProxyMode, String)> {
     let manager = PROCESS_MANAGER.lock().unwrap_or_else(|e| e.into_inner());
     match (manager.mode.as_ref(), manager.config_path.as_ref()) {

@@ -1,0 +1,36 @@
+name: "Close Unconfirmed Issues"
+
+on:
+  schedule:
+    - cron: '0 0 * * *' # 每天运行一次 (Runs every day at midnight)
+  workflow_dispatch:   # 允许手动触发 (Allows manual triggering)
+
+jobs:
+  stale:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/stale@v9
+        with:
+          # 仅处理带有此标签的 Issue
+          # Only process issues with this specific label
+          only-labels: 'waiting-for-reply'
+          
+          # 标记为“陈旧”的天数 (例如：3天不回复即认定为陈旧)
+          # Days of inactivity before an issue is considered stale
+          days-before-stale: 7
+          
+          # 标记为陈旧后多少天关闭 (设为 0 则在标记陈旧时立即关闭)
+          # Days of inactivity before a stale issue is closed (0 = immediate)
+          days-before-close: 0
+          
+          # 自动关闭时的留言
+          # Message to post when closing the issue
+          stale-issue-message: '由于作者在 7 天内未回复确认，此 Issue 已自动关闭。 / This issue was closed because there has been no reply for 7 days.'
+          
+          # 如果作者回复，自动移除标签
+          # Automatically remove the label if the author replies/updates
+          remove-stale-when-updated: true
+          
+          # 关闭时添加的额外标签 (可选)
+          # Optional label to add when closing
+          close-issue-label: 'auto-closed'
