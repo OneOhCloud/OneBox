@@ -22,6 +22,8 @@ jobs:
       skip_build: ${{ steps.check.outputs.skip_build }}
       dev_commit: ${{ steps.check.outputs.dev_commit }}
       current_commit: ${{ steps.check.outputs.current_commit }}
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
       - uses: actions/checkout@v4
         with:
@@ -93,6 +95,8 @@ jobs:
     permissions:
       contents: write
     runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
       - uses: actions/checkout@v4
 
@@ -131,6 +135,8 @@ jobs:
     if: needs.check-commit.outputs.skip_build == 'false'
     permissions:
       contents: write
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     strategy:
       fail-fast: false
       matrix:
