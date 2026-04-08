@@ -8,8 +8,129 @@ on:
     branches:
       - main
 
+  workflow_run:
+    workflows: ["Beta Build"]
+    types: [completed]
+
 jobs:
+  check-commit:
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    outputs:
+      skip_build: ${{ steps.check.outputs.skip_build }}
+      beta_commit: ${{ steps.check.outputs.beta_commit }}
+      current_commit: ${{ steps.check.outputs.current_commit }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check if commit is same as beta build
+        id: check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          CURRENT_COMMIT=$(git rev-parse HEAD)
+          echo "current_commit=$CURRENT_COMMIT" >> $GITHUB_OUTPUT
+
+          # Check if beta release exists
+          if ! gh release view beta >/dev/null 2>&1; then
+            echo "skip_build=false" >> $GITHUB_OUTPUT
+            echo "beta_commit=" >> $GITHUB_OUTPUT
+            echo "Beta release not found, will build normally"
+            exit 0
+          fi
+
+          # Get tag that the beta release points to, then get its commit
+          BETA_TAG=$(gh release view beta --json tagName -q 2>/dev/null || echo "")
+
+          if [ -z "$BETA_TAG" ]; then
+            echo "skip_build=false" >> $GITHUB_OUTPUT
+            echo "beta_commit=" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # Get the commit hash that the beta tag points to
+          BETA_COMMIT=$(git rev-list -n 1 "refs/tags/$BETA_TAG" 2>/dev/null || echo "")
+
+          if [ -z "$BETA_COMMIT" ]; then
+            # Try fetching the tag
+            git fetch origin "refs/tags/$BETA_TAG:refs/tags/$BETA_TAG" 2>/dev/null || true
+            BETA_COMMIT=$(git rev-list -n 1 "refs/tags/$BETA_TAG" 2>/dev/null || echo "")
+          fi
+
+          echo "beta_commit=$BETA_COMMIT" >> $GITHUB_OUTPUT
+
+          if [ -n "$BETA_COMMIT" ] && [ "$CURRENT_COMMIT" = "$BETA_COMMIT" ]; then
+            echo "skip_build=true" >> $GITHUB_OUTPUT
+            echo "Same commit as beta build ($CURRENT_COMMIT), will reuse artifacts"
+          else
+            echo "skip_build=false" >> $GITHUB_OUTPUT
+            echo "Different commit (current: $CURRENT_COMMIT, beta: $BETA_COMMIT), will build normally"
+          fi
+
+  delete-old-stable:
+    needs: check-commit
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get version and delete old stable release if exists
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          TAG_NAME="v$VERSION"
+
+          # Try to delete old release with same version
+          if gh release view "$TAG_NAME" >/dev/null 2>&1; then
+            gh release delete "$TAG_NAME" --yes --cleanup-tag
+          fi
+
+  copy-from-beta:
+    needs: [check-commit, delete-old-stable]
+    if: needs.check-commit.outputs.skip_build == 'true'
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create Stable Release and Copy Beta Artifacts
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Get current version
+          VERSION=$(node -p "require('./src-tauri/tauri.conf.json').version")
+
+          # Get beta release info
+          BETA_RELEASE=$(gh release view beta --json body,assets)
+          CHANGELOG=$(echo "$BETA_RELEASE" | jq -r '.body')
+
+          # Create stable release
+          gh release create "v$VERSION" \
+            --title "v$VERSION" \
+            --notes "$CHANGELOG"
+
+          # Download and re-upload assets
+          TEMP_DIR=$(mktemp -d)
+          cd "$TEMP_DIR"
+
+          gh release download beta --pattern '*' || true
+
+          if [ "$(ls -1 | wc -l)" -gt 0 ]; then
+            cd -
+            gh release upload "v$VERSION" $TEMP_DIR/* --clobber
+          fi
+
+          rm -rf "$TEMP_DIR"
+
   build-tauri:
+    needs: [check-commit, delete-old-stable]
+    if: needs.check-commit.outputs.skip_build == 'false'
     permissions:
       contents: write
     strategy:

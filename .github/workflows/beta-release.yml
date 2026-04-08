@@ -9,8 +9,70 @@ on:
     branches:
       - feature/beta
 
+  workflow_run:
+    workflows: ["Dev Build"]
+    types: [completed]
+
 jobs:
+  check-commit:
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    outputs:
+      skip_build: ${{ steps.check.outputs.skip_build }}
+      dev_commit: ${{ steps.check.outputs.dev_commit }}
+      current_commit: ${{ steps.check.outputs.current_commit }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check if commit is same as dev build
+        id: check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          CURRENT_COMMIT=$(git rev-parse HEAD)
+          echo "current_commit=$CURRENT_COMMIT" >> $GITHUB_OUTPUT
+
+          # Check if dev release exists
+          if ! gh release view dev >/dev/null 2>&1; then
+            echo "skip_build=false" >> $GITHUB_OUTPUT
+            echo "dev_commit=" >> $GITHUB_OUTPUT
+            echo "Dev release not found, will build normally"
+            exit 0
+          fi
+
+          # Get tag that the dev release points to, then get its commit
+          DEV_TAG=$(gh release view dev --json tagName -q 2>/dev/null || echo "")
+
+          if [ -z "$DEV_TAG" ]; then
+            echo "skip_build=false" >> $GITHUB_OUTPUT
+            echo "dev_commit=" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # Get the commit hash that the dev tag points to
+          DEV_COMMIT=$(git rev-list -n 1 "refs/tags/$DEV_TAG" 2>/dev/null || echo "")
+
+          if [ -z "$DEV_COMMIT" ]; then
+            # Try fetching the tag
+            git fetch origin "refs/tags/$DEV_TAG:refs/tags/$DEV_TAG" 2>/dev/null || true
+            DEV_COMMIT=$(git rev-list -n 1 "refs/tags/$DEV_TAG" 2>/dev/null || echo "")
+          fi
+
+          echo "dev_commit=$DEV_COMMIT" >> $GITHUB_OUTPUT
+
+          if [ -n "$DEV_COMMIT" ] && [ "$CURRENT_COMMIT" = "$DEV_COMMIT" ]; then
+            echo "skip_build=true" >> $GITHUB_OUTPUT
+            echo "Same commit as dev build ($CURRENT_COMMIT), will reuse artifacts"
+          else
+            echo "skip_build=false" >> $GITHUB_OUTPUT
+            echo "Different commit (current: $CURRENT_COMMIT, dev: $DEV_COMMIT), will build normally"
+          fi
+
   delete-old-beta:
+    needs: check-commit
     permissions:
       contents: write
     runs-on: ubuntu-latest
@@ -25,8 +87,48 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  copy-from-dev:
+    needs: [check-commit, delete-old-beta]
+    if: needs.check-commit.outputs.skip_build == 'true'
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create Beta Release and Copy Dev Artifacts
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Get current version
+          VERSION=$(node -p "require('./src-tauri/tauri.conf.json').version")
+
+          # Get dev release info
+          DEV_RELEASE=$(gh release view dev --json body,assets)
+          CHANGELOG=$(echo "$DEV_RELEASE" | jq -r '.body')
+
+          # Create beta release
+          gh release create beta \
+            --title "Beta" \
+            --notes "$CHANGELOG" \
+            --prerelease
+
+          # Download and re-upload assets
+          TEMP_DIR=$(mktemp -d)
+          cd "$TEMP_DIR"
+
+          gh release download dev --pattern '*' || true
+
+          if [ "$(ls -1 | wc -l)" -gt 0 ]; then
+            cd -
+            gh release upload beta $TEMP_DIR/* --clobber
+          fi
+
+          rm -rf "$TEMP_DIR"
+
   build-tauri:
-    needs: delete-old-beta
+    needs: [check-commit, delete-old-beta]
+    if: needs.check-commit.outputs.skip_build == 'false'
     permissions:
       contents: write
     strategy:
