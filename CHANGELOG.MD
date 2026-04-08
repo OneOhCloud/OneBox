@@ -2,7 +2,7 @@
 
 {{version-tag-date}}
 
-## Changes since v1.3.24
+## Changes since v1.3.26
 
 All significant changes in this version are documented here.
 
@@ -10,14 +10,15 @@ All significant changes in this version are documented here.
 ### ⚠ CHANGES
 
 - Updated dependencies
-- Improved stability of importing authenticated subscription links
-- Fixed node selector horizontal overflow when a node with a long name is selected
-- Fixed potential issue of duplicate outbound when importing subscription links rapidly
-- Used a fixed TUN interface name `utun233` on macOS so routes can be cleaned up precisely on stop
+- VPN now automatically restarts when network connectivity is restored after an outage, replacing the previous sleep-duration-based restart
+- Rapid network switching (e.g. in public places) is handled safely: restarts are debounced and only trigger after the network has been stable for 3 seconds; brief outages under 2 seconds are ignored entirely
+- Supported on both macOS and Windows 10 2004+; older Windows versions gracefully skip network monitoring with no impact on other functionality
 
 
 
-## 自 v1.3.24 以来的变更
+
+
+## 自 v1.3.26 以来的变更
 
 本版本的所有重要变更将记录于此。
 
@@ -25,11 +26,9 @@ All significant changes in this version are documented here.
 ### ⚠ 变更
 
 - 更新了依赖项
-- 增加对经过认证的订阅链接的导入稳定性
-- 解决快速导入订阅链接时可能出现 outbound 重复的问题
-- 修复选择名称过长的节点后，节点选择框横向溢出导致页面异常的问题
-- macOS TUN 模式使用固定接口名 `utun233`，关闭时精确清理该接口路由
-
+- VPN 现在在网络断开恢复后自动重启，替代了原先基于睡眠时长的重启机制
+- 安全处理公共场所的频繁网络切换：重启有 3 秒防抖，2 秒内的短暂断网不触发重启
+- 支持 macOS 及 Windows 10 2004+；旧版 Windows 自动跳过网络监控，不影响其他功能
 
 
 
