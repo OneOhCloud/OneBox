@@ -138,25 +138,34 @@ fn report_captive(app: &tauri::App) {
 /// 不会被覆盖。
 #[cfg(any(target_os = "windows", target_os = "macos"))]
 pub(crate) fn spawn_lifecycle_listener(app_handle: &tauri::AppHandle) {
-    #[cfg(target_os = "macos")]
     let handle = app_handle.clone();
-    // suppress unused warning on Windows
-    #[cfg(not(target_os = "macos"))]
-    let _ = app_handle;
 
     let rx = onebox_lifecycle::Sentinel::start().into_receiver();
 
     std::thread::Builder::new()
         .name("lifecycle-events".into())
         .spawn(move || {
-            // 记录系统进入睡眠的墙钟时间（仅 macOS 使用）
-            // 注意：必须用 SystemTime 而非 Instant，因为 macOS 单调时钟在休眠期间不计时
-            #[cfg(target_os = "macos")]
-            let mut sleep_started: Option<std::time::SystemTime> = None;
-            // 睡眠超过此时长后触发 VPN 重启（默认 1 小时）
-            #[cfg(target_os = "macos")]
-            const SLEEP_RESTART_THRESHOLD: std::time::Duration =
-                std::time::Duration::from_secs(3600);
+            // 网络恢复重启：防抖 + 最小断网时长双重过滤
+            //
+            // epoch：每次 NetworkDown 自增，用于取消正在等待的重启任务（无锁取消）。
+            // network_down_at：记录断网墙钟时间，过滤短暂抖动（< MIN_OUTAGE）。
+            //
+            // 策略：
+            //   NetworkDown → epoch++，记录断网时间，取消已排队的重启
+            //   NetworkUp   → 若断网时长 < MIN_OUTAGE 则跳过（短暂抖动）
+            //                 否则等待 DEBOUNCE_SECS 秒确认网络稳定，期间若再次断网
+            //                 则 epoch 已变，任务自动放弃，不会触发重启
+            //
+            // Windows 7 / 8 / 8.1：NotifyNetworkConnectivityHintChange 不可用，
+            // lifecycle 库不会产生任何 NetworkUp / NetworkDown 事件，
+            // 以下逻辑永远不会被触发，行为与未启用 network feature 时完全相同。
+            let network_restart_epoch =
+                std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0));
+            let mut network_down_at: Option<std::time::SystemTime> = None;
+            // 断网时长低于此值视为短暂抖动，不触发重启
+            const MIN_OUTAGE: std::time::Duration = std::time::Duration::from_secs(2);
+            // NetworkUp 后等待此时长确认网络稳定，再执行重启
+            const DEBOUNCE_SECS: u64 = 3;
 
             while let Some(event) = rx.recv() {
                 use onebox_lifecycle::SystemEvent;
@@ -169,15 +178,64 @@ pub(crate) fn spawn_lifecycle_listener(app_handle: &tauri::AppHandle) {
                     }
                     SystemEvent::WillSleep => {
                         log::info!("System will sleep");
-                        #[cfg(target_os = "macos")]
-                        {
-                            sleep_started = Some(std::time::SystemTime::now());
-                        }
                     }
                     SystemEvent::DidWake => {
                         log::info!("System did wake");
-                        #[cfg(target_os = "macos")]
-                        handle_did_wake(&handle, sleep_started.take(), SLEEP_RESTART_THRESHOLD);
+                    }
+                    SystemEvent::NetworkDown => {
+                        log::info!("[network] NetworkDown — cancelling any pending VPN restart");
+                        network_restart_epoch.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                        network_down_at = Some(std::time::SystemTime::now());
+                    }
+                    SystemEvent::NetworkUp => {
+                        log::info!("[network] NetworkUp");
+                        let down_at = match network_down_at.take() {
+                            Some(t) => t,
+                            // 初始快照就是 Up（应用刚启动时网络正常），忽略
+                            None => continue,
+                        };
+                        let outage = down_at.elapsed().unwrap_or_default();
+                        if outage < MIN_OUTAGE {
+                            log::info!(
+                                "[network] outage {:.1}s < threshold, skipping restart",
+                                outage.as_secs_f32()
+                            );
+                            continue;
+                        }
+                        log::info!(
+                            "[network] outage {:.1}s — scheduling VPN restart in {}s",
+                            outage.as_secs_f32(),
+                            DEBOUNCE_SECS
+                        );
+                        let epoch_arc = std::sync::Arc::clone(&network_restart_epoch);
+                        let current_epoch =
+                            epoch_arc.load(std::sync::atomic::Ordering::Relaxed);
+                        let h = handle.clone();
+                        tauri::async_runtime::spawn(async move {
+                            tokio::time::sleep(std::time::Duration::from_secs(DEBOUNCE_SECS))
+                                .await;
+                            // 若期间又断网，epoch 已自增，放弃本次重启
+                            if epoch_arc.load(std::sync::atomic::Ordering::Relaxed)
+                                != current_epoch
+                            {
+                                log::info!("[network] epoch changed, aborting VPN restart");
+                                return;
+                            }
+                            let Some((mode, path)) = crate::core::get_running_config() else {
+                                return;
+                            };
+                            log::info!(
+                                "[network] network stable, restarting VPN (mode: {:?})",
+                                mode
+                            );
+                            if let Err(e) = crate::core::stop(h.clone()).await {
+                                log::error!("[network] stop VPN failed: {}", e);
+                            } else if let Err(e) = crate::core::start(h, path, mode).await {
+                                log::error!("[network] restart VPN failed: {}", e);
+                            } else {
+                                log::info!("[network] VPN restarted after network recovery");
+                            }
+                        });
                     }
                     _ => {}
                 }
@@ -203,44 +261,3 @@ fn handle_will_power_off() {
     log::info!("System proxy unset on power off");
 }
 
-/// 计算实际睡眠时长，超过阈值且 VPN 正在运行时才重启
-#[cfg(target_os = "macos")]
-fn handle_did_wake(
-    handle: &tauri::AppHandle,
-    sleep_started: Option<std::time::SystemTime>,
-    threshold: std::time::Duration,
-) {
-    let Some(started) = sleep_started else {
-        return;
-    };
-    let elapsed = started.elapsed().unwrap_or_default();
-    let total_secs = elapsed.as_secs();
-    log::info!(
-        "System was asleep for {}h {}m {}s (threshold: {}h)",
-        total_secs / 3600,
-        (total_secs % 3600) / 60,
-        total_secs % 60,
-        threshold.as_secs() / 3600,
-    );
-    if elapsed < threshold {
-        return;
-    }
-    let Some((mode, path)) = crate::core::get_running_config() else {
-        return;
-    };
-    log::info!(
-        "Sleep exceeded threshold ({:?}), restarting VPN (mode: {:?})",
-        threshold,
-        mode
-    );
-    let h = handle.clone();
-    tauri::async_runtime::block_on(async {
-        if let Err(e) = crate::core::stop(h.clone()).await {
-            log::error!("Failed to stop VPN for sleep restart: {}", e);
-        } else if let Err(e) = crate::core::start(h, path, mode).await {
-            log::error!("Failed to restart VPN after sleep: {}", e);
-        } else {
-            log::info!("VPN restarted after long sleep");
-        }
-    });
-}
