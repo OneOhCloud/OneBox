@@ -3474,6 +3474,7 @@ dependencies = [
  "anyhow",
  "env_logger",
  "filetime",
+ "flate2",
  "keyring",
  "lazy_static",
  "libc",
