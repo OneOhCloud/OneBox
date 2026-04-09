@@ -1,10 +1,12 @@
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
-use std::io::Write;
+use std::io::{Write, Read};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Manager};
 use tauri_plugin_http::reqwest;
+use flate2::Compression;
+use flate2::write::GzEncoder;
 
 #[cfg(not(target_os = "windows"))]
 use crate::privilege;
@@ -36,6 +38,36 @@ fn today_date_string() -> String {
     format!("{:04}-{:02}-{:02}", year, month, day)
 }
 
+/// 压缩日志文件（使用 gzip）
+fn compress_singbox_log(log_path: &Path) -> std::io::Result<()> {
+    const MAX_LOG_SIZE: u64 = 10 * 1024 * 1024; // 10 MB
+
+    if let Ok(meta) = std::fs::metadata(log_path) {
+        if meta.len() > MAX_LOG_SIZE {
+            let compressed_path = log_path.with_extension("log.gz");
+
+            let mut input_file = std::fs::File::open(log_path)?;
+            let compressed_file = std::fs::File::create(&compressed_path)?;
+            let mut encoder = GzEncoder::new(compressed_file, Compression::default());
+
+            let mut buffer = vec![0; 8192];
+            loop {
+                let n = input_file.read(&mut buffer)?;
+                if n == 0 {
+                    break;
+                }
+                encoder.write_all(&buffer[..n])?;
+            }
+
+            encoder.finish()?;
+            std::fs::remove_file(log_path)?;
+            log::info!("Compressed sing-box log to: {}", compressed_path.display());
+            return Ok(());
+        }
+    }
+    Ok(())
+}
+
 /// 清理超过 keep_days 天的 sing-box 日志文件
 fn cleanup_old_singbox_logs(log_dir: &Path, keep_days: u64) {
     let entries = match std::fs::read_dir(log_dir) {
@@ -48,12 +80,25 @@ fn cleanup_old_singbox_logs(log_dir: &Path, keep_days: u64) {
     for entry in entries.flatten() {
         let name = entry.file_name();
         let name_str = name.to_string_lossy();
+        let path = entry.path();
+
+        // 处理未压缩的日志文件
         if name_str.starts_with("sing-box-") && name_str.ends_with(".log") {
             if let Ok(meta) = entry.metadata() {
                 let modified = meta.modified().unwrap_or(std::time::SystemTime::now());
                 if modified < cutoff {
-                    let _ = std::fs::remove_file(entry.path());
+                    let _ = std::fs::remove_file(&path);
                     log::info!("Removed old sing-box log: {}", name_str);
+                }
+            }
+        }
+        // 处理已压缩的日志文件
+        else if name_str.starts_with("sing-box-") && name_str.ends_with(".log.gz") {
+            if let Ok(meta) = entry.metadata() {
+                let modified = meta.modified().unwrap_or(std::time::SystemTime::now());
+                if modified < cutoff {
+                    let _ = std::fs::remove_file(&path);
+                    log::info!("Removed old compressed sing-box log: {}", name_str);
                 }
             }
         }
@@ -70,6 +115,19 @@ fn create_singbox_log_writer(app: &AppHandle) -> Option<std::fs::File> {
 
     let date = today_date_string();
     let log_path = log_dir.join(format!("sing-box-{}.log", date));
+
+    // 检查日志目录中是否有其他日期的日志文件需要压缩
+    if let Ok(entries) = std::fs::read_dir(&log_dir) {
+        for entry in entries.flatten() {
+            let name = entry.file_name();
+            let name_str = name.to_string_lossy();
+            // 如果是 sing-box 日志但不是今天的，则检查是否需要压缩
+            if name_str.starts_with("sing-box-") && name_str.ends_with(".log") && !name_str.contains(&date) {
+                let _ = compress_singbox_log(&entry.path());
+            }
+        }
+    }
+
     std::fs::OpenOptions::new()
         .create(true)
         .append(true)
