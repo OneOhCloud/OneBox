@@ -13,15 +13,20 @@ on:
     workflows: ["Dev Build"]
     types: [completed]
 
+# Release pipeline: dev → beta → stable
+# Beta compares version with dev tag:
+# - If same version: reuse dev artifacts (copy-from-dev job)
+# - If different version: rebuild from source (build-tauri job)
+
 jobs:
-  check-commit:
+  check-version:
     permissions:
       contents: read
     runs-on: ubuntu-latest
     outputs:
       skip_build: ${{ steps.check.outputs.skip_build }}
-      dev_commit: ${{ steps.check.outputs.dev_commit }}
-      current_commit: ${{ steps.check.outputs.current_commit }}
+      current_version: ${{ steps.check.outputs.current_version }}
+      dev_version: ${{ steps.check.outputs.dev_version }}
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
@@ -29,52 +34,64 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Check if commit is same as dev build
+      - name: Check if version is same as dev build
         id: check
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          CURRENT_COMMIT=$(git rev-parse HEAD)
-          echo "current_commit=$CURRENT_COMMIT" >> $GITHUB_OUTPUT
+          CURRENT_VERSION=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
 
           # Check if dev release exists
           if ! gh release view dev >/dev/null 2>&1; then
+            echo "⚠️  Dev release not found, will build normally"
             echo "skip_build=false" >> $GITHUB_OUTPUT
-            echo "dev_commit=" >> $GITHUB_OUTPUT
-            echo "Dev release not found, will build normally"
+            echo "dev_version=" >> $GITHUB_OUTPUT
             exit 0
           fi
 
-          # Get tag that the dev release points to, then get its commit
-          DEV_TAG=$(gh release view dev --json tagName -q 2>/dev/null || echo "")
+          # Fetch dev tag and extract version
+          git fetch origin "refs/tags/dev:refs/tags/dev" 2>/dev/null || true
 
-          if [ -z "$DEV_TAG" ]; then
+          if ! git rev-parse refs/tags/dev >/dev/null 2>&1; then
+            echo "⚠️  Dev tag not found, will build normally"
             echo "skip_build=false" >> $GITHUB_OUTPUT
-            echo "dev_commit=" >> $GITHUB_OUTPUT
+            echo "dev_version=" >> $GITHUB_OUTPUT
             exit 0
           fi
 
-          # Get the commit hash that the dev tag points to
-          DEV_COMMIT=$(git rev-list -n 1 "refs/tags/$DEV_TAG" 2>/dev/null || echo "")
-
-          if [ -z "$DEV_COMMIT" ]; then
-            # Try fetching the tag
-            git fetch origin "refs/tags/$DEV_TAG:refs/tags/$DEV_TAG" 2>/dev/null || true
-            DEV_COMMIT=$(git rev-list -n 1 "refs/tags/$DEV_TAG" 2>/dev/null || echo "")
+          if ! git cat-file -e refs/tags/dev:src-tauri/tauri.conf.json 2>/dev/null; then
+            echo "⚠️  tauri.conf.json not found in dev tag, will build normally"
+            echo "skip_build=false" >> $GITHUB_OUTPUT
+            echo "dev_version=" >> $GITHUB_OUTPUT
+            exit 0
           fi
 
-          echo "dev_commit=$DEV_COMMIT" >> $GITHUB_OUTPUT
+          DEV_VERSION=$(git show "refs/tags/dev:src-tauri/tauri.conf.json" 2>/dev/null | jq -r '.version' 2>&1)
+          if [ -z "$DEV_VERSION" ] || [ "$DEV_VERSION" = "null" ]; then
+            DEV_VERSION=$(git show "refs/tags/dev:src-tauri/tauri.conf.json" | grep -oP '"version":\s*"\K[^"]+' || echo "")
+          fi
 
-          if [ -n "$DEV_COMMIT" ] && [ "$CURRENT_COMMIT" = "$DEV_COMMIT" ]; then
+          if [ -z "$DEV_VERSION" ]; then
+            echo "⚠️  Failed to extract version from dev tag, will build normally"
+            echo "skip_build=false" >> $GITHUB_OUTPUT
+            echo "dev_version=" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          echo "dev_version=$DEV_VERSION" >> $GITHUB_OUTPUT
+
+          echo "Version check: current=$CURRENT_VERSION, dev=$DEV_VERSION"
+          if [ "$CURRENT_VERSION" = "$DEV_VERSION" ]; then
+            echo "✅ Same version, reusing dev artifacts"
             echo "skip_build=true" >> $GITHUB_OUTPUT
-            echo "Same commit as dev build ($CURRENT_COMMIT), will reuse artifacts"
           else
+            echo "Version mismatch, building normally"
             echo "skip_build=false" >> $GITHUB_OUTPUT
-            echo "Different commit (current: $CURRENT_COMMIT, dev: $DEV_COMMIT), will build normally"
           fi
 
   delete-old-beta:
-    needs: check-commit
+    needs: check-version
     permissions:
       contents: write
     runs-on: ubuntu-latest
@@ -88,10 +105,11 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
 
   copy-from-dev:
-    needs: [check-commit, delete-old-beta]
-    if: needs.check-commit.outputs.skip_build == 'true'
+    needs: [check-version, delete-old-beta]
+    if: needs.check-version.outputs.skip_build == 'true'
     permissions:
       contents: write
     runs-on: ubuntu-latest
@@ -104,7 +122,6 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Get current version
           VERSION=$(node -p "require('./src-tauri/tauri.conf.json').version")
 
           # Get dev release info
@@ -119,20 +136,28 @@ jobs:
 
           # Download and re-upload assets
           TEMP_DIR=$(mktemp -d)
-          cd "$TEMP_DIR"
 
-          gh release download dev --pattern '*' || true
+          gh release download dev --dir "$TEMP_DIR" --pattern '*' 2>/dev/null || true
 
-          if [ "$(ls -1 | wc -l)" -gt 0 ]; then
-            cd -
-            gh release upload beta $TEMP_DIR/* --clobber
+          FILE_COUNT=$(ls -1 "$TEMP_DIR" 2>/dev/null | wc -l)
+          if [ "$FILE_COUNT" -gt 0 ]; then
+            # Update latest.json URLs from dev to beta
+            if [ -f "$TEMP_DIR/latest.json" ]; then
+              sed -i "s|/releases/download/dev/|/releases/download/beta/|g" "$TEMP_DIR/latest.json"
+              echo "✅ Updated latest.json URLs to point to beta"
+            fi
+
+            gh release upload beta "$TEMP_DIR"/* --clobber
+            echo "✅ Copied $FILE_COUNT assets from dev to beta"
+          else
+            echo "⚠️  No assets found in dev release"
           fi
 
           rm -rf "$TEMP_DIR"
 
   build-tauri:
-    needs: [check-commit, delete-old-beta]
-    if: needs.check-commit.outputs.skip_build == 'false'
+    needs: [check-version, delete-old-beta]
+    if: needs.check-version.outputs.skip_build == 'false'
     permissions:
       contents: write
     env:

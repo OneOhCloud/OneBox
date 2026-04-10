@@ -12,15 +12,20 @@ on:
     workflows: ["Beta Build"]
     types: [completed]
 
+# Release pipeline: dev → beta → stable
+# Stable compares version with beta tag:
+# - If same version: reuse beta artifacts (copy-from-beta job)
+# - If different version: rebuild from source (build-tauri job)
+
 jobs:
-  check-commit:
+  check-version:
     permissions:
       contents: read
     runs-on: ubuntu-latest
     outputs:
       skip_build: ${{ steps.check.outputs.skip_build }}
-      beta_commit: ${{ steps.check.outputs.beta_commit }}
-      current_commit: ${{ steps.check.outputs.current_commit }}
+      beta_version: ${{ steps.check.outputs.beta_version }}
+      current_version: ${{ steps.check.outputs.current_version }}
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
@@ -28,75 +33,65 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Check if commit is same as beta build
+      - name: Check if version is same as beta build
         id: check
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          CURRENT_COMMIT=$(git rev-parse HEAD)
-          echo "current_commit=$CURRENT_COMMIT" >> $GITHUB_OUTPUT
+          CURRENT_VERSION=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          echo "current_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
 
           # Check if beta release exists
           if ! gh release view beta >/dev/null 2>&1; then
+            echo "⚠️  Beta release not found, will build normally"
             echo "skip_build=false" >> $GITHUB_OUTPUT
-            echo "beta_commit=" >> $GITHUB_OUTPUT
-            echo "Beta release not found, will build normally"
+            echo "beta_version=" >> $GITHUB_OUTPUT
             exit 0
           fi
 
-          # Get tag that the beta release points to, then get its commit
-          BETA_TAG=$(gh release view beta --json tagName -q 2>/dev/null || echo "")
+          # Fetch beta tag and extract version
+          git fetch origin "refs/tags/beta:refs/tags/beta" 2>/dev/null || true
 
-          if [ -z "$BETA_TAG" ]; then
+          if ! git rev-parse refs/tags/beta >/dev/null 2>&1; then
+            echo "⚠️  Beta tag not found, will build normally"
             echo "skip_build=false" >> $GITHUB_OUTPUT
-            echo "beta_commit=" >> $GITHUB_OUTPUT
+            echo "beta_version=" >> $GITHUB_OUTPUT
             exit 0
           fi
 
-          # Get the commit hash that the beta tag points to
-          BETA_COMMIT=$(git rev-list -n 1 "refs/tags/$BETA_TAG" 2>/dev/null || echo "")
-
-          if [ -z "$BETA_COMMIT" ]; then
-            # Try fetching the tag
-            git fetch origin "refs/tags/$BETA_TAG:refs/tags/$BETA_TAG" 2>/dev/null || true
-            BETA_COMMIT=$(git rev-list -n 1 "refs/tags/$BETA_TAG" 2>/dev/null || echo "")
+          if ! git cat-file -e refs/tags/beta:src-tauri/tauri.conf.json 2>/dev/null; then
+            echo "⚠️  tauri.conf.json not found in beta tag, will build normally"
+            echo "skip_build=false" >> $GITHUB_OUTPUT
+            echo "beta_version=" >> $GITHUB_OUTPUT
+            exit 0
           fi
 
-          echo "beta_commit=$BETA_COMMIT" >> $GITHUB_OUTPUT
+          BETA_VERSION=$(git show "refs/tags/beta:src-tauri/tauri.conf.json" 2>/dev/null | jq -r '.version' 2>&1)
+          if [ -z "$BETA_VERSION" ] || [ "$BETA_VERSION" = "null" ]; then
+            BETA_VERSION=$(git show "refs/tags/beta:src-tauri/tauri.conf.json" | grep -oP '"version":\s*"\K[^"]+' || echo "")
+          fi
 
-          if [ -n "$BETA_COMMIT" ] && [ "$CURRENT_COMMIT" = "$BETA_COMMIT" ]; then
+          if [ -z "$BETA_VERSION" ]; then
+            echo "⚠️  Failed to extract version from beta tag, will build normally"
+            echo "skip_build=false" >> $GITHUB_OUTPUT
+            echo "beta_version=" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          echo "beta_version=$BETA_VERSION" >> $GITHUB_OUTPUT
+
+          echo "Version check: current=$CURRENT_VERSION, beta=$BETA_VERSION"
+          if [ "$CURRENT_VERSION" = "$BETA_VERSION" ]; then
+            echo "✅ Same version, reusing beta artifacts"
             echo "skip_build=true" >> $GITHUB_OUTPUT
-            echo "Same commit as beta build ($CURRENT_COMMIT), will reuse artifacts"
           else
+            echo "Version mismatch, building normally"
             echo "skip_build=false" >> $GITHUB_OUTPUT
-            echo "Different commit (current: $CURRENT_COMMIT, beta: $BETA_COMMIT), will build normally"
-          fi
-
-  delete-old-stable:
-    needs: check-commit
-    permissions:
-      contents: write
-    runs-on: ubuntu-latest
-    env:
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Get version and delete old stable release if exists
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          VERSION=$(node -p "require('./src-tauri/tauri.conf.json').version")
-          TAG_NAME="v$VERSION"
-
-          # Try to delete old release with same version
-          if gh release view "$TAG_NAME" >/dev/null 2>&1; then
-            gh release delete "$TAG_NAME" --yes --cleanup-tag
           fi
 
   copy-from-beta:
-    needs: [check-commit, delete-old-stable]
-    if: needs.check-commit.outputs.skip_build == 'true'
+    needs: check-version
+    if: needs.check-version.outputs.skip_build == 'true'
     permissions:
       contents: write
     runs-on: ubuntu-latest
@@ -109,34 +104,42 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Get current version
           VERSION=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          TAG_NAME="v$VERSION"
 
           # Get beta release info
           BETA_RELEASE=$(gh release view beta --json body,assets)
           CHANGELOG=$(echo "$BETA_RELEASE" | jq -r '.body')
 
           # Create stable release
-          gh release create "v$VERSION" \
-            --title "v$VERSION" \
+          gh release create "$TAG_NAME" \
+            --title "$TAG_NAME" \
             --notes "$CHANGELOG"
 
           # Download and re-upload assets
           TEMP_DIR=$(mktemp -d)
-          cd "$TEMP_DIR"
 
-          gh release download beta --pattern '*' || true
+          gh release download beta --dir "$TEMP_DIR" --pattern '*' 2>/dev/null || true
 
-          if [ "$(ls -1 | wc -l)" -gt 0 ]; then
-            cd -
-            gh release upload "v$VERSION" $TEMP_DIR/* --clobber
+          FILE_COUNT=$(ls -1 "$TEMP_DIR" 2>/dev/null | wc -l)
+          if [ "$FILE_COUNT" -gt 0 ]; then
+            # Update latest.json URLs from beta to v{version}
+            if [ -f "$TEMP_DIR/latest.json" ]; then
+              sed -i "s|/releases/download/beta/|/releases/download/$TAG_NAME/|g" "$TEMP_DIR/latest.json"
+              echo "✅ Updated latest.json URLs to point to $TAG_NAME"
+            fi
+
+            gh release upload "$TAG_NAME" "$TEMP_DIR"/* --clobber
+            echo "✅ Copied $FILE_COUNT assets from beta to $TAG_NAME"
+          else
+            echo "⚠️  No assets found in beta release"
           fi
 
           rm -rf "$TEMP_DIR"
 
   build-tauri:
-    needs: [check-commit, delete-old-stable]
-    if: needs.check-commit.outputs.skip_build == 'false'
+    needs: check-version
+    if: needs.check-version.outputs.skip_build == 'false'
     permissions:
       contents: write
     env:

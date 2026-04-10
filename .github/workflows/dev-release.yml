@@ -9,6 +9,9 @@ on:
     branches:
       - feature/dev
 
+# Release pipeline: dev → beta → stable
+# Each stage checks if the version matches the previous stage and reuses artifacts if possible
+
 jobs:
   delete-old-dev:
     permissions:
@@ -24,6 +27,7 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
   build-tauri:
     needs: delete-old-dev
     permissions:
