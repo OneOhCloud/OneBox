@@ -467,7 +467,8 @@ const ACCELERATE_URL: &str = env!("ACCELERATE_URL");
 // Compile-time known-good SHA256 list for subscription hosts.
 // Add new entries here as additional hosts are approved.
 const KNOWN_HOST_SHA256_LIST: &[&str] =
-    &["183a5526e76751b07cd57236bc8f253d5424e02a3fc7da7c30f80919e975125a"];
+    &["183a5526e76751b07cd57236bc8f253d5424e02a3fc7da7c30f80919e975125a",
+    "59fe86216c23236fb4c6ab50cd8d1e261b7cad754e3e7cab33058df5b32d12e1"];
 
 const WHITELIST_REMOTE_URL: &str =
     "https://www.sing-box.net/verified_subscriptions_sha256.txt";
