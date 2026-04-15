@@ -5,6 +5,10 @@ pub const EVENT_TAURI_LOG: &str = "tauri-log";
 pub const EVENT_STATUS_CHANGED: &str = "status-changed";
 
 /// VPN代理操作的trait定义
+///
+/// `async fn` in trait 不带 `Send` 边界,但本 trait 的所有实现都是平台特定 struct
+/// 上的 inherent fn 转发,调用方(core.rs)不会跨线程持有 Future。允许该警告。
+#[allow(async_fn_in_trait)]
 pub trait VpnProxy {
     /// 设置系统代理
     async fn set_proxy(app: &AppHandle) -> anyhow::Result<()>;
@@ -37,6 +41,8 @@ pub mod linux;
 pub mod macos;
 #[cfg(target_os = "windows")]
 pub mod windows;
+#[cfg(target_os = "windows")]
+pub mod windows_native;
 
 // 平台适配器，使用编译时平台选择
 #[cfg(target_os = "linux")]

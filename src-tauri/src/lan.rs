@@ -440,7 +440,11 @@ async fn resolve_a_record(hostname: &str, dns_server: &str) -> Option<std::net::
     use tokio::time::{timeout, Duration};
 
     let ns_addr: SocketAddr = format!("{}:53", dns_server).parse().ok()?;
-    let bind_addr = if ns_addr.is_ipv4() { "0.0.0.0:0" } else { "[::]:0" };
+    let bind_addr = if ns_addr.is_ipv4() {
+        "0.0.0.0:0"
+    } else {
+        "[::]:0"
+    };
 
     let payload = build_dns_a_query(hostname)?;
     let socket = UdpSocket::bind(bind_addr).await.ok()?;
@@ -450,7 +454,7 @@ async fn resolve_a_record(hostname: &str, dns_server: &str) -> Option<std::net::
     let mut buf = [0u8; 512];
     let len = timeout(Duration::from_secs(5), socket.recv(&mut buf))
         .await
-        .ok()?  // timeout elapsed -> None
+        .ok()? // timeout elapsed -> None
         .ok()?; // io::Error -> None
 
     parse_dns_a_record(&buf[..len])
@@ -466,12 +470,12 @@ const ACCELERATE_URL: &str = env!("ACCELERATE_URL");
 
 // Compile-time known-good SHA256 list for subscription hosts.
 // Add new entries here as additional hosts are approved.
-const KNOWN_HOST_SHA256_LIST: &[&str] =
-    &["183a5526e76751b07cd57236bc8f253d5424e02a3fc7da7c30f80919e975125a",
-    "59fe86216c23236fb4c6ab50cd8d1e261b7cad754e3e7cab33058df5b32d12e1"];
+const KNOWN_HOST_SHA256_LIST: &[&str] = &[
+    "183a5526e76751b07cd57236bc8f253d5424e02a3fc7da7c30f80919e975125a",
+    "59fe86216c23236fb4c6ab50cd8d1e261b7cad754e3e7cab33058df5b32d12e1",
+];
 
-const WHITELIST_REMOTE_URL: &str =
-    "https://www.sing-box.net/verified_subscriptions_sha256.txt";
+const WHITELIST_REMOTE_URL: &str = "https://www.sing-box.net/verified_subscriptions_sha256.txt";
 const WHITELIST_STORE_NAME: &str = "whitelist_cache.json";
 const WHITELIST_KEY_HASHES: &str = "hashes";
 const WHITELIST_KEY_UPDATED_AT: &str = "updated_at";
@@ -516,7 +520,10 @@ async fn fetch_whitelist_from_remote() -> Option<Vec<String>> {
             }
         },
         Ok(resp) => {
-            log::warn!("[WHITELIST] Remote returned unexpected status {}", resp.status());
+            log::warn!(
+                "[WHITELIST] Remote returned unexpected status {}",
+                resp.status()
+            );
             None
         }
         Err(e) => {
@@ -526,7 +533,9 @@ async fn fetch_whitelist_from_remote() -> Option<Vec<String>> {
     }
 }
 
-fn open_whitelist_store(app: &AppHandle<Wry>) -> Option<std::sync::Arc<tauri_plugin_store::Store<Wry>>> {
+fn open_whitelist_store(
+    app: &AppHandle<Wry>,
+) -> Option<std::sync::Arc<tauri_plugin_store::Store<Wry>>> {
     match app.store(WHITELIST_STORE_NAME) {
         Ok(s) => Some(s),
         Err(e) => {
@@ -550,7 +559,9 @@ fn load_whitelist_timestamp(app: &AppHandle<Wry>) -> Option<u64> {
 }
 
 fn save_whitelist_cache(app: &AppHandle<Wry>, hashes: &[String]) {
-    let Some(store) = open_whitelist_store(app) else { return };
+    let Some(store) = open_whitelist_store(app) else {
+        return;
+    };
     store.set(WHITELIST_KEY_HASHES, json!(hashes));
     store.set(WHITELIST_KEY_UPDATED_AT, json!(now_unix_secs()));
     if let Err(e) = store.save() {
@@ -580,8 +591,10 @@ pub fn spawn_whitelist_refresh_task(app: AppHandle<Wry>) {
     tauri::async_runtime::spawn(async move {
         loop {
             refresh_whitelist_if_stale(&app).await;
-            tokio::time::sleep(std::time::Duration::from_secs(WHITELIST_CHECK_INTERVAL_SECS))
-                .await;
+            tokio::time::sleep(std::time::Duration::from_secs(
+                WHITELIST_CHECK_INTERVAL_SECS,
+            ))
+            .await;
         }
     });
 }
@@ -597,11 +610,13 @@ fn compute_sha256_hex(s: &str) -> String {
 /// Never performs a network request.
 fn verify_domain_sha256(domain_sha256: &str, app: &AppHandle<Wry>) -> bool {
     // Method A: compile-time list
-    if KNOWN_HOST_SHA256_LIST.iter().any(|&h| h == domain_sha256) {
+    if KNOWN_HOST_SHA256_LIST.contains(&domain_sha256) {
         return true;
     }
     // Method B: persisted whitelist cache (refreshed in background every 24 h)
-    load_whitelist_hashes(app).iter().any(|h| h == domain_sha256)
+    load_whitelist_hashes(app)
+        .iter()
+        .any(|h| h == domain_sha256)
 }
 
 /// Probes TCP:443 reachability of the compiled-in ACCELERATE_URL (5 s timeout).
@@ -648,7 +663,10 @@ fn collect_headers(
     headers
         .iter()
         .filter_map(|(name, value)| {
-            value.to_str().ok().map(|v| (name.to_string(), v.to_string()))
+            value
+                .to_str()
+                .ok()
+                .map(|v| (name.to_string(), v.to_string()))
         })
         .collect()
 }
@@ -719,12 +737,7 @@ pub async fn fetch_config_with_optimal_dns(
         match resolve_a_record(&hostname, &dns_server).await {
             Some(ip) => {
                 let addr = SocketAddr::new(IpAddr::V4(ip), port);
-                log::info!(
-                    "Resolved {} -> {} via DNS {}",
-                    hostname,
-                    ip,
-                    dns_server
-                );
+                log::info!("Resolved {} -> {} via DNS {}", hostname, ip, dns_server);
                 client_builder
                     .resolve(&hostname, addr)
                     .build()
@@ -801,9 +814,7 @@ pub async fn fetch_config_with_optimal_dns(
             }
 
             if !check_accelerator_tcp().await {
-                log::warn!(
-                    "[CONFIG_LOAD] 方式=ACCELERATOR_UNAVAILABLE, 原因=不可达:443, 回退中止"
-                );
+                log::warn!("[CONFIG_LOAD] 方式=ACCELERATOR_UNAVAILABLE, 原因=不可达:443, 回退中止");
                 return Err(format!(
                     "[CONFIG_LOAD] PRIMARY_FAILED: {}, accelerator unreachable",
                     primary_reason
@@ -916,7 +927,6 @@ pub async fn get_optimal_local_dns_server(app: AppHandle) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tokio;
     fn init_logger() {
         let _ = env_logger::builder()
             .is_test(true)

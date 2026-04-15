@@ -1,12 +1,12 @@
+use flate2::write::GzEncoder;
+use flate2::Compression;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
-use std::io::{Write, Read};
+use std::io::{Read, Write};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Manager};
 use tauri_plugin_http::reqwest;
-use flate2::Compression;
-use flate2::write::GzEncoder;
 
 #[cfg(not(target_os = "windows"))]
 use crate::privilege;
@@ -122,7 +122,10 @@ fn create_singbox_log_writer(app: &AppHandle) -> Option<std::fs::File> {
             let name = entry.file_name();
             let name_str = name.to_string_lossy();
             // 如果是 sing-box 日志但不是今天的，则检查是否需要压缩
-            if name_str.starts_with("sing-box-") && name_str.ends_with(".log") && !name_str.contains(&date) {
+            if name_str.starts_with("sing-box-")
+                && name_str.ends_with(".log")
+                && !name_str.contains(&date)
+            {
                 let _ = compress_singbox_log(&entry.path());
             }
         }
@@ -908,7 +911,7 @@ mod tests {
         let month: i32 = parts[1].parse().expect("month should be a number");
         let day: i32 = parts[2].parse().expect("day should be a number");
 
-        assert!(year >= 2024 && year <= 2100);
+        assert!((2024..=2100).contains(&year));
         assert!((1..=12).contains(&month));
         assert!((1..=31).contains(&day));
     }
