@@ -192,6 +192,18 @@ pub(crate) fn spawn_lifecycle_listener(app_handle: &tauri::AppHandle) {
                     }
                     SystemEvent::NetworkUp => {
                         log::info!("[network] NetworkUp");
+                        // 立即重设 TUN DNS —— 幂等操作,无需防抖。Wi-Fi 切换后系统
+                        // 会把活动接口 DNS 重置回 DHCP 下发的服务器,哪怕后续的
+                        // VPN 重启被 MIN_OUTAGE 过滤掉,这一步仍然保证 DNS 继续
+                        // 指向 TUN 网关。
+                        //
+                        // 延迟 1s 再做一次,兜底系统在 NetworkUp 事件之后的"慢一拍"
+                        // DNS 写入(DHCP 续租、IPv6 RA、NetworkManager dispatcher 等)。
+                        crate::core::reapply_tun_dns_override_if_active();
+                        tauri::async_runtime::spawn(async {
+                            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+                            crate::core::reapply_tun_dns_override_if_active();
+                        });
                         let down_at = match network_down_at.take() {
                             Some(t) => t,
                             // 初始快照就是 Up（应用刚启动时网络正常），忽略

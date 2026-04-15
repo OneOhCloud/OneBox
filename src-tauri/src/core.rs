@@ -859,6 +859,52 @@ pub fn clear_vpn_error(app: AppHandle) {
     }
 }
 
+/// NetworkUp 时立即重设 TUN 网关 DNS,无防抖。
+///
+/// Wi-Fi/网络变化会让系统把活动接口的 DNS 重置回 DHCP 下发的服务器,
+/// 导致 DNS 查询不再经过 TUN。由于 apply_system_dns_override 是幂等的,
+/// 每次 NetworkUp 直接重跑即可,不需要观察者轮询。
+///
+/// - macOS/Linux: 复用 PROCESS_MANAGER 里缓存的 sudo 密码和配置路径。
+/// - Windows: 跳过 —— 重设要走 elevated helper,每次 Wi-Fi 切换都弹 UAC 不可接受。
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+#[allow(dead_code)]
+pub fn reapply_tun_dns_override_if_active() {
+    let (password, config_path) = {
+        let manager = PROCESS_MANAGER.lock().unwrap_or_else(|e| e.into_inner());
+        let is_tun = manager
+            .mode
+            .as_ref()
+            .map(|m| matches!(**m, ProxyMode::TunProxy))
+            .unwrap_or(false);
+        if !is_tun {
+            return;
+        }
+        match (
+            manager.tun_password.as_ref().cloned(),
+            manager.config_path.as_ref().cloned(),
+        ) {
+            (Some(p), Some(c)) => (p, c),
+            _ => return,
+        }
+    };
+
+    log::info!("[dns] NetworkUp — re-applying TUN gateway DNS override");
+    #[cfg(target_os = "macos")]
+    if let Err(e) = crate::vpn::macos::apply_system_dns_override(&password, &config_path) {
+        log::warn!("[dns] NetworkUp re-apply failed: {}", e);
+    }
+    #[cfg(target_os = "linux")]
+    if let Err(e) = crate::vpn::linux::apply_system_dns_override(&password, &config_path) {
+        log::warn!("[dns] NetworkUp re-apply failed: {}", e);
+    }
+}
+
+#[cfg(target_os = "windows")]
+pub fn reapply_tun_dns_override_if_active() {
+    // Windows 走 elevated helper,每次 Wi-Fi 切换都弹 UAC,不实现。
+}
+
 /// 获取当前运行中的代理配置（模式 + 配置路径），用于睡眠前保存恢复状态
 pub fn get_running_config() -> Option<(ProxyMode, String)> {
     let manager = PROCESS_MANAGER.lock().unwrap_or_else(|e| e.into_inner());
