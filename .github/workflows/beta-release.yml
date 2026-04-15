@@ -13,6 +13,9 @@ on:
     workflows: ["Dev Build"]
     types: [completed]
 
+permissions:
+  contents: write
+
 # Release pipeline: dev → beta → stable
 # Beta compares version with dev tag:
 # - If same version: reuse dev artifacts (copy-from-dev job)

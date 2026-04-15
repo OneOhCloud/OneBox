@@ -12,6 +12,9 @@ on:
     workflows: ["Beta Build"]
     types: [completed]
 
+permissions:
+  contents: write
+
 # Release pipeline: dev → beta → stable
 # Stable compares version with beta tag:
 # - If same version: reuse beta artifacts (copy-from-beta job)
