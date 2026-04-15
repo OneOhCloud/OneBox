@@ -1,5 +1,16 @@
 # OneBox — Project Notes for Claude
 
+## Release workflow triggers
+
+The three release pipelines (`dev-release.yml`, `beta-release.yml`, `stable-release.yml`) are **independent**. Each one is triggered **only** by:
+
+1. A `push` that modifies `src-tauri/tauri.conf.json` on the channel's own branch (dev: `feature/dev`, beta: `feature/beta`, stable: `main`), or
+2. A manual `workflow_dispatch` from the Actions tab.
+
+Do **not** chain them with `workflow_run` triggers. An earlier design had beta listen for "Dev Build completed" and stable listen for "Beta Build completed" — this turned every dev push into an automatic full dev→beta→stable cascade, producing releases the author never asked for. It has been removed on purpose. If you see a reason to re-introduce cross-workflow triggers, treat it as a design change that needs explicit discussion, not a "missing feature" to patch back in.
+
+The canonical way to cut a release on any channel is `make bump` on that channel's branch, then push. Nothing else.
+
 ## CHANGELOG writing rules
 
 `CHANGELOG.MD` is written for **end users**, not developers. Each entry should be a single sentence describing what the user can observe. Do not include implementation details, file paths, config field names, code-level terms (e.g. `route_exclude_address`, `inbound`, `hijack-dns`), root-cause analysis, RFC terminology, or emoji. Provide both English and Simplified Chinese entries.

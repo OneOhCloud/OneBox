@@ -10,7 +10,7 @@ All significant changes in this version are documented here.
 ### ⚠ CHANGES
 
 - Dependency updates
-- Improved startup speed for Windows Tun mode
+- Use service mode on Windows to avoid frequent UAC prompts
 - Refactored state management logic for better performance and maintainability
 - Fixed bypass-router mode not handling DNS and traffic from other devices on the LAN
 
@@ -22,8 +22,8 @@ All significant changes in this version are documented here.
 ### ⚠ 变更
 
 - 依赖项更新
-- 提高 Windows Tun 模式启动速度
 - 重构状态管理逻辑以提高性能和可维护性
+- 在 Windows 上使用服务模式避免频繁弹出 UAC 提示
 - 修复旁路由模式下无法处理局域网其它设备的 DNS 与流量的问题
 
 

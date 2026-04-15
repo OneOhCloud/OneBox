@@ -9,10 +9,6 @@ on:
     branches:
       - feature/beta
 
-  workflow_run:
-    workflows: ["Dev Build"]
-    types: [completed]
-
 permissions:
   contents: write
 
