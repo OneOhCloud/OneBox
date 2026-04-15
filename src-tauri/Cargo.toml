@@ -63,7 +63,8 @@ onebox_lifecycle = { git = "https://github.com/OneOhCloud/onebox-lifecycle", tag
 
 [target.'cfg(target_os = "windows")'.dependencies]
 winapi = { version = "0.3", features = ["winbase"] }
-windows = { version = "0.62.2", features = ["Win32_Foundation", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging", "Win32_System_Registry"] }
+windows = { version = "0.62.2", features = ["Win32_Foundation", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging", "Win32_System_Registry", "Win32_System_Services", "Win32_System_Threading"] }
+tun-service = { path = "tun-service" }
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-autostart = "2"
@@ -82,3 +83,7 @@ version = "1.16.0"
 features = [
     "v4",
 ]
+
+[workspace]
+members = ["tun-service"]
+resolver = "2"

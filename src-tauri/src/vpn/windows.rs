@@ -100,11 +100,36 @@ pub async fn unset_proxy(app: &AppHandle) -> anyhow::Result<()> {
 //     出接口检测不再做 —— helper 以 scorched-earth 策略对所有非 TUN 且有 IP 的
 //     网卡都覆写 DNS,和 restore 路径的枚举策略对称,符合 CLAUDE.md 设计哲学#3。
 
-/// 特权模式下启动 TUN 进程。
-/// 流程:解析 gateway → self_elevate_helper("start", [sidecar, cfg, gateway]) →
-/// elevated 子进程在 helper 入口完成 DNS 覆写 + spawn sing-box + 自身 exit。
-/// 返回 None 是刻意的 —— sing-box 由 elevated helper 孤儿化运行,父进程没有
-/// 子进程句柄,也不走 tauri sidecar 的 stdout 监控(和重构前一致)。
+/// Locate the bundled `tun-service.exe` sitting next to `OneBox.exe`.
+/// In `cargo run` dev builds it's placed there automatically by the workspace
+/// build. Release bundling via Tauri `externalBin` is still TODO.
+#[cfg(target_os = "windows")]
+fn bundled_service_exe_path() -> Option<std::path::PathBuf> {
+    let exe_dir = std::env::current_exe().ok()?.parent()?.to_path_buf();
+    let candidates = [
+        "tun-service.exe",
+        "tun-service-x86_64-pc-windows-msvc.exe",
+        "tun-service-aarch64-pc-windows-msvc.exe",
+    ];
+    candidates
+        .into_iter()
+        .map(|n| exe_dir.join(n))
+        .find(|p| p.exists())
+}
+
+/// Start the TUN mode via the Windows service.
+///
+/// Flow:
+///   1. Locate the bundled service binary.
+///   2. Non-elevated fast path: `check_freshness()`. If `UpToDate`, skip UAC.
+///      Otherwise self-elevate to the `install-service` helper subcommand
+///      (synchronous wait on the elevated child process).
+///   3. Extract the TUN gateway from the sing-box config.
+///   4. Non-elevated `StartServiceW` with `[config, gateway, sidecar]`.
+///   5. Return `None` — sing-box runs inside the service process; no child
+///      handle in the parent. The readiness prober drives `Starting → Running`
+///      via the clash API, and the Windows service watchdog in `core.rs`
+///      synthesises `handle_process_termination` on service exit.
 #[cfg(target_os = "windows")]
 pub fn create_privileged_command(
     _app: &AppHandle,
@@ -112,6 +137,33 @@ pub fn create_privileged_command(
     path: String,
     _password: String,
 ) -> Option<TauriCommand> {
+    use tun_service::scm;
+
+    let bundled = match bundled_service_exe_path() {
+        Some(p) => p,
+        None => {
+            log::error!(
+                "[service] cannot locate bundled tun-service.exe next to OneBox.exe; \
+                 release bundling via externalBin is still TODO"
+            );
+            return None;
+        }
+    };
+
+    // Fast path: only pop UAC if the installed service is missing or stale.
+    let freshness = scm::check_freshness(&bundled);
+    log::info!("[service] freshness = {:?}", freshness);
+    if !matches!(freshness, scm::Freshness::UpToDate) {
+        let bundled_s = bundled.to_string_lossy().into_owned();
+        if let Err(e) =
+            windows_native::self_elevate_helper("install-service", &[bundled_s.as_str()])
+        {
+            log::error!("[service] elevated install-service failed: {}", e);
+            return None;
+        }
+        log::info!("[service] install-service helper completed");
+    }
+
     let gateway = extract_tun_gateway_from_config(&path).unwrap_or_else(|| {
         log::warn!(
             "[dns] could not extract TUN gateway from {}, DNS override will be skipped",
@@ -119,41 +171,42 @@ pub fn create_privileged_command(
         );
         String::new()
     });
-    let gateway_arg = if gateway.is_empty() {
-        "-"
+    let gateway_arg: String = if gateway.is_empty() {
+        "-".into()
     } else {
-        gateway.as_str()
+        gateway.clone()
     };
 
-    if let Err(e) = windows_native::self_elevate_helper(
-        "start",
-        &[sidecar_path.as_str(), path.as_str(), gateway_arg],
-    ) {
-        log::error!("Failed to launch elevated TUN start helper: {}", e);
+    if let Err(e) =
+        scm::start_service_with_args(&[path.as_str(), gateway_arg.as_str(), sidecar_path.as_str()])
+    {
+        log::error!("[service] start_service_with_args failed: {}", e);
         return None;
     }
 
     log::info!(
-        "[dns] elevated helper dispatched — gateway={}",
+        "[service] OneBoxTunService started (config={}, gateway={}, sidecar={})",
+        path,
         if gateway.is_empty() {
-            "<skipped>"
+            "-"
         } else {
             gateway.as_str()
-        }
-    );
-    log::info!(
-        "Enable tun mode via elevated helper: {} run -c {}",
-        sidecar_path,
-        path
+        },
+        sidecar_path
     );
     None
 }
 
-/// 停止 TUN 模式:elevated helper 先恢复所有非 TUN 网卡的 DNS,再 taskkill sing-box.exe。
+/// Stop TUN mode: ask the Windows service to stop. The service resets DNS
+/// scorched-earth internally before reporting `STOPPED`, so the parent
+/// process does not need to re-run the restore.
 #[cfg(target_os = "windows")]
 pub fn stop_tun_process(_password: &str) -> Result<(), String> {
-    windows_native::self_elevate_helper("stop", &[])?;
-    log::info!("Stop tun mode via elevated helper (DNS reset + taskkill)");
+    tun_service::scm::stop_service().map_err(|e| {
+        log::error!("[service] stop_service failed: {}", e);
+        e
+    })?;
+    log::info!("[service] OneBoxTunService stop requested");
     Ok(())
 }
 
@@ -169,23 +222,23 @@ pub fn restore_system_dns() -> Result<(), String> {
 
 #[cfg(target_os = "windows")]
 pub fn restart_privileged_command(sidecar_path: String, path: String) -> Result<(), String> {
-    // 重启 = stop + start,两次 UAC。合并成单次 helper 调用的收益很小:
-    // stop 和 start 之间本来就要让 DNS 恢复一次,合并反而需要额外的状态机。
+    // restart = stop + start via the Windows service; no UAC prompts because
+    // the ACL granted at install time lets Authenticated Users do both.
     stop_tun_process("")?;
     std::thread::sleep(std::time::Duration::from_millis(500));
 
     let gateway = extract_tun_gateway_from_config(&path).unwrap_or_default();
-    let gateway_arg = if gateway.is_empty() {
-        "-"
+    let gateway_arg: String = if gateway.is_empty() {
+        "-".into()
     } else {
-        gateway.as_str()
+        gateway
     };
-    windows_native::self_elevate_helper(
-        "start",
-        &[sidecar_path.as_str(), path.as_str(), gateway_arg],
-    )?;
-
-    log::info!("Restart tun mode via elevated helper");
+    tun_service::scm::start_service_with_args(&[
+        path.as_str(),
+        gateway_arg.as_str(),
+        sidecar_path.as_str(),
+    ])?;
+    log::info!("[service] OneBoxTunService restarted");
     Ok(())
 }
 

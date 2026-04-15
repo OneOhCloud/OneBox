@@ -15,7 +15,8 @@
             }
         },
         "externalBin": [
-            "binaries/sing-box"
+            "binaries/sing-box",
+            "binaries/tun-service"
         ]
     }
 }

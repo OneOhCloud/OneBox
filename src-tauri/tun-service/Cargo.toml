@@ -1,0 +1,29 @@
+[package]
+name = "tun-service"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "tun_service"
+path = "src/lib.rs"
+
+[[bin]]
+name = "tun-service"
+path = "src/main.rs"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+sha2 = "0.10"
+log = "0.4"
+windows = { version = "0.62.2", features = [
+    "Win32_Foundation",
+    "Win32_Security",
+    "Win32_Security_Authorization",
+    "Win32_System_Services",
+    "Win32_System_Registry",
+    "Win32_System_Memory",
+    "Win32_System_Threading",
+    "Win32_System_IO",
+] }
+
+[target.'cfg(target_os = "windows")'.dev-dependencies]
+tempfile = "3"

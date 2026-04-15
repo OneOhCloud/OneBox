@@ -5,8 +5,9 @@
   "type": "module",
   "scripts": {
     "sync-templates": "bun run scripts/sync-templates.ts",
-    "predev": "bun run sync-templates",
-    "prebuild": "bun run sync-templates",
+    "build:tun-service": "bun run scripts/build-tun-service.ts",
+    "predev": "bun run sync-templates && bun run build:tun-service",
+    "prebuild": "bun run sync-templates && bun run build:tun-service --release",
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",

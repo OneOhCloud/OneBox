@@ -299,12 +299,7 @@ async fn restart_tun_send_safe(
     // 承担 "从 Starting 升到 Running" 的职责。但 watchdog 走 Send-safe 路径时
     // 状态机可能停留在 Running(旧会话);将旧的 Running 推进到新的 Starting 再进入
     // Running,保证前端能看到一次 switching 中间态。
-    let _ = transition(
-        &app,
-        Intent::Start {
-            mode: "tun".into(),
-        },
-    );
+    let _ = transition(&app, Intent::Start { mode: "tun".into() });
     let epoch_snap = app.state::<VpnStateCell>().snapshot().epoch();
     readiness::spawn(app.clone(), epoch_snap);
 
@@ -487,7 +482,12 @@ pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Resu
             Err(e) => {
                 log::error!("Failed to spawn sidecar command: {}", e);
                 let msg = e.to_string();
-                let _ = transition(&app, Intent::Fail { reason: msg.clone() });
+                let _ = transition(
+                    &app,
+                    Intent::Fail {
+                        reason: msg.clone(),
+                    },
+                );
                 return Err(msg);
             }
         }
@@ -558,7 +558,12 @@ pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Resu
         let msg = e.to_string();
         log::error!("Failed to set proxy: {}", msg);
         stop(app.clone()).await.ok();
-        let _ = transition(&app, Intent::Fail { reason: msg.clone() });
+        let _ = transition(
+            &app,
+            Intent::Fail {
+                reason: msg.clone(),
+            },
+        );
         return Err(msg);
     }
 
@@ -572,7 +577,59 @@ pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Resu
     // 前端不再靠 EVENT_STATUS_CHANGED 探测,状态由 vpn://state 事件驱动。
     readiness::spawn(app.clone(), start_epoch);
 
+    // Windows TUN 模式:spawn 一个 SCM 轮询 watchdog,把服务意外退出转换成
+    // `handle_process_termination` 调用,复用与其它平台相同的状态机收尾路径。
+    #[cfg(target_os = "windows")]
+    if matches!(mode, ProxyMode::TunProxy) {
+        spawn_windows_service_watchdog(app.clone(), Arc::new(mode.clone()), start_epoch);
+    }
+
     Ok(())
+}
+
+/// Windows service watchdog:1Hz 轮询 `OneBoxTunService` 状态,观察到
+/// Running → Stopped 时合成一次 `handle_process_termination`,让前端走和其它平台
+/// 相同的 Failed/Idle 收尾路径。
+#[cfg(target_os = "windows")]
+fn spawn_windows_service_watchdog(
+    app: tauri::AppHandle,
+    process_mode: Arc<ProxyMode>,
+    _start_epoch: u64,
+) {
+    tokio::spawn(async move {
+        use tun_service::scm::{query_state, QueriedState};
+        let mut observed_running = false;
+        loop {
+            // 如果 PROCESS_MANAGER 已经不再持有 TUN 会话,退出 watchdog。
+            let still_tun = {
+                let m = PROCESS_MANAGER.lock().unwrap_or_else(|e| e.into_inner());
+                m.mode
+                    .as_ref()
+                    .map(|x| matches!(**x, ProxyMode::TunProxy))
+                    .unwrap_or(false)
+            };
+            if !still_tun {
+                return;
+            }
+
+            match query_state() {
+                QueriedState::Running => observed_running = true,
+                QueriedState::Stopped | QueriedState::NotInstalled if observed_running => {
+                    log::info!(
+                        "[win-svc-watchdog] service transitioned to stopped — firing handle_process_termination"
+                    );
+                    let payload = tauri_plugin_shell::process::TerminatedPayload {
+                        code: Some(0),
+                        signal: None,
+                    };
+                    handle_process_termination(&app, &process_mode, payload).await;
+                    return;
+                }
+                _ => {}
+            }
+            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+        }
+    });
 }
 
 // 提取进程终止处理逻辑
@@ -793,6 +850,22 @@ pub async fn stop(app: tauri::AppHandle) -> Result<(), String> {
                         log::error!("Failed to stop TUN process: {}", e);
                         e
                     })?;
+                }
+
+                // Windows TUN 模式没有 managed child,也没有 tauri sidecar 的
+                // stdout monitor,状态机从 Stopping → Idle 本来应该由
+                // spawn_windows_service_watchdog 观察 Running→Stopped 时触发
+                // `handle_process_termination` 完成。但 watchdog 与下面的
+                // "清理 PROCESS_MANAGER state" 存在竞态:watchdog 1Hz 轮询,
+                // 若它在 mode 被清掉之后才 tick,就会在 `still_tun == false`
+                // 分支直接 return,从不触发 MarkIdle,UI 永远卡在 Stopping。
+                //
+                // 因为 `stop_tun_process` 是同步阻塞到 service 进入 Stopped
+                // 才返回的,此时可以直接显式推进状态机;watchdog 仍然保留给
+                // 用户未发起 stop 的异常退出路径使用。
+                #[cfg(target_os = "windows")]
+                {
+                    let _ = transition(&app, Intent::MarkIdle);
                 }
             }
         }

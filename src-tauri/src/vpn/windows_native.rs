@@ -19,11 +19,13 @@ use std::os::windows::ffi::OsStrExt;
 use std::ptr;
 
 use windows::core::{PCWSTR, PWSTR};
+use windows::Win32::Foundation::{CloseHandle, WAIT_OBJECT_0};
 use windows::Win32::Foundation::{ERROR_NO_MORE_ITEMS, ERROR_SUCCESS};
 use windows::Win32::System::Registry::{
     RegCloseKey, RegEnumKeyExW, RegOpenKeyExW, RegQueryValueExW, RegSetValueExW, HKEY,
     HKEY_LOCAL_MACHINE, KEY_READ, KEY_SET_VALUE, REG_SAM_FLAGS, REG_SZ, REG_VALUE_TYPE,
 };
+use windows::Win32::System::Threading::{GetExitCodeProcess, WaitForSingleObject, INFINITE};
 use windows::Win32::UI::Shell::{ShellExecuteExW, SEE_MASK_NOCLOSEPROCESS, SHELLEXECUTEINFOW};
 
 // ================= 常量 =================
@@ -342,7 +344,9 @@ pub fn join_args(args: &[&str]) -> String {
 // ================= 提权 =================
 
 /// 用 `ShellExecuteExW` + `runas` verb 以管理员身份启动 `file` 并传入 `params`。
-pub fn shell_execute_runas(file: &str, params: &str) -> Result<(), String> {
+/// 等待 elevated 子进程退出并返回其 exit code；`None` 表示 ShellExecuteExW 未返回
+/// 进程句柄（例如目标是 MSI / 已安装的快捷方式路径）。
+pub fn shell_execute_runas(file: &str, params: &str) -> Result<Option<u32>, String> {
     let file_w = to_wide_z(file);
     let params_w = to_wide_z(params);
     let verb_w = to_wide_z("runas");
@@ -358,16 +362,37 @@ pub fn shell_execute_runas(file: &str, params: &str) -> Result<(), String> {
     };
 
     unsafe { ShellExecuteExW(&mut info) }.map_err(|e| format!("ShellExecuteExW failed: {}", e))?;
-    Ok(())
+    if info.hProcess.is_invalid() {
+        return Ok(None);
+    }
+    unsafe {
+        let wait = WaitForSingleObject(info.hProcess, INFINITE);
+        if wait != WAIT_OBJECT_0 {
+            let _ = CloseHandle(info.hProcess);
+            return Err(format!("WaitForSingleObject returned {:?}", wait));
+        }
+        let mut code: u32 = 0;
+        let res = GetExitCodeProcess(info.hProcess, &mut code);
+        let _ = CloseHandle(info.hProcess);
+        res.map_err(|e| format!("GetExitCodeProcess failed: {}", e))?;
+        Ok(Some(code))
+    }
 }
 
 /// 以管理员身份重新启动当前 exe,附带 `args`(已转义好的字符串)。
+/// 等待 elevated helper 退出（关键：install-service 流程依赖同步返回）。
 pub fn self_elevate(args: &str) -> Result<(), String> {
     let exe = std::env::current_exe()
         .map_err(|e| format!("current_exe: {}", e))?
         .to_string_lossy()
         .into_owned();
-    shell_execute_runas(&exe, args)
+    let exit = shell_execute_runas(&exe, args)?;
+    if let Some(code) = exit {
+        if code != 0 {
+            log_line(&format!("self_elevate: helper exit code = {}", code));
+        }
+    }
+    Ok(())
 }
 
 /// 以管理员身份启动当前 exe 进入 helper 子命令模式。
@@ -400,6 +425,35 @@ pub fn run_helper(args: &[String]) -> i32 {
             log_line(&format!("restore-dns: ok={} err={}", ok, err));
             0
         }
+        Some("install-service") => {
+            let bundled = match args.get(1) {
+                Some(p) => p.clone(),
+                None => {
+                    log_line("install-service: missing bundled exe path");
+                    return 2;
+                }
+            };
+            match tun_service::scm::ensure_installed(std::path::Path::new(&bundled)) {
+                Ok(()) => {
+                    log_line(&format!("install-service: OK ({})", bundled));
+                    0
+                }
+                Err(e) => {
+                    log_line(&format!("install-service FAILED: {}", e));
+                    1
+                }
+            }
+        }
+        Some("uninstall-service") => match tun_service::scm::uninstall() {
+            Ok(()) => {
+                log_line("uninstall-service: OK");
+                0
+            }
+            Err(e) => {
+                log_line(&format!("uninstall-service FAILED: {}", e));
+                1
+            }
+        },
         other => {
             log_line(&format!("helper: unknown subcommand {:?}", other));
             2

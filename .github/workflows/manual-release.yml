@@ -112,6 +112,16 @@ jobs:
             || { echo "::error::generated.ts missing singBoxVersion"; exit 1; }
           echo "✓ template snapshot synced and valid"
 
+      - name: Build tun-service (Windows only)
+        if: matrix.platform == 'windows-latest'
+        shell: bash
+        run: |
+          set -euo pipefail
+          bun run build:tun-service --release
+          test -f src-tauri/binaries/tun-service-x86_64-pc-windows-msvc.exe \
+            || { echo "::error::tun-service binary was not staged for Tauri externalBin"; exit 1; }
+          echo "✓ tun-service staged for Tauri externalBin"
+
       - name: Initialize Apple Signing Key
         if: matrix.platform == 'macos-latest'
         run: |
