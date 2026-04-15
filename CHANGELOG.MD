@@ -9,12 +9,11 @@ All significant changes in this version are documented here.
 
 ### ⚠ CHANGES
 
-- Updated dependencies
+- Dependency updates
+- Upgraded sing-box core to v1.13.8
+- Fixed DNS leak issue in TUN mode #32
 - Support for compressing log files to save disk space
-- VPN now automatically restarts after network disconnection recovery, replacing the previous sleep-based restart mechanism
-
-
-
+- Improved VPN connection stability during network switching scenarios
 
 ## 自 v1.3.26 以来的变更
 
@@ -23,9 +22,12 @@ All significant changes in this version are documented here.
 
 ### ⚠ 变更
 
-- 更新了依赖项
-- 支持压缩日志文件以节省磁盘空间
-- VPN 现在在网络断开恢复后自动重启，替代了原先基于睡眠时长的重启机制
+- 依赖项更新
+- sing-box 内核升级至 v1.13.8
+- 支持压缩日志文件，有效节省磁盘占用
+- 优化网络切换场景下的 VPN 连接稳定性
+- 修复 TUN 模式下的 DNS 泄漏问题 #32
+
 
 
 
