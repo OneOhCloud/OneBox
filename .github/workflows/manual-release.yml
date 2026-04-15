@@ -4,10 +4,11 @@ on:
   # 允许手动触发工作流
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   delete-old-manual:
-    permissions:
-      contents: write
     runs-on: ubuntu-latest
     steps:
       - name: Delete Old Manual Release
@@ -22,8 +23,6 @@ jobs:
 
   build-tauri:
     needs: delete-old-manual
-    permissions:
-      contents: write
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     strategy:
