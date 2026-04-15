@@ -136,11 +136,43 @@ export const useVPNOperations = () => {
     // 合并所有loading状态
     const isLoading = isOperating || serviceLoading;
 
+    // 启动/停止的最终落点都交给 isRunning 的真实翻转来决定，
+    // 避免 start()/stop() 早于内核状态 resolve 导致的 UI 闪烁
+    // （TUN 启动延迟、Windows UAC 提权脚本异步执行等场景）。
+    useEffect(() => {
+        if (isRunning && operationStatus === 'starting') {
+            setOperationStatus('idle');
+            setIsOperating(false);
+        } else if (!isRunning && operationStatus === 'stopping') {
+            setOperationStatus('idle');
+            setIsOperating(false);
+        }
+    }, [isRunning, operationStatus]);
+
+    // 兜底：starting/stopping 最多持续 15s，避免底层静默失败时永久卡住。
+    useEffect(() => {
+        if (operationStatus === 'idle') return;
+        const timer = setTimeout(() => {
+            setOperationStatus('idle');
+            setIsOperating(false);
+            mutate();
+        }, 15000);
+        return () => clearTimeout(timer);
+    }, [operationStatus]);
+
     const stopService = async () => {
         setOperationStatus('stopping');
-        await vpnServiceManager.stop();
-        mutate();
-        setOperationStatus('idle');
+        try {
+            await vpnServiceManager.stop();
+            mutate();
+            // 不在这里置 idle：Windows UAC 提权脚本异步执行，stop() resolve
+            // 早于 sing-box 真正退出。交给监听 isRunning 的 effect 处理。
+        } catch (error) {
+            // UAC 取消或停止失败：立刻恢复，避免永久卡在 stopping。
+            console.error('停止服务失败:', error);
+            setOperationStatus('idle');
+            mutate();
+        }
     };
 
     // Shared syncConfig → start flow. onSyncError differs: startService stops the VPN on
@@ -151,6 +183,8 @@ export const useVPNOperations = () => {
                 try {
                     await vpnServiceManager.start();
                     mutate();
+                    // 不在这里把 operationStatus 置 idle：start() resolve 早于 isRunning
+                    // 翻转，交给监听 isRunning 的 effect 处理。
                 } catch (error: any) {
                     if (error?.message?.includes('REQUIRE_PRIVILEGE')) {
                         setPrivilegedDialog(true);
@@ -158,7 +192,6 @@ export const useVPNOperations = () => {
                         console.error('启动服务失败:', error);
                         await message(t('connect_failed'), { title: t('error'), kind: 'error' });
                     }
-                } finally {
                     setIsOperating(false);
                     setOperationStatus('idle');
                 }
@@ -252,16 +285,9 @@ export const useVPNOperations = () => {
             if (isRunning) {
                 await stopService();
             } else {
-                setIsOperating(true);
-                setOperationStatus('starting');
-                try {
-                    await startService(isEmpty);
-                } finally {
-                    setTimeout(() => {
-                        setIsOperating(false);
-                        setOperationStatus('idle');
-                    }, 2000)
-                }
+                // starting 状态由 startService 内部设置；清理交给
+                // 监听 isRunning 的 effect（成功）或 performSyncAndStart 的 catch（失败）。
+                await startService(isEmpty);
             }
         } catch (error) {
             console.error('连接失败:', error);
