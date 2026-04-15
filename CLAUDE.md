@@ -103,7 +103,13 @@ See `conf-template/CONVENTIONS.md` for the contract.
 
 1. Derives the version directory from the baked-in `SING_BOX_VERSION` (mirrors `store.ts::getDefaultConfigTemplateURL`).
 2. In parallel, `fetch`es the four `.jsonc` files from `https://raw.githubusercontent.com/OneOhCloud/conf-template/<branch>/conf/<version>/zh-cn/<variant>.jsonc`.
-3. Parses each with `jsonc-parser`, `JSON.stringify`s it, and emits `src/config/templates/generated.ts` with the four strings keyed by `configType`, plus a metadata block (repo, branch, commit SHA, build timestamp, sing-box version).
+3. Parses each with `jsonc-parser` (validates + strips comments), then emits `src/config/templates/generated.ts` as a **TypeScript module with real object literals** — one `export const MIXED_TEMPLATE = { … } as const` per variant, plus a `BUILT_IN_TEMPLATE_OBJECTS` record mapping `configType` to those constants, plus a metadata block (repo, branch, commit SHA, build timestamp, sing-box version).
+
+The emitted file is real TypeScript code, not JSON-strings-inside-TS. Advantages:
+
+- **`tsc` parses it like any other source file.** Any malformed JSON produced by an upstream sync breaks the build immediately, not at runtime.
+- **No escape hell.** The old design serialised each template with `JSON.stringify` and embedded the result inside a TS template literal, meaning any unusual character in a template string had to survive two layers of escaping correctly. Emitting real object literals sidesteps the whole problem.
+- **Precise literal types via `as const`.** The compiler can narrow the template shape for free if future code wants to poke at specific fields.
 
 Branch defaults to `stable`; override with `CONF_TEMPLATE_BRANCH=beta|dev` in CI for non-stable release channels.
 
@@ -113,7 +119,15 @@ The tauri build chain works without modifying `tauri.conf.json`:
 ```
 tauri build → beforeBuildCommand "bun run build" → prebuild hook "sync-templates" → build (tsc && vite build)
 ```
-CI workflows (`.github/workflows/*-release.yml`) likewise don't need an explicit sync step — `tauri-action` invokes `tauri build` which chains through `prebuild`.
+
+CI release workflows (`.github/workflows/{stable,beta,dev,manual}-release.yml`) run the sync **explicitly** as a "Sync config templates" step right after "Download Binaries", not relying on the prebuild hook. Two reasons:
+
+1. **Fail-early visibility** — if sync fails (GitHub 404, parse error, network flake), we want to see it in a dedicated CI step with clear logs, not hidden mid-`tauri build` 10 minutes later.
+2. **Belt-and-suspenders against bun pre-hook breakage** — if a future bun version changes how it invokes `prebuild`, the explicit step still produces a valid `generated.ts` before `tauri-action` runs. The prebuild hook in `package.json` remains for local dev.
+
+Each channel's step sets its own `CONF_TEMPLATE_BRANCH` via env (`stable` / `beta` / `dev` / `stable` for manual). After running sync, the step greps for `BUILT_IN_TEMPLATE_OBJECTS` / `BUILD_TIME_TEMPLATE_SOURCE` / `singBoxVersion: 'v` in the output as a smoke check — catches silent corruption before the real build wastes time.
+
+**Windows runner specifics**: the step declares `shell: bash` so `set -euo pipefail` and heredoc-style `run: |` work identically across Linux, macOS, and Windows. Without that, Windows defaults to PowerShell and interprets `set -euo pipefail` as a `Set-Variable` cmdlet invocation (`A parameter cannot be found that matches parameter name 'euo'`).
 
 ### Runtime read path (non-blocking, stale allowed)
 
@@ -121,11 +135,13 @@ CI workflows (`.github/workflows/*-release.yml`) likewise don't need an explicit
 
 1. Read the current-schema v2 key from the `tauri-plugin-store` file cache (`settings.json`).
 2. If present → parse and return (stale content is acceptable).
-3. If absent → call `getBuiltInTemplate` from `config/templates/index.ts` which reads from the build-time snapshot in `src/config/templates/generated.ts`, writes it to the cache, then returns it. Seeding happens once; subsequent reads are pure cache hits.
+3. If absent → call `getBuiltInTemplate` from `config/templates/index.ts` which looks up the build-time object in `BUILT_IN_TEMPLATE_OBJECTS[mode]`, runs `JSON.stringify` on it to get a string, writes that into the cache, then returns the string for the caller's subsequent `JSON.parse`. Seeding happens once; subsequent reads are pure cache hits.
+
+`templates/index.ts` only stringifies on the cache-miss path, so the work happens at most four times per app launch (once per configType, in the fallback path). The caller's string-based store interface stays unchanged.
 
 No network I/O on this path. `setTunConfig` / `setMixedConfig` / their `-global` variants all go through `getConfigTemplate` — the merge step's **only** template source is the cache.
 
-The hand-written `TunRulesConfig` / `TunGlobalConfig` / `mixedRulesConfig` / `miexdGlobalConfig` object literals are gone. `getBuiltInTemplate` is a ~15-line dispatcher over `BUILT_IN_TEMPLATES[mode]`; the old `config/version_1_12/` directory has been renamed to `config/merger/` (its historical name — "version_1_12" — no longer reflected the actual sing-box version) and the vestigial `zh-cn/config.ts` is gone.
+The hand-written `TunRulesConfig` / `TunGlobalConfig` / `mixedRulesConfig` / `miexdGlobalConfig` object literals are gone. `getBuiltInTemplate` is a ~15-line dispatcher over `BUILT_IN_TEMPLATE_OBJECTS[mode]`; the old `config/version_1_12/` directory has been renamed to `config/merger/` (its historical name — "version_1_12" — no longer reflected the actual sing-box version) and the vestigial `zh-cn/config.ts` is gone.
 
 ### Runtime write path (background periodic refresh)
 
@@ -191,9 +207,9 @@ Purge + prime run in parallel at mount. Order doesn't matter: if purge wipes a p
 ### Files
 
 **In OneBox repo**:
-- `scripts/sync-templates.ts` — build-time fetch + emit `generated.ts` (predev/prebuild hook)
-- `src/config/templates/generated.ts` — AUTO-GENERATED, `.gitignore`d, keyed by `configType`
-- `src/config/templates/index.ts` — hand-written re-exports + `getBuiltInTemplate(mode)` helper
+- `scripts/sync-templates.ts` — build-time fetch + emit `generated.ts` (predev/prebuild hook). Emits real TS object literals, not JSON-stringified strings.
+- `src/config/templates/generated.ts` — AUTO-GENERATED, `.gitignore`d. Exports `MIXED_TEMPLATE` / `TUN_TEMPLATE` / `MIXED_GLOBAL_TEMPLATE` / `TUN_GLOBAL_TEMPLATE` as typed object constants (with `as const`) plus `BUILT_IN_TEMPLATE_OBJECTS: Record<configType, unknown>` mapping keys to those constants, plus `BUILD_TIME_TEMPLATE_SOURCE` metadata.
+- `src/config/templates/index.ts` — hand-written. Re-exports `BUILD_TIME_TEMPLATE_SOURCE`, imports `BUILT_IN_TEMPLATE_OBJECTS`, and provides `getBuiltInTemplate(mode): string` which stringifies the selected object on read.
 - `src/config/common.ts` — schema version, cache key builder, stale-URL detector
 - `src/config/merger/main.ts` — `getConfigTemplate` (read path) + the four `set*Config` mergers (renamed from `version_1_12/main.ts`)
 - `src/config/merger/helper.ts` — inbound configurators / DHCP / VPN server merging (renamed from `version_1_12/helper.ts`)
