@@ -114,7 +114,8 @@ jobs:
           # Create stable release
           gh release create "$TAG_NAME" \
             --title "$TAG_NAME" \
-            --notes "$CHANGELOG"
+            --notes "$CHANGELOG" \
+            --target "$GITHUB_SHA"
 
           # Download and re-upload assets
           TEMP_DIR=$(mktemp -d)

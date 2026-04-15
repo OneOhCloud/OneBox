@@ -132,6 +132,7 @@ jobs:
           gh release create beta \
             --title "Beta" \
             --notes "$CHANGELOG" \
+            --target "$GITHUB_SHA" \
             --prerelease
 
           # Download and re-upload assets
