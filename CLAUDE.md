@@ -1,5 +1,12 @@
 # OneBox — Project Notes for Claude
 
+## CHANGELOG writing rules
+
+`CHANGELOG.MD` is written for **end users**, not developers. Each entry should be a single sentence describing what the user can observe. Do not include implementation details, file paths, config field names, code-level terms (e.g. `route_exclude_address`, `inbound`, `hijack-dns`), root-cause analysis, RFC terminology, or emoji. Provide both English and Simplified Chinese entries.
+
+Bad: `Fixed bypass-router mode where the Mixed inbound listened on 127.0.0.1, making LAN hosts unreachable`
+Good: `Fixed bypass-router mode not handling DNS and traffic from other devices on the LAN`
+
 ## Design Philosophy
 
 These principles drive the template-cache and DNS-override subsystems below. Apply them to new code that touches system state or long-lived caches.
