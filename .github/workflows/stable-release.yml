@@ -218,6 +218,7 @@ jobs:
       - name: Sync config templates from conf-template
         env:
           CONF_TEMPLATE_BRANCH: stable
+        shell: bash
         run: |
           set -euo pipefail
           rm -f src/config/templates/generated.ts
@@ -226,8 +227,8 @@ jobs:
           # or a network 404 fails fast here instead of mid-tauri-build 10 minutes later.
           test -f src/config/templates/generated.ts \
             || { echo "::error::sync-templates did not write generated.ts"; exit 1; }
-          grep -q "BUILT_IN_TEMPLATES" src/config/templates/generated.ts \
-            || { echo "::error::generated.ts missing BUILT_IN_TEMPLATES export"; exit 1; }
+          grep -q "BUILT_IN_TEMPLATE_OBJECTS" src/config/templates/generated.ts \
+            || { echo "::error::generated.ts missing BUILT_IN_TEMPLATE_OBJECTS export"; exit 1; }
           grep -q "BUILD_TIME_TEMPLATE_SOURCE" src/config/templates/generated.ts \
             || { echo "::error::generated.ts missing BUILD_TIME_TEMPLATE_SOURCE metadata"; exit 1; }
           grep -q "singBoxVersion: 'v" src/config/templates/generated.ts \
