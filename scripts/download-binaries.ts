@@ -213,15 +213,16 @@ async function downloadCronetLibraries(): Promise<void> {
     await Promise.all(downloadTasks);
 }
 
-// 下载数据库文件到 src-tauri/resources 目录
+// Upstream conf-template still publishes v1-named rule caches; rename to v2
+// on save so OneBox's v2 migration picks them up without touching upstream.
 async function downloadDatabaseFiles(): Promise<void> {
     const dbFiles = [
         {
-            name: 'mixed-cache-rule-v1.db',
+            name: 'mixed-cache-rule-v2.db',
             url: 'https://github.com/OneOhCloud/conf-template/raw/refs/heads/database/database/stable/1.13/zh-cn/mixed-cache-rule-v1.db',
         },
         {
-            name: 'tun-cache-rule-v1.db',
+            name: 'tun-cache-rule-v2.db',
             url: 'https://github.com/OneOhCloud/conf-template/raw/refs/heads/database/database/stable/1.13/zh-cn/tun-cache-rule-v1.db'
         }
     ];

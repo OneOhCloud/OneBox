@@ -1,21 +1,26 @@
 import * as path from '@tauri-apps/api/path';
 import { getSubscriptionConfig } from '../../action/db';
-import { getAllowLan, getClashApiSecret, getCustomRuleSet, getStoreValue } from '../../single/store';
+import { getAllowLan, getClashApiSecret, getCustomRuleSet, getStoreValue, setStoreValue } from '../../single/store';
 import { STAGE_VERSION_STORE_KEY } from '../../types/definition';
 import { configureMixedInbound, configureTunInbound, updateDHCPSettings2Config, updateVPNServerConfigFromDB } from './helper';
 
-import { SING_BOX_VERSION } from '../../types/definition';
 import { configType, getConfigTemplateCacheKey } from '../common';
-import { getDefaultConfigTemplate } from './zh-cn/config';
+import { getBuiltInTemplate } from '../templates';
 
 
+// Cache is the single intermediary. Reads are non-blocking and may return
+// stale content — the periodic prime (see hooks/useSwr.ts) refreshes the
+// cache in the background. If the cache is empty (first launch, offline),
+// fall back to the build-time template snapshot (see src/config/templates)
+// and seed the cache so subsequent reads stay fast. No network I/O here.
 async function getConfigTemplate(mode: configType): Promise<any> {
-
-    // 使用缓存机制来解耦配置模板来源
-    // 后面可以灵活更换配置模板的存储位置，比如定期从远程服务器/本地文件获取等方式写入缓存
     const cacheKey = await getConfigTemplateCacheKey(mode);
-    let config = await getStoreValue(cacheKey, getDefaultConfigTemplate(mode, SING_BOX_VERSION));
-    console.debug(`Fetched config template for mode ${mode} from cache key ${cacheKey}`);
+    let config = await getStoreValue(cacheKey, '');
+    if (!config) {
+        config = getBuiltInTemplate(mode);
+        await setStoreValue(cacheKey, config);
+        console.info(`[template] cache empty for mode=${mode}, seeded built-in snapshot`);
+    }
     return JSON.parse(config);
 }
 
@@ -47,7 +52,7 @@ export async function setMixedConfig(identifier: string) {
     console.log("写入[规则]系统代理配置文件");
     let dbConfigData = await getSubscriptionConfig(identifier);
     const appConfigPath = await path.appConfigDir();
-    const dbCacheFilePath = await path.join(appConfigPath, 'mixed-cache-rule-v1.db');
+    const dbCacheFilePath = await path.join(appConfigPath, 'mixed-cache-rule-v2.db');
 
     let directCustomRuleSet = await getCustomRuleSet('direct');
     let proxyCustomRuleSet = await getCustomRuleSet('proxy');
@@ -97,7 +102,7 @@ export async function setTunConfig(identifier: string) {
     console.log("写入[规则]TUN代理配置文件");
     let dbConfigData = await getSubscriptionConfig(identifier);
     const appConfigPath = await path.appConfigDir();
-    const dbCacheFilePath = await path.join(appConfigPath, 'tun-cache-rule-v1.db');
+    const dbCacheFilePath = await path.join(appConfigPath, 'tun-cache-rule-v2.db');
     let directCustomRuleSet = await getCustomRuleSet('direct');
     let proxyCustomRuleSet = await getCustomRuleSet('proxy');
 
@@ -151,7 +156,7 @@ export async function setGlobalMixedConfig(identifier: string) {
     console.log("写入[全局]系统代理配置文件");
     let dbConfigData = await getSubscriptionConfig(identifier);
     const appConfigPath = await path.appConfigDir();
-    const dbCacheFilePath = await path.join(appConfigPath, 'mixed-cache-gloabl-v1.db');
+    const dbCacheFilePath = await path.join(appConfigPath, 'mixed-cache-global-v2.db');
 
     updateExperimentalConfig(newConfig, dbCacheFilePath);
     const allowLan = await getAllowLan();
@@ -173,7 +178,7 @@ export default async function setGlobalTunConfig(identifier: string) {
     console.log("写入[全局]TUN代理配置文件");
     let dbConfigData = await getSubscriptionConfig(identifier);
     const appConfigPath = await path.appConfigDir();
-    const dbCacheFilePath = await path.join(appConfigPath, 'tun-cache-global-v1.db');
+    const dbCacheFilePath = await path.join(appConfigPath, 'tun-cache-global-v2.db');
 
     await configureTunInbound(newConfig);
 

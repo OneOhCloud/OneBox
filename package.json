@@ -4,6 +4,9 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
+    "sync-templates": "bun run scripts/sync-templates.ts",
+    "predev": "bun run sync-templates",
+    "prebuild": "bun run sync-templates",
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",

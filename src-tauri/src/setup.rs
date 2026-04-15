@@ -16,7 +16,9 @@ pub fn app_setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>>
 
     app.manage(crate::state::AppData::new());
 
-    // 复制 resources 目录下的 .db 文件到 appConfigDir
+    // Purge must run before copy_database_files so the resource-bundled v2 defaults
+    // are not clobbered by a later v1 cleanup pass.
+    crate::utils::purge_legacy_cache_files(app.handle());
     if let Err(e) = crate::utils::copy_database_files(app.handle()) {
         log::error!("Failed to copy database files: {}", e);
     }

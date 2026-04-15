@@ -12,7 +12,7 @@ import React from 'react';
 import useSWR from "swr";
 import { UpdateProvider } from './components/settings/update-context';
 import { deduplicateSubscriptionsByUrl } from "./action/db";
-import { syncAllConfigTemplates } from "./hooks/useSwr";
+import { primeAllConfigTemplateCaches, purgeLegacyTemplateCache } from "./hooks/useSwr";
 import HomePage from "./page/home";
 import { ActiveScreenType, NavContext } from './single/context';
 import { getStoreValue } from "./single/store";
@@ -103,11 +103,22 @@ function App() {
     configuration: t("configuration"),
     settings: t("settings"),
   })
-  useSWR('swr-syncAllConfigTemplates-key', async () => {
-    return await syncAllConfigTemplates();
+  useSWR('swr-purgeLegacyTemplateCache-key', async () => {
+    await purgeLegacyTemplateCache();
+    return 'ok';
   }, {
+    revalidateOnFocus: false,
+    revalidateOnReconnect: false,
+    revalidateIfStale: false,
+    dedupingInterval: Infinity,
+  });
+
+  // Periodic background refresh of the template cache. Non-blocking — merges
+  // read directly from cache (stale allowed) and this hook just keeps the
+  // cache fresh. Revalidates on focus and at most every 30 minutes.
+  useSWR('swr-primeAllConfigTemplateCaches-key', primeAllConfigTemplateCaches, {
     revalidateOnFocus: true,
-    dedupingInterval: 60000 * 30, // 30 minutes
+    dedupingInterval: 60000 * 30,
   })
 
   const [language, setLanguage] = useState('unknown');

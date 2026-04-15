@@ -234,6 +234,23 @@ jobs:
       - name: Download Binaries
         run: bun run scripts/download-binaries.ts
 
+      - name: Sync config templates from conf-template
+        env:
+          CONF_TEMPLATE_BRANCH: beta
+        run: |
+          set -euo pipefail
+          rm -f src/config/templates/generated.ts
+          bun run sync-templates
+          test -f src/config/templates/generated.ts \
+            || { echo "::error::sync-templates did not write generated.ts"; exit 1; }
+          grep -q "BUILT_IN_TEMPLATES" src/config/templates/generated.ts \
+            || { echo "::error::generated.ts missing BUILT_IN_TEMPLATES export"; exit 1; }
+          grep -q "BUILD_TIME_TEMPLATE_SOURCE" src/config/templates/generated.ts \
+            || { echo "::error::generated.ts missing BUILD_TIME_TEMPLATE_SOURCE metadata"; exit 1; }
+          grep -q "singBoxVersion: 'v" src/config/templates/generated.ts \
+            || { echo "::error::generated.ts missing singBoxVersion"; exit 1; }
+          echo "✓ template snapshot synced and valid"
+
       - name: Initialize Apple Signing Key
         if: matrix.platform == 'macos-latest'
         run: |

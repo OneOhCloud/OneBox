@@ -2,7 +2,7 @@ import { Arch, OsType } from "@tauri-apps/plugin-os";
 
 // 跳过 13.1 版本，有严重 bug。
 export const SING_BOX_MAJOR_VERSION = "1.13";
-export const SING_BOX_MINOR_VERSION = "0";
+export const SING_BOX_MINOR_VERSION = "8";
 export const SING_BOX_VERSION = `v${SING_BOX_MAJOR_VERSION}.${SING_BOX_MINOR_VERSION}`;
 
 export const GITHUB_URL = 'https://github.com/OneOhCloud/OneBox'

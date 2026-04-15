@@ -8,7 +8,7 @@ import { getCurrentWindow } from '@tauri-apps/api/window';
 import { message } from '@tauri-apps/plugin-dialog';
 import en from '../../lang/en.json';
 import zh from '../../lang/zh.json';
-import setGlobalTunConfig, { setGlobalMixedConfig, setMixedConfig, setTunConfig } from '../config/version_1_12/main';
+import setGlobalTunConfig, { setGlobalMixedConfig, setMixedConfig, setTunConfig } from '../config/merger/main';
 import { getClashApiSecret, getEnableTun, getLanguage, getStoreValue, getUserAgent } from '../single/store';
 const appWindow = getCurrentWindow();
 const enLang = en as Record<string, string>;

@@ -231,7 +231,14 @@ export async function getDefaultConfigTemplateURL(mode: configType): Promise<str
     let versionNumber = SING_BOX_VERSION.replace('v', '').split('.')
     let major = versionNumber[0];
     let minor = versionNumber[1];
+    let patch = parseInt(versionNumber[2] || '0', 10);
     let ver = `${major}.${minor}`;
+    // sing-box 1.13.8 rejects legacy inbound fields (`sniff`, `sniff_override_destination`)
+    // that earlier 1.13.x kernels silently ignored. Templates under conf/1.13.8/ have
+    // them migrated to route-rule sniff actions; keep conf/1.13/ for older kernels.
+    if (major === '1' && minor === '13' && patch >= 8) {
+        ver = '1.13.8';
+    }
 
     switch (mode) {
         case 'mixed':

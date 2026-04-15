@@ -534,7 +534,9 @@ async fn handle_process_termination(
         }
     }
 
-    let should_cleanup = {
+    // Stash tun_password out of the lock before the cleanup block clears it — the
+    // DNS-restore fallback below still needs sudo credentials after state is reset.
+    let (should_cleanup, captured_tun_password) = {
         let mut manager = PROCESS_MANAGER.lock().unwrap_or_else(|e| {
             log::error!("Failed to lock process manager: {:?}", e);
             e.into_inner()
@@ -547,8 +549,9 @@ async fn handle_process_termination(
             .map(|m| **m == **process_mode)
             .unwrap_or(false);
 
-        if matches {
+        let captured = if matches {
             log::info!("Cleaning up resources after process termination");
+            let pwd = manager.tun_password.clone();
             manager.child = None;
             manager.mode = None;
             manager.config_path = None;
@@ -559,8 +562,11 @@ async fn handle_process_termination(
             if let Some(abort) = manager.bypass_router_watchdog_abort.take() {
                 abort.abort();
             }
-        }
-        matches
+            pwd
+        } else {
+            None
+        };
+        (matches, captured)
     };
 
     if !should_cleanup {
@@ -572,6 +578,49 @@ async fn handle_process_termination(
     if matches!(**process_mode, ProxyMode::SystemProxy) {
         if let Err(e) = PlatformVpnProxy::unset_proxy(app_handle).await {
             log::error!("Failed to unset proxy after process termination: {}", e);
+        }
+    }
+
+    // Crash safety net for TUN-mode DNS overrides. All three platforms now use
+    // stateless, idempotent restore (system-native "reset to default"), so we
+    // call it unconditionally on TUN termination — no marker file check.
+    // macOS: enumerate services + `setdnsservers empty`
+    // Linux: enumerate links + `resolvectl revert`
+    // Windows: enumerate adapters + `-ResetServerAddresses`
+    if matches!(**process_mode, ProxyMode::TunProxy) {
+        #[cfg(target_os = "macos")]
+        {
+            if let Some(pwd) = captured_tun_password.as_ref() {
+                log::info!("[dns] TUN process terminated — resetting all services to DHCP");
+                if let Err(e) = crate::vpn::macos::restore_system_dns(pwd) {
+                    log::warn!("[dns] fallback restore_system_dns failed: {}", e);
+                }
+            } else {
+                log::warn!(
+                    "[dns] TUN terminated but no password captured; user must run `sudo networksetup -setdnsservers <service> empty` manually"
+                );
+            }
+        }
+        #[cfg(target_os = "linux")]
+        {
+            if let Some(pwd) = captured_tun_password.as_ref() {
+                log::info!("[dns] TUN process terminated — reverting all links to defaults");
+                if let Err(e) = crate::vpn::linux::restore_system_dns(pwd) {
+                    log::warn!("[dns] fallback restore_system_dns failed: {}", e);
+                }
+            } else {
+                log::warn!(
+                    "[dns] TUN terminated but no password captured; user must run `sudo resolvectl revert <iface>` manually"
+                );
+            }
+        }
+        #[cfg(target_os = "windows")]
+        {
+            let _ = &captured_tun_password; // silence unused-var warning
+            log::info!("[dns] TUN process terminated — resetting all adapters to DHCP");
+            if let Err(e) = crate::vpn::windows::restore_system_dns() {
+                log::warn!("[dns] fallback restore_system_dns failed: {}", e);
+            }
         }
     }
 
