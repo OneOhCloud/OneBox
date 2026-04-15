@@ -1,6 +1,6 @@
 import * as path from '@tauri-apps/api/path';
 import { getSubscriptionConfig } from '../../action/db';
-import { getAllowLan, getClashApiSecret, getCustomRuleSet, getStoreValue, setStoreValue } from '../../single/store';
+import { getAllowLan, getClashApiSecret, getCustomRuleSet, getStoreValue, isBypassRouterEnabled, setStoreValue } from '../../single/store';
 import { STAGE_VERSION_STORE_KEY } from '../../types/definition';
 import { configureMixedInbound, configureTunInbound, updateDHCPSettings2Config, updateVPNServerConfigFromDB } from './helper';
 
@@ -86,7 +86,8 @@ export async function setMixedConfig(identifier: string) {
 
     updateExperimentalConfig(newConfig, dbCacheFilePath);
     const allowLan = await getAllowLan();
-    configureMixedInbound(newConfig, allowLan);
+    const bypassRouter = await isBypassRouterEnabled();
+    configureMixedInbound(newConfig, allowLan, bypassRouter);
 
     await updateDHCPSettings2Config(newConfig);
     await updateVPNServerConfigFromDB('config.json', dbConfigData, newConfig);
@@ -134,11 +135,12 @@ export async function setTunConfig(identifier: string) {
         }
     }
 
-    await configureTunInbound(newConfig);
+    const bypassRouter = await isBypassRouterEnabled();
+    await configureTunInbound(newConfig, bypassRouter);
 
     updateExperimentalConfig(newConfig, dbCacheFilePath);
     const allowLan = await getAllowLan();
-    configureMixedInbound(newConfig, allowLan);
+    configureMixedInbound(newConfig, allowLan, bypassRouter);
 
     await updateDHCPSettings2Config(newConfig);
     await updateVPNServerConfigFromDB('config.json', dbConfigData, newConfig);
@@ -160,7 +162,8 @@ export async function setGlobalMixedConfig(identifier: string) {
 
     updateExperimentalConfig(newConfig, dbCacheFilePath);
     const allowLan = await getAllowLan();
-    configureMixedInbound(newConfig, allowLan);
+    const bypassRouter = await isBypassRouterEnabled();
+    configureMixedInbound(newConfig, allowLan, bypassRouter);
 
     await updateDHCPSettings2Config(newConfig);
     await updateVPNServerConfigFromDB('config.json', dbConfigData, newConfig);
@@ -180,12 +183,13 @@ export default async function setGlobalTunConfig(identifier: string) {
     const appConfigPath = await path.appConfigDir();
     const dbCacheFilePath = await path.join(appConfigPath, 'tun-cache-global-v2.db');
 
-    await configureTunInbound(newConfig);
+    const bypassRouter = await isBypassRouterEnabled();
+    await configureTunInbound(newConfig, bypassRouter);
 
     updateExperimentalConfig(newConfig, dbCacheFilePath);
 
     const allowLan = await getAllowLan();
-    configureMixedInbound(newConfig, allowLan);
+    configureMixedInbound(newConfig, allowLan, bypassRouter);
 
     await updateDHCPSettings2Config(newConfig);
     await updateVPNServerConfigFromDB('config.json', dbConfigData, newConfig);

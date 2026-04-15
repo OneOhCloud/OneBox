@@ -85,7 +85,7 @@ export async function updateVPNServerConfigFromDB(fileName: string, dbConfigData
 
 }
 
-export async function configureTunInbound(newConfig: any): Promise<void> {
+export async function configureTunInbound(newConfig: any, bypassRouter: boolean = false): Promise<void> {
     const tunInbound = newConfig.inbounds.find((ib: Item) => ib.type === "tun" && ib.tag === "tun");
     if (!tunInbound) return;
 
@@ -102,12 +102,22 @@ export async function configureTunInbound(newConfig: any): Promise<void> {
         tunInbound.interface_name = TUN_INTERFACE_NAME;
     }
 
+    // 旁路由模式：其它主机以本机为网关/DNS 转发进来的包，源地址必然落在 RFC1918
+    // 网段内。模板默认把这三段放进 route_exclude_address，会让 TUN 栈在进入 sing-box
+    // 路由引擎之前就把包放掉，hijack-dns 永远不命中。启用旁路由时必须剔除。
+    if (bypassRouter && Array.isArray(tunInbound.route_exclude_address)) {
+        const lanRanges = new Set(["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"]);
+        tunInbound.route_exclude_address = tunInbound.route_exclude_address.filter(
+            (cidr: string) => !lanRanges.has(cidr),
+        );
+    }
+
     console.log("当前 TUN Stack:", tunInbound.stack);
 }
 
-export function configureMixedInbound(newConfig: any, allowLan: boolean): void {
+export function configureMixedInbound(newConfig: any, allowLan: boolean, bypassRouter: boolean = false): void {
     const mixedInbound = newConfig.inbounds.find((ib: Item) => ib.type === "mixed" && ib.tag === "mixed");
-    if (mixedInbound) mixedInbound.listen = allowLan ? "0.0.0.0" : "127.0.0.1";
+    if (mixedInbound) mixedInbound.listen = (allowLan || bypassRouter) ? "0.0.0.0" : "127.0.0.1";
 }
 
 
