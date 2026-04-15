@@ -13,6 +13,7 @@ import useSWR from "swr";
 import { UpdateProvider } from './components/settings/update-context';
 import { deduplicateSubscriptionsByUrl } from "./action/db";
 import { primeAllConfigTemplateCaches, purgeLegacyTemplateCache } from "./hooks/useSwr";
+import { VpnStateContext, useVpnStateRoot } from "./hooks/useVpnState";
 import HomePage from "./page/home";
 import { ActiveScreenType, NavContext } from './single/context';
 import { getStoreValue } from "./single/store";
@@ -96,6 +97,7 @@ function Body({ lang, activeScreen }: BodyProps) {
 
 
 function App() {
+  const vpnState = useVpnStateRoot();
   const [activeScreen, setActiveScreen] = useState<ActiveScreenType>('home');
   const [isSettingsHovered, setIsSettingsHovered] = useState(false);
   const [dockLang, setDockLang] = useState({
@@ -214,6 +216,7 @@ function App() {
 
   return (
     <NavContext.Provider value={{ activeScreen, setActiveScreen, handleLanguageChange, deepLinkUrl, setDeepLinkUrl, deepLinkApplyUrl, setDeepLinkApplyUrl }}>
+      <VpnStateContext.Provider value={vpnState}>
       <UpdateProvider>
         <Toaster position="top-center" toastOptions={{ duration: 2000 }} />
 
@@ -262,6 +265,7 @@ function App() {
 
         </main>
       </UpdateProvider>
+      </VpnStateContext.Provider>
     </NavContext.Provider>
   );
 }

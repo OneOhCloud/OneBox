@@ -41,6 +41,8 @@ pub fn run() {
             core::stop,
             core::start,
             core::is_running,
+            core::get_vpn_state,
+            core::clear_vpn_error,
             core::reload_config,
             command::version,
             command::read_logs,

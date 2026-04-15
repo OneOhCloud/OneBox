@@ -15,6 +15,7 @@ pub fn app_setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>>
     }
 
     app.manage(crate::state::AppData::new());
+    app.manage(crate::vpn::state_machine::VpnStateCell::new());
 
     // Purge must run before copy_database_files so the resource-bundled v2 defaults
     // are not clobbered by a later v1 cleanup pass.

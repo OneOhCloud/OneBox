@@ -6,12 +6,12 @@ use std::io::{Read, Write};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Manager};
-use tauri_plugin_http::reqwest;
 
 #[cfg(not(target_os = "windows"))]
 use crate::privilege;
 use crate::state::{AppData, LogType};
-use crate::vpn::{helper, EVENT_STATUS_CHANGED};
+use crate::vpn::state_machine::{transition, Intent, VpnState, VpnStateCell};
+use crate::vpn::{helper, readiness, EVENT_STATUS_CHANGED};
 use crate::vpn::{PlatformVpnProxy, VpnProxy};
 use tauri::Emitter;
 use tauri_plugin_shell::process::CommandChild;
@@ -295,6 +295,19 @@ async fn restart_tun_send_safe(
     tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
     app.emit(EVENT_STATUS_CHANGED, ()).ok();
 
+    // watchdog 重启后重新进入 Running；spawn 一个 readiness prober
+    // 承担 "从 Starting 升到 Running" 的职责。但 watchdog 走 Send-safe 路径时
+    // 状态机可能停留在 Running(旧会话);将旧的 Running 推进到新的 Starting 再进入
+    // Running,保证前端能看到一次 switching 中间态。
+    let _ = transition(
+        &app,
+        Intent::Start {
+            mode: "tun".into(),
+        },
+    );
+    let epoch_snap = app.state::<VpnStateCell>().snapshot().epoch();
+    readiness::spawn(app.clone(), epoch_snap);
+
     Ok(())
 }
 
@@ -394,47 +407,90 @@ async fn get_password_for_mode(mode: &ProxyMode) -> Result<String, String> {
 pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Result<(), String> {
     log::info!("Starting proxy process in mode: {:?}", mode);
 
+    // 状态机前置:保证从 Idle/Failed 进入。如果当前仍在 Stopping/Running/Starting,
+    // 先强制 MarkIdle 清场;前一条会话的 handle_process_termination 可能尚未触发。
+    {
+        let cur = app.state::<VpnStateCell>().snapshot();
+        if !matches!(cur, VpnState::Idle { .. } | VpnState::Failed { .. }) {
+            let _ = transition(&app, Intent::MarkIdle);
+        }
+    }
+    let mode_label = match mode {
+        ProxyMode::TunProxy => "tun",
+        ProxyMode::SystemProxy => "mixed",
+    };
+    if let Err(e) = transition(
+        &app,
+        Intent::Start {
+            mode: mode_label.into(),
+        },
+    ) {
+        return Err(format!("state transition rejected: {}", e));
+    }
+    let start_epoch = app.state::<VpnStateCell>().snapshot().epoch();
+
     // 检查是否需要权限验证
-    let password = get_password_for_mode(&mode).await?;
+    let password = match get_password_for_mode(&mode).await {
+        Ok(p) => p,
+        Err(e) => {
+            let _ = transition(&app, Intent::Fail { reason: e.clone() });
+            return Err(e);
+        }
+    };
 
     let is_system_proxy = matches!(mode, ProxyMode::SystemProxy);
 
     // 准备命令
-    let (sidecar_command_opt, is_managed) = if is_system_proxy {
-        let cmd = app
-            .shell()
-            .sidecar("sing-box")
-            .map_err(|e| {
-                log::error!("Failed to get sidecar command: {}", e);
-                e.to_string()
-            })?
-            .args(["run", "-c", &path, "--disable-color"]);
-        (Some(cmd), true)
-    } else {
-        let sidecar_path = helper::get_sidecar_path(Path::new("sing-box")).map_err(|e| {
-            log::error!("Failed to get sidecar path: {}", e);
-            e.to_string()
-        })?;
-
-        let cmd = PlatformVpnProxy::create_privileged_command(
-            &app,
-            sidecar_path,
-            path.clone(),
-            password.clone(),
-        );
-        let is_managed = cmd.is_some();
-        (cmd, is_managed)
+    let sidecar_result: Result<(Option<tauri_plugin_shell::process::Command>, bool), String> =
+        if is_system_proxy {
+            app.shell()
+                .sidecar("sing-box")
+                .map(|c| (Some(c.args(["run", "-c", &path, "--disable-color"])), true))
+                .map_err(|e| {
+                    log::error!("Failed to get sidecar command: {}", e);
+                    e.to_string()
+                })
+        } else {
+            match helper::get_sidecar_path(Path::new("sing-box")) {
+                Ok(sidecar_path) => {
+                    let cmd = PlatformVpnProxy::create_privileged_command(
+                        &app,
+                        sidecar_path,
+                        path.clone(),
+                        password.clone(),
+                    );
+                    let is_managed = cmd.is_some();
+                    Ok((cmd, is_managed))
+                }
+                Err(e) => {
+                    log::error!("Failed to get sidecar path: {}", e);
+                    Err(e.to_string())
+                }
+            }
+        };
+    let (sidecar_command_opt, is_managed) = match sidecar_result {
+        Ok(v) => v,
+        Err(e) => {
+            let _ = transition(&app, Intent::Fail { reason: e.clone() });
+            return Err(e);
+        }
     };
 
     // 启动进程
     let child_opt = if let Some(sidecar_command) = sidecar_command_opt {
         log::info!("Spawning sidecar command");
-        let (rx, child) = sidecar_command.spawn().map_err(|e| {
-            log::error!("Failed to spawn sidecar command: {}", e);
-            e.to_string()
-        })?;
-        spawn_process_monitor(app.clone(), rx, Arc::new(mode.clone()));
-        Some(child)
+        match sidecar_command.spawn() {
+            Ok((rx, child)) => {
+                spawn_process_monitor(app.clone(), rx, Arc::new(mode.clone()));
+                Some(child)
+            }
+            Err(e) => {
+                log::error!("Failed to spawn sidecar command: {}", e);
+                let msg = e.to_string();
+                let _ = transition(&app, Intent::Fail { reason: msg.clone() });
+                return Err(msg);
+            }
+        }
     } else {
         None
     };
@@ -499,18 +555,22 @@ pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Resu
     };
 
     if let Err(e) = proxy_result {
-        stop(app).await.ok();
-        log::error!("Failed to set proxy: {}", e);
-        return Err(e.to_string());
+        let msg = e.to_string();
+        log::error!("Failed to set proxy: {}", msg);
+        stop(app.clone()).await.ok();
+        let _ = transition(&app, Intent::Fail { reason: msg.clone() });
+        return Err(msg);
     }
 
     // 等待进程启动
     let wait_time = if is_managed { 1500 } else { 1000 };
     tokio::time::sleep(tokio::time::Duration::from_millis(wait_time)).await;
 
-    log::info!("Proxy process started successfully");
+    log::info!("Proxy process spawn returned; handing off to readiness prober");
 
-    app.emit(EVENT_STATUS_CHANGED, ()).ok();
+    // 让 readiness prober 负责把状态机从 Starting 推进到 Running。
+    // 前端不再靠 EVENT_STATUS_CHANGED 探测,状态由 vpn://state 事件驱动。
+    readiness::spawn(app.clone(), start_epoch);
 
     Ok(())
 }
@@ -627,9 +687,31 @@ async fn handle_process_termination(
         }
     }
 
-    // 通知前端
-    if let Err(e) = app_handle.emit(EVENT_STATUS_CHANGED, payload) {
+    // 通知前端(兼容旧监听方 — tray.tsx 仍在监听此事件触发菜单刷新)
+    if let Err(e) = app_handle.emit(EVENT_STATUS_CHANGED, payload.clone()) {
         log::error!("Failed to emit status-changed event: {}", e);
+    }
+
+    // 状态机收尾:根据当前状态决定是 Stopping→Idle 还是 Running/Starting→Failed
+    let cur = app_handle.state::<VpnStateCell>().snapshot();
+    match cur {
+        VpnState::Stopping { .. } => {
+            let _ = transition(app_handle, Intent::MarkIdle);
+        }
+        VpnState::Running { .. } | VpnState::Starting { .. } => {
+            let code = payload.code.unwrap_or(-1);
+            if code == 0 {
+                let _ = transition(app_handle, Intent::MarkIdle);
+            } else {
+                let _ = transition(
+                    app_handle,
+                    Intent::Fail {
+                        reason: format!("sing-box exited unexpectedly (code={})", code),
+                    },
+                );
+            }
+        }
+        _ => {}
     }
 }
 
@@ -637,6 +719,22 @@ async fn handle_process_termination(
 #[tauri::command]
 pub async fn stop(app: tauri::AppHandle) -> Result<(), String> {
     log::info!("Stopping proxy process");
+
+    // 状态机转换:Running/Starting → Stopping;其它状态 noop
+    {
+        let cur = app.state::<VpnStateCell>().snapshot();
+        match cur {
+            VpnState::Running { .. } => {
+                let _ = transition(&app, Intent::Stop);
+            }
+            VpnState::Starting { .. } => {
+                // 启动中被取消:直接走 MarkIdle,handle_process_termination
+                // 如果后续触发再做一次 no-op MarkIdle 即可。
+                let _ = transition(&app, Intent::MarkIdle);
+            }
+            _ => {}
+        }
+    }
 
     // 设置停止标志
     {
@@ -722,44 +820,43 @@ pub async fn stop(app: tauri::AppHandle) -> Result<(), String> {
 
     log::info!("Proxy process stopped");
 
+    // 继续兼容 tray.tsx 的 status-changed 监听;新前端走 vpn://state。
     app.emit(EVENT_STATUS_CHANGED, ()).ok();
+
+    // 对于 SystemProxy 模式,上面的 sleep 500ms 后 sing-box 通常已退出,
+    // process monitor 的 Terminated 会触发 handle_process_termination,
+    // 并在那里走 Stopping→Idle。对于 TUN/Windows 路径,elevated helper 的 taskkill
+    // 是异步的,等 process monitor 触发时一样走同一条路。
+    // 如果 30 秒后状态仍停在 Stopping(极端情况),我们不强行 MarkIdle —— 让
+    // 监控链路处理,避免双重转换破坏 epoch 顺序。
     Ok(())
 }
 
-/// 判断代理进程是否运行中
+/// 判断代理进程是否运行中 —— Plan B 后改为 state cell 的简单 matches,
+/// 保持函数签名兼容(secret 仍然写入 AppData 供其它命令使用)。
 #[tauri::command]
 pub async fn is_running(app: AppHandle, secret: String) -> bool {
-    use crate::state::AppData;
-    use tokio::net::TcpStream;
-    use tokio::time::{timeout, Duration};
-
     let app_data = app.state::<AppData>();
-    app_data.set_clash_secret(Some(secret.clone()));
+    app_data.set_clash_secret(Some(secret));
+    let state = app.state::<VpnStateCell>().snapshot();
+    matches!(state, VpnState::Running { .. })
+}
 
-    // 先快速检查端口是否开放
-    if timeout(
-        Duration::from_millis(100),
-        TcpStream::connect("127.0.0.1:9191"),
-    )
-    .await
-    .is_err()
-    {
-        return false;
+/// Plan B 新增:返回当前 VPN 生命周期状态快照。冷启动 / WebView 热重载时
+/// 前端用这个命令拉取一次后再订阅 `vpn://state` 事件,避免事件丢失。
+#[tauri::command]
+pub fn get_vpn_state(app: AppHandle) -> VpnState {
+    app.state::<VpnStateCell>().snapshot()
+}
+
+/// Plan B 新增:从 `Failed` 状态显式回到 `Idle`,供前端弹窗关闭等场景调用。
+/// 其它状态下为 no-op。
+#[tauri::command]
+pub fn clear_vpn_error(app: AppHandle) {
+    let cur = app.state::<VpnStateCell>().snapshot();
+    if matches!(cur, VpnState::Failed { .. }) {
+        let _ = transition(&app, Intent::ClearFailure);
     }
-
-    let client = reqwest::Client::builder()
-        .timeout(Duration::from_secs(1))
-        .no_proxy()
-        .build()
-        .unwrap();
-
-    client
-        .get("http://127.0.0.1:9191/version")
-        .header("Authorization", format!("Bearer {}", secret))
-        .send()
-        .await
-        .map(|res| res.status() == 200)
-        .unwrap_or(false)
 }
 
 /// 获取当前运行中的代理配置（模式 + 配置路径），用于睡眠前保存恢复状态

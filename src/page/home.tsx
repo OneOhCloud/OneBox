@@ -57,7 +57,8 @@ export default function HomePage() {
 
 
   /**
-   * 获取状态文本显示
+   * 获取状态文本显示。Plan B 后 operationStatus / isLoading / isRunning
+   * 都从权威状态机派生,按 kind 直接 switch 即可,不再需要回退链。
    */
   const getStatusText = () => {
     switch (operationStatus) {
@@ -66,7 +67,7 @@ export default function HomePage() {
       case 'stopping':
         return t('switching');
       default:
-        return isLoading ? t('switching') : isRunning ? t('connected') : t('not_connected');
+        return isRunning ? t('connected') : t('not_connected');
     }
   };
 

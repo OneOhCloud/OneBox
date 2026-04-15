@@ -4,7 +4,7 @@ import { confirm, message } from '@tauri-apps/plugin-dialog';
 import { useContext, useEffect, useRef, useState } from "react";
 import useSWR, { mutate as swrMutate } from "swr";
 import { insertSubscription } from "../../action/db";
-import { useIsRunning } from "../../hooks/useVersion";
+import { clearVpnError, useVpnState } from "../../hooks/useVpnState";
 import { NavContext } from "../../single/context";
 import { getStoreValue, setStoreValue } from "../../single/store";
 import { GET_SUBSCRIPTIONS_LIST_SWR_KEY, RULE_MODE_STORE_KEY, SSI_STORE_KEY } from "../../types/definition";
@@ -86,7 +86,7 @@ export function useGoogleNetworkCheck() {
 
 // 类型定义
 export type ProxyMode = 'rules' | 'global';
-type OperationStatus = 'starting' | 'stopping' | 'idle';
+export type OperationStatus = 'starting' | 'stopping' | 'idle';
 
 /**
  * 自定义Hook: 管理代理模式状态
@@ -124,113 +124,87 @@ export const useProxyMode = () => {
 
 /**
  * 自定义Hook: 管理VPN服务操作状态
+ *
+ * Plan B 后:权威状态来自 Rust 的 `vpn-state` 事件(经由 `VpnStateContext`),
+ * 本 hook 只剩下 UI 操作入口与派生的 isLoading/isRunning/operationStatus,
+ * 供现有消费者保持兼容。不再维护独立的 isOperating / setTimeout 兜底。
  */
 export const useVPNOperations = () => {
-    const [isOperating, setIsOperating] = useState(false);
-    const [operationStatus, setOperationStatus] = useState<OperationStatus>('idle');
+    const vpnState = useVpnState();
     const [privilegedDialog, setPrivilegedDialog] = useState(false);
-
-    const { isRunning, isLoading: serviceLoading, mutate } = useIsRunning();
     const { setActiveScreen, deepLinkApplyUrl, setDeepLinkApplyUrl } = useContext(NavContext);
 
-    // 合并所有loading状态
-    const isLoading = isOperating || serviceLoading;
+    // 从权威状态派生出兼容变量
+    const isRunning = vpnState.kind === 'running';
+    const isLoading = vpnState.kind === 'starting' || vpnState.kind === 'stopping';
+    const operationStatus: OperationStatus =
+        vpnState.kind === 'starting'
+            ? 'starting'
+            : vpnState.kind === 'stopping'
+                ? 'stopping'
+                : 'idle';
 
-    // 启动/停止的最终落点都交给 isRunning 的真实翻转来决定，
-    // 避免 start()/stop() 早于内核状态 resolve 导致的 UI 闪烁
-    // （TUN 启动延迟、Windows UAC 提权脚本异步执行等场景）。
+    // 失败状态:弹窗提示并回到 Idle,避免前端永久卡在 failed。
     useEffect(() => {
-        if (isRunning && operationStatus === 'starting') {
-            setOperationStatus('idle');
-            setIsOperating(false);
-        } else if (!isRunning && operationStatus === 'stopping') {
-            setOperationStatus('idle');
-            setIsOperating(false);
-        }
-    }, [isRunning, operationStatus]);
+        if (vpnState.kind !== 'failed') return;
+        const reason = vpnState.reason;
+        (async () => {
+            await message(`${t('connect_failed')}: ${reason}`, { title: t('error'), kind: 'error' });
+            await clearVpnError();
+        })();
+    }, [vpnState.kind === 'failed' ? vpnState.epoch : null]);
 
-    // 兜底：starting/stopping 最多持续 15s，避免底层静默失败时永久卡住。
-    useEffect(() => {
-        if (operationStatus === 'idle') return;
-        const timer = setTimeout(() => {
-            setOperationStatus('idle');
-            setIsOperating(false);
-            mutate();
-        }, 15000);
-        return () => clearTimeout(timer);
-    }, [operationStatus]);
+    // mutate 语义在新架构下等于 "主动刷新 vpn 状态"。权威状态由事件驱动,
+    // 这里返回 no-op 以维持旧调用方签名不变。
+    const mutate = () => { };
 
     const stopService = async () => {
-        setOperationStatus('stopping');
         try {
             await vpnServiceManager.stop();
-            mutate();
-            // 不在这里置 idle：Windows UAC 提权脚本异步执行，stop() resolve
-            // 早于 sing-box 真正退出。交给监听 isRunning 的 effect 处理。
         } catch (error) {
-            // UAC 取消或停止失败：立刻恢复，避免永久卡在 stopping。
             console.error('停止服务失败:', error);
-            setOperationStatus('idle');
-            mutate();
         }
     };
 
-    // Shared syncConfig → start flow. onSyncError differs: startService stops the VPN on
-    // config failure; the deep-link path already stopped before calling this.
     const performSyncAndStart = (onSyncError: (error: any) => Promise<void>) => {
         vpnServiceManager.syncConfig({
             onSuccess: async () => {
                 try {
                     await vpnServiceManager.start();
-                    mutate();
-                    // 不在这里把 operationStatus 置 idle：start() resolve 早于 isRunning
-                    // 翻转，交给监听 isRunning 的 effect 处理。
                 } catch (error: any) {
                     if (error?.message?.includes('REQUIRE_PRIVILEGE')) {
                         setPrivilegedDialog(true);
                     } else {
                         console.error('启动服务失败:', error);
-                        await message(t('connect_failed'), { title: t('error'), kind: 'error' });
                     }
-                    setIsOperating(false);
-                    setOperationStatus('idle');
                 }
             },
             onError: async (error) => {
                 await onSyncError(error);
-                setIsOperating(false);
-                setOperationStatus('idle');
             },
             onRequirePrivileged: () => {
                 setPrivilegedDialog(true);
-                setIsOperating(false);
-                setOperationStatus('idle');
             },
         });
     };
 
-    // apply=1 deep link: import subscription, switch to it, then start — all under button loading state
+    // apply=1 deep link: import subscription, switch to it, then start.
     useEffect(() => {
         if (!deepLinkApplyUrl) return;
         const url = deepLinkApplyUrl;
         setDeepLinkApplyUrl('');
-        setIsOperating(true);
-        setOperationStatus('starting');
 
         (async () => {
             try {
                 const id = await insertSubscription(url);
                 if (!id) throw new Error(t('add_subscription_failed'));
                 await setStoreValue(SSI_STORE_KEY, id);
-                // refresh subscription list and stop current VPN in parallel
                 await Promise.all([
                     swrMutate(GET_SUBSCRIPTIONS_LIST_SWR_KEY),
-                    vpnServiceManager.stop().catch(() => {}),
+                    vpnServiceManager.stop().catch(() => { }),
                 ]);
             } catch {
                 await message(t('add_subscription_failed'), { title: t('error'), kind: 'error' });
-                setIsOperating(false);
-                setOperationStatus('idle');
                 return;
             }
 
@@ -245,9 +219,6 @@ export const useVPNOperations = () => {
             setActiveScreen('configuration');
             return message(t('please_add_subscription'), { title: t('tips'), kind: 'error' });
         }
-
-        setIsOperating(true);
-        setOperationStatus('starting');
         performSyncAndStart(async (error) => {
             console.error('同步配置失败:', error);
             await stopService();
@@ -259,19 +230,12 @@ export const useVPNOperations = () => {
             setActiveScreen('configuration');
             return message(t('please_add_subscription'), { title: t('tips'), kind: 'error' });
         }
-
-        setIsOperating(true);
-        setOperationStatus('starting');
-
         try {
             vpnServiceManager.syncConfig({});
             vpnServiceManager.reload(1000);
         } catch (error) {
             console.error('重启服务失败:', error);
             await message(t('reconnect_failed'), { title: t('error'), kind: 'error' });
-        } finally {
-            setIsOperating(false);
-            setOperationStatus('idle');
         }
     };
 
@@ -285,20 +249,16 @@ export const useVPNOperations = () => {
             if (isRunning) {
                 await stopService();
             } else {
-                // starting 状态由 startService 内部设置；清理交给
-                // 监听 isRunning 的 effect（成功）或 performSyncAndStart 的 catch（失败）。
                 await startService(isEmpty);
             }
         } catch (error) {
             console.error('连接失败:', error);
             await message(`${t('connect_failed')}: ${error}`, { title: t('error'), kind: 'error' });
-            setIsOperating(false);
-            setOperationStatus('idle');
         }
     };
 
     return {
-        isOperating,
+        isOperating: isLoading,
         operationStatus,
         privilegedDialog,
         isLoading,
@@ -307,7 +267,7 @@ export const useVPNOperations = () => {
         startService,
         restartService,
         toggleService,
-        mutate
+        mutate,
     };
 };
 

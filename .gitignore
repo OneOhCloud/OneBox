@@ -38,3 +38,8 @@ src/config/templates/generated.ts
 src-tauri/*.db
 src-tauri/examples
 target
+
+# tsc -b incremental build cache + accidental emit from `vite.config.ts`
+*.tsbuildinfo
+vite.config.js
+vite.config.d.ts
