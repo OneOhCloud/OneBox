@@ -87,6 +87,16 @@ Windows batches both steps into a single elevated PS script, so ordering there i
 
 ---
 
+## Windows Platform Implementation Philosophy
+
+**1. Native Win32 over PowerShell.**
+PowerShell pulls in a runtime, breaks under restricted execution policies, leaves transcript files behind, and forces escape-hell for paths with spaces. Direct API calls are deterministic and depend only on the OS itself.
+
+**2. Demo-then-integrate for unsafe Win32 work.**
+Build a small CLI binary that exposes each Win32 entry point as a subcommand, with unit tests for the pure helpers. Validate signatures, permissions, and real-machine behavior in isolation before touching production code paths.
+
+---
+
 ## Config Template Loading Flow
 
 Core principle: **there is one source of truth — the `conf-template` repo — and every template OneBox ever uses traces back to it**. Both the built-in fallback (baked at build time) and the live-fetched runtime cache (refreshed by SWR) are snapshots of the same upstream files. They can never disagree in shape, only in freshness.
