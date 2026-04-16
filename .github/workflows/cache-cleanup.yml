@@ -1,0 +1,70 @@
+name: "Cache Cleanup"
+
+on:
+  schedule:
+    - cron: '0 2 * * 0'
+  workflow_dispatch:
+    inputs:
+      keep:
+        description: "Number of most recent caches to keep"
+        type: string
+        default: "5"
+      max_bytes:
+        description: "Delete any cache larger than this many bytes (default 900MB)"
+        type: string
+        default: "943718400"
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Delete old or oversized caches
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          KEEP: ${{ inputs.keep || '10' }}
+          MAX_BYTES: ${{ inputs.max_bytes || '943718400' }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          echo "Listing caches in $REPO"
+          echo "  keep (most recent): $KEEP"
+          echo "  max bytes: $MAX_BYTES ($(numfmt --to=iec --suffix=B "$MAX_BYTES" 2>/dev/null || echo "$MAX_BYTES B"))"
+
+          gh cache list --repo "$REPO" --limit 100 \
+            --sort created_at --order desc \
+            --json id,key,sizeInBytes,createdAt > caches.json
+
+          TOTAL=$(jq 'length' caches.json)
+          echo "Total caches: $TOTAL"
+
+          # Select caches to delete if:
+          #   - index (0-based, by recency) >= KEEP, OR
+          #   - sizeInBytes > MAX_BYTES
+          jq -r \
+            --argjson keep "$KEEP" \
+            --argjson max_bytes "$MAX_BYTES" \
+            'to_entries
+             | map(select(.key >= $keep or .value.sizeInBytes > $max_bytes))
+             | .[] | .value
+             | "\(.id)\t\(.sizeInBytes)\t\(.key)"' caches.json \
+          | while IFS=$'\t' read -r id size key; do
+              human=$(numfmt --to=iec --suffix=B "$size" 2>/dev/null || echo "$size B")
+              reason=""
+              if [ "$size" -gt "$MAX_BYTES" ]; then
+                reason="oversized ($human > $(numfmt --to=iec --suffix=B "$MAX_BYTES" 2>/dev/null || echo "$MAX_BYTES B"))"
+              else
+                reason="stale (beyond keep=$KEEP)"
+              fi
+              echo "Deleting cache id=$id size=$human key=$key  # $reason"
+              gh cache delete "$id" --repo "$REPO" || true
+            done
+
+          echo "Done."
