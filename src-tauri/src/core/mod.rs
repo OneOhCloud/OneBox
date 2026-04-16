@@ -1,6 +1,6 @@
 mod log;
 pub(crate) mod monitor;
-#[cfg(any(target_os = "macos", target_os = "windows"))]
+#[cfg(target_os = "windows")]
 pub(crate) mod watchdog;
 
 use lazy_static::lazy_static;
@@ -34,10 +34,6 @@ pub(crate) struct ProcessManager {
     pub(crate) is_stopping: bool,
     #[cfg(target_os = "linux")]
     pub(crate) dns_override: Option<(String, String)>,
-    #[cfg(target_os = "macos")]
-    pub(crate) bypass_router_restarting: bool,
-    #[cfg(target_os = "macos")]
-    pub(crate) bypass_router_watchdog_abort: Option<tokio::task::AbortHandle>,
 }
 
 impl ProcessManager {
@@ -46,29 +42,19 @@ impl ProcessManager {
         PROCESS_MANAGER.lock().unwrap_or_else(|e| e.into_inner())
     }
 
-    /// Reset all fields to their idle defaults. Platform-specific fields
-    /// are handled here so callers don't need per-platform cfg blocks.
-    /// Returns the Linux DNS override info (if any) for the caller to act on.
-    pub(crate) fn reset(&mut self) -> Option<(String, String)> {
+    /// Reset to idle defaults. Platform engines are expected to have
+    /// already torn down their own private state (macOS bypass-router
+    /// watchdog, Windows service watchdog, …) via `stop` or
+    /// `on_process_terminated` before this runs.
+    pub(crate) fn reset(&mut self) {
         self.child = None;
         self.mode = None;
         self.config_path = None;
         self.is_stopping = false;
-
         #[cfg(target_os = "linux")]
-        let dns_info = self.dns_override.take();
-        #[cfg(not(target_os = "linux"))]
-        let dns_info = None;
-
-        #[cfg(target_os = "macos")]
         {
-            if let Some(abort) = self.bypass_router_watchdog_abort.take() {
-                abort.abort();
-            }
-            self.bypass_router_restarting = false;
+            self.dns_override = None;
         }
-
-        dns_info
     }
 }
 
@@ -81,10 +67,6 @@ lazy_static! {
             is_stopping: false,
             #[cfg(target_os = "linux")]
             dns_override: None,
-            #[cfg(target_os = "macos")]
-            bypass_router_restarting: false,
-            #[cfg(target_os = "macos")]
-            bypass_router_watchdog_abort: None,
         }));
 }
 

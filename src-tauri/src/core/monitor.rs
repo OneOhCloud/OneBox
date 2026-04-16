@@ -88,14 +88,11 @@ pub(crate) async fn handle_process_termination(
     payload: tauri_plugin_shell::process::TerminatedPayload,
 ) {
     #[cfg(target_os = "macos")]
-    {
-        let is_watchdog_restart = ProcessManager::acquire().bypass_router_restarting;
-        if is_watchdog_restart {
-            log::info!(
-                "[handle_process_termination] bypass_router_watchdog restart in progress, skipping cleanup"
-            );
-            return;
-        }
+    if crate::engine::macos::watchdog::is_restart_in_progress() {
+        log::info!(
+            "[handle_process_termination] bypass_router_watchdog restart in progress, skipping cleanup"
+        );
+        return;
     }
 
     // Phase 1: confirm the exiting process belongs to the mode we think is
@@ -136,7 +133,7 @@ pub(crate) async fn handle_process_termination(
     // Phase 2: now that platform teardown has run and consumed whatever state
     // it needed, reset ProcessManager. The old `reset()` return value is
     // ignored — dns_override consumption is a platform concern.
-    let _ = ProcessManager::acquire().reset();
+    ProcessManager::acquire().reset();
 
     if let Err(e) = app_handle.emit(EVENT_STATUS_CHANGED, payload.clone()) {
         log::error!("Failed to emit status-changed event: {}", e);

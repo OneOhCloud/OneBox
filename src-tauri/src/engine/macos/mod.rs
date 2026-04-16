@@ -1,4 +1,5 @@
 pub mod helper;
+pub(crate) mod watchdog;
 
 use self::helper as macos_helper;
 use crate::engine::helper::extract_tun_gateway_from_config;
@@ -334,29 +335,16 @@ impl EngineManager for MacOSEngine {
 
                 // Optional bypass-router watchdog: restart sing-box every 4h
                 // so macOS's auto_detect_interface can pick up routing table
-                // changes that accumulate without a clean refresh.
+                // changes that accumulate without a clean refresh. All
+                // state (abort handle, restart-in-progress flag) lives
+                // inside watchdog.rs, not in ProcessManager.
                 let bypass_router_enabled = app
                     .get_store("settings.json")
                     .and_then(|store| store.get("enable_bypass_router_key"))
                     .and_then(|v| v.as_bool())
                     .unwrap_or(false);
                 if bypass_router_enabled {
-                    {
-                        let mut mgr = crate::core::ProcessManager::acquire();
-                        if let Some(abort) = mgr.bypass_router_watchdog_abort.take() {
-                            abort.abort();
-                        }
-                    }
-                    let task = tokio::spawn(crate::core::watchdog::bypass_router_watchdog(
-                        app.clone(),
-                        Arc::clone(&config_path_arc),
-                    ));
-                    let mut mgr = crate::core::ProcessManager::acquire();
-                    mgr.bypass_router_watchdog_abort = Some(task.abort_handle());
-                    log::info!(
-                        "[bypass_router_watchdog] Started, next restart in {}h",
-                        crate::core::watchdog::BYPASS_ROUTER_RESTART_INTERVAL.as_secs() / 3600
-                    );
+                    watchdog::spawn(app.clone(), Arc::clone(&config_path_arc));
                 }
 
                 // TUN mode doesn't use the system HTTP proxy — clear any stale
@@ -422,6 +410,10 @@ impl EngineManager for MacOSEngine {
     }
 
     fn on_process_terminated(_app: &AppHandle, _was_user_stop: bool) {
+        // Cancel the bypass-router watchdog eagerly — its own in-loop mode
+        // check would eventually notice TUN is gone, but only after the
+        // next 4h sleep, which is too slow.
+        watchdog::cancel();
         log::info!("[dns] TUN process terminated — resetting all services to DHCP");
         if let Err(e) = restore_system_dns() {
             log::warn!("[dns] fallback restore_system_dns failed: {}", e);
