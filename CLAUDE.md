@@ -32,6 +32,29 @@ Do **not** split this back into per-channel workflow files. The earlier multi-fi
 
 The canonical way to cut a release on any channel is `make bump` on that channel's branch, then push. Nothing else.
 
+## GitHub CLI access: use `gh` freely for history and CI diagnostics
+
+I have **full write permissions on `OneOhCloud/OneBox`** via the `gh`
+CLI already configured on this host. Before guessing at CI behaviour,
+cache state, past failures, or commit history, query it directly. The
+answers are one command away and dramatically better than speculation.
+
+Routinely useful invocations:
+
+```bash
+gh run list --limit 10 --workflow=release.yml
+gh run view <run-id> --json jobs -q '.jobs[] | {name, conclusion, status}'
+gh api repos/OneOhCloud/OneBox/actions/jobs/<job-id>/logs | grep -i cache
+gh cache list --sort created_at --order desc --json id,key,ref,sizeInBytes
+gh workflow run release.yml -r feature/dev -f channel=dev
+gh pr list --state=all --limit 20
+gh issue view <n> --json title,body,comments
+```
+
+No GitHub MCP server is installed on this host (only Gmail / Drive /
+Calendar MCPs are registered). `gh` covers every CI and repo-diagnostic
+need `gh api` can reach, and is the preferred interface for this repo.
+
 ## Verifying Linux from a macOS host: never commit just to transport
 
 When you need to check whether a local change compiles / behaves correctly
