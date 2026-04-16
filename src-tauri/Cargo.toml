@@ -64,6 +64,10 @@ sha2 = "0.10"
 onebox_lifecycle = { git = "https://github.com/OneOhCloud/onebox-lifecycle", tag = "v0.1.1" }
 #onebox_lifecycle = { git = "https://github.com/OneOhCloud/onebox-lifecycle", branch = "dev" }
 
+[target.'cfg(target_os = "linux")'.dependencies]
+gtk = "0.18"
+gdk = "0.18"
+
 [target.'cfg(target_os = "windows")'.dependencies]
 winapi = { version = "0.3", features = ["winbase"] }
 windows = { version = "0.62.2", features = ["Win32_Foundation", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging", "Win32_System_Registry", "Win32_System_Services", "Win32_System_Threading"] }

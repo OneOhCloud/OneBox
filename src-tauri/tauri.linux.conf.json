@@ -23,6 +23,14 @@
       "deb",
       "rpm"
     ],
+    "linux": {
+      "deb": {
+        "desktopTemplate": "resources/main.desktop"
+      },
+      "rpm": {
+        "desktopTemplate": "resources/main.desktop"
+      }
+    },
     "externalBin": [
       "binaries/sing-box"
     ]

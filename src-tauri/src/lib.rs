@@ -27,6 +27,26 @@ pub fn run() {
         }
     }
 
+    // On Linux/GNOME Wayland, tao creates a GTK HeaderBar for CSD which is
+    // noticeably thicker than the X11 WM-provided titlebar. Inject custom
+    // CSS before window creation to slim it down.
+    #[cfg(target_os = "linux")]
+    {
+        use gtk::prelude::CssProviderExt;
+        gtk::init().ok();
+        let css = gtk::CssProvider::new();
+        let _ = css.load_from_data(
+            b"headerbar { min-height: 0; padding-top: 0; padding-bottom: 0; }
+              headerbar .title { font-size: 0.9em; }
+              headerbar button { min-height: 0; min-width: 0; padding: 2px 4px; margin: 0; }",
+        );
+        gtk::StyleContext::add_provider_for_screen(
+            &gdk::Screen::default().expect("no default screen"),
+            &css,
+            gtk::STYLE_PROVIDER_PRIORITY_APPLICATION,
+        );
+    }
+
     let migrations = database::get_migrations();
     let builder = tauri::Builder::default();
 

@@ -38,7 +38,12 @@ pub fn app_setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>>
             w.set_focus().unwrap();
         }
     }
-    #[cfg(any(target_os = "linux", all(debug_assertions, windows)))]
+    // On Linux release builds the deb/rpm .desktop file already declares
+    // MimeType with `Exec=… %u`, so register_all() would create a duplicate
+    // handler desktop file causing the OS to prompt the user to choose.
+    // Only call register_all() in debug builds (no deb install) and on
+    // Windows debug builds.
+    #[cfg(all(debug_assertions, any(target_os = "linux", windows)))]
     {
         app.deep_link().register_all()?;
     }

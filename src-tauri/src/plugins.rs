@@ -8,10 +8,10 @@ pub fn register_plugins(builder: Builder<Wry>, migrations: Vec<Migration>) -> Bu
     builder
         .plugin(tauri_plugin_single_instance::init(
             |app: &AppHandle, args, _cwd| {
-                // On Windows, deep links arrive as CLI args to a new process.
-                // single_instance kills that process and gives us its args here.
-                // We must forward the URL manually so on_open_url fires.
-                #[cfg(windows)]
+                // On Windows and Linux, deep links arrive as CLI args to a new
+                // process. single_instance kills that process and gives us its
+                // args here. We must forward the URL manually so on_open_url fires.
+                #[cfg(any(windows, target_os = "linux"))]
                 {
                     use tauri::Emitter;
                     if let Some(url_str) = args.iter().skip(1).find(|a| a.contains("://")) {

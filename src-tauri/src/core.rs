@@ -957,7 +957,7 @@ pub async fn stop(app: tauri::AppHandle) -> Result<(), String> {
                 // 因为 `stop_tun_process` 是同步阻塞到 service 进入 Stopped
                 // 才返回的,此时可以直接显式推进状态机;watchdog 仍然保留给
                 // 用户未发起 stop 的异常退出路径使用。
-                #[cfg(target_os = "windows")]
+                #[cfg(any(target_os = "windows", target_os = "linux"))]
                 {
                     let _ = transition(&app, Intent::MarkIdle);
                 }

@@ -29,6 +29,11 @@ pub fn on_window_event(window: &Window, event: &WindowEvent) {
                 api.prevent_close();
                 log::info!("窗口关闭请求被重定向为最小化到托盘");
                 if let Some(w) = window.app_handle().get_webview_window("main") {
+                    // On Linux Wayland, hide()+show() permanently breaks tao's
+                    // CSD HeaderBar button handlers. minimize() preserves them.
+                    #[cfg(target_os = "linux")]
+                    w.minimize().unwrap();
+                    #[cfg(not(target_os = "linux"))]
                     w.hide().unwrap();
                 }
             }
