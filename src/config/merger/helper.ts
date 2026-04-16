@@ -112,6 +112,22 @@ export async function configureTunInbound(newConfig: any, bypassRouter: boolean 
         );
     }
 
+    // 旁路由模式：LAN 设备把 DNS 指向本机时，sing-box 需要在 UDP:53 上监听
+    // 才能接收并 hijack 这些 DNS 请求。模板默认不含这个 inbound（普通 TUN
+    // 模式下 DNS 通过 TUN 网关的 hijack-dns 路由规则拦截，不需要单独监听）。
+    if (bypassRouter) {
+        const hasDnsIn = newConfig.inbounds.some((ib: Item) => ib.tag === "dns-in");
+        if (!hasDnsIn) {
+            newConfig.inbounds.push({
+                tag: "dns-in",
+                type: "direct",
+                listen: "0.0.0.0",
+                listen_port: 53,
+            });
+            console.log("旁路由模式：注入 dns-in inbound (0.0.0.0:53)");
+        }
+    }
+
     console.log("当前 TUN Stack:", tunInbound.stack);
 }
 
