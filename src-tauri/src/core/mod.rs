@@ -1,32 +1,22 @@
 mod log;
-mod monitor;
+pub(crate) mod monitor;
 #[cfg(any(target_os = "macos", target_os = "windows"))]
-mod watchdog;
+pub(crate) mod watchdog;
 
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
-#[cfg(not(target_os = "macos"))]
-use std::path::Path;
 use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Manager};
 
 use crate::state::AppData;
 use crate::engine::state_machine::{transition, Intent, EngineState, EngineStateCell};
-#[cfg(not(target_os = "macos"))]
-use crate::engine::helper;
 use crate::engine::{readiness, EVENT_STATUS_CHANGED};
 use crate::engine::{PlatformEngine, EngineManager};
 use tauri::Emitter;
 use tauri_plugin_shell::process::CommandChild;
-use tauri_plugin_shell::ShellExt;
 
-use self::monitor::spawn_process_monitor;
-#[cfg(target_os = "macos")]
-use self::watchdog::bypass_router_watchdog;
 #[cfg(target_os = "windows")]
 use self::watchdog::spawn_windows_service_watchdog;
-#[cfg(target_os = "macos")]
-use self::monitor::handle_process_termination;
 
 // ── ProxyMode & ProcessManager ────────────────────────────────────────
 
@@ -123,181 +113,26 @@ pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Resu
     }
     let start_epoch = app.state::<EngineStateCell>().snapshot().epoch();
 
-    let is_system_proxy = matches!(mode, ProxyMode::SystemProxy);
-
-    let sidecar_result: Result<(Option<tauri_plugin_shell::process::Command>, bool), String> =
-        if is_system_proxy {
-            app.shell()
-                .sidecar("sing-box")
-                .map(|c| (Some(c.args(["run", "-c", &path, "--disable-color"])), true))
-                .map_err(|e| {
-                    ::log::error!("Failed to get sidecar command: {}", e);
-                    e.to_string()
-                })
-        } else {
-            #[cfg(target_os = "macos")]
-            {
-                tokio::task::spawn_blocking(crate::engine::macos::ensure_helper_installed)
-                    .await
-                    .map_err(|e| format!("helper install join error: {}", e))?
-                    .map_err(|e| format!("helper install failed: {}", e))?;
-
-                let app_c = app.clone();
-                let path_c = path.clone();
-                let _pid = tokio::task::spawn_blocking(move || {
-                    crate::engine::macos::start_tun_via_helper(&app_c, &path_c)
-                })
-                .await
-                .map_err(|e| format!("start_tun join error: {}", e))?
-                .map_err(|e| format!("start_tun_via_helper failed: {}", e))?;
-
-                Ok((None, false))
-            }
-            #[cfg(not(target_os = "macos"))]
-            {
-                #[cfg(target_os = "linux")]
-                let dns_override_info: Option<(String, String)> = {
-                    match crate::engine::linux::prepare_dns_override(&path) {
-                        Ok(info) => {
-                            let mut mgr =
-                                ProcessManager::acquire();
-                            mgr.dns_override = Some(info.clone());
-                            Some(info)
-                        }
-                        Err(e) => {
-                            ::log::warn!("[dns] prepare_dns_override failed: {}", e);
-                            None
-                        }
-                    }
-                };
-
-                match helper::get_sidecar_path(Path::new("sing-box")) {
-                    Ok(sidecar_path) => {
-                        #[cfg(target_os = "linux")]
-                        let cmd = crate::engine::linux::create_privileged_command(
-                            &app,
-                            sidecar_path,
-                            path.clone(),
-                            dns_override_info.as_ref(),
-                        );
-                        #[cfg(not(target_os = "linux"))]
-                        let cmd = PlatformEngine::create_privileged_command(
-                            &app,
-                            sidecar_path,
-                            path.clone(),
-                        );
-                        let is_managed = cmd.is_some();
-                        Ok((cmd, is_managed))
-                    }
-                    Err(e) => {
-                        ::log::error!("Failed to get sidecar path: {}", e);
-                        Err(e.to_string())
-                    }
-                }
-            }
-        };
-    let (sidecar_command_opt, is_managed) = match sidecar_result {
-        Ok(v) => v,
-        Err(e) => {
-            let _ = transition(&app, Intent::Fail { reason: e.clone() });
-            return Err(e);
-        }
-    };
-
-    let child_opt = if let Some(sidecar_command) = sidecar_command_opt {
-        ::log::info!("Spawning sidecar command");
-        match sidecar_command.spawn() {
-            Ok((rx, child)) => {
-                spawn_process_monitor(app.clone(), rx, Arc::new(mode.clone()));
-                Some(child)
-            }
-            Err(e) => {
-                ::log::error!("Failed to spawn sidecar command: {}", e);
-                let msg = e.to_string();
-                let _ = transition(&app, Intent::Fail { reason: msg.clone() });
-                return Err(msg);
-            }
-        }
-    } else {
-        None
-    };
-
-    #[cfg(target_os = "macos")]
-    if !is_system_proxy {
-        let mut exit_rx = crate::engine::macos::helper::subscribe_sing_box_exits();
-        let exit_app = app.clone();
-        let exit_mode = Arc::new(mode.clone());
-        tokio::spawn(async move {
-            if let Some(exit) = exit_rx.recv().await {
-                ::log::info!(
-                    "[helper-bridge] sing-box exit event pid={} code={}",
-                    exit.pid,
-                    exit.exit_code
-                );
-                let payload = tauri_plugin_shell::process::TerminatedPayload {
-                    code: Some(exit.exit_code),
-                    signal: None,
-                };
-                handle_process_termination(&exit_app, &exit_mode, payload).await;
-            }
-        });
+    // All privilege escalation, DNS overrides, sing-box spawn, per-mode
+    // watchdogs, and ProcessManager seeding live inside the platform engine.
+    // core just drives state-machine transitions and hands off to the
+    // readiness prober once the spawn call returns.
+    if let Err(e) = PlatformEngine::start(&app, mode.clone(), path).await {
+        ::log::error!("Failed to start engine: {}", e);
+        // Start can fail partway through (e.g. proxy set fails after the
+        // child has already spawned). Ask the platform to tear down whatever
+        // it did set up so we don't leak a half-started engine.
+        let _ = PlatformEngine::stop(&app).await;
+        ProcessManager::acquire().reset();
+        let _ = transition(&app, Intent::Fail { reason: e.clone() });
+        return Err(e);
     }
 
-    let config_path_arc = Arc::new(path);
-    {
-        let mut manager = ProcessManager::acquire();
-        manager.mode = Some(Arc::new(mode.clone()));
-        manager.config_path = Some(Arc::clone(&config_path_arc));
-        manager.child = child_opt;
-        manager.is_stopping = false;
-    }
-
-    #[cfg(target_os = "macos")]
-    if matches!(mode, ProxyMode::TunProxy) {
-        use tauri_plugin_store::StoreExt;
-        let bypass_router_enabled = app
-            .get_store("settings.json")
-            .and_then(|store| store.get("enable_bypass_router_key"))
-            .and_then(|v| v.as_bool())
-            .unwrap_or(false);
-
-        if bypass_router_enabled {
-            let pa = Arc::clone(&config_path_arc);
-            {
-                let mut manager = ProcessManager::acquire();
-                if let Some(abort) = manager.bypass_router_watchdog_abort.take() {
-                    abort.abort();
-                }
-            }
-            let task = tokio::spawn(bypass_router_watchdog(app.clone(), pa));
-            {
-                let mut manager = ProcessManager::acquire();
-                manager.bypass_router_watchdog_abort = Some(task.abort_handle());
-                ::log::info!(
-                    "[bypass_router_watchdog] Started, next restart in {}h",
-                    watchdog::BYPASS_ROUTER_RESTART_INTERVAL.as_secs() / 3600
-                );
-            }
-        }
-    }
-
-    let proxy_result = if is_system_proxy {
-        PlatformEngine::set_proxy(&app).await
-    } else {
-        PlatformEngine::unset_proxy(&app).await
-    };
-
-    if let Err(e) = proxy_result {
-        let msg = e.to_string();
-        ::log::error!("Failed to set proxy: {}", msg);
-        stop(app.clone()).await.ok();
-        let _ = transition(&app, Intent::Fail { reason: msg.clone() });
-        return Err(msg);
-    }
-
-    let wait_time = if is_managed { 1500 } else { 1000 };
+    // Give the proxy a beat to settle before readiness probing; TUN takes
+    // slightly longer because the helper owns the process and round-trips
+    // through XPC/SCM/pkexec.
+    let wait_time = if matches!(mode, ProxyMode::TunProxy) { 1500 } else { 1000 };
     tokio::time::sleep(tokio::time::Duration::from_millis(wait_time)).await;
-
     ::log::info!("Proxy process spawn returned; handing off to readiness prober");
     readiness::spawn(app.clone(), start_epoch);
 
@@ -305,7 +140,6 @@ pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Resu
     if matches!(mode, ProxyMode::TunProxy) {
         spawn_windows_service_watchdog(app.clone(), Arc::new(mode.clone()), start_epoch);
     }
-
     Ok(())
 }
 
@@ -326,65 +160,20 @@ pub async fn stop(app: tauri::AppHandle) -> Result<(), String> {
         }
     }
 
-    let (mode, child) = {
-        let mut manager = ProcessManager::acquire();
-        manager.is_stopping = true;
-        (manager.mode.clone(), manager.child.take())
-    };
+    // Platform engine signals sing-box to stop, clears the system proxy if
+    // applicable, and transitions whatever per-mode state it owns. Actual
+    // process exit is observed asynchronously by the process monitor which
+    // then calls PlatformEngine::on_process_terminated for DNS restore.
+    if let Err(e) = PlatformEngine::stop(&app).await {
+        ::log::error!("Engine stop returned error: {}", e);
+    }
 
-    if let Some(mode) = mode {
-        match mode.as_ref() {
-            ProxyMode::SystemProxy => {
-                PlatformEngine::unset_proxy(&app).await.ok();
-
-                #[cfg(unix)]
-                if let Some(child) = child {
-                    use libc::{kill, SIGTERM};
-                    let pid = child.pid();
-                    ::log::info!("[stop] Sending SIGTERM to process with PID: {}", pid);
-                    if unsafe { kill(pid as i32, SIGTERM) } != 0 {
-                        ::log::error!(
-                            "[stop] Failed to send SIGTERM to PID {}: {}",
-                            pid,
-                            std::io::Error::last_os_error()
-                        );
-                    } else {
-                        ::log::info!("[stop] SIGTERM sent successfully to PID: {}", pid);
-                    }
-                }
-
-                #[cfg(not(unix))]
-                if let Some(child) = child {
-                    child.kill().map_err(|e| e.to_string())?;
-                }
-
-                tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
-            }
-            ProxyMode::TunProxy => {
-                #[cfg(target_os = "linux")]
-                {
-                    let dns_info = {
-                        let mgr = ProcessManager::acquire();
-                        mgr.dns_override.clone()
-                    };
-                    crate::engine::linux::stop_tun_and_restore_dns(dns_info.as_ref())
-                        .map_err(|e| {
-                            ::log::error!("Failed to stop TUN process: {}", e);
-                            e
-                        })?;
-                }
-                #[cfg(not(target_os = "linux"))]
-                PlatformEngine::stop_tun_process().map_err(|e| {
-                    ::log::error!("Failed to stop TUN process: {}", e);
-                    e
-                })?;
-
-                #[cfg(any(target_os = "windows", target_os = "linux"))]
-                {
-                    let _ = transition(&app, Intent::MarkIdle);
-                }
-            }
-        }
+    // Linux and Windows don't go through readiness tick on stop, so drop
+    // to Idle explicitly. macOS rides the state machine via the helper
+    // exit event → handle_process_termination path.
+    #[cfg(any(target_os = "windows", target_os = "linux"))]
+    {
+        let _ = transition(&app, Intent::MarkIdle);
     }
 
     ProcessManager::acquire().reset();
@@ -479,7 +268,7 @@ pub async fn reload_config(app: tauri::AppHandle, is_tun: bool) -> Result<String
         if needs_proxy_reset {
             ::log::info!("SystemProxy mode detected, waiting for reload and resetting proxy");
             tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
-            if let Err(e) = PlatformEngine::set_proxy(&app).await {
+            if let Err(e) = crate::engine::apply_system_proxy(&app).await {
                 ::log::error!("Failed to reset system proxy after reload: {}", e);
                 return Err(format!("Config reloaded but failed to reset proxy: {}", e));
             }

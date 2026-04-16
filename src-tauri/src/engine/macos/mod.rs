@@ -9,7 +9,6 @@ use onebox_sysproxy_rs::Sysproxy;
 use std::process::Command;
 use tauri::AppHandle;
 use tauri::Emitter;
-use tauri_plugin_shell::process::Command as TauriCommand;
 use tauri_plugin_store::StoreExt;
 pub const TUN_INTERFACE_NAME: &str = "utun233";
 
@@ -254,28 +253,158 @@ pub fn restore_system_dns() -> Result<(), String> {
 pub struct MacOSEngine;
 
 impl EngineManager for MacOSEngine {
-    async fn set_proxy(_app: &AppHandle) -> anyhow::Result<()> {
-        set_proxy(_app).await
+    async fn start(
+        app: &AppHandle,
+        mode: crate::core::ProxyMode,
+        config_path: String,
+    ) -> Result<(), String> {
+        use std::sync::Arc;
+        use tauri_plugin_shell::ShellExt;
+
+        match mode {
+            crate::core::ProxyMode::SystemProxy => {
+                // User-mode sing-box sidecar — plain tauri spawn, no helper.
+                let cmd = app
+                    .shell()
+                    .sidecar("sing-box")
+                    .map_err(|e| format!("sidecar lookup failed: {}", e))?
+                    .args(["run", "-c", &config_path, "--disable-color"]);
+                let (rx, child) = cmd.spawn().map_err(|e| format!("spawn failed: {}", e))?;
+                crate::core::monitor::spawn_process_monitor(
+                    app.clone(),
+                    rx,
+                    Arc::new(mode.clone()),
+                );
+                {
+                    let mut mgr = crate::core::ProcessManager::acquire();
+                    mgr.mode = Some(Arc::new(mode));
+                    mgr.config_path = Some(Arc::new(config_path));
+                    mgr.child = Some(child);
+                    mgr.is_stopping = false;
+                }
+                set_proxy(app).await.map_err(|e| e.to_string())?;
+            }
+            crate::core::ProxyMode::TunProxy => {
+                // Root-mode sing-box is owned by the privileged XPC helper —
+                // we ask the helper to install itself if needed, then ask it
+                // to spawn sing-box, and subscribe to its exit notifications
+                // so the process monitor fires on crash.
+                tokio::task::spawn_blocking(ensure_helper_installed)
+                    .await
+                    .map_err(|e| format!("helper install join error: {}", e))?
+                    .map_err(|e| format!("helper install failed: {}", e))?;
+                let app_c = app.clone();
+                let path_c = config_path.clone();
+                tokio::task::spawn_blocking(move || start_tun_via_helper(&app_c, &path_c))
+                    .await
+                    .map_err(|e| format!("start_tun join error: {}", e))?
+                    .map_err(|e| format!("start_tun_via_helper failed: {}", e))?;
+
+                // Bridge the XPC helper's sing-box exit event to the same
+                // cleanup path any other mode goes through.
+                let mut exit_rx = macos_helper::subscribe_sing_box_exits();
+                let exit_app = app.clone();
+                let mode_arc = Arc::new(crate::core::ProxyMode::TunProxy);
+                let exit_mode = Arc::clone(&mode_arc);
+                tokio::spawn(async move {
+                    if let Some(exit) = exit_rx.recv().await {
+                        log::info!(
+                            "[helper-bridge] sing-box exit event pid={} code={}",
+                            exit.pid,
+                            exit.exit_code
+                        );
+                        let payload = tauri_plugin_shell::process::TerminatedPayload {
+                            code: Some(exit.exit_code),
+                            signal: None,
+                        };
+                        crate::core::monitor::handle_process_termination(
+                            &exit_app,
+                            &exit_mode,
+                            payload,
+                        )
+                        .await;
+                    }
+                });
+
+                let config_path_arc = Arc::new(config_path);
+                {
+                    let mut mgr = crate::core::ProcessManager::acquire();
+                    mgr.mode = Some(Arc::clone(&mode_arc));
+                    mgr.config_path = Some(Arc::clone(&config_path_arc));
+                    mgr.child = None; // managed by helper
+                    mgr.is_stopping = false;
+                }
+
+                // Optional bypass-router watchdog: restart sing-box every 4h
+                // so macOS's auto_detect_interface can pick up routing table
+                // changes that accumulate without a clean refresh.
+                let bypass_router_enabled = app
+                    .get_store("settings.json")
+                    .and_then(|store| store.get("enable_bypass_router_key"))
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false);
+                if bypass_router_enabled {
+                    {
+                        let mut mgr = crate::core::ProcessManager::acquire();
+                        if let Some(abort) = mgr.bypass_router_watchdog_abort.take() {
+                            abort.abort();
+                        }
+                    }
+                    let task = tokio::spawn(crate::core::watchdog::bypass_router_watchdog(
+                        app.clone(),
+                        Arc::clone(&config_path_arc),
+                    ));
+                    let mut mgr = crate::core::ProcessManager::acquire();
+                    mgr.bypass_router_watchdog_abort = Some(task.abort_handle());
+                    log::info!(
+                        "[bypass_router_watchdog] Started, next restart in {}h",
+                        crate::core::watchdog::BYPASS_ROUTER_RESTART_INTERVAL.as_secs() / 3600
+                    );
+                }
+
+                // TUN mode doesn't use the system HTTP proxy — clear any stale
+                // one left over from a previous SystemProxy session.
+                let _ = unset_proxy(app).await;
+            }
+        }
+        Ok(())
     }
 
-    async fn unset_proxy(_app: &AppHandle) -> anyhow::Result<()> {
-        unset_proxy(_app).await
-    }
-
-    fn create_privileged_command(
-        _app: &AppHandle,
-        _sidecar_path: String,
-        _path: String,
-    ) -> Option<TauriCommand> {
-        // macOS TUN mode is driven by start_tun_via_helper; this trait method
-        // is never called. Returning None causes core.rs to treat it as
-        // "no managed child" which is safe.
-        log::warn!("[macos] create_privileged_command called unexpectedly — returning None");
-        None
-    }
-
-    fn stop_tun_process() -> Result<(), String> {
-        stop_tun_process()
+    async fn stop(app: &AppHandle) -> Result<(), String> {
+        let (mode, child) = {
+            let mut mgr = crate::core::ProcessManager::acquire();
+            mgr.is_stopping = true;
+            (mgr.mode.clone(), mgr.child.take())
+        };
+        let Some(mode) = mode else {
+            return Ok(());
+        };
+        match mode.as_ref() {
+            crate::core::ProxyMode::SystemProxy => {
+                // Best-effort proxy teardown first so apps don't keep pointing
+                // at a dying sing-box socket.
+                let _ = unset_proxy(app).await;
+                if let Some(child) = child {
+                    use libc::{kill, SIGTERM};
+                    let pid = child.pid();
+                    if unsafe { kill(pid as i32, SIGTERM) } != 0 {
+                        log::error!(
+                            "[stop] Failed to send SIGTERM to PID {}: {}",
+                            pid,
+                            std::io::Error::last_os_error()
+                        );
+                    }
+                }
+                tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+            }
+            crate::core::ProxyMode::TunProxy => {
+                stop_tun_process().map_err(|e| {
+                    log::error!("Failed to stop TUN process: {}", e);
+                    e
+                })?;
+            }
+        }
+        Ok(())
     }
 
     fn on_network_up(_app: &AppHandle) {

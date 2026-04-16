@@ -11,7 +11,7 @@ use super::{ProcessManager, ProxyMode};
 
 /// Spawn the sing-box stdout/stderr monitor as a tokio task.
 /// Routes output to log file + frontend events, and handles termination.
-pub(super) fn spawn_process_monitor(
+pub(crate) fn spawn_process_monitor(
     app: tauri::AppHandle,
     mut rx: tauri::async_runtime::Receiver<tauri_plugin_shell::process::CommandEvent>,
     mode: Arc<ProxyMode>,
@@ -82,7 +82,7 @@ pub(super) fn spawn_process_monitor(
 
 /// Handle sing-box process termination (intentional stop or crash).
 /// Cleans up DNS, proxy, and transitions the state machine.
-pub(super) async fn handle_process_termination(
+pub(crate) async fn handle_process_termination(
     app_handle: &tauri::AppHandle,
     process_mode: &Arc<ProxyMode>,
     payload: tauri_plugin_shell::process::TerminatedPayload,
@@ -124,7 +124,7 @@ pub(super) async fn handle_process_termination(
     }
 
     if matches!(**process_mode, ProxyMode::SystemProxy) {
-        if let Err(e) = PlatformEngine::unset_proxy(app_handle).await {
+        if let Err(e) = crate::engine::clear_system_proxy(app_handle).await {
             log::error!("Failed to unset proxy after process termination: {}", e);
         }
     }

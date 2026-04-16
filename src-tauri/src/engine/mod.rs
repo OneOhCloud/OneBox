@@ -1,59 +1,57 @@
 use tauri::AppHandle;
-use tauri_plugin_shell::process::Command as TauriCommand;
+
+use crate::core::ProxyMode;
 
 pub const EVENT_TAURI_LOG: &str = "tauri-log";
 pub const EVENT_STATUS_CHANGED: &str = "status-changed";
 
 /// Platform-specific sing-box engine management.
 ///
-/// The long-term goal of this trait is for `core::*` to only call four
-/// verbs — `start`, `stop`, `restart`, `on_network_up` — with everything
-/// platform-specific (privileged command construction, DNS overrides,
-/// helper IPC, service registration, per-mode watchdogs) living inside
-/// `engine::{macos,linux,windows}`. This commit performs the first half
-/// of that migration: it replaces the old leaky shapes
-/// (`reload_engine(app, is_tun)`, `reapply_dns_override` returning a
-/// Linux-shaped tuple, `restore_dns_after_termination` taking that tuple)
-/// with cleaner verbs. `start`/`stop` still flow through the legacy
-/// per-platform helpers and will be migrated in a follow-up commit.
+/// `core::*` is only allowed to call the five verbs on this trait —
+/// `start`, `stop`, `restart`, `on_network_up`, `on_process_terminated`.
+/// Everything else (privileged command construction, sidecar spawning,
+/// DNS overrides, helper IPC, service registration, per-mode watchdogs)
+/// is encapsulated inside `engine::{macos,linux,windows}` and must not
+/// leak through this trait.
 #[allow(async_fn_in_trait)]
 pub trait EngineManager {
+    /// Start the engine in the given mode. Implementations are responsible
+    /// for: privilege escalation (helper XPC / pkexec / SCM service), DNS
+    /// overrides, spawning or controlling the sing-box process, setting up
+    /// per-mode watchdogs, applying/clearing the system proxy as the mode
+    /// requires, and seeding `ProcessManager` with the running
+    /// mode/config/child handle before returning `Ok(())`.
+    async fn start(
+        app: &AppHandle,
+        mode: ProxyMode,
+        config_path: String,
+    ) -> Result<(), String>;
+
+    /// Initiate an orderly stop of the engine: signal sing-box to exit,
+    /// clear the system proxy if it was configured, and return once the
+    /// stop request has been dispatched. The actual process exit is
+    /// observed asynchronously by the process monitor which then invokes
+    /// `on_process_terminated` for the DNS / state cleanup.
+    async fn stop(app: &AppHandle) -> Result<(), String>;
+
     /// Reload the running engine with the current on-disk config and
     /// flush the OS DNS resolver cache so entries keyed to the previous
     /// config (FakeIPs under global mode, Chinese-domain answers, etc.)
     /// don't linger for their full TTL after the switch.
-    ///
-    /// Implementations must read the running mode from their own state
-    /// (ProcessManager, a platform-local OnceCell, …) — callers no longer
-    /// have to pass it in.
     async fn restart(app: &AppHandle) -> Result<(), String>;
 
     /// Notify the engine of a system NetworkUp event (Wi-Fi switch, wake
     /// from sleep, DHCP renewal). Engines that override DNS re-apply the
-    /// override on the active interface; others are no-ops. Return value
-    /// (success/failure) is informational only — NetworkUp is
-    /// best-effort and the caller does not branch on it.
+    /// override on the active interface; others are no-ops.
     fn on_network_up(_app: &AppHandle) {}
 
-    /// Restore system DNS after the sing-box process has terminated,
-    /// either cleanly (user stop) or unexpectedly (crash, external kill).
-    /// Implementations read any per-platform teardown state from their
-    /// own module — the parameters previously used to thread Linux's
-    /// `(iface, original_dns)` tuple through `core` are gone.
+    /// Restore system DNS after the sing-box process has terminated.
+    /// Called from the process monitor; implementations read any per-
+    /// platform teardown state from their own module. `was_user_stop`
+    /// lets platforms distinguish the fast path (user stop, state already
+    /// teardown'd) from the crash-recovery path (external kill, UAC
+    /// fallback needed on Windows).
     fn on_process_terminated(_app: &AppHandle, _was_user_stop: bool) {}
-
-    // ── Legacy (being migrated away) ────────────────────────────────
-    // Still used by `core::start` and `core::stop` until the second
-    // refactor commit collapses them behind a clean `start`/`stop` pair.
-
-    async fn set_proxy(app: &AppHandle) -> anyhow::Result<()>;
-    async fn unset_proxy(app: &AppHandle) -> anyhow::Result<()>;
-    fn create_privileged_command(
-        app: &AppHandle,
-        sidecar_path: String,
-        path: String,
-    ) -> Option<TauriCommand>;
-    fn stop_tun_process() -> Result<(), String>;
 }
 
 pub mod helper;
@@ -100,6 +98,32 @@ pub use linux::LinuxEngine as PlatformEngine;
 pub use macos::MacOSEngine as PlatformEngine;
 #[cfg(target_os = "windows")]
 pub use windows::WindowsEngine as PlatformEngine;
+
+/// Apply the platform's HTTP/SOCKS system-proxy override. Shared entry
+/// point so `core::*` does not need per-platform cfg gates to call
+/// individual `engine::<platform>::set_proxy` free functions.
+pub(crate) async fn apply_system_proxy(app: &AppHandle) -> anyhow::Result<()> {
+    #[cfg(target_os = "macos")]
+    { macos::set_proxy(app).await }
+    #[cfg(target_os = "linux")]
+    { linux::set_proxy(app).await }
+    #[cfg(target_os = "windows")]
+    { windows::set_proxy(app).await }
+    #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
+    { let _ = app; Ok(()) }
+}
+
+/// Clear the platform's HTTP/SOCKS system-proxy override.
+pub(crate) async fn clear_system_proxy(app: &AppHandle) -> anyhow::Result<()> {
+    #[cfg(target_os = "macos")]
+    { macos::unset_proxy(app).await }
+    #[cfg(target_os = "linux")]
+    { linux::unset_proxy(app).await }
+    #[cfg(target_os = "windows")]
+    { windows::unset_proxy(app).await }
+    #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
+    { let _ = app; Ok(()) }
+}
 
 /// Clean up system proxy settings on app shutdown.
 pub fn cleanup_on_shutdown() {

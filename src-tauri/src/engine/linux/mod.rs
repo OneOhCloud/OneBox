@@ -256,24 +256,119 @@ pub fn restore_system_dns(iface: &str, original_dns: &str) -> Result<(), String>
 pub struct LinuxEngine;
 
 impl EngineManager for LinuxEngine {
-    async fn set_proxy(_app: &AppHandle) -> anyhow::Result<()> {
-        set_proxy(_app).await
-    }
-
-    async fn unset_proxy(_app: &AppHandle) -> anyhow::Result<()> {
-        unset_proxy(_app).await
-    }
-
-    fn create_privileged_command(
+    async fn start(
         app: &AppHandle,
-        sidecar_path: String,
-        path: String,
-    ) -> Option<TauriCommand> {
-        create_privileged_command(app, sidecar_path, path, None)
+        mode: crate::core::ProxyMode,
+        config_path: String,
+    ) -> Result<(), String> {
+        use std::sync::Arc;
+        use tauri_plugin_shell::ShellExt;
+
+        match mode {
+            crate::core::ProxyMode::SystemProxy => {
+                let cmd = app
+                    .shell()
+                    .sidecar("sing-box")
+                    .map_err(|e| format!("sidecar lookup failed: {}", e))?
+                    .args(["run", "-c", &config_path, "--disable-color"]);
+                let (rx, child) = cmd.spawn().map_err(|e| format!("spawn failed: {}", e))?;
+                crate::core::monitor::spawn_process_monitor(
+                    app.clone(),
+                    rx,
+                    Arc::new(mode.clone()),
+                );
+                {
+                    let mut mgr = crate::core::ProcessManager::acquire();
+                    mgr.mode = Some(Arc::new(mode));
+                    mgr.config_path = Some(Arc::new(config_path));
+                    mgr.child = Some(child);
+                    mgr.is_stopping = false;
+                }
+                set_proxy(app).await.map_err(|e| e.to_string())?;
+            }
+            crate::core::ProxyMode::TunProxy => {
+                // Capture the active interface's original DNS into
+                // ProcessManager so the teardown path can restore exactly
+                // what was there before. Failure here is non-fatal — we'd
+                // rather start TUN without a captured override than refuse
+                // to start at all.
+                let dns_info = match prepare_dns_override(&config_path) {
+                    Ok(info) => {
+                        let mut mgr = crate::core::ProcessManager::acquire();
+                        mgr.dns_override = Some(info.clone());
+                        Some(info)
+                    }
+                    Err(e) => {
+                        log::warn!("[dns] prepare_dns_override failed: {}", e);
+                        None
+                    }
+                };
+
+                let sidecar_path = crate::engine::helper::get_sidecar_path(
+                    std::path::Path::new("sing-box"),
+                )
+                .map_err(|e| format!("Failed to get sidecar path: {}", e))?;
+                let cmd = create_privileged_command(
+                    app,
+                    sidecar_path,
+                    config_path.clone(),
+                    dns_info.as_ref(),
+                )
+                .ok_or_else(|| "pkexec command not available".to_string())?;
+                let (rx, child) = cmd.spawn().map_err(|e| format!("spawn failed: {}", e))?;
+                crate::core::monitor::spawn_process_monitor(
+                    app.clone(),
+                    rx,
+                    Arc::new(mode.clone()),
+                );
+                {
+                    let mut mgr = crate::core::ProcessManager::acquire();
+                    mgr.mode = Some(Arc::new(mode));
+                    mgr.config_path = Some(Arc::new(config_path));
+                    mgr.child = Some(child);
+                    mgr.is_stopping = false;
+                }
+                let _ = unset_proxy(app).await;
+            }
+        }
+        Ok(())
     }
 
-    fn stop_tun_process() -> Result<(), String> {
-        stop_tun_process()
+    async fn stop(app: &AppHandle) -> Result<(), String> {
+        let (mode, child) = {
+            let mut mgr = crate::core::ProcessManager::acquire();
+            mgr.is_stopping = true;
+            (mgr.mode.clone(), mgr.child.take())
+        };
+        let Some(mode) = mode else { return Ok(()); };
+        match mode.as_ref() {
+            crate::core::ProxyMode::SystemProxy => {
+                let _ = unset_proxy(app).await;
+                if let Some(child) = child {
+                    use libc::{kill, SIGTERM};
+                    let pid = child.pid();
+                    if unsafe { kill(pid as i32, SIGTERM) } != 0 {
+                        log::error!(
+                            "[stop] Failed to send SIGTERM to PID {}: {}",
+                            pid,
+                            std::io::Error::last_os_error()
+                        );
+                    }
+                }
+                tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+            }
+            crate::core::ProxyMode::TunProxy => {
+                let dns_info = {
+                    let mgr = crate::core::ProcessManager::acquire();
+                    mgr.dns_override.clone()
+                };
+                stop_tun_and_restore_dns(dns_info.as_ref()).map_err(|e| {
+                    log::error!("Failed to stop TUN process: {}", e);
+                    e
+                })?;
+            }
+        }
+        Ok(())
     }
 
     fn on_network_up(_app: &AppHandle) {

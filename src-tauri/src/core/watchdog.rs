@@ -15,7 +15,7 @@ use tauri::Manager;
 // ── macOS: bypass-router 4-hour restart watchdog ──────────────────────
 
 #[cfg(target_os = "macos")]
-pub(super) const BYPASS_ROUTER_RESTART_INTERVAL: std::time::Duration =
+pub(crate) const BYPASS_ROUTER_RESTART_INTERVAL: std::time::Duration =
     std::time::Duration::from_secs(4 * 3600);
 
 /// Restart sing-box via the privileged helper (Send-safe, no keychain).
@@ -72,7 +72,7 @@ async fn restart_tun_send_safe(
 /// Bypass-router watchdog: restart sing-box every 4 hours to clear
 /// stale routes from `auto_detect_interface`.
 #[cfg(target_os = "macos")]
-pub(super) async fn bypass_router_watchdog(app: tauri::AppHandle, path: Arc<String>) {
+pub(crate) async fn bypass_router_watchdog(app: tauri::AppHandle, path: Arc<String>) {
     loop {
         tokio::time::sleep(BYPASS_ROUTER_RESTART_INTERVAL).await;
 
@@ -126,7 +126,7 @@ pub(super) async fn bypass_router_watchdog(app: tauri::AppHandle, path: Arc<Stri
 /// 1Hz poll of the Windows service state. When Running→Stopped is observed,
 /// synthesize a handle_process_termination call.
 #[cfg(target_os = "windows")]
-pub(super) fn spawn_windows_service_watchdog(
+pub(crate) fn spawn_windows_service_watchdog(
     app: tauri::AppHandle,
     process_mode: Arc<ProxyMode>,
     _start_epoch: u64,

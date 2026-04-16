@@ -249,33 +249,103 @@ pub fn restart_privileged_command(sidecar_path: String, path: String) -> Result<
 pub struct WindowsEngine;
 
 impl EngineManager for WindowsEngine {
-    async fn set_proxy(app: &AppHandle) -> anyhow::Result<()> {
-        set_proxy(app).await
-    }
+    async fn start(
+        app: &AppHandle,
+        mode: crate::core::ProxyMode,
+        config_path: String,
+    ) -> Result<(), String> {
+        use std::sync::Arc;
+        use tauri_plugin_shell::ShellExt;
 
-    async fn unset_proxy(app: &AppHandle) -> anyhow::Result<()> {
-        // 在某些 Windows 使用 sysproxy 取消代理时可能失败,捕获错误并记录日志
-        // 但不阻止程序继续运行,让用户仍然可以切到 tun 模式。
-        if let Err(e) = unset_proxy(app).await {
-            log::warn!("Failed to unset proxy: {}", e);
-            let _ = app.emit(
-                EVENT_TAURI_LOG,
-                (2, format!("Failed to unset proxy: {}", e)),
-            );
+        match mode {
+            crate::core::ProxyMode::SystemProxy => {
+                let cmd = app
+                    .shell()
+                    .sidecar("sing-box")
+                    .map_err(|e| format!("sidecar lookup failed: {}", e))?
+                    .args(["run", "-c", &config_path, "--disable-color"]);
+                let (rx, child) = cmd.spawn().map_err(|e| format!("spawn failed: {}", e))?;
+                crate::core::monitor::spawn_process_monitor(
+                    app.clone(),
+                    rx,
+                    Arc::new(mode.clone()),
+                );
+                {
+                    let mut mgr = crate::core::ProcessManager::acquire();
+                    mgr.mode = Some(Arc::new(mode));
+                    mgr.config_path = Some(Arc::new(config_path));
+                    mgr.child = Some(child);
+                    mgr.is_stopping = false;
+                }
+                if let Err(e) = set_proxy(app).await {
+                    let _ = app.emit(EVENT_TAURI_LOG, (2, format!("Failed to set proxy: {}", e)));
+                    return Err(e.to_string());
+                }
+            }
+            crate::core::ProxyMode::TunProxy => {
+                let sidecar_path = crate::engine::helper::get_sidecar_path(
+                    std::path::Path::new("sing-box"),
+                )
+                .map_err(|e| format!("Failed to get sidecar path: {}", e))?;
+                let cmd = create_privileged_command(app, sidecar_path, config_path.clone())
+                    .ok_or_else(|| "service command not available".to_string())?;
+                let (rx, child) = cmd.spawn().map_err(|e| format!("spawn failed: {}", e))?;
+                crate::core::monitor::spawn_process_monitor(
+                    app.clone(),
+                    rx,
+                    Arc::new(mode.clone()),
+                );
+                {
+                    let mut mgr = crate::core::ProcessManager::acquire();
+                    mgr.mode = Some(Arc::new(mode));
+                    mgr.config_path = Some(Arc::new(config_path));
+                    mgr.child = Some(child);
+                    mgr.is_stopping = false;
+                }
+                // SystemProxy setting may linger across mode switches on
+                // Windows; best-effort unset so browsers stop pointing at
+                // the mixed port.
+                if let Err(e) = unset_proxy(app).await {
+                    log::warn!("Failed to unset proxy: {}", e);
+                    let _ = app.emit(
+                        EVENT_TAURI_LOG,
+                        (2, format!("Failed to unset proxy: {}", e)),
+                    );
+                }
+            }
         }
         Ok(())
     }
 
-    fn create_privileged_command(
-        app: &AppHandle,
-        sidecar_path: String,
-        path: String,
-    ) -> Option<TauriCommand> {
-        create_privileged_command(app, sidecar_path, path)
-    }
-
-    fn stop_tun_process() -> Result<(), String> {
-        stop_tun_process()
+    async fn stop(app: &AppHandle) -> Result<(), String> {
+        let (mode, child) = {
+            let mut mgr = crate::core::ProcessManager::acquire();
+            mgr.is_stopping = true;
+            (mgr.mode.clone(), mgr.child.take())
+        };
+        let Some(mode) = mode else { return Ok(()); };
+        match mode.as_ref() {
+            crate::core::ProxyMode::SystemProxy => {
+                if let Err(e) = unset_proxy(app).await {
+                    log::warn!("Failed to unset proxy: {}", e);
+                    let _ = app.emit(
+                        EVENT_TAURI_LOG,
+                        (2, format!("Failed to unset proxy: {}", e)),
+                    );
+                }
+                if let Some(child) = child {
+                    child.kill().map_err(|e| e.to_string())?;
+                }
+                tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+            }
+            crate::core::ProxyMode::TunProxy => {
+                stop_tun_process().map_err(|e| {
+                    log::error!("Failed to stop TUN process: {}", e);
+                    e
+                })?;
+            }
+        }
+        Ok(())
     }
 
     // Windows has no NetworkUp DNS re-apply — DNS override lives in the
