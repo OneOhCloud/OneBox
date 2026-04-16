@@ -301,7 +301,7 @@ impl EngineManager for LinuxEngine {
                     mgr.child = Some(child);
                     mgr.is_stopping = false;
                 }
-                let _ = unset_system_proxy(app).await;
+                let _ = clear_system_proxy(app).await;
             }
         }
         Ok(())
@@ -316,7 +316,7 @@ impl EngineManager for LinuxEngine {
         let Some(mode) = mode else { return Ok(()); };
         match mode.as_ref() {
             crate::engine::ProxyMode::SystemProxy => {
-                let _ = unset_system_proxy(app).await;
+                let _ = clear_system_proxy(app).await;
                 if let Some(child) = child {
                     use libc::{kill, SIGTERM};
                     let pid = child.pid();
