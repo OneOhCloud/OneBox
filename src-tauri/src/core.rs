@@ -1016,11 +1016,7 @@ pub async fn stop(app: tauri::AppHandle) -> Result<(), String> {
                 // 用户未发起 stop 的异常退出路径使用。
                 #[cfg(any(target_os = "windows", target_os = "linux"))]
                 {
-                    log::info!("[stop] about to call MarkIdle, current state: {:?}", app.state::<VpnStateCell>().snapshot());
-                    match transition(&app, Intent::MarkIdle) {
-                        Ok(state) => log::info!("[stop] MarkIdle transition succeeded: {:?}", state),
-                        Err(e) => log::error!("[stop] MarkIdle transition FAILED: {}", e),
-                    }
+                    let _ = transition(&app, Intent::MarkIdle);
                 }
             }
         }
