@@ -7,6 +7,9 @@ use tokio::process::Command;
 
 const DEFAULT_CAPTIVE_URL: &str = "http://captive.oneoh.cloud";
 
+// Only consumed by the macOS `get_lan_ip` branch; Linux uses a shell
+// pipeline and Windows parses `ipconfig` output directly.
+#[allow(dead_code)]
 pub(crate) fn is_private_ip(ip: &str) -> bool {
     let parts: Vec<&str> = ip.split('.').collect();
     if parts.len() != 4 {
