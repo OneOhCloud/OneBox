@@ -1,52 +1,17 @@
-#[cfg(not(target_os = "macos"))]
-use keyring::Entry;
-#[cfg(not(target_os = "windows"))]
-use std::process::Command;
-
-#[cfg(target_os = "linux")]
-use std::{io::Write, process::Stdio};
-
-#[allow(dead_code)]
-const KEYRING_SERVICE: &str = "onebox.oneoh.cloud";
-#[allow(dead_code)]
-const KEYRING_KEY_NAME: &str = "privilege_password";
-
-// 定义 trait 作为接口
-#[allow(dead_code)]
-pub trait PrivilegeHelper {
-    #[cfg(not(target_os = "windows"))]
-    fn get_current_user() -> String {
-        "unknown".to_string()
+/// Check whether platform-specific privilege escalation is available.
+///
+/// - macOS: true if the privileged helper responds to ping (installed via SMJobBless).
+/// - Linux: true if `pkexec` is available (polkit-based escalation).
+/// - Windows: always false (service-based model; no runtime privilege check needed).
+#[tauri::command]
+pub async fn is_privileged(_password: Option<String>) -> bool {
+    #[cfg(target_os = "macos")]
+    {
+        crate::helper_client::api::ping().is_ok()
     }
-    async fn is_privileged(_password: Option<String>) -> bool {
-        // 默认实现
-        false
-    }
-}
-
-// 各平台实现
-#[cfg(target_os = "windows")]
-pub struct PlatformPrivilegeHelper;
-
-#[cfg(target_os = "windows")]
-impl PrivilegeHelper for PlatformPrivilegeHelper {
-    async fn is_privileged(_password: Option<String>) -> bool {
-        // 默认实现
-        false
-    }
-}
-
-#[cfg(target_os = "linux")]
-pub struct PlatformPrivilegeHelper;
-
-#[cfg(target_os = "linux")]
-impl PrivilegeHelper for PlatformPrivilegeHelper {
-    fn get_current_user() -> String {
-        "root".to_string()
-    }
-    /// Linux: pkexec handles privilege escalation via polkit — always "privileged"
-    /// as long as pkexec is available on the system.
-    async fn is_privileged(_password: Option<String>) -> bool {
+    #[cfg(target_os = "linux")]
+    {
+        use std::process::{Command, Stdio};
         Command::new("which")
             .arg("pkexec")
             .stdout(Stdio::null())
@@ -55,59 +20,16 @@ impl PrivilegeHelper for PlatformPrivilegeHelper {
             .map(|s| s.success())
             .unwrap_or(false)
     }
-}
-
-#[cfg(target_os = "macos")]
-pub struct PlatformPrivilegeHelper;
-
-#[cfg(target_os = "macos")]
-impl PrivilegeHelper for PlatformPrivilegeHelper {
-    fn get_current_user() -> String {
-        let output = Command::new("whoami")
-            .output()
-            .expect("Failed to execute command");
-        let username = String::from_utf8_lossy(&output.stdout);
-        username.trim().to_string()
-    }
-
-    async fn is_privileged(_password: Option<String>) -> bool {
-        // macOS: privileged helper replaces the password-based flow.
-        // If the helper responds to ping, privilege is available.
-        crate::helper_client::api::ping().is_ok()
-    }
-}
-
-#[cfg(target_os = "linux")]
-pub fn get_current_username() -> String {
-    PlatformPrivilegeHelper::get_current_user()
-}
-
-/// Linux: pkexec handles auth — no password needed from keyring.
-#[cfg(target_os = "linux")]
-pub async fn get_privilege_password_from_keyring() -> String {
-    String::new()
-}
-
-#[tauri::command]
-pub async fn is_privileged(password: Option<String>) -> bool {
-    PlatformPrivilegeHelper::is_privileged(password).await
-}
-
-#[tauri::command]
-pub async fn save_privilege_password_to_keyring(password: String) -> bool {
-    // macOS: privileged helper handles all root operations via XPC; no
-    // password is stored in the keychain. Return true so the frontend
-    // considers the "save" step successful without actually persisting.
-    #[cfg(target_os = "macos")]
+    #[cfg(target_os = "windows")]
     {
-        let _ = password;
-        return true;
+        false
     }
-    #[cfg(not(target_os = "macos"))]
-    {
-        match Entry::new(KEYRING_SERVICE, KEYRING_KEY_NAME) {
-            Ok(entry) => entry.set_password(&password).is_ok(),
-            Err(_) => false,
-        }
-    }
+}
+
+/// Legacy command kept for frontend compatibility. Password is no longer
+/// stored on any platform — all privilege escalation is handled by the
+/// platform's native mechanism (helper, pkexec, or service).
+#[tauri::command]
+pub async fn save_privilege_password_to_keyring(_password: String) -> bool {
+    true
 }

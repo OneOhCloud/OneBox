@@ -269,14 +269,11 @@ impl VpnProxy for LinuxVpnProxy {
         app: &AppHandle,
         sidecar_path: String,
         path: String,
-        _password: String,
     ) -> Option<TauriCommand> {
-        // Trait impl called from Windows path only; Linux uses the direct
-        // function with dns_override parameter from core.rs.
         create_privileged_command(app, sidecar_path, path, None)
     }
 
-    fn stop_tun_process(_password: &str) -> Result<(), String> {
+    fn stop_tun_process() -> Result<(), String> {
         stop_tun_process()
     }
 }

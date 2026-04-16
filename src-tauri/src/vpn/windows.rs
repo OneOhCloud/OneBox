@@ -135,7 +135,6 @@ pub fn create_privileged_command(
     _app: &AppHandle,
     sidecar_path: String,
     path: String,
-    _password: String,
 ) -> Option<TauriCommand> {
     use tun_service::scm;
 
@@ -201,7 +200,7 @@ pub fn create_privileged_command(
 /// scorched-earth internally before reporting `STOPPED`, so the parent
 /// process does not need to re-run the restore.
 #[cfg(target_os = "windows")]
-pub fn stop_tun_process(_password: &str) -> Result<(), String> {
+pub fn stop_tun_process() -> Result<(), String> {
     tun_service::scm::stop_service().map_err(|e| {
         log::error!("[service] stop_service failed: {}", e);
         e
@@ -267,13 +266,12 @@ impl VpnProxy for WindowsVpnProxy {
         app: &AppHandle,
         sidecar_path: String,
         path: String,
-        password: String,
     ) -> Option<TauriCommand> {
-        create_privileged_command(app, sidecar_path, path, password)
+        create_privileged_command(app, sidecar_path, path)
     }
 
-    fn stop_tun_process(password: &str) -> Result<(), String> {
-        stop_tun_process(password)
+    fn stop_tun_process() -> Result<(), String> {
+        stop_tun_process()
     }
 
     fn restart(sidecar_path: String, path: String) {

@@ -264,17 +264,15 @@ impl VpnProxy for MacOSVpnProxy {
         _app: &AppHandle,
         _sidecar_path: String,
         _path: String,
-        _password: String,
     ) -> Option<TauriCommand> {
-        // macOS TUN mode is now driven by start_tun_via_helper; this trait
-        // method is never called on macOS. If it is, returning None causes
-        // core.rs to treat it as "no managed child" which is safe.
+        // macOS TUN mode is driven by start_tun_via_helper; this trait method
+        // is never called. Returning None causes core.rs to treat it as
+        // "no managed child" which is safe.
         log::warn!("[macos] create_privileged_command called unexpectedly — returning None");
         None
     }
 
-    fn stop_tun_process(_password: &str) -> Result<(), String> {
-        // Delegate to the passwordless helper-backed implementation.
+    fn stop_tun_process() -> Result<(), String> {
         stop_tun_process()
     }
 }

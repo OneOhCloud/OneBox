@@ -159,9 +159,8 @@ pub enum ProxyMode {
 /// 进程管理器，记录当前代理进程及模式
 struct ProcessManager {
     child: Option<CommandChild>,
-    mode: Option<Arc<ProxyMode>>,      // 使用 Arc 避免 clone
-    tun_password: Option<Arc<String>>, // 使用 Arc 避免 clone
-    config_path: Option<Arc<String>>,  // 使用 Arc 避免 clone
+    mode: Option<Arc<ProxyMode>>,
+    config_path: Option<Arc<String>>,
     is_stopping: bool,                 // 标记是否正在执行stop操作
     /// Linux: (interface_name, original_dns_servers) captured at DNS override time.
     /// Used to restore DNS to the exact original state on stop/crash.
@@ -179,7 +178,6 @@ lazy_static! {
     static ref PROCESS_MANAGER: Arc<Mutex<ProcessManager>> = Arc::new(Mutex::new(ProcessManager {
         child: None,
         mode: None,
-        tun_password: None,
         config_path: None,
         is_stopping: false,
         #[cfg(target_os = "linux")]
@@ -384,28 +382,6 @@ async fn bypass_router_watchdog(app: tauri::AppHandle, path: Arc<String>) {
     }
 }
 
-async fn get_password_for_mode(mode: &ProxyMode) -> Result<String, String> {
-    // macOS: privileged helper handles TUN privilege — no password required.
-    #[cfg(target_os = "macos")]
-    {
-        let _ = mode;
-        Ok(String::new())
-    }
-
-    // Linux: pkexec handles privilege escalation — no password needed.
-    #[cfg(target_os = "linux")]
-    {
-        let _ = mode;
-        Ok(String::new())
-    }
-
-    #[cfg(target_os = "windows")]
-    {
-        log::info!("mode: {:?}", mode);
-        Ok(String::new())
-    }
-}
-
 /// 启动代理进程
 #[tauri::command]
 pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Result<(), String> {
@@ -432,17 +408,6 @@ pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Resu
         return Err(format!("state transition rejected: {}", e));
     }
     let start_epoch = app.state::<VpnStateCell>().snapshot().epoch();
-
-    // 检查是否需要权限验证
-    // macOS: helper handles privilege, password is always empty.
-    #[allow(unused_variables)]
-    let password = match get_password_for_mode(&mode).await {
-        Ok(p) => p,
-        Err(e) => {
-            let _ = transition(&app, Intent::Fail { reason: e.clone() });
-            return Err(e);
-        }
-    };
 
     let is_system_proxy = matches!(mode, ProxyMode::SystemProxy);
 
@@ -513,7 +478,6 @@ pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Resu
                             &app,
                             sidecar_path,
                             path.clone(),
-                            password.clone(),
                         );
                         let is_managed = cmd.is_some();
                         Ok((cmd, is_managed))
@@ -580,16 +544,6 @@ pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Resu
         });
     }
 
-    // 更新进程管理器状态；提前构造 Arc 供 watchdog 直接使用，避免写入后再读回
-    // macOS TUN mode: password not needed (helper handles privilege).
-    #[cfg(target_os = "macos")]
-    let tun_password_arc: Option<Arc<String>> = None;
-    #[cfg(not(target_os = "macos"))]
-    let tun_password_arc = if !is_system_proxy {
-        Some(Arc::new(password))
-    } else {
-        None
-    };
     let config_path_arc = Arc::new(path);
     {
         let mut manager = PROCESS_MANAGER.lock().unwrap_or_else(|e| {
@@ -598,7 +552,6 @@ pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Resu
         });
         manager.mode = Some(Arc::new(mode.clone()));
         manager.config_path = Some(Arc::clone(&config_path_arc));
-        manager.tun_password = tun_password_arc.clone();
         manager.child = child_opt;
         manager.is_stopping = false;
     }
@@ -741,18 +694,17 @@ async fn handle_process_termination(
         }
     }
 
-    // Stash tun_password, dns_override, and is_stopping out of the lock
-    // before the cleanup block clears them — Linux needs dns_override for
-    // targeted DNS restore, and Windows needs is_stopping to decide whether
-    // the termination came from a user-initiated stop vs. an external kill.
+    // Stash dns_override and is_stopping out of the lock before the cleanup
+    // block clears them — Linux needs dns_override for targeted DNS restore,
+    // and Windows needs is_stopping to decide whether termination came from
+    // a user-initiated stop vs. an external kill.
     #[allow(unused_variables)]
-    let (should_cleanup, captured_tun_password, was_user_initiated_stop, captured_dns_override) = {
+    let (should_cleanup, was_user_initiated_stop, captured_dns_override) = {
         let mut manager = PROCESS_MANAGER.lock().unwrap_or_else(|e| {
             log::error!("Failed to lock process manager: {:?}", e);
             e.into_inner()
         });
 
-        // 检查模式是否匹配（比较值而不是指针）
         let matches = manager
             .mode
             .as_ref()
@@ -762,9 +714,8 @@ async fn handle_process_termination(
         #[allow(unused_assignments)]
         let mut dns_info: Option<(String, String)> = None;
 
-        let (captured, stopping) = if matches {
+        let stopping = if matches {
             log::info!("Cleaning up resources after process termination");
-            let pwd = manager.tun_password.clone();
             let was_stopping = manager.is_stopping;
             #[cfg(target_os = "linux")]
             {
@@ -777,19 +728,18 @@ async fn handle_process_termination(
             manager.child = None;
             manager.mode = None;
             manager.config_path = None;
-            manager.tun_password = None;
             manager.is_stopping = false;
             // sing-box 意外退出时终止 watchdog，避免其在进程已停止后无效重启
             #[cfg(target_os = "macos")]
             if let Some(abort) = manager.bypass_router_watchdog_abort.take() {
                 abort.abort();
             }
-            (pwd, was_stopping)
+            was_stopping
         } else {
             dns_info = None;
-            (None, false)
+            false
         };
-        (matches, captured, stopping, dns_info)
+        (matches, stopping, dns_info)
     };
 
     if !should_cleanup {
@@ -845,7 +795,7 @@ async fn handle_process_termination(
         }
         #[cfg(target_os = "windows")]
         {
-            let _ = &captured_tun_password; // silence unused-var warning
+            // Windows 服务架构下，tun-service 的 ServiceMain 退出前已经跑过
                                             // 在 Windows 服务架构下，tun-service 的 ServiceMain 退出前已经跑过
                                             // scorched-earth `dns::restore_all()`，所以正常 stop 路径这里不需要
                                             // 再弹 UAC 跑 restore_system_dns —— 那是冗余的"兜底"提示。
@@ -926,17 +876,12 @@ pub async fn stop(app: tauri::AppHandle) -> Result<(), String> {
         manager.is_stopping = true;
     }
 
-    #[allow(unused_variables)]
-    let (mode, password, child) = {
+    let (mode, child) = {
         let mut manager = PROCESS_MANAGER.lock().unwrap_or_else(|e| {
             log::error!("Mutex lock error during stop: {:?}", e);
             e.into_inner()
         });
-        (
-            manager.mode.clone(),
-            manager.tun_password.clone(),
-            manager.child.take(),
-        )
+        (manager.mode.clone(), manager.child.take())
     };
 
     // 根据当前模式执行清理操作
@@ -995,12 +940,10 @@ pub async fn stop(app: tauri::AppHandle) -> Result<(), String> {
                 }
                 #[cfg(target_os = "windows")]
                 {
-                    if let Some(pwd) = password {
-                        PlatformVpnProxy::stop_tun_process(&pwd).map_err(|e| {
-                            log::error!("Failed to stop TUN process: {}", e);
-                            e
-                        })?;
-                    }
+                    PlatformVpnProxy::stop_tun_process().map_err(|e| {
+                        log::error!("Failed to stop TUN process: {}", e);
+                        e
+                    })?;
                 }
 
                 // Windows TUN 模式没有 managed child,也没有 tauri sidecar 的
@@ -1029,7 +972,6 @@ pub async fn stop(app: tauri::AppHandle) -> Result<(), String> {
             e.into_inner()
         });
         manager.mode = None;
-        manager.tun_password = None;
         manager.config_path = None;
         manager.is_stopping = false;
         #[cfg(target_os = "linux")]
@@ -1151,7 +1093,7 @@ pub async fn reload_config(app: tauri::AppHandle, is_tun: bool) -> Result<String
     {
         use std::process::Command;
 
-        let (is_privileged, password_str, needs_proxy_reset) = {
+        let (is_privileged, needs_proxy_reset) = {
             let manager = PROCESS_MANAGER.lock().unwrap_or_else(|e| e.into_inner());
 
             // 验证模式匹配
@@ -1169,20 +1111,13 @@ pub async fn reload_config(app: tauri::AppHandle, is_tun: bool) -> Result<String
                 }
             }
 
-            let pwd = manager
-                .tun_password
-                .as_ref()
-                .map(|p| p.as_str())
-                .unwrap_or("")
-                .to_string();
-
             // SystemProxy 模式需要在重载后重新设置代理
             let needs_reset = matches!(
                 manager.mode.as_ref().map(|m| m.as_ref()),
                 Some(ProxyMode::SystemProxy)
             );
 
-            (is_tun, pwd, needs_reset)
+            (is_tun, needs_reset)
         };
 
         log::info!("Reloading config");
@@ -1212,17 +1147,16 @@ pub async fn reload_config(app: tauri::AppHandle, is_tun: bool) -> Result<String
 
         #[cfg(not(target_os = "macos"))]
         {
-            let output = if is_privileged && !password_str.is_empty() {
-                let command = format!("echo '{}' | sudo -S pkill -HUP sing-box", password_str);
-                Command::new("sh")
-                    .arg("-c")
-                    .arg(&command)
+            // On Linux, sing-box runs as root (via pkexec), so we need pkexec
+            // to send SIGHUP. On Windows, the service handles it.
+            let output = if is_privileged {
+                Command::new("pkexec")
+                    .args(["pkill", "-HUP", "sing-box"])
                     .output()
-                    .map_err(|e| format!("Failed to send SIGHUP with sudo: {}", e))?
+                    .map_err(|e| format!("Failed to send SIGHUP via pkexec: {}", e))?
             } else {
                 Command::new("pkill")
-                    .arg("-HUP")
-                    .arg("sing-box")
+                    .args(["-HUP", "sing-box"])
                     .output()
                     .map_err(|e| format!("Failed to send SIGHUP: {}", e))?
             };

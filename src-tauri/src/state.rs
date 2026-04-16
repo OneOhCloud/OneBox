@@ -49,20 +49,6 @@ impl AppData {
         }
     }
 
-    #[allow(dead_code)]
-    pub fn read(&self, log_type: LogType) -> String {
-        let buffer = match log_type {
-            LogType::Info => &self.log_buffer,
-            LogType::Error => &self.error_log_buffer,
-        };
-
-        if let Ok(buffer) = buffer.lock() {
-            buffer.join("\n")
-        } else {
-            String::new()
-        }
-    }
-
     pub fn read_cleared(&self, log_type: LogType) -> String {
         let buffer = match log_type {
             LogType::Info => &self.log_buffer,

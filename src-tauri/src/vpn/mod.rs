@@ -16,16 +16,16 @@ pub trait VpnProxy {
     /// 取消系统代理
     async fn unset_proxy(app: &AppHandle) -> anyhow::Result<()>;
 
-    /// 创建特权模式命令
+    /// Build the platform-specific privileged command to start sing-box in TUN mode.
+    /// Returns None if the platform manages the process externally (e.g. macOS helper).
     fn create_privileged_command(
         app: &AppHandle,
         sidecar_path: String,
         path: String,
-        password: String,
     ) -> Option<TauriCommand>;
 
-    /// 停止TUN模式进程
-    fn stop_tun_process(password: &str) -> Result<(), String>;
+    /// Stop the TUN-mode sing-box process via the platform's privilege mechanism.
+    fn stop_tun_process() -> Result<(), String>;
 
     #[cfg(target_os = "windows")]
     fn restart(sidecar_path: String, path: String) {
