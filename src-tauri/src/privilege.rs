@@ -44,39 +44,16 @@ impl PrivilegeHelper for PlatformPrivilegeHelper {
     fn get_current_user() -> String {
         "root".to_string()
     }
-    async fn is_privileged(password: Option<String>) -> bool {
-        let password = match password {
-            Some(p) => p,
-            None => get_privilege_password_from_keyring().await,
-        };
-        let mut child = match Command::new("sudo")
-            .arg("-S")
-            .arg("whoami")
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-        {
-            Ok(child) => child,
-            Err(_) => return false,
-        };
-
-        if let Some(mut stdin) = child.stdin.take() {
-            if stdin
-                .write_all(format!("{}\n", password).as_bytes())
-                .is_err()
-            {
-                return false;
-            }
-        }
-
-        let output = match child.wait_with_output() {
-            Ok(output) => output,
-            Err(_) => return false,
-        };
-
-        let stdout_str = String::from_utf8_lossy(&output.stdout);
-        stdout_str.trim() == get_current_username()
+    /// Linux: pkexec handles privilege escalation via polkit — always "privileged"
+    /// as long as pkexec is available on the system.
+    async fn is_privileged(_password: Option<String>) -> bool {
+        Command::new("which")
+            .arg("pkexec")
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status()
+            .map(|s| s.success())
+            .unwrap_or(false)
     }
 }
 
@@ -105,12 +82,10 @@ pub fn get_current_username() -> String {
     PlatformPrivilegeHelper::get_current_user()
 }
 
+/// Linux: pkexec handles auth — no password needed from keyring.
 #[cfg(target_os = "linux")]
 pub async fn get_privilege_password_from_keyring() -> String {
-    match Entry::new(KEYRING_SERVICE, KEYRING_KEY_NAME) {
-        Ok(entry) => entry.get_password().unwrap_or_default(),
-        Err(_) => String::new(),
-    }
+    String::new()
 }
 
 #[tauri::command]

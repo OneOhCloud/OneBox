@@ -1,0 +1,10 @@
+// Polkit rule: allow members of the sudo group to run OneBox TUN helper
+// without re-authenticating after the first authorization.
+// Installed to /etc/polkit-1/rules.d/ by the deb/rpm package.
+polkit.addRule(function(action, subject) {
+    if (action.id === "cloud.oneoh.onebox.run-privileged" &&
+        subject.local && subject.active &&
+        subject.isInGroup("sudo")) {
+        return polkit.Result.YES;
+    }
+});

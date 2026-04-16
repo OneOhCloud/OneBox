@@ -46,10 +46,8 @@ pub async fn set_proxy(_app: &AppHandle) -> anyhow::Result<()> {
 
 /// 取消系统代理
 pub async fn unset_proxy(_app: &AppHandle) -> anyhow::Result<()> {
-    // 清理系统代理设置
     let mut sysproxy = Sysproxy::get_system_proxy().map_err(|e| anyhow::anyhow!(e))?;
     sysproxy.enable = false;
-
     sysproxy
         .set_system_proxy()
         .map_err(|e| anyhow::anyhow!(e))?;
@@ -57,63 +55,83 @@ pub async fn unset_proxy(_app: &AppHandle) -> anyhow::Result<()> {
     Ok(())
 }
 
-/// 特权模式下启动进程
+const HELPER_PATH: &str = "/usr/lib/OneBox/onebox-tun-helper";
+
+/// Build the pkexec-wrapped command to start sing-box as root via the
+/// privileged helper. DNS override + sing-box launch happen in a single
+/// pkexec call (one auth prompt). The helper uses `exec` so pkexec stays
+/// as parent and Tauri can monitor the process.
 pub fn create_privileged_command(
     app: &AppHandle,
     sidecar_path: String,
     path: String,
-    password: String,
+    dns_override: Option<&(String, String)>,
 ) -> Option<TauriCommand> {
-    // ZH: TUN 启动前把系统 DNS 指向 TUN 网关，防止 systemd-resolved 经
-    //     `SO_BINDTODEVICE` 绕开 fwmark 路由直接从物理网卡发 DNS。
-    //     失败不阻塞启动。
-    // EN: Override system DNS before spawn so systemd-resolved cannot bypass
-    //     fwmark-based routing via SO_BINDTODEVICE. Non-fatal on failure.
-    if let Err(e) = apply_system_dns_override(&password, &path) {
-        log::warn!("[dns] apply_system_dns_override failed: {}", e);
+    let mut args = vec![HELPER_PATH.to_string(), "start-tun".to_string(), sidecar_path, path.clone()];
+
+    if let Some((iface, _original)) = dns_override {
+        let gateway = extract_tun_gateway_from_config(&path).unwrap_or_default();
+        if !gateway.is_empty() {
+            args.push(iface.clone());
+            args.push(gateway);
+        }
     }
 
-    let command = format!(
-        r#"echo '{}' | sudo -S '{}' run -c '{}' --disable-color"#,
-        password.escape_default(),
-        sidecar_path.escape_default(),
-        path.escape_default()
-    );
-    log::debug!("Executing command: {}", command);
-    Some(app.shell().command("sh").args(vec!["-c", &command]))
+    let args_ref: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
+    Some(app.shell().command("pkexec").args(args_ref))
 }
 
-/// 停止TUN模式下的进程
-pub fn stop_tun_process(password: &str) -> Result<(), String> {
-    // ZH: 先恢复系统 DNS，再杀 sing-box，保证即使后面失败用户网络也不至于卡住。
-    if let Err(e) = restore_system_dns(password) {
-        log::warn!("[dns] restore_system_dns failed: {}", e);
+/// Stop sing-box and restore DNS in a single pkexec call (one auth prompt).
+pub fn stop_tun_and_restore_dns(
+    dns_override: Option<&(String, String)>,
+) -> Result<(), String> {
+    let mut args = vec![HELPER_PATH, "stop-tun"];
+
+    let iface_owned;
+    let servers_owned;
+    if let Some((iface, original_dns)) = dns_override {
+        log::info!(
+            "[dns] restore: setting [{}] DNS back to {}",
+            iface,
+            original_dns
+        );
+        iface_owned = iface.clone();
+        servers_owned = original_dns.clone();
+        args.push(&iface_owned);
+        for server in servers_owned.split_whitespace() {
+            args.push(server);
+        }
     }
 
-    let command = format!("echo '{}' | sudo -S pkill -f sing-box", password);
-    log::debug!("Executing command: {}", command);
-    Command::new("sh")
-        .arg("-c")
-        .arg(command)
+    let out = Command::new("pkexec")
+        .args(&args)
         .output()
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| format!("pkexec stop failed: {}", e))?;
+    if !out.status.success() {
+        let stderr = String::from_utf8_lossy(&out.stderr);
+        log::warn!("[stop] pkexec non-zero exit: {}", stderr);
+    }
     Ok(())
+}
+
+/// Legacy trait-compatible wrapper (unused on Linux, kept for trait signature).
+pub fn stop_tun_process() -> Result<(), String> {
+    stop_tun_and_restore_dns(None)
 }
 
 // ========== Linux 系统 DNS 接管 (systemd-resolved) ==========
 //
-// ZH: Ubuntu 18.04+ 默认启用 systemd-resolved 作为 stub resolver (127.0.0.53)，
-//     通过 per-link DNS 把上游查询发往配置的 nameserver。新版本 resolved 会用
-//     `SO_BINDTODEVICE` 把查询 socket 绑到具体物理接口，绕开 sing-box TUN 的
-//     fwmark 路由。解决方式：强制把活跃接口的 per-link DNS 改成 TUN 网关。
-//     恢复走 `resolvectl revert`（systemd 原生的"回到默认"语义），不做快照。
-// EN: Ubuntu uses systemd-resolved as a stub resolver. Recent versions may
-//     bind the upstream socket to a physical interface, bypassing sing-box's
-//     fwmark routing. Fix: force the active link's per-link DNS to the TUN
-//     gateway. Restore is `resolvectl revert` on every link — systemd's own
-//     "back to defaults" semantics; no snapshot, no backup file.
+// Ubuntu 18.04+ uses systemd-resolved as a stub resolver (127.0.0.53).
+// Recent versions bind upstream sockets to physical interfaces via
+// SO_BINDTODEVICE, bypassing sing-box's fwmark routing. Fix: force
+// the active link's per-link DNS to the TUN gateway.
+//
+// Restore: re-apply the original DNS obtained from NetworkManager
+// (nmcli) on the single interface we overrode. We do NOT touch other
+// interfaces (e.g. tailscale0), and we do NOT use `resolvectl revert`
+// which clears DNS entirely in "foreign" resolv.conf mode.
 
-/// ZH: 检测默认路由出接口名，如 "wlp2s0" / "enp3s0"。
+/// Detect the default-route egress interface (e.g. "ens33", "wlp2s0").
 fn detect_active_iface() -> Result<String, String> {
     let out = Command::new("sh")
         .arg("-c")
@@ -128,76 +146,114 @@ fn detect_active_iface() -> Result<String, String> {
     }
 }
 
-/// ZH: 枚举所有非 loopback 网络接口，用于 restore 阶段逐个 revert。
-/// EN: All non-loopback network interfaces, iterated by restore.
-fn list_all_ifaces() -> Result<Vec<String>, String> {
-    let out = Command::new("sh")
-        .arg("-c")
-        .arg("ip -br link show 2>/dev/null | awk '{print $1}'")
+/// Capture the current DNS servers for an interface from NetworkManager.
+/// Falls back to parsing `resolvectl status <iface>` if nmcli fails.
+fn capture_original_dns(iface: &str) -> Result<String, String> {
+    // Try nmcli first (most reliable on NM-managed systems).
+    let out = Command::new("nmcli")
+        .args(["-t", "-f", "IP4.DNS", "dev", "show", iface])
         .output()
-        .map_err(|e| format!("ip -br link show failed: {}", e))?;
+        .map_err(|e| format!("nmcli failed: {}", e))?;
     let stdout = String::from_utf8_lossy(&out.stdout);
-    Ok(stdout
+    // nmcli output looks like "IP4.DNS[1]:192.168.6.2\nIP4.DNS[2]:8.8.8.8"
+    let servers: Vec<&str> = stdout
         .lines()
-        .map(|l| l.trim())
-        .filter(|l| !l.is_empty() && *l != "lo")
-        .map(|l| {
-            // Strip any @parent suffix ("wlan0@NONE" → "wlan0").
-            l.split('@').next().unwrap_or(l).to_string()
-        })
-        .collect())
+        .filter_map(|l| l.split(':').nth(1))
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+        .collect();
+    if !servers.is_empty() {
+        return Ok(servers.join(" "));
+    }
+
+    // Fallback: parse resolvectl status output.
+    let out = Command::new("resolvectl")
+        .args(["status", iface])
+        .output()
+        .map_err(|e| format!("resolvectl status failed: {}", e))?;
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    for line in stdout.lines() {
+        let line = line.trim();
+        if line.starts_with("DNS Servers:") || line.starts_with("Current DNS Server:") {
+            if let Some(servers) = line.split(':').nth(1) {
+                let s = servers.trim();
+                if !s.is_empty() {
+                    return Ok(s.to_string());
+                }
+            }
+        }
+    }
+
+    Err(format!("could not determine original DNS for {}", iface))
 }
 
-/// ZH: 把活跃接口的 per-link DNS 指向 TUN 网关。不做快照，不落地文件。
-/// EN: Point the active link's per-link DNS at the TUN gateway. No snapshot,
-///     no state file — restore relies on `resolvectl revert` semantics.
-pub fn apply_system_dns_override(password: &str, config_path: &str) -> Result<(), String> {
+/// Capture the active interface and its current DNS servers WITHOUT applying
+/// the override yet. The actual override is baked into the pkexec call in
+/// `create_privileged_command` so only one auth prompt is needed.
+pub fn prepare_dns_override(config_path: &str) -> Result<(String, String), String> {
+    // Verify the config has a TUN gateway (early fail before prompting user).
+    let _gateway = extract_tun_gateway_from_config(config_path)
+        .ok_or_else(|| format!("could not extract TUN gateway from {}", config_path))?;
+    let iface = detect_active_iface()?;
+    let original_dns = capture_original_dns(&iface)?;
+    log::info!(
+        "[dns] captured original DNS for [{}]: {}",
+        iface,
+        original_dns
+    );
+    Ok((iface, original_dns))
+}
+
+/// Override the active interface's DNS to point at the TUN gateway.
+/// Returns `(iface, original_dns)` for later restoration.
+/// Used by reapply_tun_dns_override_if_active (network change handler).
+pub fn apply_system_dns_override(config_path: &str) -> Result<(String, String), String> {
     let gateway = extract_tun_gateway_from_config(config_path)
         .ok_or_else(|| format!("could not extract TUN gateway from {}", config_path))?;
     let iface = detect_active_iface()?;
+    let original_dns = capture_original_dns(&iface)?;
 
-    let cmd = format!(
-        "echo '{}' | sudo -S resolvectl dns '{}' {}",
-        password.escape_default(),
-        iface.replace('\'', "'\\''"),
-        gateway
+    log::info!(
+        "[dns] resolvectl override → {} for [{}] (original: {})",
+        gateway,
+        iface,
+        original_dns
     );
-    log::info!("[dns] resolvectl override → {} for [{}]", gateway, iface);
-    let out = Command::new("sh")
-        .arg("-c")
-        .arg(cmd)
+    let out = Command::new("pkexec")
+        .args([HELPER_PATH, "dns-override", &iface, &gateway])
         .output()
-        .map_err(|e| format!("resolvectl set failed: {}", e))?;
+        .map_err(|e| format!("pkexec dns-override failed: {}", e))?;
     if !out.status.success() {
         let stderr = String::from_utf8_lossy(&out.stderr);
-        log::warn!("[dns] resolvectl non-zero exit: {}", stderr);
+        log::warn!("[dns] dns-override non-zero exit: {}", stderr);
+    }
+    Ok((iface, original_dns))
+}
+
+/// Restore DNS on the single interface we overrode, using the original
+/// servers captured at override time. Does NOT touch other interfaces.
+pub fn restore_system_dns(iface: &str, original_dns: &str) -> Result<(), String> {
+    log::info!(
+        "[dns] restore: setting [{}] DNS back to {}",
+        iface,
+        original_dns
+    );
+    let mut args = vec![HELPER_PATH, "dns-restore", iface];
+    let servers: Vec<&str> = original_dns.split_whitespace().collect();
+    args.extend(servers);
+
+    let out = Command::new("pkexec")
+        .args(&args)
+        .output()
+        .map_err(|e| format!("pkexec dns-restore failed: {}", e))?;
+    if !out.status.success() {
+        let stderr = String::from_utf8_lossy(&out.stderr);
+        return Err(format!("[dns] restore failed: {}", stderr));
     }
     Ok(())
 }
 
-/// ZH: 恢复系统 DNS。枚举所有 link 逐个 `resolvectl revert`，让
-///     systemd-resolved 把 per-link DNS 回退到 NetworkManager / netplan
-///     的配置。对从未被我们 override 过的 link 执行也是幂等 no-op。
-/// EN: Restore: iterate every link and run `resolvectl revert`, letting
-///     systemd-resolved drop back to NetworkManager / netplan's configured
-///     DNS. Idempotent on links we never touched.
-pub fn restore_system_dns(password: &str) -> Result<(), String> {
-    let ifaces = list_all_ifaces()?;
-    log::info!("[dns] restore: reverting {} links to defaults", ifaces.len());
-    for iface in &ifaces {
-        let cmd = format!(
-            "echo '{}' | sudo -S resolvectl revert '{}'",
-            password.escape_default(),
-            iface.replace('\'', "'\\''")
-        );
-        if let Err(e) = Command::new("sh").arg("-c").arg(cmd).output() {
-            log::warn!("[dns] failed to revert [{}]: {}", iface, e);
-        }
-    }
-    Ok(())
-}
-
-/// Linux平台的VPN代理实现
+/// Linux platform VPN proxy implementation.
 pub struct LinuxVpnProxy;
 
 impl VpnProxy for LinuxVpnProxy {
@@ -213,12 +269,14 @@ impl VpnProxy for LinuxVpnProxy {
         app: &AppHandle,
         sidecar_path: String,
         path: String,
-        password: String,
+        _password: String,
     ) -> Option<TauriCommand> {
-        create_privileged_command(app, sidecar_path, path, password)
+        // Trait impl called from Windows path only; Linux uses the direct
+        // function with dns_override parameter from core.rs.
+        create_privileged_command(app, sidecar_path, path, None)
     }
 
-    fn stop_tun_process(password: &str) -> Result<(), String> {
-        stop_tun_process(password)
+    fn stop_tun_process(_password: &str) -> Result<(), String> {
+        stop_tun_process()
     }
 }

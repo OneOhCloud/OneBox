@@ -1,0 +1,39 @@
+#!/bin/sh
+# OneBox TUN helper — runs privileged operations via pkexec.
+# Installed to /usr/lib/OneBox/onebox-tun-helper by deb/rpm package.
+# Polkit policy cloud.oneoh.onebox.run-privileged authorizes this script.
+set -e
+
+case "$1" in
+    start-tun)
+        # $2 = sidecar path, $3 = config path
+        # Optional: $4 = iface, $5 = gateway (DNS override)
+        if [ -n "$4" ] && [ -n "$5" ]; then
+            resolvectl dns "$4" "$5"
+        fi
+        exec "$2" run -c "$3" --disable-color
+        ;;
+    stop-tun)
+        # $2 = iface (optional), $3... = original DNS servers (optional)
+        if [ -n "$2" ] && [ -n "$3" ]; then
+            iface="$2"
+            shift 2
+            resolvectl dns "$iface" "$@"
+        fi
+        pkill -x sing-box || true
+        ;;
+    dns-override)
+        # $2 = iface, $3 = gateway
+        resolvectl dns "$2" "$3"
+        ;;
+    dns-restore)
+        # $2 = iface, $3... = original DNS servers
+        iface="$2"
+        shift 2
+        resolvectl dns "$iface" "$@"
+        ;;
+    *)
+        echo "Usage: $0 {start-tun|stop-tun|dns-override|dns-restore}" >&2
+        exit 1
+        ;;
+esac

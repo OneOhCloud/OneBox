@@ -163,6 +163,10 @@ struct ProcessManager {
     tun_password: Option<Arc<String>>, // 使用 Arc 避免 clone
     config_path: Option<Arc<String>>,  // 使用 Arc 避免 clone
     is_stopping: bool,                 // 标记是否正在执行stop操作
+    /// Linux: (interface_name, original_dns_servers) captured at DNS override time.
+    /// Used to restore DNS to the exact original state on stop/crash.
+    #[cfg(target_os = "linux")]
+    dns_override: Option<(String, String)>,
     // Watchdog 主动发起重启时置 true，防止 handle_process_termination 误清状态
     #[cfg(target_os = "macos")]
     bypass_router_restarting: bool,
@@ -178,6 +182,8 @@ lazy_static! {
         tun_password: None,
         config_path: None,
         is_stopping: false,
+        #[cfg(target_os = "linux")]
+        dns_override: None,
         #[cfg(target_os = "macos")]
         bypass_router_restarting: false,
         #[cfg(target_os = "macos")]
@@ -386,17 +392,11 @@ async fn get_password_for_mode(mode: &ProxyMode) -> Result<String, String> {
         Ok(String::new())
     }
 
+    // Linux: pkexec handles privilege escalation — no password needed.
     #[cfg(target_os = "linux")]
     {
-        if matches!(mode, ProxyMode::TunProxy) {
-            let pwd = privilege::get_privilege_password_from_keyring().await;
-            if pwd.is_empty() {
-                return Err("REQUIRE_PRIVILEGE".to_string());
-            }
-            Ok(pwd)
-        } else {
-            Ok(String::new())
-        }
+        let _ = mode;
+        Ok(String::new())
     }
 
     #[cfg(target_os = "windows")]
@@ -480,8 +480,35 @@ pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Resu
             }
             #[cfg(not(target_os = "macos"))]
             {
+                // Linux: capture original DNS for later restore, then pass
+                // the override info to create_privileged_command so DNS
+                // override + sing-box start happen in a single pkexec call.
+                #[cfg(target_os = "linux")]
+                let dns_override_info: Option<(String, String)> = {
+                    match crate::vpn::linux::prepare_dns_override(&path) {
+                        Ok(info) => {
+                            let mut mgr =
+                                PROCESS_MANAGER.lock().unwrap_or_else(|e| e.into_inner());
+                            mgr.dns_override = Some(info.clone());
+                            Some(info)
+                        }
+                        Err(e) => {
+                            log::warn!("[dns] prepare_dns_override failed: {}", e);
+                            None
+                        }
+                    }
+                };
+
                 match helper::get_sidecar_path(Path::new("sing-box")) {
                     Ok(sidecar_path) => {
+                        #[cfg(target_os = "linux")]
+                        let cmd = crate::vpn::linux::create_privileged_command(
+                            &app,
+                            sidecar_path,
+                            path.clone(),
+                            dns_override_info.as_ref(),
+                        );
+                        #[cfg(not(target_os = "linux"))]
                         let cmd = PlatformVpnProxy::create_privileged_command(
                             &app,
                             sidecar_path,
@@ -714,15 +741,12 @@ async fn handle_process_termination(
         }
     }
 
-    // Stash tun_password AND the is_stopping flag out of the lock before the
-    // cleanup block clears them — Linux still needs sudo credentials for DNS
-    // restore after state is reset, and Windows needs to know whether the
-    // termination came from a user-initiated stop vs. an external kill.
-    // macOS no longer uses captured_tun_password (helper handles DNS restore
-    // without a password), but the variable is still populated for other
-    // platform arms.
+    // Stash tun_password, dns_override, and is_stopping out of the lock
+    // before the cleanup block clears them — Linux needs dns_override for
+    // targeted DNS restore, and Windows needs is_stopping to decide whether
+    // the termination came from a user-initiated stop vs. an external kill.
     #[allow(unused_variables)]
-    let (should_cleanup, captured_tun_password, was_user_initiated_stop) = {
+    let (should_cleanup, captured_tun_password, was_user_initiated_stop, captured_dns_override) = {
         let mut manager = PROCESS_MANAGER.lock().unwrap_or_else(|e| {
             log::error!("Failed to lock process manager: {:?}", e);
             e.into_inner()
@@ -735,10 +759,21 @@ async fn handle_process_termination(
             .map(|m| **m == **process_mode)
             .unwrap_or(false);
 
+        #[allow(unused_assignments)]
+        let mut dns_info: Option<(String, String)> = None;
+
         let (captured, stopping) = if matches {
             log::info!("Cleaning up resources after process termination");
             let pwd = manager.tun_password.clone();
             let was_stopping = manager.is_stopping;
+            #[cfg(target_os = "linux")]
+            {
+                dns_info = manager.dns_override.take();
+            }
+            #[cfg(not(target_os = "linux"))]
+            {
+                dns_info = None;
+            }
             manager.child = None;
             manager.mode = None;
             manager.config_path = None;
@@ -751,9 +786,10 @@ async fn handle_process_termination(
             }
             (pwd, was_stopping)
         } else {
+            dns_info = None;
             (None, false)
         };
-        (matches, captured, stopping)
+        (matches, captured, stopping, dns_info)
     };
 
     if !should_cleanup {
@@ -790,14 +826,20 @@ async fn handle_process_termination(
         }
         #[cfg(target_os = "linux")]
         {
-            if let Some(pwd) = captured_tun_password.as_ref() {
-                log::info!("[dns] TUN process terminated — reverting all links to defaults");
-                if let Err(e) = crate::vpn::linux::restore_system_dns(pwd) {
+            if let Some((iface, original_dns)) = captured_dns_override {
+                log::info!(
+                    "[dns] TUN process terminated — restoring [{}] DNS to {}",
+                    iface,
+                    original_dns
+                );
+                if let Err(e) =
+                    crate::vpn::linux::restore_system_dns(&iface, &original_dns)
+                {
                     log::warn!("[dns] fallback restore_system_dns failed: {}", e);
                 }
             } else {
                 log::warn!(
-                    "[dns] TUN terminated but no password captured; user must run `sudo resolvectl revert <iface>` manually"
+                    "[dns] TUN terminated but no dns_override captured; DNS may need manual restore"
                 );
             }
         }
@@ -936,7 +978,22 @@ pub async fn stop(app: tauri::AppHandle) -> Result<(), String> {
                         e
                     })?;
                 }
-                #[cfg(not(target_os = "macos"))]
+                #[cfg(target_os = "linux")]
+                {
+                    // Linux: restore DNS + kill sing-box in a single pkexec call
+                    // (avoids double auth prompt). No password needed.
+                    let dns_info = {
+                        let mgr =
+                            PROCESS_MANAGER.lock().unwrap_or_else(|e| e.into_inner());
+                        mgr.dns_override.clone()
+                    };
+                    crate::vpn::linux::stop_tun_and_restore_dns(dns_info.as_ref())
+                        .map_err(|e| {
+                            log::error!("Failed to stop TUN process: {}", e);
+                            e
+                        })?;
+                }
+                #[cfg(target_os = "windows")]
                 {
                     if let Some(pwd) = password {
                         PlatformVpnProxy::stop_tun_process(&pwd).map_err(|e| {
@@ -959,7 +1016,11 @@ pub async fn stop(app: tauri::AppHandle) -> Result<(), String> {
                 // 用户未发起 stop 的异常退出路径使用。
                 #[cfg(any(target_os = "windows", target_os = "linux"))]
                 {
-                    let _ = transition(&app, Intent::MarkIdle);
+                    log::info!("[stop] about to call MarkIdle, current state: {:?}", app.state::<VpnStateCell>().snapshot());
+                    match transition(&app, Intent::MarkIdle) {
+                        Ok(state) => log::info!("[stop] MarkIdle transition succeeded: {:?}", state),
+                        Err(e) => log::error!("[stop] MarkIdle transition FAILED: {}", e),
+                    }
                 }
             }
         }
@@ -975,6 +1036,10 @@ pub async fn stop(app: tauri::AppHandle) -> Result<(), String> {
         manager.tun_password = None;
         manager.config_path = None;
         manager.is_stopping = false;
+        #[cfg(target_os = "linux")]
+        {
+            manager.dns_override = None;
+        }
         // 用户主动停止时终止 watchdog
         #[cfg(target_os = "macos")]
         {
@@ -1033,7 +1098,7 @@ pub fn clear_vpn_error(app: AppHandle) {
 /// 每次 NetworkUp 直接重跑即可,不需要观察者轮询。
 ///
 /// - macOS: 通过 privileged helper 调 networksetup,只需 config_path。
-/// - Linux: 复用 PROCESS_MANAGER 里缓存的 sudo 密码和配置路径。
+/// - Linux: pkexec 调 resolvectl,只需 config_path。结果更新到 dns_override。
 /// - Windows: 跳过 —— 重设要走 elevated helper,每次 Wi-Fi 切换都弹 UAC 不可接受。
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 #[allow(dead_code)]
@@ -1051,11 +1116,6 @@ pub fn reapply_tun_dns_override_if_active() {
         Some(c) => c,
         None => return,
     };
-    #[cfg(target_os = "linux")]
-    let password = match manager.tun_password.as_ref().cloned() {
-        Some(p) => p,
-        None => return,
-    };
     drop(manager);
 
     log::info!("[dns] NetworkUp — re-applying TUN gateway DNS override");
@@ -1064,8 +1124,12 @@ pub fn reapply_tun_dns_override_if_active() {
         log::warn!("[dns] NetworkUp re-apply failed: {}", e);
     }
     #[cfg(target_os = "linux")]
-    if let Err(e) = crate::vpn::linux::apply_system_dns_override(&password, &config_path) {
-        log::warn!("[dns] NetworkUp re-apply failed: {}", e);
+    match crate::vpn::linux::apply_system_dns_override(&config_path) {
+        Ok(override_info) => {
+            let mut mgr = PROCESS_MANAGER.lock().unwrap_or_else(|e| e.into_inner());
+            mgr.dns_override = Some(override_info);
+        }
+        Err(e) => log::warn!("[dns] NetworkUp re-apply failed: {}", e),
     }
 }
 
