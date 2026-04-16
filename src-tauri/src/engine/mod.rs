@@ -77,12 +77,24 @@ pub trait EngineManager {
     /// the helper script on disk. Returns a short human-readable string
     /// (`"pong"`, `"running"`, `"available"`) on success.
     async fn probe(app: &AppHandle) -> Result<String, String>;
+
+    /// How long core should wait after `start()` returns before handing
+    /// off to the readiness prober. TUN mode takes longer because it
+    /// round-trips through the privileged companion (XPC / SCM / pkexec)
+    /// before sing-box actually starts accepting connections; SystemProxy
+    /// just spawns a user-mode sidecar. Default covers both; override if
+    /// a specific platform needs a different cadence.
+    fn start_settle_delay(mode: &ProxyMode) -> std::time::Duration {
+        match mode {
+            ProxyMode::TunProxy => std::time::Duration::from_millis(1500),
+            ProxyMode::SystemProxy => std::time::Duration::from_millis(1000),
+        }
+    }
 }
 
-pub mod helper;
-pub mod readiness;
-pub mod state_machine;
-pub(crate) mod sysproxy;
+pub mod common;
+pub use common::{helper, readiness, state_machine};
+pub(crate) use common::sysproxy;
 
 #[cfg(target_os = "linux")]
 pub mod linux;

@@ -17,7 +17,7 @@
 use onebox_sysproxy_rs::Sysproxy;
 use tauri::{AppHandle, Emitter};
 
-use super::EVENT_TAURI_LOG;
+use crate::engine::EVENT_TAURI_LOG;
 
 const PROXY_HOST: &str = "127.0.0.1";
 const PROXY_PORT: u16 = 6789;

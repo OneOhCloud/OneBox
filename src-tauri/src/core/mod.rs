@@ -95,11 +95,10 @@ pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Resu
         return Err(e);
     }
 
-    // Give the proxy a beat to settle before readiness probing; TUN takes
-    // slightly longer because the helper owns the process and round-trips
-    // through XPC/SCM/pkexec.
-    let wait_time = if matches!(mode, ProxyMode::TunProxy) { 1500 } else { 1000 };
-    tokio::time::sleep(tokio::time::Duration::from_millis(wait_time)).await;
+    // Platform-specific settle window before readiness probing — TUN
+    // round-trips through the privileged companion, SystemProxy just
+    // spawns a user-mode sidecar.
+    tokio::time::sleep(PlatformEngine::start_settle_delay(&mode)).await;
     ::log::info!("Proxy process spawn returned; handing off to readiness prober");
     readiness::spawn(app.clone(), start_epoch);
     Ok(())
