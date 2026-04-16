@@ -33,8 +33,13 @@ case "$1" in
         resolvectl dns "$iface" "$@"
         ;;
     reload)
-        # Send SIGHUP to sing-box for config reload
+        # Send SIGHUP to sing-box for config reload, then flush the
+        # systemd-resolved cache. Without the flush, stale entries from
+        # the previous config (e.g. a FakeIP assigned under global mode)
+        # keep being returned for their full TTL even after rules-mode
+        # resolution should produce a real IP. One pkexec call covers both.
         pkill -HUP sing-box || true
+        resolvectl flush-caches 2>/dev/null || true
         ;;
     *)
         echo "Usage: $0 {start-tun|stop-tun|dns-override|dns-restore|reload}" >&2

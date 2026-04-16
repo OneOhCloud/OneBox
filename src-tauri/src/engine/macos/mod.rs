@@ -294,4 +294,40 @@ impl EngineManager for MacOSEngine {
             log::warn!("[dns] fallback restore_system_dns failed: {}", e);
         }
     }
+
+    async fn reload_engine(_app: &AppHandle, is_tun: bool) -> Result<(), String> {
+        // TUN mode: sing-box runs as root under the XPC helper — ask the
+        // helper to SIGHUP it, then flush the OS resolver cache.
+        // SystemProxy mode: sing-box runs as the current user, pkill is enough;
+        // DNS isn't overridden so no cache flush is needed.
+        if is_tun {
+            tokio::task::spawn_blocking(macos_helper::api::reload_sing_box)
+                .await
+                .map_err(|e| format!("reload join error: {}", e))?
+                .map_err(|e| format!("helper reload_sing_box failed: {}", e))?;
+            log::info!("[reload] SIGHUP sent via helper");
+
+            // Clear mDNSResponder + dscacheutil. FakeIP responses carry a 600s
+            // TTL, so without this the OS keeps returning stale mappings for
+            // up to 10 minutes after the config switch.
+            match tokio::task::spawn_blocking(macos_helper::api::flush_dns_cache).await {
+                Ok(Ok(())) => log::info!("[reload] flushed DNS cache"),
+                Ok(Err(e)) => log::warn!("[reload] flush_dns_cache failed: {}", e),
+                Err(e) => log::warn!("[reload] flush_dns_cache join error: {}", e),
+            }
+        } else {
+            let output = Command::new("pkill")
+                .args(["-HUP", "sing-box"])
+                .output()
+                .map_err(|e| format!("Failed to send SIGHUP: {}", e))?;
+            if !output.status.success() {
+                return Err(format!(
+                    "pkill -HUP non-zero: {}",
+                    String::from_utf8_lossy(&output.stderr)
+                ));
+            }
+            log::info!("[reload] SIGHUP sent via pkill");
+        }
+        Ok(())
+    }
 }

@@ -458,13 +458,10 @@ pub fn get_running_config() -> Option<(ProxyMode, String)> {
 }
 
 #[tauri::command]
-#[allow(unused_variables)]
 pub async fn reload_config(app: tauri::AppHandle, is_tun: bool) -> Result<String, String> {
-    #[cfg(unix)]
+    #[cfg(any(unix, target_os = "windows"))]
     {
-        use std::process::Command;
-
-        let (is_privileged, needs_proxy_reset) = {
+        let needs_proxy_reset = {
             let manager = ProcessManager::acquire();
 
             match (manager.mode.as_ref().map(|m| m.as_ref()), is_tun) {
@@ -481,48 +478,14 @@ pub async fn reload_config(app: tauri::AppHandle, is_tun: bool) -> Result<String
                 }
             }
 
-            let needs_reset = matches!(
+            matches!(
                 manager.mode.as_ref().map(|m| m.as_ref()),
                 Some(ProxyMode::SystemProxy)
-            );
-
-            (is_tun, needs_reset)
+            )
         };
 
         ::log::info!("Reloading config");
-
-        #[cfg(target_os = "macos")]
-        if is_privileged {
-            tokio::task::spawn_blocking(crate::engine::macos::helper::api::reload_sing_box)
-                .await
-                .map_err(|e| format!("reload join error: {}", e))?
-                .map_err(|e| format!("helper reload_sing_box failed: {}", e))?;
-            ::log::info!("SIGHUP sent via helper");
-        } else {
-            let output = Command::new("pkill")
-                .arg("-HUP")
-                .arg("sing-box")
-                .output()
-                .map_err(|e| format!("Failed to send SIGHUP: {}", e))?;
-            if !output.status.success() {
-                let error = String::from_utf8_lossy(&output.stderr);
-                return Err(format!("Failed to reload config: {}", error));
-            }
-            ::log::info!("SIGHUP sent via pkill");
-        }
-
-        #[cfg(target_os = "linux")]
-        {
-            let output = Command::new("pkexec")
-                .args([crate::engine::linux::HELPER_PATH, "reload"])
-                .output()
-                .map_err(|e| format!("Failed to send SIGHUP via helper: {}", e))?;
-            if !output.status.success() {
-                let error = String::from_utf8_lossy(&output.stderr);
-                return Err(format!("Failed to reload config: {}", error));
-            }
-            ::log::info!("SIGHUP sent via helper");
-        }
+        PlatformEngine::reload_engine(&app, is_tun).await?;
 
         if needs_proxy_reset {
             ::log::info!("SystemProxy mode detected, waiting for reload and resetting proxy");
@@ -535,24 +498,6 @@ pub async fn reload_config(app: tauri::AppHandle, is_tun: bool) -> Result<String
         }
 
         Ok("Configuration reloaded successfully".to_string())
-    }
-
-    #[cfg(target_os = "windows")]
-    {
-        let config_path = {
-            let manager = ProcessManager::acquire();
-            manager
-                .config_path
-                .as_ref()
-                .map(|p| p.as_str().to_string())
-                .unwrap_or_default()
-        };
-
-        let sidecar_path = helper::get_sidecar_path(Path::new("sing-box"))
-            .map_err(|e| format!("Failed to get sidecar path: {}", e))?;
-
-        PlatformEngine::restart(sidecar_path, config_path);
-        Ok("Configuration reload attempted by restarting process".to_string())
     }
 
     #[cfg(not(any(unix, target_os = "windows")))]

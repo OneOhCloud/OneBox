@@ -158,6 +158,26 @@ unsafe extern "system" fn service_main(argc: u32, argv: *mut PWSTR) {
     let (ok, err) = dns::apply_override(&gateway);
     dns::log_line(&format!("apply_override: ok={} err={}", ok, err));
 
+    // Flush the system resolver cache. On a reload (mode switch) the
+    // previous config's entries — notably FakeIPs from global mode with
+    // the 600s TTL baked into sing-box — would otherwise keep being
+    // returned by the Dnscache service for up to 10 minutes. Running
+    // this from SYSTEM context inside the service avoids the elevation
+    // requirement that `ipconfig /flushdns` has when invoked by a user
+    // process on Windows 10+.
+    match std::process::Command::new("ipconfig")
+        .arg("/flushdns")
+        .creation_flags(CREATE_NO_WINDOW)
+        .output()
+    {
+        Ok(o) if o.status.success() => dns::log_line("ipconfig /flushdns OK"),
+        Ok(o) => dns::log_line(&format!(
+            "ipconfig /flushdns non-zero: {}",
+            String::from_utf8_lossy(&o.stderr).trim()
+        )),
+        Err(e) => dns::log_line(&format!("ipconfig /flushdns spawn failed: {}", e)),
+    }
+
     // Spawn sing-box. `CREATE_NO_WINDOW` is required — without it the service
     // (which has no console) spawning a console-subsystem child causes Windows
     // to pop a fresh terminal on the user's desktop.

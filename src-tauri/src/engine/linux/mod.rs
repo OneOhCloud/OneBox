@@ -305,4 +305,24 @@ impl EngineManager for LinuxEngine {
             );
         }
     }
+
+    async fn reload_engine(_app: &AppHandle, _is_tun: bool) -> Result<(), String> {
+        // Helper's `reload` verb bundles `pkill -HUP sing-box` and
+        // `resolvectl flush-caches` in one pkexec call. The flush is needed
+        // because systemd-resolved honors sing-box's 600s FakeIP TTL, so
+        // without it a global → rules switch keeps returning the old
+        // FakeIP for up to 10 minutes after the reload.
+        let output = Command::new("pkexec")
+            .args([HELPER_PATH, "reload"])
+            .output()
+            .map_err(|e| format!("pkexec reload failed: {}", e))?;
+        if !output.status.success() {
+            return Err(format!(
+                "helper reload non-zero: {}",
+                String::from_utf8_lossy(&output.stderr)
+            ));
+        }
+        log::info!("[reload] SIGHUP + flush-caches via helper");
+        Ok(())
+    }
 }

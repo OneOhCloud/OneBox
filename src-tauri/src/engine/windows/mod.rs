@@ -239,6 +239,9 @@ pub fn restart_privileged_command(sidecar_path: String, path: String) -> Result<
         sidecar_path.as_str(),
     ])?;
     log::info!("[service] OneBoxTunService restarted");
+    // DNS cache flush happens inside the service (service.rs::service_main)
+    // because `ipconfig /flushdns` needs admin on Windows 10+. Calling it
+    // from this Rust process would run as the user and silently fail.
     Ok(())
 }
 
@@ -293,7 +296,22 @@ impl EngineManager for WindowsEngine {
         }
     }
 
-    fn restart(sidecar_path: String, path: String) {
-        let _ = restart_privileged_command(sidecar_path, path);
+    async fn reload_engine(_app: &AppHandle, _is_tun: bool) -> Result<(), String> {
+        // Windows service is driven by SCM; SIGHUP is not a thing. The
+        // "reload" is a stop+start of OneBoxTunService, with the service
+        // itself running `ipconfig /flushdns` from SYSTEM context during
+        // its startup (see tun-service/src/service.rs::service_main).
+        let (config_path, sidecar_path) = {
+            let manager = crate::core::ProcessManager::acquire();
+            let cfg = manager
+                .config_path
+                .as_ref()
+                .map(|p| p.as_str().to_string())
+                .unwrap_or_default();
+            let sidecar = crate::engine::helper::get_sidecar_path(std::path::Path::new("sing-box"))
+                .map_err(|e| format!("Failed to get sidecar path: {}", e))?;
+            (cfg, sidecar)
+        };
+        restart_privileged_command(sidecar_path, config_path)
     }
 }

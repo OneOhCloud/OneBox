@@ -42,11 +42,28 @@ pub trait EngineManager {
     ) {
     }
 
-    #[cfg(target_os = "windows")]
-    fn restart(sidecar_path: String, path: String) {
-        let _ = sidecar_path;
-        let _ = path;
-    }
+    /// Reload the running sing-box engine with the current on-disk config,
+    /// and flush the OS DNS resolver cache so entries keyed to the previous
+    /// config (FakeIPs, Chinese-domain answers, etc.) don't linger for their
+    /// full TTL after the switch.
+    ///
+    /// Each platform bundles reload + flush behind this one method so the
+    /// caller does not have to coordinate them:
+    ///   - macOS: SIGHUP via XPC helper (TUN) or `pkill -HUP` (SystemProxy),
+    ///     plus `dscacheutil -flushcache` + `killall -HUP mDNSResponder`
+    ///     through the helper.
+    ///   - Linux: a single pkexec to the shell helper whose `reload` verb
+    ///     runs `pkill -HUP sing-box` followed by `resolvectl flush-caches`.
+    ///   - Windows: SCM stop+start of OneBoxTunService; the service itself
+    ///     runs `ipconfig /flushdns` from SYSTEM context inside
+    ///     `service_main`, so no separate user-side call is needed
+    ///     (`ipconfig /flushdns` requires elevation on Windows 10+).
+    ///
+    /// `is_tun` is TRUE when the currently running mode is TunProxy; FALSE
+    /// for SystemProxy. Platforms that only apply DNS overrides in TUN
+    /// mode can skip the flush on FALSE, but the helper invocations
+    /// handle this internally.
+    async fn reload_engine(app: &AppHandle, is_tun: bool) -> Result<(), String>;
 }
 
 pub mod helper;
