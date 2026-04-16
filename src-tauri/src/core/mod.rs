@@ -28,8 +28,6 @@ pub(crate) struct ProcessManager {
     pub(crate) mode: Option<Arc<ProxyMode>>,
     pub(crate) config_path: Option<Arc<String>>,
     pub(crate) is_stopping: bool,
-    #[cfg(target_os = "linux")]
-    pub(crate) dns_override: Option<(String, String)>,
 }
 
 impl ProcessManager {
@@ -40,17 +38,13 @@ impl ProcessManager {
 
     /// Reset to idle defaults. Platform engines are expected to have
     /// already torn down their own private state (macOS bypass-router
-    /// watchdog, Windows service watchdog, …) via `stop` or
+    /// watchdog, Linux DNS-override stash, …) via `stop` or
     /// `on_process_terminated` before this runs.
     pub(crate) fn reset(&mut self) {
         self.child = None;
         self.mode = None;
         self.config_path = None;
         self.is_stopping = false;
-        #[cfg(target_os = "linux")]
-        {
-            self.dns_override = None;
-        }
     }
 }
 
@@ -61,8 +55,6 @@ lazy_static! {
             mode: None,
             config_path: None,
             is_stopping: false,
-            #[cfg(target_os = "linux")]
-            dns_override: None,
         }));
 }
 

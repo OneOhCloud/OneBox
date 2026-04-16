@@ -1,12 +1,34 @@
 use anyhow;
 use onebox_sysproxy_rs::Sysproxy;
 use std::process::Command;
+use std::sync::Mutex;
 use tauri::AppHandle;
 use tauri_plugin_shell::process::Command as TauriCommand;
 use tauri_plugin_shell::ShellExt;
 
 use crate::engine::helper::extract_tun_gateway_from_config;
 use crate::engine::EngineManager;
+
+/// Private state for the interface-scoped DNS override.
+///
+/// `apply_system_dns_override` captures (iface, original_dns) at start
+/// so the teardown path can restore exactly what was there before.
+/// This used to live in `ProcessManager.dns_override`, but that field
+/// leaked a Linux-shaped tuple into the shared cross-platform state
+/// container; moving it here keeps it a Linux engine implementation
+/// detail.
+static DNS_OVERRIDE: Mutex<Option<(String, String)>> = Mutex::new(None);
+
+fn set_dns_override(info: Option<(String, String)>) {
+    *DNS_OVERRIDE.lock().unwrap_or_else(|e| e.into_inner()) = info;
+}
+
+fn take_dns_override() -> Option<(String, String)> {
+    DNS_OVERRIDE
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .take()
+}
 
 // 默认绕过列表
 pub static DEFAULT_BYPASS: &str =
@@ -294,8 +316,7 @@ impl EngineManager for LinuxEngine {
                 // to start at all.
                 let dns_info = match prepare_dns_override(&config_path) {
                     Ok(info) => {
-                        let mut mgr = crate::core::ProcessManager::acquire();
-                        mgr.dns_override = Some(info.clone());
+                        set_dns_override(Some(info.clone()));
                         Some(info)
                     }
                     Err(e) => {
@@ -358,10 +379,9 @@ impl EngineManager for LinuxEngine {
                 tokio::time::sleep(std::time::Duration::from_millis(500)).await;
             }
             crate::core::ProxyMode::TunProxy => {
-                let dns_info = {
-                    let mgr = crate::core::ProcessManager::acquire();
-                    mgr.dns_override.clone()
-                };
+                // take_dns_override drains the stash so on_process_terminated
+                // doesn't double-restore when the monitor fires afterwards.
+                let dns_info = take_dns_override();
                 stop_tun_and_restore_dns(dns_info.as_ref()).map_err(|e| {
                     log::error!("Failed to stop TUN process: {}", e);
                     e
@@ -373,8 +393,9 @@ impl EngineManager for LinuxEngine {
 
     fn on_network_up(_app: &AppHandle) {
         // NetworkUp → new default interface may need DNS overriding again.
-        // Reads the current config from ProcessManager; refreshes the stored
-        // (iface, original_dns) tuple so the later teardown uses the right one.
+        // Read the current config from ProcessManager; refresh the stored
+        // (iface, original_dns) tuple in our private stash so the later
+        // teardown uses the right one.
         let config_path = {
             let manager = crate::core::ProcessManager::acquire();
             match manager.config_path.as_ref() {
@@ -383,22 +404,17 @@ impl EngineManager for LinuxEngine {
             }
         };
         match apply_system_dns_override(&config_path) {
-            Ok(info) => {
-                let mut manager = crate::core::ProcessManager::acquire();
-                manager.dns_override = Some(info);
-            }
+            Ok(info) => set_dns_override(Some(info)),
             Err(e) => log::warn!("[dns] NetworkUp re-apply failed: {}", e),
         }
     }
 
     fn on_process_terminated(_app: &AppHandle, _was_user_stop: bool) {
-        // Read the teardown state that `core::start` stashed at boot.
-        // Note the Linux restore is interface-scoped and stateful — without
-        // the captured (iface, original_dns) we have nothing to restore to.
-        let dns_info = {
-            let manager = crate::core::ProcessManager::acquire();
-            manager.dns_override.clone()
-        };
+        // Drain the teardown state captured at start. If stop already
+        // consumed it (user-initiated path), this is a no-op — exactly
+        // what we want, since restoring twice would clobber whatever the
+        // user set afterwards.
+        let dns_info = take_dns_override();
         if let Some((iface, original_dns)) = dns_info {
             log::info!(
                 "[dns] TUN process terminated — restoring [{}] DNS to {}",
