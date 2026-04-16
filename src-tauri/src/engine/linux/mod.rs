@@ -1,5 +1,3 @@
-use anyhow;
-use onebox_sysproxy_rs::Sysproxy;
 use std::process::Command;
 use std::sync::Mutex;
 use tauri::AppHandle;
@@ -7,6 +5,7 @@ use tauri_plugin_shell::process::Command as TauriCommand;
 use tauri_plugin_shell::ShellExt;
 
 use crate::engine::helper::extract_tun_gateway_from_config;
+use crate::engine::sysproxy::{clear_system_proxy, set_system_proxy};
 use crate::engine::EngineManager;
 
 /// Private state for the interface-scoped DNS override.
@@ -28,53 +27,6 @@ fn take_dns_override() -> Option<(String, String)> {
         .lock()
         .unwrap_or_else(|e| e.into_inner())
         .take()
-}
-
-// 默认绕过列表
-pub static DEFAULT_BYPASS: &str =
-    "localhost,127.0.0.1,192.168.0.0/16,10.0.0.0/8,172.16.0.0/12,172.29.0.0/16,::1";
-
-/// 代理配置
-#[derive(Clone)]
-pub struct ProxyConfig {
-    pub host: String,
-    pub port: u16,
-    pub bypass: String,
-}
-
-impl Default for ProxyConfig {
-    fn default() -> Self {
-        Self {
-            host: "127.0.0.1".to_string(),
-            port: 6789,
-            bypass: DEFAULT_BYPASS.to_string(),
-        }
-    }
-}
-
-/// 设置系统代理
-pub async fn set_proxy(_app: &AppHandle) -> anyhow::Result<()> {
-    let config = ProxyConfig::default();
-    let sys = Sysproxy {
-        enable: true,
-        host: config.host.clone(),
-        port: config.port.clone(),
-        bypass: config.bypass,
-    };
-    sys.set_system_proxy()?;
-    log::info!("Proxy set to {}:{}", config.host, config.port);
-    Ok(())
-}
-
-/// 取消系统代理
-pub async fn unset_proxy(_app: &AppHandle) -> anyhow::Result<()> {
-    let mut sysproxy = Sysproxy::get_system_proxy().map_err(|e| anyhow::anyhow!(e))?;
-    sysproxy.enable = false;
-    sysproxy
-        .set_system_proxy()
-        .map_err(|e| anyhow::anyhow!(e))?;
-    log::info!("Proxy unset");
-    Ok(())
 }
 
 pub const HELPER_PATH: &str = "/usr/lib/OneBox/onebox-tun-helper";
@@ -306,7 +258,7 @@ impl EngineManager for LinuxEngine {
                     mgr.child = Some(child);
                     mgr.is_stopping = false;
                 }
-                set_proxy(app).await.map_err(|e| e.to_string())?;
+                set_system_proxy(app).await.map_err(|e| e.to_string())?;
             }
             crate::engine::ProxyMode::TunProxy => {
                 // Capture the active interface's original DNS into
@@ -349,7 +301,7 @@ impl EngineManager for LinuxEngine {
                     mgr.child = Some(child);
                     mgr.is_stopping = false;
                 }
-                let _ = unset_proxy(app).await;
+                let _ = unset_system_proxy(app).await;
             }
         }
         Ok(())
@@ -364,7 +316,7 @@ impl EngineManager for LinuxEngine {
         let Some(mode) = mode else { return Ok(()); };
         match mode.as_ref() {
             crate::engine::ProxyMode::SystemProxy => {
-                let _ = unset_proxy(app).await;
+                let _ = unset_system_proxy(app).await;
                 if let Some(child) = child {
                     use libc::{kill, SIGTERM};
                     let pid = child.pid();

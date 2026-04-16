@@ -82,6 +82,7 @@ pub trait EngineManager {
 pub mod helper;
 pub mod readiness;
 pub mod state_machine;
+pub(crate) mod sysproxy;
 
 #[cfg(target_os = "linux")]
 pub mod linux;
@@ -113,31 +114,10 @@ pub use macos::MacOSEngine as PlatformEngine;
 #[cfg(target_os = "windows")]
 pub use windows::WindowsEngine as PlatformEngine;
 
-/// Apply the platform's HTTP/SOCKS system-proxy override. Shared entry
-/// point so `core::*` does not need per-platform cfg gates to call
-/// individual `engine::<platform>::set_proxy` free functions.
-pub(crate) async fn apply_system_proxy(app: &AppHandle) -> anyhow::Result<()> {
-    #[cfg(target_os = "macos")]
-    { macos::set_proxy(app).await }
-    #[cfg(target_os = "linux")]
-    { linux::set_proxy(app).await }
-    #[cfg(target_os = "windows")]
-    { windows::set_proxy(app).await }
-    #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
-    { let _ = app; Ok(()) }
-}
-
-/// Clear the platform's HTTP/SOCKS system-proxy override.
-pub(crate) async fn clear_system_proxy(app: &AppHandle) -> anyhow::Result<()> {
-    #[cfg(target_os = "macos")]
-    { macos::unset_proxy(app).await }
-    #[cfg(target_os = "linux")]
-    { linux::unset_proxy(app).await }
-    #[cfg(target_os = "windows")]
-    { windows::unset_proxy(app).await }
-    #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
-    { let _ = app; Ok(()) }
-}
+/// Re-export the cross-platform system-proxy entry points so existing
+/// `core::*` call sites (`engine::apply_system_proxy`, etc.) keep working.
+pub(crate) use sysproxy::set_system_proxy as apply_system_proxy;
+pub(crate) use sysproxy::clear_system_proxy;
 
 /// Clean up system proxy settings on app shutdown.
 pub fn cleanup_on_shutdown() {

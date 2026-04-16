@@ -1,85 +1,14 @@
 use crate::engine::EVENT_TAURI_LOG;
-use anyhow;
-use onebox_sysproxy_rs::Sysproxy;
 use tauri::AppHandle;
 use tauri::Emitter;
 use tauri_plugin_shell::process::Command as TauriCommand;
 
 use crate::engine::helper::extract_tun_gateway_from_config;
+use crate::engine::sysproxy::{clear_system_proxy, set_system_proxy};
 pub mod native;
 pub(crate) mod watchdog;
 use self::native as windows_native;
 use crate::engine::EngineManager;
-
-// 默认绕过列表
-pub static DEFAULT_BYPASS: &str = "localhost;127.*;192.168.*;10.*;172.16.*;172.17.*;172.18.*;172.19.*;172.20.*;172.21.*;172.22.*;172.23.*;172.24.*;172.25.*;172.26.*;172.27.*;172.28.*;172.29.*;172.30.*;172.31.*;<local>";
-
-/// 代理配置
-#[derive(Clone)]
-pub struct ProxyConfig {
-    pub host: String,
-    pub port: u16,
-    pub bypass: String,
-}
-
-impl Default for ProxyConfig {
-    fn default() -> Self {
-        Self {
-            host: "127.0.0.1".to_string(),
-            port: 6789,
-            bypass: DEFAULT_BYPASS.to_string(),
-        }
-    }
-}
-
-/// 设置系统代理(直接调用 onebox-sysproxy-rs 库,无需外部二进制)
-pub async fn set_proxy(app: &AppHandle) -> anyhow::Result<()> {
-    let config = ProxyConfig::default();
-    app.emit(
-        EVENT_TAURI_LOG,
-        (
-            0,
-            format!("Start set system proxy: {}:{}", config.host, config.port),
-        ),
-    )
-    .unwrap();
-
-    let sys = Sysproxy {
-        enable: true,
-        host: config.host.clone(),
-        port: config.port,
-        bypass: config.bypass,
-    };
-    sys.set_system_proxy().map_err(|e| anyhow::anyhow!(e))?;
-    log::info!("Proxy set to {}:{}", config.host, config.port);
-    Ok(())
-}
-
-/// 取消系统代理
-pub async fn unset_proxy(app: &AppHandle) -> anyhow::Result<()> {
-    app.emit(EVENT_TAURI_LOG, (0, "Start unset system proxy"))
-        .unwrap();
-
-    let mut sysproxy = match Sysproxy::get_system_proxy() {
-        Ok(proxy) => proxy,
-        Err(e) => {
-            let msg = format!("Sysproxy::get_system_proxy failed: {}", e);
-            let _ = app.emit(EVENT_TAURI_LOG, (1, msg.clone()));
-            return Err(anyhow::anyhow!(msg));
-        }
-    };
-    sysproxy.enable = false;
-    if let Err(e) = sysproxy.set_system_proxy() {
-        let msg = format!("Sysproxy::set_system_proxy failed: {}", e);
-        let _ = app.emit(EVENT_TAURI_LOG, (1, msg.clone()));
-        return Err(anyhow::anyhow!(msg));
-    }
-
-    app.emit(EVENT_TAURI_LOG, (0, "System proxy unset successfully"))
-        .unwrap();
-    log::info!("Proxy unset");
-    Ok(())
-}
 
 // ========== Windows 系统 DNS 接管 + 单次 UAC 提权启动 ==========
 //
@@ -278,7 +207,7 @@ impl EngineManager for WindowsEngine {
                     mgr.child = Some(child);
                     mgr.is_stopping = false;
                 }
-                if let Err(e) = set_proxy(app).await {
+                if let Err(e) = set_system_proxy(app).await {
                     let _ = app.emit(EVENT_TAURI_LOG, (2, format!("Failed to set proxy: {}", e)));
                     return Err(e.to_string());
                 }
@@ -310,7 +239,7 @@ impl EngineManager for WindowsEngine {
                 // SystemProxy setting may linger across mode switches on
                 // Windows; best-effort unset so browsers stop pointing at
                 // the mixed port.
-                if let Err(e) = unset_proxy(app).await {
+                if let Err(e) = unset_system_proxy(app).await {
                     log::warn!("Failed to unset proxy: {}", e);
                     let _ = app.emit(
                         EVENT_TAURI_LOG,
@@ -331,7 +260,7 @@ impl EngineManager for WindowsEngine {
         let Some(mode) = mode else { return Ok(()); };
         match mode.as_ref() {
             crate::engine::ProxyMode::SystemProxy => {
-                if let Err(e) = unset_proxy(app).await {
+                if let Err(e) = unset_system_proxy(app).await {
                     log::warn!("Failed to unset proxy: {}", e);
                     let _ = app.emit(
                         EVENT_TAURI_LOG,

@@ -3,77 +3,12 @@ pub(crate) mod watchdog;
 
 use self::helper as macos_helper;
 use crate::engine::helper::extract_tun_gateway_from_config;
+use crate::engine::sysproxy::{clear_system_proxy, set_system_proxy};
 use crate::engine::EngineManager;
-use crate::engine::EVENT_TAURI_LOG;
-use anyhow;
-use onebox_sysproxy_rs::Sysproxy;
 use std::process::Command;
 use tauri::AppHandle;
-use tauri::Emitter;
 use tauri_plugin_store::StoreExt;
 pub const TUN_INTERFACE_NAME: &str = "utun233";
-
-// 默认绕过列表
-pub static DEFAULT_BYPASS: &str =
-    "127.0.0.1,192.168.0.0/16,10.0.0.0/8,172.16.0.0/12,172.29.0.0/16,localhost,*.local,*.crashlytics.com,<local>";
-
-/// 代理配置
-#[derive(Clone)]
-pub struct ProxyConfig {
-    pub host: String,
-    pub port: u16,
-    pub bypass: String,
-}
-
-impl Default for ProxyConfig {
-    fn default() -> Self {
-        Self {
-            host: "127.0.0.1".to_string(),
-            port: 6789,
-            bypass: DEFAULT_BYPASS.to_string(),
-        }
-    }
-}
-
-/// 设置系统代理
-pub async fn set_proxy(_app: &AppHandle) -> anyhow::Result<()> {
-    let config = ProxyConfig::default();
-    let sys = Sysproxy {
-        enable: true,
-        host: config.host.clone(),
-        port: config.port,
-        bypass: config.bypass,
-    };
-    sys.set_system_proxy().map_err(|e| anyhow::anyhow!(e))?;
-    log::info!("Proxy set to {}:{}", config.host, config.port);
-    Ok(())
-}
-
-/// 取消系统代理
-pub async fn unset_proxy(app: &AppHandle) -> anyhow::Result<()> {
-    app.emit(EVENT_TAURI_LOG, (0, "Start unset system proxy"))
-        .ok();
-
-    let mut sysproxy = match Sysproxy::get_system_proxy() {
-        Ok(proxy) => proxy,
-        Err(e) => {
-            let msg = format!("Sysproxy::get_system_proxy failed: {}", e);
-            app.emit(EVENT_TAURI_LOG, (1, msg.clone())).ok();
-            return Err(anyhow::anyhow!(msg));
-        }
-    };
-    sysproxy.enable = false;
-    if let Err(e) = sysproxy.set_system_proxy() {
-        let msg = format!("Sysproxy::set_system_proxy failed: {}", e);
-        app.emit(EVENT_TAURI_LOG, (1, msg.clone())).ok();
-        return Err(anyhow::anyhow!(msg));
-    }
-
-    app.emit(EVENT_TAURI_LOG, (0, "System proxy unset successfully"))
-        .ok();
-    log::info!("Proxy unset");
-    Ok(())
-}
 
 // ============================================================================
 // Helper-backed TUN lifecycle
@@ -283,7 +218,7 @@ impl EngineManager for MacOSEngine {
                     mgr.child = Some(child);
                     mgr.is_stopping = false;
                 }
-                set_proxy(app).await.map_err(|e| e.to_string())?;
+                set_system_proxy(app).await.map_err(|e| e.to_string())?;
             }
             crate::engine::ProxyMode::TunProxy => {
                 // Root-mode sing-box is owned by the privileged XPC helper —
@@ -349,7 +284,7 @@ impl EngineManager for MacOSEngine {
 
                 // TUN mode doesn't use the system HTTP proxy — clear any stale
                 // one left over from a previous SystemProxy session.
-                let _ = unset_proxy(app).await;
+                let _ = clear_system_proxy(app).await;
             }
         }
         Ok(())
@@ -368,7 +303,7 @@ impl EngineManager for MacOSEngine {
             crate::engine::ProxyMode::SystemProxy => {
                 // Best-effort proxy teardown first so apps don't keep pointing
                 // at a dying sing-box socket.
-                let _ = unset_proxy(app).await;
+                let _ = clear_system_proxy(app).await;
                 if let Some(child) = child {
                     use libc::{kill, SIGTERM};
                     let pid = child.pid();
