@@ -654,9 +654,13 @@ async fn handle_process_termination(
         }
     }
 
-    // Stash tun_password out of the lock before the cleanup block clears it — the
-    // DNS-restore fallback below still needs sudo credentials after state is reset.
-    let (should_cleanup, captured_tun_password) = {
+    // Stash tun_password AND the is_stopping flag out of the lock before the
+    // cleanup block clears them — the DNS-restore fallback below still needs
+    // sudo credentials after state is reset, and Windows needs to know whether
+    // the termination came from a user-initiated stop (clean path, service
+    // already restored DNS internally → skip UAC fallback) vs. an external
+    // kill (cleanup didn't run → need UAC fallback).
+    let (should_cleanup, captured_tun_password, was_user_initiated_stop) = {
         let mut manager = PROCESS_MANAGER.lock().unwrap_or_else(|e| {
             log::error!("Failed to lock process manager: {:?}", e);
             e.into_inner()
@@ -669,9 +673,10 @@ async fn handle_process_termination(
             .map(|m| **m == **process_mode)
             .unwrap_or(false);
 
-        let captured = if matches {
+        let (captured, stopping) = if matches {
             log::info!("Cleaning up resources after process termination");
             let pwd = manager.tun_password.clone();
+            let was_stopping = manager.is_stopping;
             manager.child = None;
             manager.mode = None;
             manager.config_path = None;
@@ -682,17 +687,21 @@ async fn handle_process_termination(
             if let Some(abort) = manager.bypass_router_watchdog_abort.take() {
                 abort.abort();
             }
-            pwd
+            (pwd, was_stopping)
         } else {
-            None
+            (None, false)
         };
-        (matches, captured)
+        (matches, captured, stopping)
     };
 
     if !should_cleanup {
         log::info!("Process mode has changed, skipping cleanup");
         return;
     }
+
+    // 非 Windows 平台没有 service cleanup 语义,这个标志只是被消费掉。
+    #[cfg(not(target_os = "windows"))]
+    let _ = was_user_initiated_stop;
 
     // 清理系统代理设置
     if matches!(**process_mode, ProxyMode::SystemProxy) {
@@ -737,9 +746,24 @@ async fn handle_process_termination(
         #[cfg(target_os = "windows")]
         {
             let _ = &captured_tun_password; // silence unused-var warning
-            log::info!("[dns] TUN process terminated — resetting all adapters to DHCP");
-            if let Err(e) = crate::vpn::windows::restore_system_dns() {
-                log::warn!("[dns] fallback restore_system_dns failed: {}", e);
+                                            // 在 Windows 服务架构下，tun-service 的 ServiceMain 退出前已经跑过
+                                            // scorched-earth `dns::restore_all()`，所以正常 stop 路径这里不需要
+                                            // 再弹 UAC 跑 restore_system_dns —— 那是冗余的"兜底"提示。
+                                            //
+                                            // 只有真正的异常路径（外部 taskkill 掉 tun-service.exe、SCM 强杀、
+                                            // 断电重启后残留 DNS 等）才需要走 UAC 兜底 —— 那种场景下
+                                            // `is_stopping == false`，service 的 cleanup 也大概率没跑完。
+            if was_user_initiated_stop {
+                log::info!(
+                    "[dns] user-initiated stop; service already reset DNS, skipping UAC fallback"
+                );
+            } else {
+                log::warn!(
+                    "[dns] TUN process terminated unexpectedly — requesting UAC DNS restore"
+                );
+                if let Err(e) = crate::vpn::windows::restore_system_dns() {
+                    log::warn!("[dns] fallback restore_system_dns failed: {}", e);
+                }
             }
         }
     }
