@@ -1,3 +1,4 @@
+use crate::helper_client;
 use crate::vpn::helper::extract_tun_gateway_from_config;
 use crate::vpn::VpnProxy;
 use crate::vpn::EVENT_TAURI_LOG;
@@ -7,7 +8,6 @@ use std::process::Command;
 use tauri::AppHandle;
 use tauri::Emitter;
 use tauri_plugin_shell::process::Command as TauriCommand;
-use tauri_plugin_shell::ShellExt;
 use tauri_plugin_store::StoreExt;
 pub const TUN_INTERFACE_NAME: &str = "utun233";
 
@@ -49,8 +49,6 @@ pub async fn set_proxy(_app: &AppHandle) -> anyhow::Result<()> {
 
 /// 取消系统代理
 pub async fn unset_proxy(app: &AppHandle) -> anyhow::Result<()> {
-    // 清理系统代理设置
-    // 使用 ok() 忽略 emit 错误，避免关机/退出时 event system 已拆除导致 panic
     app.emit(EVENT_TAURI_LOG, (0, "Start unset system proxy"))
         .ok();
 
@@ -75,145 +73,92 @@ pub async fn unset_proxy(app: &AppHandle) -> anyhow::Result<()> {
     Ok(())
 }
 
-/// 特权模式下启动进程
-pub fn create_privileged_command(
-    app: &AppHandle,
-    sidecar_path: String,
-    path: String,
-    password: String,
-) -> Option<TauriCommand> {
-    let store = app.get_store("settings.json")?;
-    let enable_bypass_router_key = "enable_bypass_router_key";
-    let enable_bypass_router: bool = store
-        .get(enable_bypass_router_key)
-        .and_then(|value| value.as_bool())
+// ============================================================================
+// Helper-backed TUN lifecycle
+// ============================================================================
+
+/// Ensure the privileged helper is installed (auto-install if needed).
+/// Blocks the calling thread while the SMJobBless authorization prompt is
+/// shown; callers must invoke from `spawn_blocking` / background.
+pub fn ensure_helper_installed() -> Result<(), String> {
+    match helper_client::api::ping() {
+        Ok(_) => Ok(()),
+        Err(_) => {
+            log::info!("[helper] not responding, triggering SMJobBless install...");
+            helper_client::api::install()
+        }
+    }
+}
+
+/// Start sing-box in TUN mode via the privileged helper. Called from
+/// core.rs's macOS TUN branch instead of the old `create_privileged_command`.
+///
+/// Steps:
+///   1. Enable IP forwarding if bypass-router mode is on.
+///   2. Override system DNS to the TUN gateway (non-fatal on failure).
+///   3. Ask the helper to posix_spawn sing-box as root.
+///
+/// Returns the helper-tracked pid on success.
+pub fn start_tun_via_helper(app: &AppHandle, config_path: &str) -> Result<i32, String> {
+    let enable_bypass_router: bool = app
+        .get_store("settings.json")
+        .and_then(|s| s.get("enable_bypass_router_key"))
+        .and_then(|v| v.as_bool())
         .unwrap_or(false);
 
-    let command = format!(
-        r#"ulimit -n 65535 && echo '{}' | sudo -S '{}' run -c '{}' --disable-color"#,
-        password.escape_default(),
-        sidecar_path.escape_default(),
-        path.escape_default()
-    );
-    log::info!(
-        "Enable tun mode with command: {}",
-        command.replace(password.as_str(), "******")
-    );
-
-    // 如果启用了旁路由模式，则开启IP转发
     if enable_bypass_router {
-        let command = format!(
-            "echo '{}' | sudo -S sysctl -w net.inet.ip.forwarding=1",
-            password
-        );
-        log::info!(
-            "Enable IP forwarding with command : {}",
-            command.replace(password.as_str(), "******")
-        );
-        let _ = Command::new("sh")
-            .arg("-c")
-            .arg(command)
-            .output()
-            .map_err(|e| e.to_string());
+        if let Err(e) = helper_client::api::set_ip_forwarding(true) {
+            log::warn!("[helper] set_ip_forwarding(true) failed: {}", e);
+        }
     }
 
-    // ZH: TUN 启动前把系统 DNS 指向 TUN 网关，绕开 mDNSResponder 的 per-interface
-    //     直发行为。失败不阻塞启动 —— 代理连接仍能工作，只是 OS 级 DNS 查询会
-    //     继续被污染，表现等同于未修复的旧行为。
-    // EN: Override system DNS to the TUN gateway before spawn. Failures are
-    //     non-fatal — the proxy still starts; OS-level DNS queries would just
-    //     keep leaking as before the fix.
-    if let Err(e) = apply_system_dns_override(&password, &path) {
+    // DNS override — non-fatal, mirrors the old create_privileged_command behavior.
+    if let Err(e) = apply_system_dns_override(config_path) {
         log::warn!("[dns] apply_system_dns_override failed: {}", e);
     }
 
-    Some(app.shell().command("sh").args(vec!["-c", &command]))
+    let pid = helper_client::api::start_sing_box(config_path)?;
+    log::info!("[helper] sing-box started, pid={}", pid);
+    Ok(pid)
 }
 
-/// 停止TUN模式下的进程，并清理 `utun233` 接口的路由。
+/// Stop TUN mode: restore DNS, kill sing-box, disable IP forwarding, clean
+/// routes, flush DNS cache. All operations go through the privileged helper.
 ///
-/// 配置写入时固定 `interface_name = "utun233"`，停止后枚举该接口的路由并逐条删除，
-/// 再 down 掉接口，让 macOS configd 从物理网卡重建默认路由。
-pub fn stop_tun_process(password: &str) -> Result<(), String> {
-    // ZH: 先把系统 DNS 恢复原值。即使后面杀进程 / 清路由的步骤失败，用户的
-    //     网络 DNS 也不会被留在 TUN 网关状态。
-    // EN: Restore original system DNS first so that even if later cleanup
-    //     steps fail, the user's system DNS isn't stuck pointing at the TUN
-    //     gateway.
-    if let Err(e) = restore_system_dns(password) {
+/// Restore DNS runs first (before kill) so the user's network isn't left
+/// pointing at an unreachable TUN gateway if the kill step fails.
+pub fn stop_tun_process() -> Result<(), String> {
+    if let Err(e) = restore_system_dns() {
         log::warn!("[dns] restore_system_dns failed: {}", e);
     }
 
-    let command = format!("echo '{}' | sudo -S pkill -15 -f sing-box", password);
-    log::info!(
-        "Stop tun mode with command : {}",
-        command.replace(password, "******")
-    );
-    Command::new("sh")
-        .arg("-c")
-        .arg(command)
-        .output()
-        .map_err(|e| e.to_string())?;
+    helper_client::api::stop_sing_box()?;
+    log::info!("[helper] SIGTERM sent to sing-box");
 
     std::thread::sleep(std::time::Duration::from_millis(500));
 
-    // 关闭IP转发
-    let command = format!(
-        "echo '{}' | sudo -S sysctl -w net.inet.ip.forwarding=0",
-        password
-    );
-    log::info!(
-        "Disable IP forwarding with command : {}",
-        command.replace(password, "******")
-    );
-    Command::new("sh")
-        .arg("-c")
-        .arg(command)
-        .output()
-        .map_err(|e| e.to_string())?;
+    if let Err(e) = helper_client::api::set_ip_forwarding(false) {
+        log::warn!("[helper] set_ip_forwarding(false) failed: {}", e);
+    }
 
-    let command = format!(
-        "echo '{}' | sudo -S sh -c '\
-            netstat -rn -f inet 2>/dev/null \
-                | awk \"NR>4 && \\$NF==\\\"{iface}\\\"{{print \\$1}}\" \
-                | while read dest; do route -q delete \"$dest\" 2>/dev/null; done; \
-            netstat -rn -f inet6 2>/dev/null \
-                | awk \"NR>4 && \\$NF==\\\"{iface}\\\"{{print \\$1}}\" \
-                | while read dest; do route -q delete -inet6 \"$dest\" 2>/dev/null; done; \
-            ifconfig {iface} down 2>/dev/null; \
-            true'",
-        password,
-        iface = TUN_INTERFACE_NAME
-    );
-    log::info!("Removing routes for {} interface", TUN_INTERFACE_NAME);
-    Command::new("sh")
-        .arg("-c")
-        .arg(command)
-        .output()
-        .map_err(|e| e.to_string())?;
+    if let Err(e) = helper_client::api::remove_tun_routes(TUN_INTERFACE_NAME) {
+        log::warn!("[helper] remove_tun_routes({}) failed: {}", TUN_INTERFACE_NAME, e);
+    }
 
-    flush_dns_cache(password);
+    helper_client::api::flush_dns_cache().ok();
     Ok(())
 }
 
-// ========== macOS 系统 DNS 接管 ==========
+// ============================================================================
+// macOS 系统 DNS 接管 (passwordless, helper-backed)
+// ============================================================================
 //
-// ZH: macOS 的 `mDNSResponder` 不走路由表决定 DNS 查询的出接口，而是根据
-//     `scutil --dns` 里每个网络服务绑定的 nameserver 直接从物理网卡发 UDP/53。
-//     这使得 sing-box TUN 的 `hijack-dns` 规则触不到 OS 级查询，导致 curl/host 等
-//     查询被 GFW 明文注入污染。
-//     解决办法：TUN 启动时把系统 DNS 指向 TUN 网关 `172.19.0.1`，强制查询包进入
-//     TUN 被 hijack-dns 捕获；TUN 停止时恢复原值。
-// EN: macOS `mDNSResponder` does NOT use the routing table to decide which
-//     interface to send DNS queries on. It uses the per-service nameserver
-//     recorded in `scutil --dns` and sends UDP/53 directly via the physical NIC,
-//     bypassing the TUN interface. As a result sing-box `hijack-dns` never sees
-//     OS-level DNS queries, leaving them to be poisoned by GFW plaintext DNS
-//     injection. Fix: point system DNS at the TUN gateway on TUN start, so every
-//     DNS packet must traverse TUN and hit `hijack-dns`; restore on TUN stop.
+// See the CLAUDE.md "System DNS Override Flow" section for the full design
+// rationale. The only change in Phase 2b.2 is that setdnsservers / flushDnsCache
+// now go through the XPC helper instead of `echo | sudo -S`.
 
-/// ZH: 通过默认路由的出接口倒推 networksetup 的服务名（Wi-Fi / Ethernet 等）。
-/// EN: Map the default route's outgoing interface to its networksetup service name.
+/// Map the default route's outgoing interface to its networksetup service name.
+/// Does NOT require root — route(1) and networksetup(1) are readable by any user.
 fn detect_active_network_service() -> Result<String, String> {
     let out = Command::new("route")
         .args(["-n", "get", "default"])
@@ -249,43 +194,8 @@ fn detect_active_network_service() -> Result<String, String> {
     Err(format!("could not map interface {} to a network service", iface))
 }
 
-/// ZH: 刷新 macOS DNS 缓存并重启 mDNSResponder。写入 DNS 改动后必须做，否则
-///     新配置要过几秒才生效。
-fn flush_dns_cache(password: &str) {
-    let cmd = format!(
-        "echo '{}' | sudo -S sh -c 'dscacheutil -flushcache; killall -HUP mDNSResponder' 2>/dev/null",
-        password.escape_default()
-    );
-    let _ = Command::new("sh").arg("-c").arg(cmd).output();
-}
-
-/// ZH: 调用 networksetup 把指定服务的 DNS 设为给定 spec（`empty` 或具体 IP）。
-/// EN: Thin wrapper around `networksetup -setdnsservers <service> <spec>`, where
-///     `spec` is either the literal `empty` (revert to DHCP-provided) or a
-///     space-separated IP list.
-fn setdnsservers(password: &str, service: &str, spec: &str) -> Result<(), String> {
-    let cmd = format!(
-        "echo '{}' | sudo -S networksetup -setdnsservers '{}' {}",
-        password.escape_default(),
-        service.replace('\'', "'\\''"),
-        spec
-    );
-    let out = Command::new("sh")
-        .arg("-c")
-        .arg(cmd)
-        .output()
-        .map_err(|e| format!("networksetup -setdnsservers failed: {}", e))?;
-    if !out.status.success() {
-        let stderr = String::from_utf8_lossy(&out.stderr);
-        log::warn!("[dns] setdnsservers non-zero exit: {}", stderr);
-    }
-    Ok(())
-}
-
-/// ZH: 列出 macOS 所有网络服务（`networksetup -listallnetworkservices`
-///     的输出，去掉第一行标题和被星号标记的禁用服务）。
-/// EN: All macOS network services, minus the title line and any disabled
-///     services (prefixed with `*` in networksetup's output).
+/// All macOS network services, minus the title line and any disabled services
+/// (prefixed with `*` in networksetup's output). Does NOT require root.
 fn list_all_network_services() -> Result<Vec<String>, String> {
     let out = Command::new("networksetup")
         .arg("-listallnetworkservices")
@@ -294,49 +204,51 @@ fn list_all_network_services() -> Result<Vec<String>, String> {
     let stdout = String::from_utf8_lossy(&out.stdout);
     Ok(stdout
         .lines()
-        .skip(1) // first line is "An asterisk (*) denotes that a network service is disabled."
+        .skip(1)
         .map(|l| l.trim())
         .filter(|l| !l.is_empty() && !l.starts_with('*'))
         .map(|l| l.to_string())
         .collect())
 }
 
-/// ZH: 把系统 DNS 指向 TUN 网关。检测当前活动服务，一条 networksetup 命令搞定，
-///     不做任何快照、不落地文件。
-/// EN: Point system DNS at the TUN gateway. Detect the currently active network
-///     service, apply in a single `networksetup` call. No snapshot, no state
-///     file — restore is handled by the system's own `empty` semantics.
-pub fn apply_system_dns_override(password: &str, config_path: &str) -> Result<(), String> {
+/// Point system DNS at the TUN gateway. Detect the currently active network
+/// service, apply via the privileged helper, flush cache.
+pub fn apply_system_dns_override(config_path: &str) -> Result<(), String> {
     let gateway = extract_tun_gateway_from_config(config_path)
         .ok_or_else(|| format!("could not extract TUN gateway from {}", config_path))?;
     let service = detect_active_network_service()?;
     log::info!("[dns] override → {} for [{}]", gateway, service);
-    setdnsservers(password, &service, &gateway)?;
-    flush_dns_cache(password);
+    helper_client::api::set_dns_servers(&service, &gateway)?;
+    helper_client::api::flush_dns_cache().ok();
     Ok(())
 }
 
-/// ZH: 恢复系统 DNS。枚举所有网络服务，逐个 `setdnsservers <svc> empty`
-///     让 macOS 回到 DHCP 下发的默认 DNS。不读文件、不查历史，完全幂等 ——
-///     即使在 TUN 仍然在位时调用（stop 流程里 DNS 恢复早于 kill sing-box），
-///     由于不依赖路由表探测，依然正确。
-/// EN: Restore system DNS by iterating every network service and resetting
-///     each to `empty` (DHCP default). Stateless, idempotent, works even while
-///     TUN is still up (the normal stop flow restores DNS *before* killing
-///     sing-box) because it doesn't rely on route-table detection.
-pub fn restore_system_dns(password: &str) -> Result<(), String> {
+/// Restore system DNS by iterating every network service and resetting each
+/// to `empty` (DHCP default). Stateless, idempotent, works even while TUN
+/// is still up.
+pub fn restore_system_dns() -> Result<(), String> {
     let services = list_all_network_services()?;
-    log::info!("[dns] restore: resetting {} services → empty (DHCP)", services.len());
+    log::info!(
+        "[dns] restore: resetting {} services → empty (DHCP)",
+        services.len()
+    );
     for svc in &services {
-        if let Err(e) = setdnsservers(password, svc, "empty") {
+        if let Err(e) = helper_client::api::set_dns_servers(svc, "empty") {
             log::warn!("[dns] failed to reset [{}]: {}", svc, e);
         }
     }
-    flush_dns_cache(password);
+    helper_client::api::flush_dns_cache().ok();
     Ok(())
 }
 
-/// macOS平台的VPN代理实现
+// ============================================================================
+// VpnProxy trait impl — kept for cross-platform trait compatibility.
+//
+// core.rs bypasses create_privileged_command entirely on macOS (goes through
+// start_tun_via_helper instead). The trait methods are still required by the
+// compiler; they delegate or no-op.
+// ============================================================================
+
 pub struct MacOSVpnProxy;
 
 impl VpnProxy for MacOSVpnProxy {
@@ -349,15 +261,20 @@ impl VpnProxy for MacOSVpnProxy {
     }
 
     fn create_privileged_command(
-        app: &AppHandle,
-        sidecar_path: String,
-        path: String,
-        password: String,
+        _app: &AppHandle,
+        _sidecar_path: String,
+        _path: String,
+        _password: String,
     ) -> Option<TauriCommand> {
-        create_privileged_command(app, sidecar_path, path, password)
+        // macOS TUN mode is now driven by start_tun_via_helper; this trait
+        // method is never called on macOS. If it is, returning None causes
+        // core.rs to treat it as "no managed child" which is safe.
+        log::warn!("[macos] create_privileged_command called unexpectedly — returning None");
+        None
     }
 
-    fn stop_tun_process(password: &str) -> Result<(), String> {
-        stop_tun_process(password)
+    fn stop_tun_process(_password: &str) -> Result<(), String> {
+        // Delegate to the passwordless helper-backed implementation.
+        stop_tun_process()
     }
 }

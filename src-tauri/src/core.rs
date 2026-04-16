@@ -7,11 +7,13 @@ use std::path::Path;
 use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Manager};
 
-#[cfg(not(target_os = "windows"))]
+#[cfg(target_os = "linux")]
 use crate::privilege;
 use crate::state::{AppData, LogType};
 use crate::vpn::state_machine::{transition, Intent, VpnState, VpnStateCell};
-use crate::vpn::{helper, readiness, EVENT_STATUS_CHANGED};
+#[cfg(not(target_os = "macos"))]
+use crate::vpn::helper;
+use crate::vpn::{readiness, EVENT_STATUS_CHANGED};
 use crate::vpn::{PlatformVpnProxy, VpnProxy};
 use tauri::Emitter;
 use tauri_plugin_shell::process::CommandChild;
@@ -260,45 +262,51 @@ fn spawn_process_monitor(
 /// watchdog 重启 sing-box 的内部函数（macOS 专用，Send-safe）。
 ///
 /// 跳过 keychain 读取和系统代理切换（均为非 Send 的异步调用），
-/// 直接使用已存的 password/path 重新拉起进程。
+/// 通过 privileged helper 重新拉起进程。
 #[cfg(target_os = "macos")]
 async fn restart_tun_send_safe(
     app: tauri::AppHandle,
     path: Arc<String>,
-    password: Arc<String>,
 ) -> Result<(), String> {
-    let sidecar_path =
-        helper::get_sidecar_path(Path::new("sing-box")).map_err(|e| e.to_string())?;
+    let app_c = app.clone();
+    let path_c = path.as_ref().clone();
+    let _pid = tokio::task::spawn_blocking(move || {
+        crate::vpn::macos::start_tun_via_helper(&app_c, &path_c)
+    })
+    .await
+    .map_err(|e| format!("restart join error: {}", e))?
+    .map_err(|e| format!("restart start_tun_via_helper failed: {}", e))?;
 
-    // create_privileged_command 会在 bypass_router 启用时重新执行 sysctl ip.forwarding=1
-    let cmd = PlatformVpnProxy::create_privileged_command(
-        &app,
-        sidecar_path,
-        path.as_ref().clone(),
-        password.as_ref().clone(),
-    )
-    .ok_or_else(|| "create_privileged_command returned None".to_string())?;
-
-    let (rx, child) = cmd.spawn().map_err(|e| e.to_string())?;
-    let process_mode = Arc::new(ProxyMode::TunProxy);
-    spawn_process_monitor(app.clone(), rx, Arc::clone(&process_mode));
+    // Wire exit-event bridge for the new process instance.
+    let mut exit_rx = crate::helper_client::subscribe_sing_box_exits();
+    let exit_app = app.clone();
+    let exit_mode = Arc::new(ProxyMode::TunProxy);
+    tokio::spawn(async move {
+        if let Some(exit) = exit_rx.recv().await {
+            log::info!(
+                "[helper-bridge] sing-box exit (watchdog restart) pid={} code={}",
+                exit.pid,
+                exit.exit_code
+            );
+            let payload = tauri_plugin_shell::process::TerminatedPayload {
+                code: Some(exit.exit_code),
+                signal: None,
+            };
+            handle_process_termination(&exit_app, &exit_mode, payload).await;
+        }
+    });
 
     {
         let mut manager = PROCESS_MANAGER.lock().unwrap_or_else(|e| e.into_inner());
-        manager.mode = Some(process_mode);
+        manager.mode = Some(Arc::new(ProxyMode::TunProxy));
         manager.config_path = Some(Arc::clone(&path));
-        manager.tun_password = Some(Arc::clone(&password));
-        manager.child = Some(child);
+        manager.child = None;
         manager.is_stopping = false;
     }
 
     tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
     app.emit(EVENT_STATUS_CHANGED, ()).ok();
 
-    // watchdog 重启后重新进入 Running；spawn 一个 readiness prober
-    // 承担 "从 Starting 升到 Running" 的职责。但 watchdog 走 Send-safe 路径时
-    // 状态机可能停留在 Running(旧会话);将旧的 Running 推进到新的 Starting 再进入
-    // Running,保证前端能看到一次 switching 中间态。
     let _ = transition(&app, Intent::Start { mode: "tun".into() });
     let epoch_snap = app.state::<VpnStateCell>().snapshot().epoch();
     readiness::spawn(app.clone(), epoch_snap);
@@ -320,12 +328,10 @@ const BYPASS_ROUTER_RESTART_INTERVAL: std::time::Duration =
 /// 清除 auto_detect_interface 引起的路由表状态污染。
 /// 由 stop() 或 handle_process_termination() 通过 bypass_router_watchdog_abort 取消。
 #[cfg(target_os = "macos")]
-async fn bypass_router_watchdog(app: tauri::AppHandle, password: Arc<String>, path: Arc<String>) {
+async fn bypass_router_watchdog(app: tauri::AppHandle, path: Arc<String>) {
     loop {
         tokio::time::sleep(BYPASS_ROUTER_RESTART_INTERVAL).await;
 
-        // 检查是否仍处于 TUN 模式（用户手动停止时 abort 会在 sleep 处取消，
-        // 此处作为防御性检查）
         let still_tun = {
             let manager = PROCESS_MANAGER.lock().unwrap_or_else(|e| e.into_inner());
             manager
@@ -345,20 +351,20 @@ async fn bypass_router_watchdog(app: tauri::AppHandle, password: Arc<String>, pa
             BYPASS_ROUTER_RESTART_INTERVAL.as_secs() / 3600
         );
 
-        // 标记 watchdog 主动重启，防止 handle_process_termination 清除进程状态
         {
             let mut manager = PROCESS_MANAGER.lock().unwrap_or_else(|e| e.into_inner());
             manager.bypass_router_restarting = true;
         }
 
-        if let Err(e) = PlatformVpnProxy::stop_tun_process(password.as_str()) {
+        // stop_tun_process is now passwordless (helper-backed)
+        let stop_result = tokio::task::spawn_blocking(crate::vpn::macos::stop_tun_process).await;
+        if let Err(e) = stop_result.map_err(|e| e.to_string()).and_then(|r| r) {
             log::error!("[bypass_router_watchdog] stop_tun_process failed: {}", e);
             let mut manager = PROCESS_MANAGER.lock().unwrap_or_else(|e| e.into_inner());
             manager.bypass_router_restarting = false;
-            continue; // 下一个间隔重试
+            continue;
         }
 
-        // 等待 TUN 接口和路由条目完全释放
         tokio::time::sleep(std::time::Duration::from_secs(2)).await;
 
         {
@@ -366,18 +372,21 @@ async fn bypass_router_watchdog(app: tauri::AppHandle, password: Arc<String>, pa
             manager.bypass_router_restarting = false;
         }
 
-        // 重启（Send-safe：不调用 start，规避 macOS keychain/代理 API 的非 Send 约束）
-        if let Err(e) =
-            restart_tun_send_safe(app.clone(), Arc::clone(&path), Arc::clone(&password)).await
-        {
+        if let Err(e) = restart_tun_send_safe(app.clone(), Arc::clone(&path)).await {
             log::error!("[bypass_router_watchdog] restart failed: {}", e);
-            // 继续 loop，下一个间隔重试
         }
     }
 }
 
 async fn get_password_for_mode(mode: &ProxyMode) -> Result<String, String> {
-    #[cfg(any(target_os = "linux", target_os = "macos"))]
+    // macOS: privileged helper handles TUN privilege — no password required.
+    #[cfg(target_os = "macos")]
+    {
+        let _ = mode;
+        Ok(String::new())
+    }
+
+    #[cfg(target_os = "linux")]
     {
         if matches!(mode, ProxyMode::TunProxy) {
             let pwd = privilege::get_privilege_password_from_keyring().await;
@@ -425,6 +434,8 @@ pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Resu
     let start_epoch = app.state::<VpnStateCell>().snapshot().epoch();
 
     // 检查是否需要权限验证
+    // macOS: helper handles privilege, password is always empty.
+    #[allow(unused_variables)]
     let password = match get_password_for_mode(&mode).await {
         Ok(p) => p,
         Err(e) => {
@@ -446,20 +457,44 @@ pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Resu
                     e.to_string()
                 })
         } else {
-            match helper::get_sidecar_path(Path::new("sing-box")) {
-                Ok(sidecar_path) => {
-                    let cmd = PlatformVpnProxy::create_privileged_command(
-                        &app,
-                        sidecar_path,
-                        path.clone(),
-                        password.clone(),
-                    );
-                    let is_managed = cmd.is_some();
-                    Ok((cmd, is_managed))
-                }
-                Err(e) => {
-                    log::error!("Failed to get sidecar path: {}", e);
-                    Err(e.to_string())
+            // TUN mode — platform-specific.
+            #[cfg(target_os = "macos")]
+            {
+                // macOS: auto-install helper, start sing-box via XPC. The helper
+                // owns the root process; no TauriCommand is produced.
+                tokio::task::spawn_blocking(crate::vpn::macos::ensure_helper_installed)
+                    .await
+                    .map_err(|e| format!("helper install join error: {}", e))?
+                    .map_err(|e| format!("helper install failed: {}", e))?;
+
+                let app_c = app.clone();
+                let path_c = path.clone();
+                let _pid = tokio::task::spawn_blocking(move || {
+                    crate::vpn::macos::start_tun_via_helper(&app_c, &path_c)
+                })
+                .await
+                .map_err(|e| format!("start_tun join error: {}", e))?
+                .map_err(|e| format!("start_tun_via_helper failed: {}", e))?;
+
+                Ok((None, false))
+            }
+            #[cfg(not(target_os = "macos"))]
+            {
+                match helper::get_sidecar_path(Path::new("sing-box")) {
+                    Ok(sidecar_path) => {
+                        let cmd = PlatformVpnProxy::create_privileged_command(
+                            &app,
+                            sidecar_path,
+                            path.clone(),
+                            password.clone(),
+                        );
+                        let is_managed = cmd.is_some();
+                        Ok((cmd, is_managed))
+                    }
+                    Err(e) => {
+                        log::error!("Failed to get sidecar path: {}", e);
+                        Err(e.to_string())
+                    }
                 }
             }
         };
@@ -495,7 +530,34 @@ pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Resu
         None
     };
 
+    // macOS TUN: wire the exit-event bridge so helper-pushed singBoxDidExit
+    // feeds into handle_process_termination via the existing state machine.
+    #[cfg(target_os = "macos")]
+    if !is_system_proxy {
+        let mut exit_rx = crate::helper_client::subscribe_sing_box_exits();
+        let exit_app = app.clone();
+        let exit_mode = Arc::new(mode.clone());
+        tokio::spawn(async move {
+            if let Some(exit) = exit_rx.recv().await {
+                log::info!(
+                    "[helper-bridge] sing-box exit event pid={} code={}",
+                    exit.pid,
+                    exit.exit_code
+                );
+                let payload = tauri_plugin_shell::process::TerminatedPayload {
+                    code: Some(exit.exit_code),
+                    signal: None,
+                };
+                handle_process_termination(&exit_app, &exit_mode, payload).await;
+            }
+        });
+    }
+
     // 更新进程管理器状态；提前构造 Arc 供 watchdog 直接使用，避免写入后再读回
+    // macOS TUN mode: password not needed (helper handles privilege).
+    #[cfg(target_os = "macos")]
+    let tun_password_arc: Option<Arc<String>> = None;
+    #[cfg(not(target_os = "macos"))]
     let tun_password_arc = if !is_system_proxy {
         Some(Arc::new(password))
     } else {
@@ -525,24 +587,22 @@ pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Resu
             .unwrap_or(false);
 
         if bypass_router_enabled {
-            if let Some(pw) = tun_password_arc {
-                let pa = Arc::clone(&config_path_arc);
-                // 终止旧 watchdog，防止重叠
-                {
-                    let mut manager = PROCESS_MANAGER.lock().unwrap_or_else(|e| e.into_inner());
-                    if let Some(abort) = manager.bypass_router_watchdog_abort.take() {
-                        abort.abort();
-                    }
+            let pa = Arc::clone(&config_path_arc);
+            // 终止旧 watchdog，防止重叠
+            {
+                let mut manager = PROCESS_MANAGER.lock().unwrap_or_else(|e| e.into_inner());
+                if let Some(abort) = manager.bypass_router_watchdog_abort.take() {
+                    abort.abort();
                 }
-                let task = tokio::spawn(bypass_router_watchdog(app.clone(), pw, pa));
-                {
-                    let mut manager = PROCESS_MANAGER.lock().unwrap_or_else(|e| e.into_inner());
-                    manager.bypass_router_watchdog_abort = Some(task.abort_handle());
-                    log::info!(
-                        "[bypass_router_watchdog] Started, next restart in {}h",
-                        BYPASS_ROUTER_RESTART_INTERVAL.as_secs() / 3600
-                    );
-                }
+            }
+            let task = tokio::spawn(bypass_router_watchdog(app.clone(), pa));
+            {
+                let mut manager = PROCESS_MANAGER.lock().unwrap_or_else(|e| e.into_inner());
+                manager.bypass_router_watchdog_abort = Some(task.abort_handle());
+                log::info!(
+                    "[bypass_router_watchdog] Started, next restart in {}h",
+                    BYPASS_ROUTER_RESTART_INTERVAL.as_secs() / 3600
+                );
             }
         }
     }
@@ -655,11 +715,13 @@ async fn handle_process_termination(
     }
 
     // Stash tun_password AND the is_stopping flag out of the lock before the
-    // cleanup block clears them — the DNS-restore fallback below still needs
-    // sudo credentials after state is reset, and Windows needs to know whether
-    // the termination came from a user-initiated stop (clean path, service
-    // already restored DNS internally → skip UAC fallback) vs. an external
-    // kill (cleanup didn't run → need UAC fallback).
+    // cleanup block clears them — Linux still needs sudo credentials for DNS
+    // restore after state is reset, and Windows needs to know whether the
+    // termination came from a user-initiated stop vs. an external kill.
+    // macOS no longer uses captured_tun_password (helper handles DNS restore
+    // without a password), but the variable is still populated for other
+    // platform arms.
+    #[allow(unused_variables)]
     let (should_cleanup, captured_tun_password, was_user_initiated_stop) = {
         let mut manager = PROCESS_MANAGER.lock().unwrap_or_else(|e| {
             log::error!("Failed to lock process manager: {:?}", e);
@@ -719,15 +781,11 @@ async fn handle_process_termination(
     if matches!(**process_mode, ProxyMode::TunProxy) {
         #[cfg(target_os = "macos")]
         {
-            if let Some(pwd) = captured_tun_password.as_ref() {
-                log::info!("[dns] TUN process terminated — resetting all services to DHCP");
-                if let Err(e) = crate::vpn::macos::restore_system_dns(pwd) {
-                    log::warn!("[dns] fallback restore_system_dns failed: {}", e);
-                }
-            } else {
-                log::warn!(
-                    "[dns] TUN terminated but no password captured; user must run `sudo networksetup -setdnsservers <service> empty` manually"
-                );
+            // macOS DNS restore goes through the privileged helper — no
+            // password needed. Always callable, never "no password captured".
+            log::info!("[dns] TUN process terminated — resetting all services to DHCP");
+            if let Err(e) = crate::vpn::macos::restore_system_dns() {
+                log::warn!("[dns] fallback restore_system_dns failed: {}", e);
             }
         }
         #[cfg(target_os = "linux")]
@@ -826,6 +884,7 @@ pub async fn stop(app: tauri::AppHandle) -> Result<(), String> {
         manager.is_stopping = true;
     }
 
+    #[allow(unused_variables)]
     let (mode, password, child) = {
         let mut manager = PROCESS_MANAGER.lock().unwrap_or_else(|e| {
             log::error!("Mutex lock error during stop: {:?}", e);
@@ -869,11 +928,22 @@ pub async fn stop(app: tauri::AppHandle) -> Result<(), String> {
                 tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
             }
             ProxyMode::TunProxy => {
-                if let Some(pwd) = password {
-                    PlatformVpnProxy::stop_tun_process(&pwd).map_err(|e| {
+                // macOS: helper-backed stop, no password needed.
+                #[cfg(target_os = "macos")]
+                {
+                    crate::vpn::macos::stop_tun_process().map_err(|e| {
                         log::error!("Failed to stop TUN process: {}", e);
                         e
                     })?;
+                }
+                #[cfg(not(target_os = "macos"))]
+                {
+                    if let Some(pwd) = password {
+                        PlatformVpnProxy::stop_tun_process(&pwd).map_err(|e| {
+                            log::error!("Failed to stop TUN process: {}", e);
+                            e
+                        })?;
+                    }
                 }
 
                 // Windows TUN 模式没有 managed child,也没有 tauri sidecar 的
@@ -962,33 +1032,35 @@ pub fn clear_vpn_error(app: AppHandle) {
 /// 导致 DNS 查询不再经过 TUN。由于 apply_system_dns_override 是幂等的,
 /// 每次 NetworkUp 直接重跑即可,不需要观察者轮询。
 ///
-/// - macOS/Linux: 复用 PROCESS_MANAGER 里缓存的 sudo 密码和配置路径。
+/// - macOS: 通过 privileged helper 调 networksetup,只需 config_path。
+/// - Linux: 复用 PROCESS_MANAGER 里缓存的 sudo 密码和配置路径。
 /// - Windows: 跳过 —— 重设要走 elevated helper,每次 Wi-Fi 切换都弹 UAC 不可接受。
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 #[allow(dead_code)]
 pub fn reapply_tun_dns_override_if_active() {
-    let (password, config_path) = {
-        let manager = PROCESS_MANAGER.lock().unwrap_or_else(|e| e.into_inner());
-        let is_tun = manager
-            .mode
-            .as_ref()
-            .map(|m| matches!(**m, ProxyMode::TunProxy))
-            .unwrap_or(false);
-        if !is_tun {
-            return;
-        }
-        match (
-            manager.tun_password.as_ref().cloned(),
-            manager.config_path.as_ref().cloned(),
-        ) {
-            (Some(p), Some(c)) => (p, c),
-            _ => return,
-        }
+    let manager = PROCESS_MANAGER.lock().unwrap_or_else(|e| e.into_inner());
+    let is_tun = manager
+        .mode
+        .as_ref()
+        .map(|m| matches!(**m, ProxyMode::TunProxy))
+        .unwrap_or(false);
+    if !is_tun {
+        return;
+    }
+    let config_path = match manager.config_path.as_ref().cloned() {
+        Some(c) => c,
+        None => return,
     };
+    #[cfg(target_os = "linux")]
+    let password = match manager.tun_password.as_ref().cloned() {
+        Some(p) => p,
+        None => return,
+    };
+    drop(manager);
 
     log::info!("[dns] NetworkUp — re-applying TUN gateway DNS override");
     #[cfg(target_os = "macos")]
-    if let Err(e) = crate::vpn::macos::apply_system_dns_override(&password, &config_path) {
+    if let Err(e) = crate::vpn::macos::apply_system_dns_override(&config_path) {
         log::warn!("[dns] NetworkUp re-apply failed: {}", e);
     }
     #[cfg(target_os = "linux")]
@@ -1053,39 +1125,53 @@ pub async fn reload_config(app: tauri::AppHandle, is_tun: bool) -> Result<String
             (is_tun, pwd, needs_reset)
         };
 
-        log::info!("Reloading config using pkill -HUP sing-box");
+        log::info!("Reloading config");
 
-        // 使用 pkill 发送 SIGHUP 信号（兼容原始代码行为）
-        let output = if is_privileged && !password_str.is_empty() {
-            // TUN 模式需要 sudo 权限
-            let command = format!("echo '{}' | sudo -S pkill -HUP sing-box", password_str);
-            Command::new("sh")
-                .arg("-c")
-                .arg(&command)
-                .output()
-                .map_err(|e| {
-                    log::error!("Failed to execute sudo pkill command: {}", e);
-                    format!("Failed to send SIGHUP with sudo: {}", e)
-                })?
+        // macOS TUN: sing-box runs as root under the helper; use helper's
+        // reloadSingBox (SIGHUP via tracked pid) instead of sudo pkill.
+        // Non-TUN and non-macOS: direct pkill (sing-box runs as user).
+        #[cfg(target_os = "macos")]
+        if is_privileged {
+            tokio::task::spawn_blocking(crate::helper_client::api::reload_sing_box)
+                .await
+                .map_err(|e| format!("reload join error: {}", e))?
+                .map_err(|e| format!("helper reload_sing_box failed: {}", e))?;
+            log::info!("SIGHUP sent via helper");
         } else {
-            // System Proxy 模式直接发送信号
-            Command::new("pkill")
+            let output = Command::new("pkill")
                 .arg("-HUP")
                 .arg("sing-box")
                 .output()
-                .map_err(|e| {
-                    log::error!("Failed to execute pkill command: {}", e);
-                    format!("Failed to send SIGHUP: {}", e)
-                })?
-        };
-
-        if !output.status.success() {
-            let error = String::from_utf8_lossy(&output.stderr);
-            log::error!("Failed to send SIGHUP: {}", error);
-            return Err(format!("Failed to reload config: {}", error));
+                .map_err(|e| format!("Failed to send SIGHUP: {}", e))?;
+            if !output.status.success() {
+                let error = String::from_utf8_lossy(&output.stderr);
+                return Err(format!("Failed to reload config: {}", error));
+            }
+            log::info!("SIGHUP sent via pkill");
         }
 
-        log::info!("SIGHUP sent successfully");
+        #[cfg(not(target_os = "macos"))]
+        {
+            let output = if is_privileged && !password_str.is_empty() {
+                let command = format!("echo '{}' | sudo -S pkill -HUP sing-box", password_str);
+                Command::new("sh")
+                    .arg("-c")
+                    .arg(&command)
+                    .output()
+                    .map_err(|e| format!("Failed to send SIGHUP with sudo: {}", e))?
+            } else {
+                Command::new("pkill")
+                    .arg("-HUP")
+                    .arg("sing-box")
+                    .output()
+                    .map_err(|e| format!("Failed to send SIGHUP: {}", e))?
+            };
+            if !output.status.success() {
+                let error = String::from_utf8_lossy(&output.stderr);
+                return Err(format!("Failed to reload config: {}", error));
+            }
+            log::info!("SIGHUP sent successfully");
+        }
 
         // 如果是 SystemProxy 模式，需要等待进程重载后重新设置系统代理
         if needs_proxy_reset {
