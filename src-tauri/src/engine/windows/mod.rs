@@ -275,6 +275,24 @@ impl EngineManager for WindowsEngine {
         stop_tun_process()
     }
 
+    fn restore_dns_after_termination(
+        was_user_stop: bool,
+        _dns_info: Option<(String, String)>,
+    ) {
+        if was_user_stop {
+            log::info!(
+                "[dns] user-initiated stop; service already reset DNS, skipping UAC fallback"
+            );
+        } else {
+            log::warn!(
+                "[dns] TUN process terminated unexpectedly — requesting UAC DNS restore"
+            );
+            if let Err(e) = restore_system_dns() {
+                log::warn!("[dns] fallback restore_system_dns failed: {}", e);
+            }
+        }
+    }
+
     fn restart(sidecar_path: String, path: String) {
         let _ = restart_privileged_command(sidecar_path, path);
     }

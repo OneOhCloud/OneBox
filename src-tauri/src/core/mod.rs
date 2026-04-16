@@ -1,5 +1,6 @@
 mod log;
 mod monitor;
+#[cfg(any(target_os = "macos", target_os = "windows"))]
 mod watchdog;
 
 use lazy_static::lazy_static;
@@ -47,6 +48,38 @@ pub(crate) struct ProcessManager {
     pub(crate) bypass_router_restarting: bool,
     #[cfg(target_os = "macos")]
     pub(crate) bypass_router_watchdog_abort: Option<tokio::task::AbortHandle>,
+}
+
+impl ProcessManager {
+    /// Lock the global PROCESS_MANAGER, recovering from poison.
+    pub(crate) fn acquire() -> std::sync::MutexGuard<'static, ProcessManager> {
+        PROCESS_MANAGER.lock().unwrap_or_else(|e| e.into_inner())
+    }
+
+    /// Reset all fields to their idle defaults. Platform-specific fields
+    /// are handled here so callers don't need per-platform cfg blocks.
+    /// Returns the Linux DNS override info (if any) for the caller to act on.
+    pub(crate) fn reset(&mut self) -> Option<(String, String)> {
+        self.child = None;
+        self.mode = None;
+        self.config_path = None;
+        self.is_stopping = false;
+
+        #[cfg(target_os = "linux")]
+        let dns_info = self.dns_override.take();
+        #[cfg(not(target_os = "linux"))]
+        let dns_info = None;
+
+        #[cfg(target_os = "macos")]
+        {
+            if let Some(abort) = self.bypass_router_watchdog_abort.take() {
+                abort.abort();
+            }
+            self.bypass_router_restarting = false;
+        }
+
+        dns_info
+    }
 }
 
 lazy_static! {
@@ -127,7 +160,7 @@ pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Resu
                     match crate::engine::linux::prepare_dns_override(&path) {
                         Ok(info) => {
                             let mut mgr =
-                                PROCESS_MANAGER.lock().unwrap_or_else(|e| e.into_inner());
+                                ProcessManager::acquire();
                             mgr.dns_override = Some(info.clone());
                             Some(info)
                         }
@@ -212,10 +245,7 @@ pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Resu
 
     let config_path_arc = Arc::new(path);
     {
-        let mut manager = PROCESS_MANAGER.lock().unwrap_or_else(|e| {
-            ::log::error!("Mutex lock error during process setup: {:?}", e);
-            e.into_inner()
-        });
+        let mut manager = ProcessManager::acquire();
         manager.mode = Some(Arc::new(mode.clone()));
         manager.config_path = Some(Arc::clone(&config_path_arc));
         manager.child = child_opt;
@@ -234,14 +264,14 @@ pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Resu
         if bypass_router_enabled {
             let pa = Arc::clone(&config_path_arc);
             {
-                let mut manager = PROCESS_MANAGER.lock().unwrap_or_else(|e| e.into_inner());
+                let mut manager = ProcessManager::acquire();
                 if let Some(abort) = manager.bypass_router_watchdog_abort.take() {
                     abort.abort();
                 }
             }
             let task = tokio::spawn(bypass_router_watchdog(app.clone(), pa));
             {
-                let mut manager = PROCESS_MANAGER.lock().unwrap_or_else(|e| e.into_inner());
+                let mut manager = ProcessManager::acquire();
                 manager.bypass_router_watchdog_abort = Some(task.abort_handle());
                 ::log::info!(
                     "[bypass_router_watchdog] Started, next restart in {}h",
@@ -297,10 +327,7 @@ pub async fn stop(app: tauri::AppHandle) -> Result<(), String> {
     }
 
     let (mode, child) = {
-        let mut manager = PROCESS_MANAGER.lock().unwrap_or_else(|e| {
-            ::log::error!("Mutex lock error during stop: {:?}", e);
-            e.into_inner()
-        });
+        let mut manager = ProcessManager::acquire();
         manager.is_stopping = true;
         (manager.mode.clone(), manager.child.take())
     };
@@ -334,33 +361,23 @@ pub async fn stop(app: tauri::AppHandle) -> Result<(), String> {
                 tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
             }
             ProxyMode::TunProxy => {
-                #[cfg(target_os = "macos")]
-                {
-                    crate::engine::macos::stop_tun_process().map_err(|e| {
-                        ::log::error!("Failed to stop TUN process: {}", e);
-                        e
-                    })?;
-                }
                 #[cfg(target_os = "linux")]
                 {
                     let dns_info = {
-                        let mgr = PROCESS_MANAGER.lock().unwrap_or_else(|e| e.into_inner());
+                        let mgr = ProcessManager::acquire();
                         mgr.dns_override.clone()
                     };
-                    crate::engine::linux::stop_tun_and_restore_dns(dns_info.as_ref()).map_err(
-                        |e| {
+                    crate::engine::linux::stop_tun_and_restore_dns(dns_info.as_ref())
+                        .map_err(|e| {
                             ::log::error!("Failed to stop TUN process: {}", e);
                             e
-                        },
-                    )?;
+                        })?;
                 }
-                #[cfg(target_os = "windows")]
-                {
-                    PlatformEngine::stop_tun_process().map_err(|e| {
-                        ::log::error!("Failed to stop TUN process: {}", e);
-                        e
-                    })?;
-                }
+                #[cfg(not(target_os = "linux"))]
+                PlatformEngine::stop_tun_process().map_err(|e| {
+                    ::log::error!("Failed to stop TUN process: {}", e);
+                    e
+                })?;
 
                 #[cfg(any(target_os = "windows", target_os = "linux"))]
                 {
@@ -370,26 +387,7 @@ pub async fn stop(app: tauri::AppHandle) -> Result<(), String> {
         }
     }
 
-    {
-        let mut manager = PROCESS_MANAGER.lock().unwrap_or_else(|e| {
-            ::log::error!("Mutex lock error during state cleanup: {:?}", e);
-            e.into_inner()
-        });
-        manager.mode = None;
-        manager.config_path = None;
-        manager.is_stopping = false;
-        #[cfg(target_os = "linux")]
-        {
-            manager.dns_override = None;
-        }
-        #[cfg(target_os = "macos")]
-        {
-            if let Some(abort) = manager.bypass_router_watchdog_abort.take() {
-                abort.abort();
-            }
-            manager.bypass_router_restarting = false;
-        }
-    }
+    ProcessManager::acquire().reset();
 
     ::log::info!("Proxy process stopped");
     app.emit(EVENT_STATUS_CHANGED, ()).ok();
@@ -418,9 +416,8 @@ pub fn clear_engine_error(app: AppHandle) {
 }
 
 #[cfg(any(target_os = "macos", target_os = "linux"))]
-#[allow(dead_code)]
 pub fn reapply_tun_dns_override_if_active() {
-    let manager = PROCESS_MANAGER.lock().unwrap_or_else(|e| e.into_inner());
+    let manager = ProcessManager::acquire();
     let is_tun = manager
         .mode
         .as_ref()
@@ -436,18 +433,16 @@ pub fn reapply_tun_dns_override_if_active() {
     drop(manager);
 
     ::log::info!("[dns] NetworkUp — re-applying TUN gateway DNS override");
-    #[cfg(target_os = "macos")]
-    if let Err(e) = crate::engine::macos::apply_system_dns_override(&config_path) {
-        ::log::warn!("[dns] NetworkUp re-apply failed: {}", e);
-    }
+    let result = PlatformEngine::reapply_dns_override(&config_path);
+
+    // Linux returns updated (iface, dns) that must be stored back.
     #[cfg(target_os = "linux")]
-    match crate::engine::linux::apply_system_dns_override(&config_path) {
-        Ok(override_info) => {
-            let mut mgr = PROCESS_MANAGER.lock().unwrap_or_else(|e| e.into_inner());
-            mgr.dns_override = Some(override_info);
-        }
-        Err(e) => ::log::warn!("[dns] NetworkUp re-apply failed: {}", e),
+    if let Some(override_info) = result {
+        let mut mgr = ProcessManager::acquire();
+        mgr.dns_override = Some(override_info);
     }
+    #[cfg(not(target_os = "linux"))]
+    let _ = result;
 }
 
 #[cfg(target_os = "windows")]
@@ -455,7 +450,7 @@ pub fn reapply_tun_dns_override_if_active() {}
 
 #[cfg(any(target_os = "macos", target_os = "windows"))]
 pub fn get_running_config() -> Option<(ProxyMode, String)> {
-    let manager = PROCESS_MANAGER.lock().unwrap_or_else(|e| e.into_inner());
+    let manager = ProcessManager::acquire();
     match (manager.mode.as_ref(), manager.config_path.as_ref()) {
         (Some(mode), Some(path)) => Some(((**mode).clone(), (**path).clone())),
         _ => None,
@@ -470,7 +465,7 @@ pub async fn reload_config(app: tauri::AppHandle, is_tun: bool) -> Result<String
         use std::process::Command;
 
         let (is_privileged, needs_proxy_reset) = {
-            let manager = PROCESS_MANAGER.lock().unwrap_or_else(|e| e.into_inner());
+            let manager = ProcessManager::acquire();
 
             match (manager.mode.as_ref().map(|m| m.as_ref()), is_tun) {
                 (Some(ProxyMode::TunProxy), true) => {}
@@ -545,7 +540,7 @@ pub async fn reload_config(app: tauri::AppHandle, is_tun: bool) -> Result<String
     #[cfg(target_os = "windows")]
     {
         let config_path = {
-            let manager = PROCESS_MANAGER.lock().unwrap_or_else(|e| e.into_inner());
+            let manager = ProcessManager::acquire();
             manager
                 .config_path
                 .as_ref()

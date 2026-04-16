@@ -2,12 +2,12 @@ use std::sync::Arc;
 use tauri::Emitter;
 use tauri::Manager;
 
-use crate::engine::state_machine::{transition, Intent, EngineState, EngineStateCell};
-use crate::engine::{PlatformEngine, EngineManager, EVENT_STATUS_CHANGED};
+use crate::engine::state_machine::{transition, EngineState, EngineStateCell, Intent};
+use crate::engine::{EngineManager, PlatformEngine, EVENT_STATUS_CHANGED};
 use crate::state::{AppData, LogType};
 
 use super::log::{create_singbox_log_writer, write_singbox_log};
-use super::{ProxyMode, PROCESS_MANAGER};
+use super::{ProcessManager, ProxyMode};
 
 /// Spawn the sing-box stdout/stderr monitor as a tokio task.
 /// Routes output to log file + frontend events, and handles termination.
@@ -57,8 +57,7 @@ pub(super) fn spawn_process_monitor(
                         #[cfg(target_os = "windows")]
                         {
                             let is_stopping = {
-                                let manager =
-                                    PROCESS_MANAGER.lock().unwrap_or_else(|e| e.into_inner());
+                                let manager = ProcessManager::acquire();
                                 manager.is_stopping
                             };
                             if is_stopping && payload.code == Some(1) {
@@ -90,10 +89,7 @@ pub(super) async fn handle_process_termination(
 ) {
     #[cfg(target_os = "macos")]
     {
-        let is_watchdog_restart = {
-            let manager = PROCESS_MANAGER.lock().unwrap_or_else(|e| e.into_inner());
-            manager.bypass_router_restarting
-        };
+        let is_watchdog_restart = ProcessManager::acquire().bypass_router_restarting;
         if is_watchdog_restart {
             log::info!(
                 "[handle_process_termination] bypass_router_watchdog restart in progress, skipping cleanup"
@@ -102,12 +98,8 @@ pub(super) async fn handle_process_termination(
         }
     }
 
-    #[allow(unused_variables)]
     let (should_cleanup, was_user_initiated_stop, captured_dns_override) = {
-        let mut manager = PROCESS_MANAGER.lock().unwrap_or_else(|e| {
-            log::error!("Failed to lock process manager: {:?}", e);
-            e.into_inner()
-        });
+        let mut manager = ProcessManager::acquire();
 
         let matches = manager
             .mode
@@ -115,43 +107,20 @@ pub(super) async fn handle_process_termination(
             .map(|m| **m == **process_mode)
             .unwrap_or(false);
 
-        #[allow(unused_assignments)]
-        let mut dns_info: Option<(String, String)> = None;
-
-        let stopping = if matches {
+        if matches {
             log::info!("Cleaning up resources after process termination");
             let was_stopping = manager.is_stopping;
-            #[cfg(target_os = "linux")]
-            {
-                dns_info = manager.dns_override.take();
-            }
-            #[cfg(not(target_os = "linux"))]
-            {
-                dns_info = None;
-            }
-            manager.child = None;
-            manager.mode = None;
-            manager.config_path = None;
-            manager.is_stopping = false;
-            #[cfg(target_os = "macos")]
-            if let Some(abort) = manager.bypass_router_watchdog_abort.take() {
-                abort.abort();
-            }
-            was_stopping
+            let dns_info = manager.reset();
+            (true, was_stopping, dns_info)
         } else {
-            dns_info = None;
-            false
-        };
-        (matches, stopping, dns_info)
+            (false, false, None)
+        }
     };
 
     if !should_cleanup {
         log::info!("Process mode has changed, skipping cleanup");
         return;
     }
-
-    #[cfg(not(target_os = "windows"))]
-    let _ = was_user_initiated_stop;
 
     if matches!(**process_mode, ProxyMode::SystemProxy) {
         if let Err(e) = PlatformEngine::unset_proxy(app_handle).await {
@@ -160,45 +129,10 @@ pub(super) async fn handle_process_termination(
     }
 
     if matches!(**process_mode, ProxyMode::TunProxy) {
-        #[cfg(target_os = "macos")]
-        {
-            log::info!("[dns] TUN process terminated — resetting all services to DHCP");
-            if let Err(e) = crate::engine::macos::restore_system_dns() {
-                log::warn!("[dns] fallback restore_system_dns failed: {}", e);
-            }
-        }
-        #[cfg(target_os = "linux")]
-        {
-            if let Some((iface, original_dns)) = captured_dns_override {
-                log::info!(
-                    "[dns] TUN process terminated — restoring [{}] DNS to {}",
-                    iface,
-                    original_dns
-                );
-                if let Err(e) = crate::engine::linux::restore_system_dns(&iface, &original_dns) {
-                    log::warn!("[dns] fallback restore_system_dns failed: {}", e);
-                }
-            } else {
-                log::warn!(
-                    "[dns] TUN terminated but no dns_override captured; DNS may need manual restore"
-                );
-            }
-        }
-        #[cfg(target_os = "windows")]
-        {
-            if was_user_initiated_stop {
-                log::info!(
-                    "[dns] user-initiated stop; service already reset DNS, skipping UAC fallback"
-                );
-            } else {
-                log::warn!(
-                    "[dns] TUN process terminated unexpectedly — requesting UAC DNS restore"
-                );
-                if let Err(e) = crate::engine::windows::restore_system_dns() {
-                    log::warn!("[dns] fallback restore_system_dns failed: {}", e);
-                }
-            }
-        }
+        PlatformEngine::restore_dns_after_termination(
+            was_user_initiated_stop,
+            captured_dns_override,
+        );
     }
 
     if let Err(e) = app_handle.emit(EVENT_STATUS_CHANGED, payload.clone()) {

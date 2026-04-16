@@ -275,4 +275,34 @@ impl EngineManager for LinuxEngine {
     fn stop_tun_process() -> Result<(), String> {
         stop_tun_process()
     }
+
+    fn reapply_dns_override(config_path: &str) -> Option<(String, String)> {
+        match apply_system_dns_override(config_path) {
+            Ok(info) => Some(info),
+            Err(e) => {
+                log::warn!("[dns] NetworkUp re-apply failed: {}", e);
+                None
+            }
+        }
+    }
+
+    fn restore_dns_after_termination(
+        _was_user_stop: bool,
+        dns_info: Option<(String, String)>,
+    ) {
+        if let Some((iface, original_dns)) = dns_info {
+            log::info!(
+                "[dns] TUN process terminated — restoring [{}] DNS to {}",
+                iface,
+                original_dns
+            );
+            if let Err(e) = restore_system_dns(&iface, &original_dns) {
+                log::warn!("[dns] fallback restore_system_dns failed: {}", e);
+            }
+        } else {
+            log::warn!(
+                "[dns] TUN terminated but no dns_override captured; DNS may need manual restore"
+            );
+        }
+    }
 }

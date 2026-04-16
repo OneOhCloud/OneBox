@@ -277,4 +277,21 @@ impl EngineManager for MacOSEngine {
     fn stop_tun_process() -> Result<(), String> {
         stop_tun_process()
     }
+
+    fn reapply_dns_override(config_path: &str) -> Option<(String, String)> {
+        if let Err(e) = apply_system_dns_override(config_path) {
+            log::warn!("[dns] NetworkUp re-apply failed: {}", e);
+        }
+        None
+    }
+
+    fn restore_dns_after_termination(
+        _was_user_stop: bool,
+        _dns_info: Option<(String, String)>,
+    ) {
+        log::info!("[dns] TUN process terminated — resetting all services to DHCP");
+        if let Err(e) = restore_system_dns() {
+            log::warn!("[dns] fallback restore_system_dns failed: {}", e);
+        }
+    }
 }

@@ -1,8 +1,7 @@
-#[cfg(any(target_os = "macos", target_os = "windows"))]
 use std::sync::Arc;
 
-#[cfg(any(target_os = "macos", target_os = "windows"))]
-use super::{ProxyMode, PROCESS_MANAGER};
+use super::{ProcessManager, ProxyMode};
+use super::monitor::handle_process_termination;
 
 #[cfg(target_os = "macos")]
 use crate::engine::state_machine::{transition, Intent, EngineStateCell};
@@ -12,8 +11,6 @@ use crate::engine::{readiness, EVENT_STATUS_CHANGED};
 use tauri::Emitter;
 #[cfg(target_os = "macos")]
 use tauri::Manager;
-#[cfg(any(target_os = "macos", target_os = "windows"))]
-use super::monitor::handle_process_termination;
 
 // ── macOS: bypass-router 4-hour restart watchdog ──────────────────────
 
@@ -55,7 +52,7 @@ async fn restart_tun_send_safe(
     });
 
     {
-        let mut manager = PROCESS_MANAGER.lock().unwrap_or_else(|e| e.into_inner());
+        let mut manager = ProcessManager::acquire();
         manager.mode = Some(Arc::new(ProxyMode::TunProxy));
         manager.config_path = Some(Arc::clone(&path));
         manager.child = None;
@@ -80,7 +77,7 @@ pub(super) async fn bypass_router_watchdog(app: tauri::AppHandle, path: Arc<Stri
         tokio::time::sleep(BYPASS_ROUTER_RESTART_INTERVAL).await;
 
         let still_tun = {
-            let manager = PROCESS_MANAGER.lock().unwrap_or_else(|e| e.into_inner());
+            let manager = ProcessManager::acquire();
             manager
                 .mode
                 .as_ref()
@@ -99,14 +96,14 @@ pub(super) async fn bypass_router_watchdog(app: tauri::AppHandle, path: Arc<Stri
         );
 
         {
-            let mut manager = PROCESS_MANAGER.lock().unwrap_or_else(|e| e.into_inner());
+            let mut manager = ProcessManager::acquire();
             manager.bypass_router_restarting = true;
         }
 
         let stop_result = tokio::task::spawn_blocking(crate::engine::macos::stop_tun_process).await;
         if let Err(e) = stop_result.map_err(|e| e.to_string()).and_then(|r| r) {
             log::error!("[bypass_router_watchdog] stop_tun_process failed: {}", e);
-            let mut manager = PROCESS_MANAGER.lock().unwrap_or_else(|e| e.into_inner());
+            let mut manager = ProcessManager::acquire();
             manager.bypass_router_restarting = false;
             continue;
         }
@@ -114,7 +111,7 @@ pub(super) async fn bypass_router_watchdog(app: tauri::AppHandle, path: Arc<Stri
         tokio::time::sleep(std::time::Duration::from_secs(2)).await;
 
         {
-            let mut manager = PROCESS_MANAGER.lock().unwrap_or_else(|e| e.into_inner());
+            let mut manager = ProcessManager::acquire();
             manager.bypass_router_restarting = false;
         }
 
@@ -139,7 +136,7 @@ pub(super) fn spawn_windows_service_watchdog(
         let mut observed_running = false;
         loop {
             let still_tun = {
-                let m = PROCESS_MANAGER.lock().unwrap_or_else(|e| e.into_inner());
+                let m = ProcessManager::acquire();
                 m.mode
                     .as_ref()
                     .map(|x| matches!(**x, ProxyMode::TunProxy))

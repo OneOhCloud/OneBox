@@ -25,6 +25,23 @@ pub trait EngineManager {
     /// Stop the TUN-mode sing-box process via the platform's privilege mechanism.
     fn stop_tun_process() -> Result<(), String>;
 
+    /// Restore system DNS after TUN process termination.
+    /// Called from the process termination handler with platform-opaque context:
+    /// - `was_user_stop`: true if the user explicitly stopped the engine
+    /// - `dns_info`: Linux-only original DNS state captured at start
+    /// Re-apply TUN gateway DNS override after a network change.
+    /// Returns `Some((iface, dns))` on Linux so the caller can store
+    /// the updated override state; other platforms return `None`.
+    fn reapply_dns_override(_config_path: &str) -> Option<(String, String)> {
+        None
+    }
+
+    fn restore_dns_after_termination(
+        _was_user_stop: bool,
+        _dns_info: Option<(String, String)>,
+    ) {
+    }
+
     #[cfg(target_os = "windows")]
     fn restart(sidecar_path: String, path: String) {
         let _ = sidecar_path;
