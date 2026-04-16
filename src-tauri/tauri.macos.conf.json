@@ -2,6 +2,9 @@
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "identifier": "cloud.oneoh.onebox",
   "productName": "OneBox",
+  "build": {
+    "beforeBundleCommand": "scripts/prebundle.sh"
+  },
   "bundle": {
     "targets": [
       "app",
