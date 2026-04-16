@@ -33,7 +33,7 @@ async function updateExperimentalConfig(newConfig: any, dbCacheFilePath: string)
 
     newConfig["experimental"]["cache_file"] = {
         "enabled": true,
-        "store_fakeip": false,
+        "store_fakeip": true,
         "store_rdrc": true,
         "path": dbCacheFilePath
     };
