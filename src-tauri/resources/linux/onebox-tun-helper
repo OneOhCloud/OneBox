@@ -32,8 +32,12 @@ case "$1" in
         shift 2
         resolvectl dns "$iface" "$@"
         ;;
+    reload)
+        # Send SIGHUP to sing-box for config reload
+        pkill -HUP sing-box || true
+        ;;
     *)
-        echo "Usage: $0 {start-tun|stop-tun|dns-override|dns-restore}" >&2
+        echo "Usage: $0 {start-tun|stop-tun|dns-override|dns-restore|reload}" >&2
         exit 1
         ;;
 esac

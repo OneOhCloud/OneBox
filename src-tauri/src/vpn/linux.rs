@@ -55,7 +55,7 @@ pub async fn unset_proxy(_app: &AppHandle) -> anyhow::Result<()> {
     Ok(())
 }
 
-const HELPER_PATH: &str = "/usr/lib/OneBox/onebox-tun-helper";
+pub const HELPER_PATH: &str = "/usr/lib/OneBox/onebox-tun-helper";
 
 /// Build the pkexec-wrapped command to start sing-box as root via the
 /// privileged helper. DNS override + sing-box launch happen in a single

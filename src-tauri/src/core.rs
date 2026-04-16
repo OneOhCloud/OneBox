@@ -1145,21 +1145,26 @@ pub async fn reload_config(app: tauri::AppHandle, is_tun: bool) -> Result<String
             log::info!("SIGHUP sent via pkill");
         }
 
-        #[cfg(not(target_os = "macos"))]
+        #[cfg(target_os = "linux")]
         {
-            // On Linux, sing-box runs as root (via pkexec), so we need pkexec
-            // to send SIGHUP. On Windows, the service handles it.
-            let output = if is_privileged {
-                Command::new("pkexec")
-                    .args(["pkill", "-HUP", "sing-box"])
-                    .output()
-                    .map_err(|e| format!("Failed to send SIGHUP via pkexec: {}", e))?
-            } else {
-                Command::new("pkill")
-                    .args(["-HUP", "sing-box"])
-                    .output()
-                    .map_err(|e| format!("Failed to send SIGHUP: {}", e))?
-            };
+            // Linux: sing-box runs as root (via pkexec). Route through the
+            // polkit-authorized helper so no auth prompt is needed.
+            let output = Command::new("pkexec")
+                .args([crate::vpn::linux::HELPER_PATH, "reload"])
+                .output()
+                .map_err(|e| format!("Failed to send SIGHUP via helper: {}", e))?;
+            if !output.status.success() {
+                let error = String::from_utf8_lossy(&output.stderr);
+                return Err(format!("Failed to reload config: {}", error));
+            }
+            log::info!("SIGHUP sent via helper");
+        }
+        #[cfg(target_os = "windows")]
+        {
+            let output = Command::new("pkill")
+                .args(["-HUP", "sing-box"])
+                .output()
+                .map_err(|e| format!("Failed to send SIGHUP: {}", e))?;
             if !output.status.success() {
                 let error = String::from_utf8_lossy(&output.stderr);
                 return Err(format!("Failed to reload config: {}", error));
