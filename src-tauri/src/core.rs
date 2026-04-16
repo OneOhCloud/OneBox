@@ -7,8 +7,6 @@ use std::path::Path;
 use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Manager};
 
-#[cfg(target_os = "linux")]
-use crate::privilege;
 use crate::state::{AppData, LogType};
 use crate::engine::state_machine::{transition, Intent, VpnState, VpnStateCell};
 #[cfg(not(target_os = "macos"))]

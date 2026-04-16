@@ -5,7 +5,6 @@ pub mod engine;
 mod events;
 mod lan;
 mod plugins;
-mod privilege;
 mod setup;
 mod state;
 mod utils;
@@ -73,7 +72,6 @@ pub fn run() {
             command::open_directory,
             command::get_app_version,
             command::get_pending_deep_link,
-            privilege::is_privileged,
             engine::macos_helper::helper_ping,
             engine::macos_helper::helper_install,
         ])
