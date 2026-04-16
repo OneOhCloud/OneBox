@@ -32,6 +32,38 @@ Do **not** split this back into per-channel workflow files. The earlier multi-fi
 
 The canonical way to cut a release on any channel is `make bump` on that channel's branch, then push. Nothing else.
 
+## Verifying Linux from a macOS host: never commit just to transport
+
+When you need to check whether a local change compiles / behaves correctly
+on Linux, **do not commit + push + pull** just to move the code onto the
+Linux VM. That pollutes the git history with "fix typo", "re-add missing
+import" churn that shouldn't exist as commits. Commits are for finished
+work, not transport.
+
+Use `make linux-check` instead (wraps `scripts/linux-check.sh`). The
+script:
+
+1. `ssh`s into the Linux VM (default `root@100.91.1.95`; override with
+   `ONEBOX_LINUX_VM=user@host`). If the VM is unreachable it prints a
+   note asking me to start the VM manually and exits — **never try to
+   guess the VM's up state or attempt to boot it automatically**, I have
+   a snapshot and will start it.
+2. `git fetch` + `git checkout --detach <local HEAD>` on the VM so the
+   committed baseline matches local.
+3. Pipes `git diff HEAD --binary` through `git apply` on the VM so
+   whatever WIP I have in the working tree lands without a commit.
+4. Runs `cargo check` on the VM and tails the output.
+
+A second invocation re-runs cleanly because step 2 starts with
+`git reset --hard HEAD` to unwind the previous patch.
+
+If you discover a real bug during a linux-check round, fold the fix into
+the **same** working-tree diff and rerun `make linux-check` until it's
+green. Only then, commit once with the final change.
+
+The same principle applies if a Windows VM gets added later — add
+`make windows-check` that patch-transports the same way.
+
 ## Workflows that need my hands: ask, don't guess
 
 Some test / verification flows in this project cannot be fully automated by

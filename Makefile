@@ -1,12 +1,13 @@
-.PHONY: update dev build bump helper help
+.PHONY: update dev build bump helper linux-check help
 
 help:
 	@echo "Available targets:"
-	@echo "  update   Update JS and Rust dependencies"
-	@echo "  dev      Start Tauri dev server"
-	@echo "  build    Build Tauri application (invokes scripts/prebundle.sh)"
-	@echo "  bump     Bump patch version in tauri.conf.json and commit all changes"
-	@echo "  helper   Build the macOS privileged helper (universal binary)"
+	@echo "  update       Update JS and Rust dependencies"
+	@echo "  dev          Start Tauri dev server"
+	@echo "  build        Build Tauri application (invokes scripts/prebundle.sh)"
+	@echo "  bump         Bump patch version in tauri.conf.json and commit all changes"
+	@echo "  helper       Build the macOS privileged helper (universal binary)"
+	@echo "  linux-check  Run cargo check on the Linux VM with local WIP patched"
 
 helper:
 	scripts/build-helper.sh
@@ -39,3 +40,10 @@ dev:
 
 build:
 	bunx tauri build
+
+# Sync the Linux VM to local HEAD, apply any WIP as a patch, and run
+# cargo check on the VM. Does NOT commit or push. If the VM is offline
+# the script prompts to start it manually and exits. Override the
+# target host via ONEBOX_LINUX_VM=user@host.
+linux-check:
+	@scripts/linux-check.sh
