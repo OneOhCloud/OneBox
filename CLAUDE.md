@@ -21,12 +21,14 @@ This is a project-specific reminder of the global
 
 ## Release workflow triggers
 
-The three release pipelines (`dev-release.yml`, `beta-release.yml`, `stable-release.yml`) are **independent**. Each one is triggered **only** by:
+All four release channels (dev, beta, stable, manual) are served by a **single workflow**: `release.yml`. It is triggered by:
 
 1. A `push` that modifies `src-tauri/tauri.conf.json` on the channel's own branch (dev: `feature/dev`, beta: `feature/beta`, stable: `main`), or
-2. A manual `workflow_dispatch` from the Actions tab.
+2. A manual `workflow_dispatch` from the Actions tab, where the operator picks the channel.
 
-Do **not** chain them with `workflow_run` triggers. An earlier design had beta listen for "Dev Build completed" and stable listen for "Beta Build completed" — this turned every dev push into an automatic full dev→beta→stable cascade, producing releases the author never asked for. It has been removed on purpose. If you see a reason to re-introduce cross-workflow triggers, treat it as a design change that needs explicit discussion, not a "missing feature" to patch back in.
+The workflow's `resolve` job maps the trigger to a channel, then derives all channel-specific parameters (tag name, prerelease flag, template branch, etc.). Beta and stable have a `check-reuse` job that can skip the full build by copying artifacts from the upstream channel (dev→beta, beta→stable) when the version matches.
+
+Do **not** split this back into per-channel workflow files. The earlier multi-file design wasted GitHub Actions cache (each workflow had its own Rust cache namespace) and required every build-step change to be replicated four times. Do **not** chain releases with `workflow_run` triggers — an earlier design caused an automatic dev→beta→stable cascade on every dev push. If you see a reason to re-introduce either pattern, treat it as a design change that needs explicit discussion, not a "missing feature" to patch back in.
 
 The canonical way to cut a release on any channel is `make bump` on that channel's branch, then push. Nothing else.
 
