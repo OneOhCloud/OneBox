@@ -20,7 +20,11 @@
       "minimumSystemVersion": "10.15",
       "exceptionDomain": "",
       "signingIdentity": "Developer ID Application: OneOh Cloud LLC (GN2W3N34TM)",
-      "entitlements": "packages/macos/entitlements.plist"
+      "entitlements": "packages/macos/entitlements.plist",
+      "infoPlist": "Info.privileged-helper.plist",
+      "files": {
+        "Library/LaunchServices/cloud.oneoh.onebox.helper": "target/helper/cloud.oneoh.onebox.helper"
+      }
     }
   }
 }

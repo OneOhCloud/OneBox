@@ -6,6 +6,7 @@ import { SettingItem } from "../components/developer/common";
 import ToggleDev from "../components/developer/dev-toggle";
 import ToggleDHCP from "../components/developer/dhcp-toggle";
 import DNSSettingsItem from "../components/developer/dns-settings";
+import HelperPing from "../components/developer/helper-ping";
 import ToggleLocalConfig from "../components/developer/local-config-toggle";
 import StageSetting from "../components/developer/select-stage";
 import TunStackSetting from "../components/developer/tun-stack";
@@ -35,6 +36,7 @@ export default function Page() {
 
                         <DNSSettingsItem />
                         <UASettingsItem />
+                        <HelperPing />
                         <SettingItem
                             icon={<Binoculars className="w-5 h-5 text-gray-500" />}
 

@@ -1,11 +1,15 @@
-.PHONY: update dev build bump help
+.PHONY: update dev build bump helper help
 
 help:
 	@echo "Available targets:"
 	@echo "  update   Update JS and Rust dependencies"
 	@echo "  dev      Start Tauri dev server"
-	@echo "  build    Build Tauri application"
+	@echo "  build    Build Tauri application (invokes scripts/prebundle.sh)"
 	@echo "  bump     Bump patch version in tauri.conf.json and commit all changes"
+	@echo "  helper   Build the macOS privileged helper (universal binary)"
+
+helper:
+	scripts/build-helper.sh
 
 bump:
 	@current=$$(sed -n 's/.*"version": "\([^"]*\)".*/\1/p' src-tauri/tauri.conf.json | head -1); \

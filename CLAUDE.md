@@ -1,5 +1,24 @@
 # OneBox — Project Notes for Claude
 
+## Reading third-party source
+
+Several moving parts in this project come from code we don't own: `sing-box`,
+the Tauri 2 CLI / bundler, `tauri-action`, `onebox-lifecycle`, etc. Whenever
+a question can only be answered by reading one of those — *how* does Tauri
+assemble the .app bundle, *when* does the bundler sign vs. notarize, *what*
+does `beforeBundleCommand` run against — **clone the upstream repo at the
+exact version we use, then read from the checkout**. Do not rely on web
+search, blog posts, or GitHub's web UI: they lose surrounding context and
+often point at the wrong branch for the version we're on.
+
+Scratch location: `/tmp/src-probe/<name>` or `~/src/`. The clone is
+disposable and must not be added to this repo. Use `git clone --depth=1
+--branch <tag>` (or `--branch v<ver>`) to match the pinned version in
+`Cargo.lock` / `package.json`.
+
+This is a project-specific reminder of the global
+`Problem Analysis Priority Order` rule in `~/.claude/CLAUDE.md`.
+
 ## Release workflow triggers
 
 The three release pipelines (`dev-release.yml`, `beta-release.yml`, `stable-release.yml`) are **independent**. Each one is triggered **only** by:
@@ -10,6 +29,53 @@ The three release pipelines (`dev-release.yml`, `beta-release.yml`, `stable-rele
 Do **not** chain them with `workflow_run` triggers. An earlier design had beta listen for "Dev Build completed" and stable listen for "Beta Build completed" — this turned every dev push into an automatic full dev→beta→stable cascade, producing releases the author never asked for. It has been removed on purpose. If you see a reason to re-introduce cross-workflow triggers, treat it as a design change that needs explicit discussion, not a "missing feature" to patch back in.
 
 The canonical way to cut a release on any channel is `make bump` on that channel's branch, then push. Nothing else.
+
+## Workflows that need my hands: ask, don't guess
+
+Some test / verification flows in this project cannot be fully automated by
+the assistant, because they require GUI interaction, a signed app bundle in
+`/Applications`, a system authorization prompt, or a process the assistant's
+tools can't drive (e.g. clicking a toggle in OneBox, confirming a sudo prompt
+in a TCC dialog).
+
+**Never pretend a manual step is automated.** If a workflow has a manual
+gate, the assistant should produce a short-lived shell script at
+`scripts/tmp-<name>.sh` that:
+
+1. Runs every step it *can* run non-interactively (sudo cleanup, re-signing,
+   launchd inspection, log queries, etc.).
+2. At each manual gate, prints a clearly-framed **MANUAL STEP** block
+   describing exactly what I need to do in the GUI / terminal, then waits on
+   `read -r -p "Confirm done? [y/N] "`. Any answer other than `y`/`Y`
+   aborts with a non-zero exit.
+3. Immediately after each manual gate, runs an automated sanity check so
+   that a silent failure on my side (forgot to click, authorization denied,
+   etc.) is caught before the next step. Example: after "click Install
+   privileged helper", check `sudo launchctl print system/<label>`.
+4. Prints a one-line success message at the end and lists anything the
+   script cannot verify (e.g. a toast message only visible in the UI).
+
+File naming: `scripts/tmp-<purpose>.sh`. The `tmp-` prefix is a marker that
+the file is disposable — delete it once the workflow it validates has been
+merged and stabilised. Don't let these accumulate; they rot quickly.
+
+Do **not**:
+
+- Write the manual step into a memory file and tell me "I'll remember to
+  do this next time". The script is the authoritative place.
+- Bundle the automated and manual parts into a single `echo "now do X"`
+  without a `read` gate — I will miss it and the script will race ahead.
+- Skip the sanity check after a manual gate just because the script "should
+  work". The point of these scripts is to catch the case where it doesn't.
+- Check the temporary scripts into a release. They are for the dev loop
+  only; once the feature ships, the script should be removed in the same
+  commit, or at minimum in the follow-up cleanup commit.
+
+Real example: `scripts/tmp-test-phase2a.sh` for the SMJobBless caller
+validation flow — cleans old helper, re-integrates new one, pauses for me
+to click Install + accept the system prompt, verifies launchd registered
+it, pauses again for me to click Ping, then scrapes the unified log for
+`connection accepted` / `reject:` lines.
 
 ## CHANGELOG writing rules
 

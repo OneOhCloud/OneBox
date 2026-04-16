@@ -2,6 +2,7 @@ mod command;
 mod core;
 mod database;
 mod events;
+mod helper_client;
 mod lan;
 mod plugins;
 mod privilege;
@@ -55,6 +56,8 @@ pub fn run() {
             command::get_pending_deep_link,
             privilege::is_privileged,
             privilege::save_privilege_password_to_keyring,
+            helper_client::helper_ping,
+            helper_client::helper_install,
         ])
         .setup(setup::app_setup)
         .on_menu_event(events::on_menu_event)
