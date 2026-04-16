@@ -224,7 +224,7 @@ pub fn restore_system_dns() -> Result<(), String> {
 pub fn restart_privileged_command(sidecar_path: String, path: String) -> Result<(), String> {
     // restart = stop + start via the Windows service; no UAC prompts because
     // the ACL granted at install time lets Authenticated Users do both.
-    stop_tun_process("")?;
+    stop_tun_process()?;
     std::thread::sleep(std::time::Duration::from_millis(500));
 
     let gateway = extract_tun_gateway_from_config(&path).unwrap_or_default();

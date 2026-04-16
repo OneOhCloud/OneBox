@@ -1,12 +1,17 @@
 use std::sync::Arc;
 
-use crate::engine::state_machine::{transition, Intent, EngineStateCell};
-use crate::engine::{readiness, EVENT_STATUS_CHANGED};
-use tauri::Emitter;
-use tauri::Manager;
-
-use super::monitor::handle_process_termination;
 use super::{ProxyMode, PROCESS_MANAGER};
+
+#[cfg(target_os = "macos")]
+use crate::engine::state_machine::{transition, Intent, EngineStateCell};
+#[cfg(target_os = "macos")]
+use crate::engine::{readiness, EVENT_STATUS_CHANGED};
+#[cfg(target_os = "macos")]
+use tauri::Emitter;
+#[cfg(target_os = "macos")]
+use tauri::Manager;
+#[cfg(any(target_os = "macos", target_os = "windows"))]
+use super::monitor::handle_process_termination;
 
 // ── macOS: bypass-router 4-hour restart watchdog ──────────────────────
 
