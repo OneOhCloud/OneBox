@@ -277,23 +277,3 @@ pub async fn helper_install() -> Result<(), String> {
         .map_err(|e| format!("helper_install join error: {}", e))?
 }
 
-/// Phase 2b.1 smoke test: starts sing-box via helper, sleeps a few seconds,
-/// then stops it. Purely developer-facing — Phase 2b.2 wires the real
-/// start/stop path into `vpn::macos` and this command goes away.
-#[tauri::command]
-pub async fn helper_smoke_test(config_path: String) -> Result<String, String> {
-    let pid = tokio::task::spawn_blocking({
-        let p = config_path.clone();
-        move || api::start_sing_box(&p)
-    })
-    .await
-    .map_err(|e| format!("start_sing_box join error: {}", e))??;
-
-    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
-
-    tokio::task::spawn_blocking(api::stop_sing_box)
-        .await
-        .map_err(|e| format!("stop_sing_box join error: {}", e))??;
-
-    Ok(format!("started pid={}, stopped via SIGTERM", pid))
-}

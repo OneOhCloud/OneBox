@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { type } from "@tauri-apps/plugin-os";
-import { PlayCircle, ShieldCheck, ShieldLock } from "react-bootstrap-icons";
+import { ShieldCheck, ShieldLock } from "react-bootstrap-icons";
 import { toast } from "sonner";
 import { SettingItem } from "./common";
 
@@ -37,21 +37,6 @@ export default function HelperPing() {
         }
     };
 
-    const onSmokeTest = async () => {
-        // Phase 2b.1 probe: start sing-box via helper with the main app's
-        // existing config, wait 3 s, stop it. Temporary — Phase 2b.2 will
-        // wire the real start/stop into vpn/macos and this button goes
-        // away along with the underlying tauri command.
-        const paths = await invoke<{ data_dir: string }>("get_app_paths");
-        const configPath = `${paths.data_dir}/config.json`;
-        try {
-            const result = await invoke<string>("helper_smoke_test", { configPath });
-            toast.success(result);
-        } catch (e) {
-            toast.error(`smoke test failed: ${e}`);
-        }
-    };
-
     return (
         <>
             <SettingItem
@@ -65,12 +50,6 @@ export default function HelperPing() {
                 title="Privileged helper ping"
                 subTitle="XPC round-trip — requires install to have run"
                 onPress={onPing}
-            />
-            <SettingItem
-                icon={<PlayCircle className="text-[#34C759]" size={22} />}
-                title="Helper smoke test (start/stop sing-box)"
-                subTitle="Phase 2b.1 — starts then stops sing-box via helper"
-                onPress={onSmokeTest}
             />
         </>
     );

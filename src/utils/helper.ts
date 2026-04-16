@@ -139,10 +139,12 @@ async function syncConfig(props: SyncConfigProps) {
         //en: Directly use getStoreValue(RULE_MODE_STORE_KEY) instead of setStoreValue to get the current mode, so that the old value will not be read
         const currentMode = await getStoreValue(RULE_MODE_STORE_KEY)
 
-        //zh: 在 linux 和 macOS 上使用 TUN 模式时需要输入超级管理员密码
-        //en: When using TUN mode on linux and macOS, you need to enter the super administrator password
-        if (useTun && (type() == 'linux' || type() == 'macos')) {
-            console.log('在 Linux 或 macOS 上使用 TUN 模式，需要输入超级管理员密码');
+        //zh: 在 linux 上使用 TUN 模式时需要输入超级管理员密码
+        //    macOS 通过 privileged helper (XPC) 处理权限，无需密码
+        //en: When using TUN mode on linux, you need to enter the super administrator password
+        //    macOS handles privilege via the XPC privileged helper — no password needed
+        if (useTun && type() == 'linux') {
+            console.log('在 Linux 上使用 TUN 模式，需要输入超级管理员密码');
             const privileged = await verifyPrivileged();
             console.log('是否有超级管理员权限:', privileged);
             if (!privileged) {
@@ -151,11 +153,10 @@ async function syncConfig(props: SyncConfigProps) {
                 props.onError?.(new Error("没有超级管理员权限"));
             } else {
                 console.log('有超级管理员权限，继续配置');
-                console.log('privileged:', privileged);
             }
             const fn = currentMode === 'global' ? setGlobalTunConfig : setTunConfig;
             await fn(identifier);
-        } else if (useTun && type() == 'windows') {
+        } else if (useTun && (type() == 'macos' || type() == 'windows')) {
             console.log('在 Windows 上使用 TUN 模式，无需密码');
             const fn = currentMode === 'global' ? setGlobalTunConfig : setTunConfig;
             await fn(identifier);

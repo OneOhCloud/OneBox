@@ -1,3 +1,4 @@
+#[cfg(not(target_os = "macos"))]
 use keyring::Entry;
 #[cfg(not(target_os = "windows"))]
 use std::process::Command;
@@ -5,10 +6,13 @@ use std::process::Command;
 #[cfg(target_os = "linux")]
 use std::{io::Write, process::Stdio};
 
+#[allow(dead_code)]
 const KEYRING_SERVICE: &str = "onebox.oneoh.cloud";
+#[allow(dead_code)]
 const KEYRING_KEY_NAME: &str = "privilege_password";
 
 // 定义 trait 作为接口
+#[allow(dead_code)]
 pub trait PrivilegeHelper {
     #[cfg(not(target_os = "windows"))]
     fn get_current_user() -> String {
@@ -89,48 +93,19 @@ impl PrivilegeHelper for PlatformPrivilegeHelper {
         username.trim().to_string()
     }
 
-    async fn is_privileged(password: Option<String>) -> bool {
-        let username = get_current_username();
-
-        let password = match password {
-            Some(p) => p,
-            None => get_privilege_password_from_keyring().await,
-        };
-
-        if password.is_empty() {
-            log::info!("Password is empty");
-            return false;
-        }
-
-        let output = Command::new("osascript")
-            .arg("-e")
-            .arg(format!(
-                "do shell script \"exit 0\" user name \"{}\" password \"{}\" with administrator privileges",
-                username, password
-            ))
-            .output(); // 使用 .await 以异步方式等待命令完成
-
-        match output {
-            Ok(output) if output.status.success() => true,
-            Ok(output) => {
-                let error_message = String::from_utf8_lossy(&output.stderr);
-                log::info!("Error: {}", error_message);
-                false
-            }
-            Err(e) => {
-                log::info!("Failed to execute command: {}", e);
-                false
-            }
-        }
+    async fn is_privileged(_password: Option<String>) -> bool {
+        // macOS: privileged helper replaces the password-based flow.
+        // If the helper responds to ping, privilege is available.
+        crate::helper_client::api::ping().is_ok()
     }
 }
 
-#[cfg(not(target_os = "windows"))]
+#[cfg(target_os = "linux")]
 pub fn get_current_username() -> String {
     PlatformPrivilegeHelper::get_current_user()
 }
 
-#[cfg(not(target_os = "windows"))]
+#[cfg(target_os = "linux")]
 pub async fn get_privilege_password_from_keyring() -> String {
     match Entry::new(KEYRING_SERVICE, KEYRING_KEY_NAME) {
         Ok(entry) => entry.get_password().unwrap_or_default(),
@@ -145,8 +120,19 @@ pub async fn is_privileged(password: Option<String>) -> bool {
 
 #[tauri::command]
 pub async fn save_privilege_password_to_keyring(password: String) -> bool {
-    match Entry::new(KEYRING_SERVICE, KEYRING_KEY_NAME) {
-        Ok(entry) => entry.set_password(&password).is_ok(),
-        Err(_) => false,
+    // macOS: privileged helper handles all root operations via XPC; no
+    // password is stored in the keychain. Return true so the frontend
+    // considers the "save" step successful without actually persisting.
+    #[cfg(target_os = "macos")]
+    {
+        let _ = password;
+        return true;
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        match Entry::new(KEYRING_SERVICE, KEYRING_KEY_NAME) {
+            Ok(entry) => entry.set_password(&password).is_ok(),
+            Err(_) => false,
+        }
     }
 }
