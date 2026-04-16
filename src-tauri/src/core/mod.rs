@@ -175,30 +175,20 @@ pub fn get_running_config() -> Option<(ProxyMode, String)> {
 }
 
 #[tauri::command]
-pub async fn reload_config(app: tauri::AppHandle, is_tun: bool) -> Result<String, String> {
+pub async fn reload_config(app: tauri::AppHandle) -> Result<String, String> {
     #[cfg(any(unix, target_os = "windows"))]
     {
+        // Read the currently-running mode directly from ProcessManager —
+        // callers no longer need to pass it in (the previous `is_tun`
+        // parameter was only used as a consistency check against this
+        // same piece of state).
         let needs_proxy_reset = {
             let manager = ProcessManager::acquire();
-
-            match (manager.mode.as_ref().map(|m| m.as_ref()), is_tun) {
-                (Some(ProxyMode::TunProxy), true) => {}
-                (Some(ProxyMode::SystemProxy), false) => {}
-                (Some(ProxyMode::TunProxy), false) => {
-                    return Err("Current mode is TUN mode, not System Proxy mode".to_string());
-                }
-                (Some(ProxyMode::SystemProxy), true) => {
-                    return Err("Current mode is System Proxy mode, not TUN mode".to_string());
-                }
-                (None, _) => {
-                    return Err("No running process found".to_string());
-                }
+            match manager.mode.as_ref().map(|m| m.as_ref()) {
+                Some(ProxyMode::TunProxy) => false,
+                Some(ProxyMode::SystemProxy) => true,
+                None => return Err("No running process found".to_string()),
             }
-
-            matches!(
-                manager.mode.as_ref().map(|m| m.as_ref()),
-                Some(ProxyMode::SystemProxy)
-            )
         };
 
         ::log::info!("Reloading config");

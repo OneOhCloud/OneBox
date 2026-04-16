@@ -208,7 +208,7 @@ export const vpnServiceManager = {
                 await new Promise(resolve => setTimeout(resolve, 1000)); // 等待1秒确保服务完全停止
                 await vpnServiceManager.start();
             } else {
-                await invoke("reload_config", { isTun: useTun });
+                await invoke("reload_config");
             }
         } else {
             console.warn("VPN service is not running, cannot reload config");
