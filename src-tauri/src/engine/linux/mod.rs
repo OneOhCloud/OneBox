@@ -415,6 +415,26 @@ impl EngineManager for LinuxEngine {
         }
     }
 
+    async fn ensure_installed(_app: &AppHandle) -> Result<(), String> {
+        // The helper script and polkit policy are installed by the .deb/.rpm
+        // package; there is no runtime install step to perform. We still
+        // verify the script exists so a broken package install surfaces as
+        // a clear error here instead of during the first `start`.
+        if std::path::Path::new(HELPER_PATH).exists() {
+            Ok(())
+        } else {
+            Err(format!("{HELPER_PATH} not found — is the OneBox package installed?"))
+        }
+    }
+
+    async fn probe(_app: &AppHandle) -> Result<String, String> {
+        if std::path::Path::new(HELPER_PATH).exists() {
+            Ok("available".into())
+        } else {
+            Err(format!("{HELPER_PATH} missing"))
+        }
+    }
+
     async fn restart(_app: &AppHandle) -> Result<(), String> {
         // Helper's `reload` verb bundles `pkill -HUP sing-box` and
         // `resolvectl flush-caches` in one pkexec call. The flush is needed

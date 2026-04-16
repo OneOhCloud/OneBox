@@ -72,8 +72,8 @@ pub fn run() {
             command::open_directory,
             command::get_app_version,
             command::get_pending_deep_link,
-            engine::helper_ping,
-            engine::helper_install,
+            engine::engine_probe,
+            engine::engine_ensure_installed,
         ])
         .setup(setup::app_setup)
         .on_menu_event(events::on_menu_event)

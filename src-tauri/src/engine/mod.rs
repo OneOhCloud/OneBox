@@ -52,6 +52,22 @@ pub trait EngineManager {
     /// teardown'd) from the crash-recovery path (external kill, UAC
     /// fallback needed on Windows).
     fn on_process_terminated(_app: &AppHandle, _was_user_stop: bool) {}
+
+    /// Idempotently install the platform's privileged companion:
+    ///   - macOS: SMJobBless → /Library/PrivilegedHelperTools/…
+    ///   - Windows: SCM CreateService → OneBoxTunService
+    ///   - Linux: no-op (helper script + polkit policy ship in the .deb/.rpm)
+    ///
+    /// Prompts for OS-level authorization on first call (Touch ID / UAC).
+    /// Safe to call repeatedly — subsequent calls are fast no-ops once the
+    /// companion is installed.
+    async fn ensure_installed(app: &AppHandle) -> Result<(), String>;
+
+    /// Smoke-test that the privileged companion is reachable. macOS does
+    /// an XPC `ping`, Windows queries the SCM service state, Linux stats
+    /// the helper script on disk. Returns a short human-readable string
+    /// (`"pong"`, `"running"`, `"available"`) on success.
+    async fn probe(app: &AppHandle) -> Result<String, String>;
 }
 
 pub mod helper;
@@ -65,31 +81,20 @@ pub mod macos;
 #[cfg(target_os = "windows")]
 pub mod windows;
 
-// macOS helper commands exposed to generate_handler! at the engine:: level.
-// On macOS these delegate to the real XPC helper (blocking FFI, wrapped in
-// spawn_blocking); on other platforms they return an error.
+/// Dev probe: install the platform's privileged companion (macOS helper
+/// via SMJobBless, Windows SCM service via CreateService) if not already
+/// installed. Linux is a no-op. Surfaces the OS-level authorization prompt
+/// on first call.
 #[tauri::command]
-pub async fn helper_ping() -> Result<String, String> {
-    #[cfg(target_os = "macos")]
-    {
-        tokio::task::spawn_blocking(macos::helper::api::ping)
-            .await
-            .map_err(|e| format!("helper_ping join error: {}", e))?
-    }
-    #[cfg(not(target_os = "macos"))]
-    { Err("macOS only".into()) }
+pub async fn engine_ensure_installed(app: AppHandle) -> Result<(), String> {
+    PlatformEngine::ensure_installed(&app).await
 }
 
+/// Dev probe: round-trip a liveness check to the privileged companion.
+/// Returns a short status string or a descriptive error.
 #[tauri::command]
-pub async fn helper_install() -> Result<(), String> {
-    #[cfg(target_os = "macos")]
-    {
-        tokio::task::spawn_blocking(macos::helper::api::install)
-            .await
-            .map_err(|e| format!("helper_install join error: {}", e))?
-    }
-    #[cfg(not(target_os = "macos"))]
-    { Err("macOS only".into()) }
+pub async fn engine_probe(app: AppHandle) -> Result<String, String> {
+    PlatformEngine::probe(&app).await
 }
 
 #[cfg(target_os = "linux")]

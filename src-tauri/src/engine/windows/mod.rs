@@ -367,6 +367,32 @@ impl EngineManager for WindowsEngine {
         }
     }
 
+    async fn ensure_installed(_app: &AppHandle) -> Result<(), String> {
+        // Service installation self-elevates; Windows pops UAC the first
+        // time. Once installed, the ACL granted at install time lets
+        // Authenticated Users start/stop the service without further
+        // prompts (see `start`/`stop` above).
+        let sidecar = crate::engine::helper::get_sidecar_path(std::path::Path::new("sing-box"))
+            .map_err(|e| format!("Failed to resolve bundled exe: {}", e))?;
+        tokio::task::spawn_blocking(move || {
+            windows_native::self_elevate_helper("install-service", &[sidecar.as_str()])
+        })
+        .await
+        .map_err(|e| format!("install-service join error: {}", e))?
+    }
+
+    async fn probe(_app: &AppHandle) -> Result<String, String> {
+        use tun_service::scm::QueriedState;
+        match tun_service::scm::query_state() {
+            QueriedState::Running => Ok("running".into()),
+            QueriedState::Stopped => Ok("stopped".into()),
+            QueriedState::StartPending => Ok("start-pending".into()),
+            QueriedState::StopPending => Ok("stop-pending".into()),
+            QueriedState::Other => Ok("other".into()),
+            QueriedState::NotInstalled => Err("not installed".into()),
+        }
+    }
+
     async fn restart(_app: &AppHandle) -> Result<(), String> {
         // Windows service is driven by SCM; SIGHUP is not a thing. The
         // "reload" is a stop+start of OneBoxTunService, with the service

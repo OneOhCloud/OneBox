@@ -1,39 +1,33 @@
 import { invoke } from "@tauri-apps/api/core";
-import { type } from "@tauri-apps/plugin-os";
 import { ShieldCheck, ShieldLock } from "react-bootstrap-icons";
 import { toast } from "sonner";
 import { SettingItem } from "./common";
 
-// Phase 1c developer-only probes for the macOS privileged helper. Two items:
+// Developer-only probes for the platform's privileged companion:
+//   - macOS: XPC helper installed via SMJobBless.
+//   - Windows: OneBoxTunService installed via SCM (UAC on first install).
+//   - Linux: helper script + polkit policy installed by the .deb/.rpm;
+//     "install" is a no-op that just verifies the script is on disk.
 //
-//   1. `helper_install` -> SMJobBless flow. Triggers the macOS authorization
-//      prompt the first time; subsequent calls are a fast no-op.
-//   2. `helper_ping` -> XPC round-trip. Only succeeds after install has run.
-//
-// Both commands run on the backend through helper_client.m. The install path
-// only works when the app was launched from a signed, notarized bundle with
-// SMPrivilegedExecutables patched into Info.plist — i.e. after running
-// scripts/integrate-helper-into-bundle.sh against the production build.
-// Running from `tauri dev` will fail with a signature mismatch; that's
-// expected and documented in src-tauri/helper/README.md.
+// On macOS, install only works from a signed, notarized bundle with
+// SMPrivilegedExecutables patched into Info.plist — `tauri dev` will
+// fail with a signature mismatch. See src-tauri/helper/README.md.
 export default function HelperPing() {
-    if (type() !== "macos") return null;
-
     const onInstall = async () => {
         try {
-            await invoke("helper_install");
-            toast.success("helper installed");
+            await invoke("engine_ensure_installed");
+            toast.success("privileged companion installed");
         } catch (e) {
             toast.error(`install failed: ${e}`);
         }
     };
 
-    const onPing = async () => {
+    const onProbe = async () => {
         try {
-            const reply = await invoke<string>("helper_ping");
-            toast.success(`helper: ${reply}`);
+            const reply = await invoke<string>("engine_probe");
+            toast.success(`companion: ${reply}`);
         } catch (e) {
-            toast.error(`helper error: ${e}`);
+            toast.error(`probe failed: ${e}`);
         }
     };
 
@@ -41,15 +35,15 @@ export default function HelperPing() {
         <>
             <SettingItem
                 icon={<ShieldLock className="text-[#FF9500]" size={22} />}
-                title="Install privileged helper"
-                subTitle="SMJobBless — first call shows the system prompt"
+                title="Install privileged companion"
+                subTitle="SMJobBless / SCM install — first call shows the system prompt"
                 onPress={onInstall}
             />
             <SettingItem
                 icon={<ShieldCheck className="text-[#30B0C7]" size={22} />}
-                title="Privileged helper ping"
-                subTitle="XPC round-trip — requires install to have run"
-                onPress={onPing}
+                title="Probe privileged companion"
+                subTitle="Round-trip liveness check — requires install to have run"
+                onPress={onProbe}
             />
         </>
     );

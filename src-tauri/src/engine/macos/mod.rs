@@ -289,10 +289,7 @@ impl EngineManager for MacOSEngine {
                 // we ask the helper to install itself if needed, then ask it
                 // to spawn sing-box, and subscribe to its exit notifications
                 // so the process monitor fires on crash.
-                tokio::task::spawn_blocking(ensure_helper_installed)
-                    .await
-                    .map_err(|e| format!("helper install join error: {}", e))?
-                    .map_err(|e| format!("helper install failed: {}", e))?;
+                Self::ensure_installed(app).await?;
                 let app_c = app.clone();
                 let path_c = config_path.clone();
                 tokio::task::spawn_blocking(move || start_tun_via_helper(&app_c, &path_c))
@@ -429,6 +426,25 @@ impl EngineManager for MacOSEngine {
         if let Err(e) = restore_system_dns() {
             log::warn!("[dns] fallback restore_system_dns failed: {}", e);
         }
+    }
+
+    async fn ensure_installed(_app: &AppHandle) -> Result<(), String> {
+        // SMJobBless requires a signed, notarized bundle with
+        // SMPrivilegedExecutables set — see src-tauri/helper/README.md.
+        // Ping first so we don't trigger the OS authorization prompt on
+        // every call once the helper is already installed and reachable.
+        tokio::task::spawn_blocking(ensure_helper_installed)
+            .await
+            .map_err(|e| format!("ensure_installed join error: {}", e))?
+    }
+
+    async fn probe(_app: &AppHandle) -> Result<String, String> {
+        // XPC round-trip to the privileged helper. Fails if the helper
+        // wasn't installed, or if code-signing caller-validation rejects
+        // this process (e.g. `tauri dev` against a production helper).
+        tokio::task::spawn_blocking(macos_helper::api::ping)
+            .await
+            .map_err(|e| format!("helper_ping join error: {}", e))?
     }
 
     async fn restart(_app: &AppHandle) -> Result<(), String> {
