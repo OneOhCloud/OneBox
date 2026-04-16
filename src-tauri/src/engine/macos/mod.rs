@@ -256,14 +256,14 @@ pub struct MacOSEngine;
 impl EngineManager for MacOSEngine {
     async fn start(
         app: &AppHandle,
-        mode: crate::core::ProxyMode,
+        mode: crate::engine::ProxyMode,
         config_path: String,
     ) -> Result<(), String> {
         use std::sync::Arc;
         use tauri_plugin_shell::ShellExt;
 
         match mode {
-            crate::core::ProxyMode::SystemProxy => {
+            crate::engine::ProxyMode::SystemProxy => {
                 // User-mode sing-box sidecar — plain tauri spawn, no helper.
                 let cmd = app
                     .shell()
@@ -285,7 +285,7 @@ impl EngineManager for MacOSEngine {
                 }
                 set_proxy(app).await.map_err(|e| e.to_string())?;
             }
-            crate::core::ProxyMode::TunProxy => {
+            crate::engine::ProxyMode::TunProxy => {
                 // Root-mode sing-box is owned by the privileged XPC helper —
                 // we ask the helper to install itself if needed, then ask it
                 // to spawn sing-box, and subscribe to its exit notifications
@@ -302,7 +302,7 @@ impl EngineManager for MacOSEngine {
                 // cleanup path any other mode goes through.
                 let mut exit_rx = macos_helper::subscribe_sing_box_exits();
                 let exit_app = app.clone();
-                let mode_arc = Arc::new(crate::core::ProxyMode::TunProxy);
+                let mode_arc = Arc::new(crate::engine::ProxyMode::TunProxy);
                 let exit_mode = Arc::clone(&mode_arc);
                 tokio::spawn(async move {
                     if let Some(exit) = exit_rx.recv().await {
@@ -365,7 +365,7 @@ impl EngineManager for MacOSEngine {
             return Ok(());
         };
         match mode.as_ref() {
-            crate::core::ProxyMode::SystemProxy => {
+            crate::engine::ProxyMode::SystemProxy => {
                 // Best-effort proxy teardown first so apps don't keep pointing
                 // at a dying sing-box socket.
                 let _ = unset_proxy(app).await;
@@ -382,7 +382,7 @@ impl EngineManager for MacOSEngine {
                 }
                 tokio::time::sleep(std::time::Duration::from_millis(500)).await;
             }
-            crate::core::ProxyMode::TunProxy => {
+            crate::engine::ProxyMode::TunProxy => {
                 stop_tun_process().map_err(|e| {
                     log::error!("Failed to stop TUN process: {}", e);
                     e
@@ -394,14 +394,16 @@ impl EngineManager for MacOSEngine {
 
     fn on_network_up(_app: &AppHandle) {
         // Re-apply the TUN gateway DNS override on the new active service.
-        // Called from the onebox_lifecycle NetworkUp handler; reads the
-        // current config from ProcessManager since the trait deliberately
-        // does not expose it.
+        // Called unconditionally from the lifecycle handler; gate on
+        // "engine running in TUN mode" so SystemProxy sessions and idle
+        // states don't try to rewrite DNS.
         let config_path = {
             let manager = crate::core::ProcessManager::acquire();
-            match manager.config_path.as_ref() {
-                Some(p) => p.as_str().to_string(),
-                None => return, // engine not running; nothing to re-apply
+            match (manager.mode.as_ref(), manager.config_path.as_ref()) {
+                (Some(m), Some(p)) if matches!(**m, crate::engine::ProxyMode::TunProxy) => {
+                    p.as_str().to_string()
+                }
+                _ => return,
             }
         };
         if let Err(e) = apply_system_dns_override(&config_path) {
@@ -449,7 +451,7 @@ impl EngineManager for MacOSEngine {
             let manager = crate::core::ProcessManager::acquire();
             matches!(
                 manager.mode.as_ref().map(|m| m.as_ref()),
-                Some(crate::core::ProxyMode::TunProxy)
+                Some(crate::engine::ProxyMode::TunProxy)
             )
         };
         if is_tun {

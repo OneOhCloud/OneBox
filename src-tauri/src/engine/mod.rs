@@ -1,9 +1,18 @@
+use serde::{Deserialize, Serialize};
 use tauri::AppHandle;
-
-use crate::core::ProxyMode;
 
 pub const EVENT_TAURI_LOG: &str = "tauri-log";
 pub const EVENT_STATUS_CHANGED: &str = "status-changed";
+
+/// Which kind of proxy the engine is driving. Used both as a state tag
+/// (stored in `core::ProcessManager`) and as a parameter to
+/// `EngineManager::start`.
+#[derive(Clone, Default, PartialEq, Serialize, Deserialize, Debug)]
+pub enum ProxyMode {
+    #[default]
+    SystemProxy,
+    TunProxy,
+}
 
 /// Platform-specific sing-box engine management.
 ///

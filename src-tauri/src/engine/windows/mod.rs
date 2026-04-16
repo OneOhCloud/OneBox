@@ -252,14 +252,14 @@ pub struct WindowsEngine;
 impl EngineManager for WindowsEngine {
     async fn start(
         app: &AppHandle,
-        mode: crate::core::ProxyMode,
+        mode: crate::engine::ProxyMode,
         config_path: String,
     ) -> Result<(), String> {
         use std::sync::Arc;
         use tauri_plugin_shell::ShellExt;
 
         match mode {
-            crate::core::ProxyMode::SystemProxy => {
+            crate::engine::ProxyMode::SystemProxy => {
                 let cmd = app
                     .shell()
                     .sidecar("sing-box")
@@ -283,7 +283,7 @@ impl EngineManager for WindowsEngine {
                     return Err(e.to_string());
                 }
             }
-            crate::core::ProxyMode::TunProxy => {
+            crate::engine::ProxyMode::TunProxy => {
                 let sidecar_path = crate::engine::helper::get_sidecar_path(
                     std::path::Path::new("sing-box"),
                 )
@@ -330,7 +330,7 @@ impl EngineManager for WindowsEngine {
         };
         let Some(mode) = mode else { return Ok(()); };
         match mode.as_ref() {
-            crate::core::ProxyMode::SystemProxy => {
+            crate::engine::ProxyMode::SystemProxy => {
                 if let Err(e) = unset_proxy(app).await {
                     log::warn!("Failed to unset proxy: {}", e);
                     let _ = app.emit(
@@ -343,7 +343,7 @@ impl EngineManager for WindowsEngine {
                 }
                 tokio::time::sleep(std::time::Duration::from_millis(500)).await;
             }
-            crate::core::ProxyMode::TunProxy => {
+            crate::engine::ProxyMode::TunProxy => {
                 stop_tun_process().map_err(|e| {
                     log::error!("Failed to stop TUN process: {}", e);
                     e

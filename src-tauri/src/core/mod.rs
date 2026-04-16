@@ -2,7 +2,6 @@ mod log;
 pub(crate) mod monitor;
 
 use lazy_static::lazy_static;
-use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Manager};
 
@@ -14,14 +13,12 @@ use tauri::Emitter;
 use tauri_plugin_shell::process::CommandChild;
 
 
-// ── ProxyMode & ProcessManager ────────────────────────────────────────
-
-#[derive(Clone, Default, PartialEq, Serialize, Deserialize, Debug)]
-pub enum ProxyMode {
-    #[default]
-    SystemProxy,
-    TunProxy,
-}
+// ── ProcessManager ────────────────────────────────────────────────────
+//
+// ProxyMode lives in `engine` since the mode is an engine-level concept;
+// this module re-exports it so existing `core::ProxyMode` paths continue
+// to work.
+pub use crate::engine::ProxyMode;
 
 pub(crate) struct ProcessManager {
     pub(crate) child: Option<CommandChild>,
@@ -167,28 +164,6 @@ pub fn clear_engine_error(app: AppHandle) {
     if matches!(cur, EngineState::Failed { .. }) {
         let _ = transition(&app, Intent::ClearFailure);
     }
-}
-
-/// Notify the platform engine of a system NetworkUp event (Wi-Fi switch,
-/// wake from sleep, DHCP renewal). Implementations that override DNS
-/// re-apply the override on the new active interface; others are no-ops.
-/// We still gate on "is the engine actually running in TUN mode" here so
-/// `on_network_up` doesn't try to touch DNS when the user hasn't started
-/// a session.
-pub fn reapply_tun_dns_override_if_active(app: &AppHandle) {
-    let is_tun = {
-        let manager = ProcessManager::acquire();
-        manager
-            .mode
-            .as_ref()
-            .map(|m| matches!(**m, ProxyMode::TunProxy))
-            .unwrap_or(false)
-    };
-    if !is_tun {
-        return;
-    }
-    ::log::info!("[dns] NetworkUp — re-applying TUN gateway DNS override");
-    PlatformEngine::on_network_up(app);
 }
 
 #[cfg(any(target_os = "macos", target_os = "windows"))]

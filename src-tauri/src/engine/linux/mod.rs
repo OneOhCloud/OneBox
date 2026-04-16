@@ -280,14 +280,14 @@ pub struct LinuxEngine;
 impl EngineManager for LinuxEngine {
     async fn start(
         app: &AppHandle,
-        mode: crate::core::ProxyMode,
+        mode: crate::engine::ProxyMode,
         config_path: String,
     ) -> Result<(), String> {
         use std::sync::Arc;
         use tauri_plugin_shell::ShellExt;
 
         match mode {
-            crate::core::ProxyMode::SystemProxy => {
+            crate::engine::ProxyMode::SystemProxy => {
                 let cmd = app
                     .shell()
                     .sidecar("sing-box")
@@ -308,7 +308,7 @@ impl EngineManager for LinuxEngine {
                 }
                 set_proxy(app).await.map_err(|e| e.to_string())?;
             }
-            crate::core::ProxyMode::TunProxy => {
+            crate::engine::ProxyMode::TunProxy => {
                 // Capture the active interface's original DNS into
                 // ProcessManager so the teardown path can restore exactly
                 // what was there before. Failure here is non-fatal — we'd
@@ -363,7 +363,7 @@ impl EngineManager for LinuxEngine {
         };
         let Some(mode) = mode else { return Ok(()); };
         match mode.as_ref() {
-            crate::core::ProxyMode::SystemProxy => {
+            crate::engine::ProxyMode::SystemProxy => {
                 let _ = unset_proxy(app).await;
                 if let Some(child) = child {
                     use libc::{kill, SIGTERM};
@@ -378,7 +378,7 @@ impl EngineManager for LinuxEngine {
                 }
                 tokio::time::sleep(std::time::Duration::from_millis(500)).await;
             }
-            crate::core::ProxyMode::TunProxy => {
+            crate::engine::ProxyMode::TunProxy => {
                 // take_dns_override drains the stash so on_process_terminated
                 // doesn't double-restore when the monitor fires afterwards.
                 let dns_info = take_dns_override();
@@ -393,14 +393,16 @@ impl EngineManager for LinuxEngine {
 
     fn on_network_up(_app: &AppHandle) {
         // NetworkUp → new default interface may need DNS overriding again.
-        // Read the current config from ProcessManager; refresh the stored
-        // (iface, original_dns) tuple in our private stash so the later
-        // teardown uses the right one.
+        // Gate on "engine running in TUN mode" — we only have DNS state
+        // to refresh in that case. Refresh the stashed (iface, original_dns)
+        // tuple too so the later teardown uses the right one.
         let config_path = {
             let manager = crate::core::ProcessManager::acquire();
-            match manager.config_path.as_ref() {
-                Some(p) => p.as_str().to_string(),
-                None => return,
+            match (manager.mode.as_ref(), manager.config_path.as_ref()) {
+                (Some(m), Some(p)) if matches!(**m, crate::engine::ProxyMode::TunProxy) => {
+                    p.as_str().to_string()
+                }
+                _ => return,
             }
         };
         match apply_system_dns_override(&config_path) {
