@@ -19,6 +19,79 @@ disposable and must not be added to this repo. Use `git clone --depth=1
 This is a project-specific reminder of the global
 `Problem Analysis Priority Order` rule in `~/.claude/CLAUDE.md`.
 
+## Deep link bug triage: read logs before code
+
+Runtime log directory on macOS: `~/Library/Logs/cloud.oneoh.onebox/OneBox.log`
+(Linux `~/.config/cloud.oneoh.onebox/logs/`, Windows
+`%APPDATA%\cloud.oneoh.onebox\logs\`). For **any** deep-link-related
+report — "doesn't auto-import", "opens the app but does nothing",
+"sometimes works, sometimes doesn't" — open this file **before** reading
+Rust or TS source.
+
+Key log markers produced by `src-tauri/src/app/setup.rs`:
+
+- `Received deep link: [Url { ... }]` — `on_open_url` fired, hot-start path.
+- `Cold-start deep link config data: ... apply=<bool>` — Windows/Linux
+  cold-start fallback (`deep_link().get_current()` caught a URL that
+  `on_open_url` missed because the plugin delivered before registration).
+- `Received config data: <base64> apply=<bool>` — payload parsed OK.
+
+What the log tells you that source cannot:
+
+1. **Did Rust even see the URL?** If `Received deep link` is absent, the
+   problem is on the OS / plugin side, not in OneBox's TS/apply logic.
+2. **Timing vs. app startup.** Compare the deep-link timestamp to
+   `Copying database files`, `User-Agent:`, and `captive.oneoh.cloud
+   status:` — these mark `app_setup()` progress. A deep link arriving
+   *before* the webview is ready is a different bug from one arriving
+   after.
+3. **Hot-start vs. cold-start.** An `[engine-state] ... (epoch=N)` line
+   immediately before the deep link means the app was already running
+   (hot start). Absence of any prior state line plus presence of
+   `Copying database files` right above means cold start — and cold-start
+   first-install is the scenario most likely to race the frontend's
+   `listen('deep_link_pending', ...)` registration.
+
+If the user reports a failure case but the log doesn't contain the
+failure reproduction, **ask them to reproduce and attach fresh logs**
+before speculating on the fix. The source code has several plausible
+race windows; the log pins down which one is actually firing.
+
+## Frontend: respect the Tailwind / linter hints
+
+We use Tailwind v4 (dynamic spacing via `--spacing`, default 4px/unit) plus
+the `tailwindcss-intellisense` extension. When the extension emits a
+`suggestCanonicalClasses` hint ("The class `w-[22px]` can be written as
+`w-5.5`"), **take it** rather than leaving the arbitrary bracket form in
+place. Reasons:
+
+- Arbitrary values (`w-[22px]`, `left-[11px]`) bypass the theme scale and
+  are harder to refactor later.
+- The canonical form (`w-5.5`, `left-2.75`) participates in the spacing
+  theme — if we ever change `--spacing`, the layout scales uniformly.
+- Reviewers and future contributors expect the canonical form, and a
+  mixed style makes diffs noisier.
+
+Rule of thumb: if the pixel value is an integer multiple of `--spacing`
+(4px by default), use the canonical class. Examples:
+
+| Arbitrary      | Canonical   |
+|----------------|-------------|
+| `w-[22px]`     | `w-5.5`     |
+| `h-[22px]`     | `h-5.5`     |
+| `left-[11px]`  | `left-2.75` |
+| `min-h-[24px]` | `min-h-6`   |
+
+Keep the arbitrary form only when the value doesn't fit the spacing
+scale (e.g. `text-[10px]` — default text sizes start at `text-xs` = 12px)
+or when the property has no theme-backed canonical form
+(`tracking-[0.22em]`, custom `shadow-[…]` with multi-parameter values).
+
+The same principle extends to every Tailwind-IntelliSense severity-4
+hint (unnecessary negative modifier, deprecated class, unknown-modifier
+reorder, etc.) — treat them as review-ready lints, not suggestions to
+ignore.
+
 ## Release workflow triggers
 
 All four release channels (dev, beta, stable, manual) are served by a **single workflow**: `release.yml`. It is triggered by:
@@ -151,8 +224,8 @@ If the OS / filesystem / store already holds the canonical state, don't shadow i
 **2. Operations are idempotent — no guards, no "only call if needed" checks.**
 Every mutation can be run repeatedly without harm. This means callers never have to track "did I already do X?", and crash-recovery paths can call the operation unconditionally.
 
-**3. Cleanup is scorched-earth, driven by patterns, not by tracked entities.**
-Enumerate the universe (store keys, network services, network adapters), match by shape (key pattern, non-default state), and reset every match. Never maintain a list of "things I touched."
+**3. Cleanup is scorched-earth where viable; targeted restore where the default-primitive would be destructive.**
+macOS and Windows enumerate all non-TUN interfaces and reset them to DHCP defaults (`networksetup -setdnsservers … empty` / clear the Windows `NameServer` registry value). The OS treats these as "back to default" and the operation is idempotent — no list of "things I touched" is needed. Linux does *not* have a safe equivalent (`resolvectl revert` in "foreign" resolv.conf mode erases NetworkManager/netplan-managed static DNS), so the Linux engine captures `(iface, original_dns)` at start and re-applies the captured value on stop. This is the one place Design Philosophy #6's trade-off bias bends: we track Linux-only teardown state, because the alternative is destroying the user's config.
 
 **4. Reads and writes are decoupled. Stale reads are allowed.**
 The read path is fast, local, never blocks on network. The write path refreshes in the background. The two paths don't synchronize — the read may return old data while a write is mid-flight, and that's fine.
@@ -169,7 +242,7 @@ A stateless reset might nuke a user's unrelated manual DNS on Ethernet; a scorch
 
 ## System DNS Override Flow
 
-Core principle: **on all three platforms, DNS override is a single directed "set" on the active interface, and restore is a system-native "reset all" enumerated by shape — no snapshot, no backup file, no in-process state.**
+Core principle: **on all three platforms, DNS override is a single directed "set" on the active (or every non-TUN) interface. Restore is scorched-earth on macOS and Windows (enumerate → reset), and targeted on Linux (re-apply captured original) because `resolvectl revert` would destroy NetworkManager/netplan static DNS.**
 
 ### Why DNS needs overriding at all
 
@@ -179,52 +252,55 @@ Pointing system DNS at the TUN gateway (e.g. `172.19.0.1`) forces every query in
 
 ### Apply (on TUN start)
 
-Each platform detects the currently-active network interface and issues **one** system command:
+| Platform | Detection | Write mechanism | Runs as |
+|---|---|---|---|
+| macOS | `route -n get default` → `networksetup -listallhardwareports` to map iface → service | `networksetup -setdnsservers <service> <gw>` via privileged XPC helper | root (helper) |
+| Linux | `ip route get 1.1.1.1` for active iface, `nmcli` / `resolvectl status` to capture original DNS | `resolvectl dns <iface> <gw>` via `pkexec` shell helper | root (pkexec) |
+| Windows | `tun_service::dns::enumerate_interfaces` — non-TUN adapters that already have an IP | `tun_service::dns::apply_override(gateway)` → per-iface `set_interface_dns` writes the `HKLM\SYSTEM\…\Interfaces\{GUID}\NameServer` registry value | SYSTEM (service) |
 
-| Platform | Detection | Command |
+The TUN gateway IP comes from `engine::common::helper::extract_tun_gateway_from_config` parsing the rendered sing-box config. **Linux additionally stashes** `(iface, original_dns)` into the private `DNS_OVERRIDE` `Mutex` static inside `engine/linux/mod.rs` — that's the *only* DNS-specific in-process state we keep, and it's scoped to Linux.
+
+### Restore (on TUN stop / crash / reload)
+
+| Platform | Strategy | Implementation |
 |---|---|---|
-| macOS | `route -n get default` → `networksetup -listallhardwareports` | `networksetup -setdnsservers <service> <gw>` |
-| Linux | `ip route get 1.1.1.1` | `resolvectl dns <iface> <gw>` |
-| Windows | `Get-NetRoute -DestinationPrefix 0.0.0.0/0` (filter TUN aliases) | `Set-DnsClientServerAddress -InterfaceAlias <alias> -ServerAddresses <gw>` |
+| macOS | Scorched-earth: enumerate all network services, set each to `empty` (DHCP default) | `engine/macos/mod.rs::restore_system_dns` via helper `networksetup -setdnsservers <service> empty` |
+| Linux | Targeted: re-apply captured original DNS to the one iface we touched | `engine/linux/mod.rs::restore_system_dns(iface, original)` via pkexec `resolvectl dns` |
+| Windows | Scorched-earth: blank `NameServer` on every non-TUN adapter with an IP → DHCP default | Two parallel copies of `reset_all_interfaces_dns` (native Win32 registry writes): `tun_service::dns` runs it inside the SCM service on normal stop; `engine/windows/native.rs` runs it via UAC self-elevation on the crash-recovery path |
 
-No backup is taken. The TUN gateway IP comes from `helper::extract_tun_gateway_from_config` parsing the rendered sing-box config.
+Restore is called from two paths:
 
-### Restore (on TUN stop / crash / watchdog)
+1. **User-initiated stop** — `PlatformEngine::stop(app)`:
+   - macOS: `stop_tun_process` restores DNS **before** killing sing-box via helper.
+   - Linux: `stop_tun_and_restore_dns(take_dns_override())` drains the stash and does restore + pkill in one pkexec call.
+   - Windows: SCM stop; the service's own stop handler calls `reset_all_interfaces_dns` before reporting STOPPED.
+2. **Process exited** (crash, external kill, reload) — `core::monitor::handle_process_termination` calls `PlatformEngine::on_process_terminated(app, was_user_stop)`:
+   - macOS: re-runs scorched-earth `restore_system_dns` (idempotent; no-op if stop already ran).
+   - Linux: `take_dns_override()` — drained on user-stop path, so this is a no-op there; on crash it's the only restore that runs.
+   - Windows: if `!was_user_stop`, self-elevates via UAC to re-run `reset_all_interfaces_dns` (crash path only); user-stop path already cleaned up via the service.
 
-Each platform **enumerates every non-loopback interface** and calls the system's native "revert to default" primitive on each. This is idempotent — running it on an interface we never touched is a no-op:
-
-| Platform | Enumeration | Reset command per entry |
-|---|---|---|
-| macOS | `networksetup -listallnetworkservices` (strip disabled `*` prefix) | `networksetup -setdnsservers <service> empty` → DHCP default |
-| Linux | `ip -br link show` (strip `lo`) | `resolvectl revert <iface>` → NetworkManager / netplan config |
-| Windows | `Get-NetAdapter` | `Set-DnsClientServerAddress -InterfaceAlias <alias> -ResetServerAddresses` → DHCP default |
-
-Restore is called from three sites, all unconditionally:
-
-1. `vpn::<platform>::stop_tun_process` — normal user-initiated stop. Runs *before* killing sing-box so the user's network isn't stuck pointing at an unreachable TUN gateway if the kill fails.
-2. `core::handle_process_termination` — watchdog fallback. Fires whenever a TUN-mode sing-box process exits, regardless of how. Since restore is idempotent, we call it with no file-existence check and no state lookup.
-3. Windows also calls it from a dedicated UAC-elevated PS script in the crash path (restore embedded in stop script + restart-on-crash script).
+On top of restore, `PlatformEngine::restart` (the config-reload path) also flushes the OS DNS cache — `dscacheutil -flushcache` + `killall -HUP mDNSResponder` on macOS, `resolvectl flush-caches` on Linux (bundled into the pkexec `reload` verb), `ipconfig /flushdns` from the Windows service. Without this, stale FakeIP entries linger for up to sing-box's 600s DNS TTL after a mode switch.
 
 ### What we deliberately DON'T do
 
-- **No backup file.** The prior design wrote `/tmp/onebox-dns-backup.tsv` storing the user's original DNS values so restore could replay them. Deleted. The restore now uses the OS's built-in "back to DHCP" semantics.
-- **No in-process state tracking of "which service did I touch".** The process manager tracks `tun_password` (needed for sudo) but nothing DNS-specific.
-- **No "only restore if we applied" guard.** Restore always runs on TUN termination. Cost: a few hundred ms of no-op `setdnsservers` / `resolvectl revert` calls. Benefit: immune to crashes between apply and restore.
-- **No attempt to preserve user's manual DNS on unrelated interfaces.** If the user had `1.1.1.1` manually set on Ethernet while using Wi-Fi with OneBox, stop will reset Ethernet too. Accepted trade-off — see Design Philosophy #6.
+- **No backup file.** The prior design wrote `/tmp/onebox-dns-backup.tsv`. Deleted. macOS/Windows use the OS's "back to DHCP" primitive; Linux uses a process-local `Mutex<Option<(String, String)>>` that dies with the process.
+- **No "only restore if we applied" guard.** Every termination path calls restore. Cost is a few ms of no-op `setdnsservers empty` / registry writes. Benefit: immune to crashes between apply and restore.
+- **No attempt to preserve the user's manual DNS on unrelated interfaces** (macOS/Windows). If Ethernet had `1.1.1.1` set manually while Wi-Fi was running OneBox, stop will reset Ethernet too. Accepted trade-off — see Design Philosophy #6. Linux does preserve the one iface it touched, because `resolvectl revert` would erase NM/netplan static DNS.
 
 ### Files
 
-- `src-tauri/src/vpn/helper.rs` — `extract_tun_gateway_from_config` (parses sing-box config to find TUN inbound's IPv4 address)
-- `src-tauri/src/vpn/macos.rs` — `apply_system_dns_override` / `restore_system_dns` + `detect_active_network_service` / `list_all_network_services`
-- `src-tauri/src/vpn/linux.rs` — `apply_system_dns_override` / `restore_system_dns` + `detect_active_iface` / `list_all_ifaces`
-- `src-tauri/src/vpn/windows.rs` — `prepare_dns_override` / `build_dns_apply_block` / `build_dns_restore_block` (embedded in elevated PS scripts)
-- `src-tauri/src/core.rs::handle_process_termination` — watchdog fallback that unconditionally calls restore on TUN termination
+- `src-tauri/src/engine/common/helper.rs` — `extract_tun_gateway_from_config` (parses the rendered config for the TUN inbound's IPv4).
+- `src-tauri/src/engine/macos/mod.rs` — `apply_system_dns_override` / `restore_system_dns`, `detect_active_network_service`, `list_all_network_services`, `stop_tun_process`. XPC calls go to the privileged helper in `engine/macos/helper.{rs,m}`.
+- `src-tauri/src/engine/linux/mod.rs` — `apply_system_dns_override` / `restore_system_dns`, `detect_active_iface`, `capture_original_dns`, `stop_tun_and_restore_dns` (pkexec), and the private `DNS_OVERRIDE` stash. Shell helper at `src-tauri/resources/linux/onebox-tun-helper` runs as root.
+- `src-tauri/src/engine/windows/native.rs` — `enumerate_interfaces`, `reset_all_interfaces_dns`, `self_elevate_helper` (used on the crash-recovery restore path). Pure native Win32 registry writes, no PowerShell.
+- `src-tauri/tun-service/src/dns.rs` — the SCM service's own copy of the same interface-enumeration + apply/reset logic, called from `service_main` on normal start and stop.
+- `src-tauri/src/core/monitor.rs::handle_process_termination` — dispatcher that unconditionally calls `PlatformEngine::on_process_terminated` on TUN-mode sing-box exit.
 
-### Why the restore-before-kill order matters (macOS / Linux)
+### Why the restore-before-kill order matters
 
-In `stop_tun_process` we restore DNS **first**, then kill sing-box. If we killed sing-box first, TUN tears down, the default route reverts to physical NIC, and for ~500ms the system DNS is still pointing at a now-unreachable `172.19.0.1` — every app's DNS lookup times out during that window. Restoring first means the stale gateway address is overwritten before its addressability vanishes.
+In `stop_tun_process` (macOS) / `stop_tun_and_restore_dns` (Linux) we restore DNS **first**, then kill sing-box. If we killed sing-box first, TUN tears down, the default route reverts to the physical NIC, and for ~500 ms the system DNS still points at an unreachable `172.19.0.1` — every app's DNS lookup times out during that window. Restoring first overwrites the stale gateway while it's still addressable.
 
-Windows batches both steps into a single elevated PS script, so ordering there is script-internal.
+Windows doesn't need an explicit order here: the reset runs inside the service process before the SCM state transitions to STOPPED, so by the time the TUN is removed the registry's `NameServer` values are already cleared.
 
 ---
 
@@ -271,12 +347,12 @@ The tauri build chain works without modifying `tauri.conf.json`:
 tauri build → beforeBuildCommand "bun run build" → prebuild hook "sync-templates" → build (tsc && vite build)
 ```
 
-CI release workflows (`.github/workflows/{stable,beta,dev,manual}-release.yml`) run the sync **explicitly** as a "Sync config templates" step right after "Download Binaries", not relying on the prebuild hook. Two reasons:
+The single CI release workflow (`.github/workflows/release.yml`) runs the sync **explicitly** as a "Sync config templates" step right after "Download Binaries", not relying on the prebuild hook. Two reasons:
 
 1. **Fail-early visibility** — if sync fails (GitHub 404, parse error, network flake), we want to see it in a dedicated CI step with clear logs, not hidden mid-`tauri build` 10 minutes later.
 2. **Belt-and-suspenders against bun pre-hook breakage** — if a future bun version changes how it invokes `prebuild`, the explicit step still produces a valid `generated.ts` before `tauri-action` runs. The prebuild hook in `package.json` remains for local dev.
 
-Each channel's step sets its own `CONF_TEMPLATE_BRANCH` via env (`stable` / `beta` / `dev` / `stable` for manual). After running sync, the step greps for `BUILT_IN_TEMPLATE_OBJECTS` / `BUILD_TIME_TEMPLATE_SOURCE` / `singBoxVersion: 'v` in the output as a smoke check — catches silent corruption before the real build wastes time.
+The channel-specific `CONF_TEMPLATE_BRANCH` (`stable` / `beta` / `dev` / `stable` for manual) is derived from the `resolve` job's channel output and threaded into the sync step's env. After running sync, the step greps for `BUILT_IN_TEMPLATE_OBJECTS` / `BUILD_TIME_TEMPLATE_SOURCE` / `singBoxVersion: 'v` in the output as a smoke check — catches silent corruption before the real build wastes time.
 
 **Windows runner specifics**: the step declares `shell: bash` so `set -euo pipefail` and heredoc-style `run: |` work identically across Linux, macOS, and Windows. Without that, Windows defaults to PowerShell and interprets `set -euo pipefail` as a `Set-Variable` cmdlet invocation (`A parameter cannot be found that matches parameter name 'euo'`).
 
