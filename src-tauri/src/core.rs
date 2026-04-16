@@ -1159,19 +1159,6 @@ pub async fn reload_config(app: tauri::AppHandle, is_tun: bool) -> Result<String
             }
             log::info!("SIGHUP sent via helper");
         }
-        #[cfg(target_os = "windows")]
-        {
-            let output = Command::new("pkill")
-                .args(["-HUP", "sing-box"])
-                .output()
-                .map_err(|e| format!("Failed to send SIGHUP: {}", e))?;
-            if !output.status.success() {
-                let error = String::from_utf8_lossy(&output.stderr);
-                return Err(format!("Failed to reload config: {}", error));
-            }
-            log::info!("SIGHUP sent successfully");
-        }
-
         // 如果是 SystemProxy 模式，需要等待进程重载后重新设置系统代理
         if needs_proxy_reset {
             log::info!("SystemProxy mode detected, waiting for reload and resetting proxy");
