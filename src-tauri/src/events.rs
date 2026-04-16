@@ -9,7 +9,7 @@ pub fn on_menu_event(app: &AppHandle, event: tauri::menu::MenuEvent) {
             show_dashboard(app.clone());
         }
         "quit" => {
-            crate::command::sync_quit(app.clone());
+            crate::commands::shell::sync_quit(app.clone());
         }
         "enable" => {
             // 已在前端处理，此处略过
@@ -41,7 +41,7 @@ pub fn on_window_event(window: &Window, event: &WindowEvent) {
         WindowEvent::Destroyed => {
             if window.label() == "main" {
                 log::info!("主窗口被销毁，应用将退出");
-                crate::command::sync_quit(window.app_handle().clone());
+                crate::commands::shell::sync_quit(window.app_handle().clone());
             }
             log::info!("Destroyed");
         }

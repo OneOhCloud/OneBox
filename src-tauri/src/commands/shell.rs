@@ -13,7 +13,7 @@ pub fn get_tray_icon(app: AppHandle) -> Vec<u8> {
     #[cfg(target_os = "macos")]
     {
         log::info!("macos tray icon for app: {:?}", app.package_info().name);
-        include_bytes!("../icons/macos.png").to_vec()
+        include_bytes!("../../icons/macos.png").to_vec()
     }
     #[cfg(not(target_os = "macos"))]
     {

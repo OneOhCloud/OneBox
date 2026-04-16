@@ -1,9 +1,8 @@
-mod command;
+mod commands;
 mod core;
 mod database;
 pub mod engine;
 mod events;
-mod lan;
 mod plugins;
 mod setup;
 mod state;
@@ -50,28 +49,28 @@ pub fn run() {
 
     plugins::register_plugins(builder, migrations)
         .invoke_handler(tauri::generate_handler![
-            lan::get_lan_ip,
-            lan::ping_google,
-            lan::open_browser,
-            lan::get_captive_redirect_url,
-            lan::check_captive_portal_status,
-            lan::get_optimal_local_dns_server,
-            lan::fetch_config_with_optimal_dns,
+            commands::network::get_lan_ip,
+            commands::network::ping_google,
+            commands::network::open_browser,
+            commands::network::get_captive_redirect_url,
+            commands::network::check_captive_portal_status,
+            commands::dns::get_optimal_local_dns_server,
+            commands::config_fetch::fetch_config_with_optimal_dns,
             core::stop,
             core::start,
             core::is_running,
             core::get_engine_state,
             core::clear_engine_error,
             core::reload_config,
-            command::version,
-            command::read_logs,
-            command::open_devtools,
-            command::get_app_paths,
-            command::get_tray_icon,
-            command::create_window,
-            command::open_directory,
-            command::get_app_version,
-            command::get_pending_deep_link,
+            commands::shell::version,
+            commands::shell::read_logs,
+            commands::shell::open_devtools,
+            commands::shell::get_app_paths,
+            commands::shell::get_tray_icon,
+            commands::shell::create_window,
+            commands::shell::open_directory,
+            commands::shell::get_app_version,
+            commands::shell::get_pending_deep_link,
             engine::engine_probe,
             engine::engine_ensure_installed,
         ])
@@ -104,7 +103,7 @@ mod tests {
     #[test]
     fn test_get_optimal_dns_server() {
         tauri::async_runtime::block_on(async {
-            let res = lan::get_best_dns_server().await;
+            let res = commands::dns::get_best_dns_server().await;
             assert!(res.is_some());
             let dns = res.unwrap();
             assert!(is_valid_ipv4(&dns));
