@@ -7,6 +7,7 @@ use tauri_plugin_shell::process::Command as TauriCommand;
 
 use crate::engine::helper::extract_tun_gateway_from_config;
 pub mod native;
+pub(crate) mod watchdog;
 use self::native as windows_native;
 use crate::engine::EngineManager;
 
@@ -295,13 +296,17 @@ impl EngineManager for WindowsEngine {
                     rx,
                     Arc::new(mode.clone()),
                 );
+                let mode_arc = Arc::new(mode);
                 {
                     let mut mgr = crate::core::ProcessManager::acquire();
-                    mgr.mode = Some(Arc::new(mode));
+                    mgr.mode = Some(Arc::clone(&mode_arc));
                     mgr.config_path = Some(Arc::new(config_path));
                     mgr.child = Some(child);
                     mgr.is_stopping = false;
                 }
+                // Poll the SCM service state so external kills / crashes
+                // surface through the normal process_monitor path.
+                watchdog::spawn(app.clone(), mode_arc);
                 // SystemProxy setting may linger across mode switches on
                 // Windows; best-effort unset so browsers stop pointing at
                 // the mixed port.

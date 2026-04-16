@@ -1,23 +1,23 @@
-//! Cross-platform watchdog plumbing. macOS's bypass-router watchdog now
-//! lives in `engine::macos::watchdog`; only the Windows service-state
-//! watchdog remains here, pending relocation into `engine::windows`.
+//! Windows service-state watchdog.
+//!
+//! sing-box runs inside the OneBoxTunService (an SCM service process),
+//! and if that process exits for any reason other than our own `stop`
+//! we have to synthesize the same cleanup path the sidecar child monitor
+//! provides on the other two platforms — otherwise the UI never learns
+//! the engine died.
 
-#[cfg(target_os = "windows")]
 use std::sync::Arc;
 
-#[cfg(target_os = "windows")]
-use super::monitor::handle_process_termination;
-#[cfg(target_os = "windows")]
-use super::{ProcessManager, ProxyMode};
+use tauri::AppHandle;
 
-/// 1Hz poll of the Windows service state. When Running→Stopped is observed,
-/// synthesize a `handle_process_termination` call.
-#[cfg(target_os = "windows")]
-pub(crate) fn spawn_windows_service_watchdog(
-    app: tauri::AppHandle,
-    process_mode: Arc<ProxyMode>,
-    _start_epoch: u64,
-) {
+use crate::core::monitor::handle_process_termination;
+use crate::core::{ProcessManager, ProxyMode};
+
+/// 1Hz poll of the Windows service state. When Running→Stopped is
+/// observed (and only after we've seen at least one Running tick, so we
+/// don't fire on the initial "not yet started" window), synthesize a
+/// `handle_process_termination` call.
+pub(crate) fn spawn(app: AppHandle, process_mode: Arc<ProxyMode>) {
     tokio::spawn(async move {
         use tun_service::scm::{query_state, QueriedState};
         let mut observed_running = false;

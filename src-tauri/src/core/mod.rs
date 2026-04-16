@@ -1,7 +1,5 @@
 mod log;
 pub(crate) mod monitor;
-#[cfg(target_os = "windows")]
-pub(crate) mod watchdog;
 
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
@@ -15,8 +13,6 @@ use crate::engine::{PlatformEngine, EngineManager};
 use tauri::Emitter;
 use tauri_plugin_shell::process::CommandChild;
 
-#[cfg(target_os = "windows")]
-use self::watchdog::spawn_windows_service_watchdog;
 
 // ── ProxyMode & ProcessManager ────────────────────────────────────────
 
@@ -117,11 +113,6 @@ pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Resu
     tokio::time::sleep(tokio::time::Duration::from_millis(wait_time)).await;
     ::log::info!("Proxy process spawn returned; handing off to readiness prober");
     readiness::spawn(app.clone(), start_epoch);
-
-    #[cfg(target_os = "windows")]
-    if matches!(mode, ProxyMode::TunProxy) {
-        spawn_windows_service_watchdog(app.clone(), Arc::new(mode.clone()), start_epoch);
-    }
     Ok(())
 }
 
