@@ -43,6 +43,33 @@ pub mod macos;
 #[cfg(target_os = "windows")]
 pub mod windows;
 
+// macOS helper commands exposed to generate_handler! at the engine:: level.
+// On macOS these delegate to the real XPC helper (blocking FFI, wrapped in
+// spawn_blocking); on other platforms they return an error.
+#[tauri::command]
+pub async fn helper_ping() -> Result<String, String> {
+    #[cfg(target_os = "macos")]
+    {
+        tokio::task::spawn_blocking(macos::helper::api::ping)
+            .await
+            .map_err(|e| format!("helper_ping join error: {}", e))?
+    }
+    #[cfg(not(target_os = "macos"))]
+    { Err("macOS only".into()) }
+}
+
+#[tauri::command]
+pub async fn helper_install() -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        tokio::task::spawn_blocking(macos::helper::api::install)
+            .await
+            .map_err(|e| format!("helper_install join error: {}", e))?
+    }
+    #[cfg(not(target_os = "macos"))]
+    { Err("macOS only".into()) }
+}
+
 #[cfg(target_os = "linux")]
 pub use linux::LinuxEngine as PlatformEngine;
 #[cfg(target_os = "macos")]

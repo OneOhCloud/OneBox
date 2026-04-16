@@ -247,21 +247,6 @@ pub mod api {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Tauri commands (dev-only probes, no direct consumption yet)
-// ---------------------------------------------------------------------------
-
-#[tauri::command]
-pub async fn helper_ping() -> Result<String, String> {
-    tokio::task::spawn_blocking(api::ping)
-        .await
-        .map_err(|e| format!("helper_ping join error: {}", e))?
-}
-
-#[tauri::command]
-pub async fn helper_install() -> Result<(), String> {
-    tokio::task::spawn_blocking(api::install)
-        .await
-        .map_err(|e| format!("helper_install join error: {}", e))?
-}
+// Tauri commands for helper_ping/helper_install are defined in
+// engine/mod.rs as cross-platform wrappers that delegate to api::ping/install.
 
