@@ -79,24 +79,42 @@ pub(super) fn cleanup_old_singbox_logs(log_dir: &Path, keep_days: u64) {
 }
 
 /// Create a daily-rotated log file writer for sing-box output.
-/// Compresses previous days' logs and removes logs older than 7 days.
+/// In a single directory scan: removes logs older than 7 days, compresses
+/// previous days' logs that are still uncompressed.
 pub(super) fn create_singbox_log_writer(app: &AppHandle) -> Option<std::fs::File> {
     let log_dir = app.path().app_log_dir().ok()?;
     std::fs::create_dir_all(&log_dir).ok()?;
 
-    cleanup_old_singbox_logs(&log_dir, 7);
-
     let date = today_date_string();
     let log_path = log_dir.join(format!("sing-box-{}.log", date));
+    let cutoff = std::time::SystemTime::now() - std::time::Duration::from_secs(7 * 86400);
 
     if let Ok(entries) = std::fs::read_dir(&log_dir) {
         for entry in entries.flatten() {
             let name = entry.file_name();
             let name_str = name.to_string_lossy();
-            if name_str.starts_with("sing-box-")
-                && name_str.ends_with(".log")
-                && !name_str.contains(&date)
-            {
+            if !name_str.starts_with("sing-box-") {
+                continue;
+            }
+
+            let is_log = name_str.ends_with(".log");
+            let is_gz = name_str.ends_with(".log.gz");
+            if !is_log && !is_gz {
+                continue;
+            }
+
+            // Prune old logs (both .log and .log.gz)
+            if let Ok(meta) = entry.metadata() {
+                let modified = meta.modified().unwrap_or(std::time::SystemTime::now());
+                if modified < cutoff {
+                    let _ = std::fs::remove_file(entry.path());
+                    log::info!("Removed old sing-box log: {}", name_str);
+                    continue;
+                }
+            }
+
+            // Compress previous days' uncompressed logs
+            if is_log && !name_str.contains(&date) {
                 let _ = compress_singbox_log(&entry.path());
             }
         }

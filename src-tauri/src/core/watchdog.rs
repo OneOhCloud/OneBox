@@ -16,7 +16,7 @@ use super::monitor::handle_process_termination;
 // ── macOS: bypass-router 4-hour restart watchdog ──────────────────────
 
 #[cfg(target_os = "macos")]
-const BYPASS_ROUTER_RESTART_INTERVAL: std::time::Duration =
+pub(super) const BYPASS_ROUTER_RESTART_INTERVAL: std::time::Duration =
     std::time::Duration::from_secs(4 * 3600);
 
 /// Restart sing-box via the privileged helper (Send-safe, no keychain).

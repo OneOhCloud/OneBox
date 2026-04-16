@@ -153,10 +153,6 @@ export const useVPNOperations = () => {
         })();
     }, [engineState.kind === 'failed' ? engineState.epoch : null]);
 
-    // mutate 语义在新架构下等于 "主动刷新 vpn 状态"。权威状态由事件驱动,
-    // 这里返回 no-op 以维持旧调用方签名不变。
-    const mutate = () => { };
-
     const stopService = async () => {
         try {
             await vpnServiceManager.stop();
@@ -250,14 +246,12 @@ export const useVPNOperations = () => {
     };
 
     return {
-        isOperating: isLoading,
         operationStatus,
         isLoading,
         isRunning,
         startService,
         restartService,
         toggleService,
-        mutate,
     };
 };
 

@@ -65,12 +65,6 @@ lazy_static! {
         }));
 }
 
-// ── macOS bypass-router restart interval ──────────────────────────────
-
-#[cfg(target_os = "macos")]
-const BYPASS_ROUTER_RESTART_INTERVAL: std::time::Duration =
-    std::time::Duration::from_secs(4 * 3600);
-
 // ── Tauri Commands ────────────────────────────────────────────────────
 
 #[tauri::command]
@@ -80,6 +74,10 @@ pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Resu
     {
         let cur = app.state::<EngineStateCell>().snapshot();
         if !matches!(cur, EngineState::Idle { .. } | EngineState::Failed { .. }) {
+            ::log::warn!(
+                "[start] engine in {} state, forcing MarkIdle before restart",
+                cur.kind()
+            );
             let _ = transition(&app, Intent::MarkIdle);
         }
     }
@@ -247,7 +245,7 @@ pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Resu
                 manager.bypass_router_watchdog_abort = Some(task.abort_handle());
                 ::log::info!(
                     "[bypass_router_watchdog] Started, next restart in {}h",
-                    BYPASS_ROUTER_RESTART_INTERVAL.as_secs() / 3600
+                    watchdog::BYPASS_ROUTER_RESTART_INTERVAL.as_secs() / 3600
                 );
             }
         }
@@ -298,19 +296,12 @@ pub async fn stop(app: tauri::AppHandle) -> Result<(), String> {
         }
     }
 
-    {
-        let mut manager = PROCESS_MANAGER.lock().unwrap_or_else(|e| {
-            ::log::error!("Mutex lock error during stop flag setting: {:?}", e);
-            e.into_inner()
-        });
-        manager.is_stopping = true;
-    }
-
     let (mode, child) = {
         let mut manager = PROCESS_MANAGER.lock().unwrap_or_else(|e| {
             ::log::error!("Mutex lock error during stop: {:?}", e);
             e.into_inner()
         });
+        manager.is_stopping = true;
         (manager.mode.clone(), manager.child.take())
     };
 

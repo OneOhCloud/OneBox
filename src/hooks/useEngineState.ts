@@ -12,15 +12,8 @@ export function useEngineStateRoot(): EngineState {
         let lastEpoch = -1;
 
         (async () => {
-            try {
-                const snapshot = await invoke<EngineState>('get_engine_state');
-                if (cancelled) return;
-                setState(snapshot);
-                lastEpoch = snapshot.epoch;
-            } catch (e) {
-                console.error('[engine-state] get_engine_state failed:', e);
-            }
-
+            // Register listener FIRST to avoid missing events emitted
+            // between the invoke response and listener registration.
             try {
                 unlisten = await listen<EngineState>(ENGINE_STATE_EVENT, (e) => {
                     const next = e.payload;
@@ -31,6 +24,20 @@ export function useEngineStateRoot(): EngineState {
                 });
             } catch (e) {
                 console.error('[engine-state] listen failed:', e);
+            }
+
+            // Then fetch the current snapshot. If an event arrived between
+            // listen registration and this invoke, the epoch guard above
+            // ensures the fresher value wins.
+            try {
+                const snapshot = await invoke<EngineState>('get_engine_state');
+                if (cancelled) return;
+                if (snapshot.epoch > lastEpoch) {
+                    lastEpoch = snapshot.epoch;
+                    setState(snapshot);
+                }
+            } catch (e) {
+                console.error('[engine-state] get_engine_state failed:', e);
             }
         })();
 

@@ -18,14 +18,12 @@ export default function HomePage() {
     operationStatus,
     toggleService,
     restartService,
-    mutate
   } = useVPNOperations();
   const { indicatorStyle, modeButtonsRef } = useModeIndicator(selectedMode);
 
   const isEmpty = !subscriptions?.length;
 
   useEffect(() => {
-    mutate();
     initializeMode();
   }, []);
 
