@@ -121,10 +121,10 @@ export async function configureTunInbound(newConfig: any, bypassRouter: boolean 
             newConfig.inbounds.push({
                 tag: "dns-in",
                 type: "direct",
-                listen: "0.0.0.0",
+                listen: "::",
                 listen_port: 53,
             });
-            console.log("旁路由模式：注入 dns-in inbound (0.0.0.0:53)");
+            console.log("旁路由模式：注入 dns-in inbound ([::]:53)");
         }
     }
 
