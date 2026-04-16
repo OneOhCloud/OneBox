@@ -1,8 +1,5 @@
 # OneBox
 
-[![Dev Build](https://github.com/OneOhCloud/OneBox/actions/workflows/dev-release.yml/badge.svg)](https://github.com/OneOhCloud/OneBox/actions/workflows/dev-release.yml)
-[![Beta Build](https://github.com/OneOhCloud/OneBox/actions/workflows/beta-release.yml/badge.svg)](https://github.com/OneOhCloud/OneBox/actions/workflows/beta-release.yml)
-[![Stable Build](https://github.com/OneOhCloud/OneBox/actions/workflows/stable-release.yml/badge.svg)](https://github.com/OneOhCloud/OneBox/actions/workflows/stable-release.yml)
 [![sing-box](https://repology.org/badge/version-for-repo/homebrew/sing-box.svg?header=sing-box-latest-version)](https://github.com/SagerNet/sing-box)
 
 **简单、稳定、安全。无需繁琐配置，开箱即用。**
