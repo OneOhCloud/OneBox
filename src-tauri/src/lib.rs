@@ -58,6 +58,7 @@ pub fn run() {
             privilege::save_privilege_password_to_keyring,
             helper_client::helper_ping,
             helper_client::helper_install,
+            helper_client::helper_smoke_test,
         ])
         .setup(setup::app_setup)
         .on_menu_event(events::on_menu_event)
