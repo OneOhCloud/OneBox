@@ -453,6 +453,7 @@ pub fn reapply_tun_dns_override_if_active() {
 #[cfg(target_os = "windows")]
 pub fn reapply_tun_dns_override_if_active() {}
 
+#[cfg(any(target_os = "macos", target_os = "windows"))]
 pub fn get_running_config() -> Option<(ProxyMode, String)> {
     let manager = PROCESS_MANAGER.lock().unwrap_or_else(|e| e.into_inner());
     match (manager.mode.as_ref(), manager.config_path.as_ref()) {

@@ -1,5 +1,7 @@
+#[cfg(any(target_os = "macos", target_os = "windows"))]
 use std::sync::Arc;
 
+#[cfg(any(target_os = "macos", target_os = "windows"))]
 use super::{ProxyMode, PROCESS_MANAGER};
 
 #[cfg(target_os = "macos")]

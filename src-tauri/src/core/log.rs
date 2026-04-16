@@ -51,6 +51,7 @@ fn compress_singbox_log(log_path: &Path) -> std::io::Result<()> {
     Ok(())
 }
 
+#[cfg(test)]
 pub(super) fn cleanup_old_singbox_logs(log_dir: &Path, keep_days: u64) {
     let entries = match std::fs::read_dir(log_dir) {
         Ok(e) => e,
