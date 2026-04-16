@@ -1,22 +1,10 @@
-//! Rust-facing wrapper around the Objective-C XPC shim in `helper_client.m`.
-//!
-//! Phase 2b.1 adds wrappers for every helper capability that Phase 2b.2 will
-//! use to replace the `echo '$PASSWORD' | sudo -S ...` paths in
-//! `vpn/macos.rs`. Nothing in this file yet replaces an existing sudo call
-//! — it's strictly additive so the migration can land in a separate step.
+//! Rust-facing wrapper around the Objective-C XPC shim in `helper.m`.
 //!
 //! All FFI boundary functions block the calling thread on an NSXPCConnection
 //! round-trip (with a hard timeout). Tauri commands wrap every call in
 //! `tokio::task::spawn_blocking` so the async runtime stays responsive.
 //!
 //! On non-macOS targets every function is a stub that returns an error.
-//! Call sites can be gated on `cfg(target_os = "macos")`, or check the
-//! returned error string.
-
-// Phase 2b.1 adds the full helper API surface ahead of the vpn/macos.rs
-// migration in Phase 2b.2. Until 2b.2 lands, most of these symbols have no
-// Rust-side consumer — silence the dead_code noise at the module boundary
-// rather than sprinkling #[allow] on every item.
 #![allow(dead_code)]
 
 #[cfg(target_os = "macos")]

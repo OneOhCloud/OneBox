@@ -4,7 +4,7 @@ import { confirm, message } from '@tauri-apps/plugin-dialog';
 import { useContext, useEffect, useRef, useState } from "react";
 import useSWR, { mutate as swrMutate } from "swr";
 import { insertSubscription } from "../../action/db";
-import { clearVpnError, useVpnState } from "../../hooks/useVpnState";
+import { clearEngineError, useEngineState } from "../../hooks/useEngineState";
 import { NavContext } from "../../single/context";
 import { getStoreValue, setStoreValue } from "../../single/store";
 import { GET_SUBSCRIPTIONS_LIST_SWR_KEY, RULE_MODE_STORE_KEY, SSI_STORE_KEY } from "../../types/definition";
@@ -125,33 +125,33 @@ export const useProxyMode = () => {
 /**
  * 自定义Hook: 管理VPN服务操作状态
  *
- * Plan B 后:权威状态来自 Rust 的 `vpn-state` 事件(经由 `VpnStateContext`),
+ * Plan B 后:权威状态来自 Rust 的 `engine-state` 事件(经由 `EngineStateContext`),
  * 本 hook 只剩下 UI 操作入口与派生的 isLoading/isRunning/operationStatus,
  * 供现有消费者保持兼容。不再维护独立的 isOperating / setTimeout 兜底。
  */
 export const useVPNOperations = () => {
-    const vpnState = useVpnState();
+    const engineState = useEngineState();
     const { setActiveScreen, deepLinkApplyUrl, setDeepLinkApplyUrl } = useContext(NavContext);
 
     // 从权威状态派生出兼容变量
-    const isRunning = vpnState.kind === 'running';
-    const isLoading = vpnState.kind === 'starting' || vpnState.kind === 'stopping';
+    const isRunning = engineState.kind === 'running';
+    const isLoading = engineState.kind === 'starting' || engineState.kind === 'stopping';
     const operationStatus: OperationStatus =
-        vpnState.kind === 'starting'
+        engineState.kind === 'starting'
             ? 'starting'
-            : vpnState.kind === 'stopping'
+            : engineState.kind === 'stopping'
                 ? 'stopping'
                 : 'idle';
 
     // 失败状态:弹窗提示并回到 Idle,避免前端永久卡在 failed。
     useEffect(() => {
-        if (vpnState.kind !== 'failed') return;
-        const reason = vpnState.reason;
+        if (engineState.kind !== 'failed') return;
+        const reason = engineState.reason;
         (async () => {
             await message(`${t('connect_failed')}: ${reason}`, { title: t('error'), kind: 'error' });
-            await clearVpnError();
+            await clearEngineError();
         })();
-    }, [vpnState.kind === 'failed' ? vpnState.epoch : null]);
+    }, [engineState.kind === 'failed' ? engineState.epoch : null]);
 
     // mutate 语义在新架构下等于 "主动刷新 vpn 状态"。权威状态由事件驱动,
     // 这里返回 no-op 以维持旧调用方签名不变。

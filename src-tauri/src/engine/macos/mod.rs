@@ -244,7 +244,7 @@ pub fn restore_system_dns() -> Result<(), String> {
 }
 
 // ============================================================================
-// VpnProxy trait impl — kept for cross-platform trait compatibility.
+// EngineManager trait impl.
 //
 // core.rs bypasses create_privileged_command entirely on macOS (goes through
 // start_tun_via_helper instead). The trait methods are still required by the

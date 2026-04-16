@@ -3,7 +3,7 @@
 //! Single write entry: `transition()`. It acquires the state lock, validates
 //! the transition, increments the epoch counter under the same lock, emits
 //! `vpn://state`, and logs the change. Every other site that needs to read
-//! state uses `VpnStateCell::snapshot()`.
+//! state uses `EngineStateCell::snapshot()`.
 //!
 //! The `epoch` field on every variant is strictly monotonic; the frontend
 //! uses it to drop out-of-order events. Prober tasks capture the epoch at
@@ -15,11 +15,11 @@ use std::sync::Mutex;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager};
 
-pub const EVENT_VPN_STATE: &str = "vpn-state";
+pub const EVENT_ENGINE_STATE: &str = "engine-state";
 
 #[derive(Serialize, Clone, Debug)]
 #[serde(tag = "kind", rename_all = "lowercase")]
-pub enum VpnState {
+pub enum EngineState {
     Idle {
         epoch: u64,
     },
@@ -44,50 +44,50 @@ pub enum VpnState {
     },
 }
 
-impl VpnState {
+impl EngineState {
     pub fn kind(&self) -> &'static str {
         match self {
-            VpnState::Idle { .. } => "idle",
-            VpnState::Starting { .. } => "starting",
-            VpnState::Running { .. } => "running",
-            VpnState::Stopping { .. } => "stopping",
-            VpnState::Failed { .. } => "failed",
+            EngineState::Idle { .. } => "idle",
+            EngineState::Starting { .. } => "starting",
+            EngineState::Running { .. } => "running",
+            EngineState::Stopping { .. } => "stopping",
+            EngineState::Failed { .. } => "failed",
         }
     }
 
     pub fn epoch(&self) -> u64 {
         match self {
-            VpnState::Idle { epoch }
-            | VpnState::Starting { epoch, .. }
-            | VpnState::Running { epoch, .. }
-            | VpnState::Stopping { epoch, .. }
-            | VpnState::Failed { epoch, .. } => *epoch,
+            EngineState::Idle { epoch }
+            | EngineState::Starting { epoch, .. }
+            | EngineState::Running { epoch, .. }
+            | EngineState::Stopping { epoch, .. }
+            | EngineState::Failed { epoch, .. } => *epoch,
         }
     }
 
     pub fn mode(&self) -> Option<&str> {
         match self {
-            VpnState::Starting { mode, .. } | VpnState::Running { mode, .. } => Some(mode.as_str()),
+            EngineState::Starting { mode, .. } | EngineState::Running { mode, .. } => Some(mode.as_str()),
             _ => None,
         }
     }
 }
 
 /// Held in Tauri `State`, registered in `setup::app_setup`.
-pub struct VpnStateCell {
-    inner: Mutex<VpnState>,
+pub struct EngineStateCell {
+    inner: Mutex<EngineState>,
     counter: AtomicU64,
 }
 
-impl VpnStateCell {
+impl EngineStateCell {
     pub fn new() -> Self {
         Self {
-            inner: Mutex::new(VpnState::Idle { epoch: 0 }),
+            inner: Mutex::new(EngineState::Idle { epoch: 0 }),
             counter: AtomicU64::new(0),
         }
     }
 
-    pub fn snapshot(&self) -> VpnState {
+    pub fn snapshot(&self) -> EngineState {
         self.inner
             .lock()
             .unwrap_or_else(|e| e.into_inner())
@@ -99,7 +99,7 @@ impl VpnStateCell {
     }
 }
 
-impl Default for VpnStateCell {
+impl Default for EngineStateCell {
     fn default() -> Self {
         Self::new()
     }
@@ -138,58 +138,58 @@ fn now_secs() -> i64 {
 
 /// Apply an `Intent` to the state cell under lock, emit `vpn://state`, and
 /// return the new state. Rejects illegal transitions.
-pub fn transition(app: &AppHandle, intent: Intent) -> Result<VpnState, String> {
-    let cell = app.state::<VpnStateCell>();
+pub fn transition(app: &AppHandle, intent: Intent) -> Result<EngineState, String> {
+    let cell = app.state::<EngineStateCell>();
     let mut guard = cell.inner.lock().unwrap_or_else(|e| e.into_inner());
     let current = guard.clone();
 
     let new_state = match (&current, intent) {
-        (VpnState::Idle { .. }, Intent::Start { mode })
-        | (VpnState::Failed { .. }, Intent::Start { mode }) => {
+        (EngineState::Idle { .. }, Intent::Start { mode })
+        | (EngineState::Failed { .. }, Intent::Start { mode }) => {
             let epoch = cell.counter.fetch_add(1, Ordering::SeqCst) + 1;
-            VpnState::Starting {
+            EngineState::Starting {
                 since: now_secs(),
                 epoch,
                 mode,
             }
         }
-        (VpnState::Starting { mode, .. }, Intent::MarkRunning) => {
+        (EngineState::Starting { mode, .. }, Intent::MarkRunning) => {
             let epoch = cell.counter.fetch_add(1, Ordering::SeqCst) + 1;
-            VpnState::Running {
+            EngineState::Running {
                 since: now_secs(),
                 epoch,
                 mode: mode.clone(),
             }
         }
-        (VpnState::Running { .. }, Intent::Stop) => {
+        (EngineState::Running { .. }, Intent::Stop) => {
             let epoch = cell.counter.fetch_add(1, Ordering::SeqCst) + 1;
-            VpnState::Stopping {
+            EngineState::Stopping {
                 since: now_secs(),
                 epoch,
             }
         }
         (
-            VpnState::Stopping { .. } | VpnState::Starting { .. } | VpnState::Running { .. },
+            EngineState::Stopping { .. } | EngineState::Starting { .. } | EngineState::Running { .. },
             Intent::MarkIdle,
         ) => {
             let epoch = cell.counter.fetch_add(1, Ordering::SeqCst) + 1;
-            VpnState::Idle { epoch }
+            EngineState::Idle { epoch }
         }
-        (VpnState::Failed { .. }, Intent::ClearFailure) => {
+        (EngineState::Failed { .. }, Intent::ClearFailure) => {
             let epoch = cell.counter.fetch_add(1, Ordering::SeqCst) + 1;
-            VpnState::Idle { epoch }
+            EngineState::Idle { epoch }
         }
-        (VpnState::Stopping { .. }, Intent::RollbackToRunning { mode }) => {
+        (EngineState::Stopping { .. }, Intent::RollbackToRunning { mode }) => {
             let epoch = cell.counter.fetch_add(1, Ordering::SeqCst) + 1;
-            VpnState::Running {
+            EngineState::Running {
                 since: now_secs(),
                 epoch,
                 mode,
             }
         }
-        (cur, Intent::Fail { reason }) if !matches!(cur, VpnState::Idle { .. }) => {
+        (cur, Intent::Fail { reason }) if !matches!(cur, EngineState::Idle { .. }) => {
             let epoch = cell.counter.fetch_add(1, Ordering::SeqCst) + 1;
-            VpnState::Failed {
+            EngineState::Failed {
                 reason,
                 at: now_secs(),
                 epoch,
@@ -197,13 +197,13 @@ pub fn transition(app: &AppHandle, intent: Intent) -> Result<VpnState, String> {
         }
         (cur, intent) => {
             let msg = format!("illegal transition from {} via {:?}", cur.kind(), intent);
-            log::warn!("[vpn-state] {}", msg);
+            log::warn!("[engine-state] {}", msg);
             return Err(msg);
         }
     };
 
     log::info!(
-        "[vpn-state] {} -> {} (epoch={})",
+        "[engine-state] {} -> {} (epoch={})",
         current.kind(),
         new_state.kind(),
         new_state.epoch()
@@ -212,8 +212,8 @@ pub fn transition(app: &AppHandle, intent: Intent) -> Result<VpnState, String> {
     *guard = new_state.clone();
     drop(guard);
 
-    if let Err(e) = app.emit(EVENT_VPN_STATE, new_state.clone()) {
-        log::error!("[vpn-state] emit {} failed: {}", EVENT_VPN_STATE, e);
+    if let Err(e) = app.emit(EVENT_ENGINE_STATE, new_state.clone()) {
+        log::error!("[engine-state] emit {} failed: {}", EVENT_ENGINE_STATE, e);
     }
 
     Ok(new_state)
@@ -225,7 +225,7 @@ mod tests {
 
     #[test]
     fn epoch_monotonic_bumps() {
-        let cell = VpnStateCell::new();
+        let cell = EngineStateCell::new();
         assert_eq!(cell.current_epoch(), 0);
         for i in 1..=3 {
             let e = cell.counter.fetch_add(1, Ordering::SeqCst) + 1;
@@ -236,12 +236,12 @@ mod tests {
 
     #[test]
     fn snapshot_clones_state() {
-        let cell = VpnStateCell::new();
+        let cell = EngineStateCell::new();
         let s1 = cell.snapshot();
-        assert!(matches!(s1, VpnState::Idle { epoch: 0 }));
+        assert!(matches!(s1, EngineState::Idle { epoch: 0 }));
         {
             let mut g = cell.inner.lock().unwrap();
-            *g = VpnState::Running {
+            *g = EngineState::Running {
                 since: 1,
                 epoch: 42,
                 mode: "tun".into(),
@@ -249,17 +249,17 @@ mod tests {
         }
         let s2 = cell.snapshot();
         match s2 {
-            VpnState::Running { epoch, .. } => assert_eq!(epoch, 42),
+            EngineState::Running { epoch, .. } => assert_eq!(epoch, 42),
             _ => panic!("wrong variant"),
         }
-        assert!(matches!(s1, VpnState::Idle { .. }));
+        assert!(matches!(s1, EngineState::Idle { .. }));
     }
 
     #[test]
     fn state_kind_labels() {
-        assert_eq!(VpnState::Idle { epoch: 0 }.kind(), "idle");
+        assert_eq!(EngineState::Idle { epoch: 0 }.kind(), "idle");
         assert_eq!(
-            VpnState::Starting {
+            EngineState::Starting {
                 since: 0,
                 epoch: 1,
                 mode: "tun".into()
@@ -268,11 +268,11 @@ mod tests {
             "starting"
         );
         assert_eq!(
-            VpnState::Stopping { since: 0, epoch: 1 }.kind(),
+            EngineState::Stopping { since: 0, epoch: 1 }.kind(),
             "stopping"
         );
         assert_eq!(
-            VpnState::Failed {
+            EngineState::Failed {
                 reason: "x".into(),
                 at: 0,
                 epoch: 1

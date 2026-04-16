@@ -8,7 +8,7 @@ use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Manager};
 
 use crate::state::{AppData, LogType};
-use crate::engine::state_machine::{transition, Intent, VpnState, VpnStateCell};
+use crate::engine::state_machine::{transition, Intent, EngineState, EngineStateCell};
 #[cfg(not(target_os = "macos"))]
 use crate::engine::helper;
 use crate::engine::{readiness, EVENT_STATUS_CHANGED};
@@ -310,7 +310,7 @@ async fn restart_tun_send_safe(
     app.emit(EVENT_STATUS_CHANGED, ()).ok();
 
     let _ = transition(&app, Intent::Start { mode: "tun".into() });
-    let epoch_snap = app.state::<VpnStateCell>().snapshot().epoch();
+    let epoch_snap = app.state::<EngineStateCell>().snapshot().epoch();
     readiness::spawn(app.clone(), epoch_snap);
 
     Ok(())
@@ -388,8 +388,8 @@ pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Resu
     // 状态机前置:保证从 Idle/Failed 进入。如果当前仍在 Stopping/Running/Starting,
     // 先强制 MarkIdle 清场;前一条会话的 handle_process_termination 可能尚未触发。
     {
-        let cur = app.state::<VpnStateCell>().snapshot();
-        if !matches!(cur, VpnState::Idle { .. } | VpnState::Failed { .. }) {
+        let cur = app.state::<EngineStateCell>().snapshot();
+        if !matches!(cur, EngineState::Idle { .. } | EngineState::Failed { .. }) {
             let _ = transition(&app, Intent::MarkIdle);
         }
     }
@@ -405,7 +405,7 @@ pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Resu
     ) {
         return Err(format!("state transition rejected: {}", e));
     }
-    let start_epoch = app.state::<VpnStateCell>().snapshot().epoch();
+    let start_epoch = app.state::<EngineStateCell>().snapshot().epoch();
 
     let is_system_proxy = matches!(mode, ProxyMode::SystemProxy);
 
@@ -612,7 +612,7 @@ pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Resu
     log::info!("Proxy process spawn returned; handing off to readiness prober");
 
     // 让 readiness prober 负责把状态机从 Starting 推进到 Running。
-    // 前端不再靠 EVENT_STATUS_CHANGED 探测,状态由 vpn://state 事件驱动。
+    // 前端不再靠 EVENT_STATUS_CHANGED 探测,状态由 engine-state 事件驱动。
     readiness::spawn(app.clone(), start_epoch);
 
     // Windows TUN 模式:spawn 一个 SCM 轮询 watchdog,把服务意外退出转换成
@@ -822,12 +822,12 @@ async fn handle_process_termination(
     }
 
     // 状态机收尾:根据当前状态决定是 Stopping→Idle 还是 Running/Starting→Failed
-    let cur = app_handle.state::<VpnStateCell>().snapshot();
+    let cur = app_handle.state::<EngineStateCell>().snapshot();
     match cur {
-        VpnState::Stopping { .. } => {
+        EngineState::Stopping { .. } => {
             let _ = transition(app_handle, Intent::MarkIdle);
         }
-        VpnState::Running { .. } | VpnState::Starting { .. } => {
+        EngineState::Running { .. } | EngineState::Starting { .. } => {
             let code = payload.code.unwrap_or(-1);
             if code == 0 {
                 let _ = transition(app_handle, Intent::MarkIdle);
@@ -851,12 +851,12 @@ pub async fn stop(app: tauri::AppHandle) -> Result<(), String> {
 
     // 状态机转换:Running/Starting → Stopping;其它状态 noop
     {
-        let cur = app.state::<VpnStateCell>().snapshot();
+        let cur = app.state::<EngineStateCell>().snapshot();
         match cur {
-            VpnState::Running { .. } => {
+            EngineState::Running { .. } => {
                 let _ = transition(&app, Intent::Stop);
             }
-            VpnState::Starting { .. } => {
+            EngineState::Starting { .. } => {
                 // 启动中被取消:直接走 MarkIdle,handle_process_termination
                 // 如果后续触发再做一次 no-op MarkIdle 即可。
                 let _ = transition(&app, Intent::MarkIdle);
@@ -988,7 +988,7 @@ pub async fn stop(app: tauri::AppHandle) -> Result<(), String> {
 
     log::info!("Proxy process stopped");
 
-    // 继续兼容 tray.tsx 的 status-changed 监听;新前端走 vpn://state。
+    // 继续兼容 tray.tsx 的 status-changed 监听;新前端走 engine-state。
     app.emit(EVENT_STATUS_CHANGED, ()).ok();
 
     // 对于 SystemProxy 模式,上面的 sleep 500ms 后 sing-box 通常已退出,
@@ -1006,23 +1006,23 @@ pub async fn stop(app: tauri::AppHandle) -> Result<(), String> {
 pub async fn is_running(app: AppHandle, secret: String) -> bool {
     let app_data = app.state::<AppData>();
     app_data.set_clash_secret(Some(secret));
-    let state = app.state::<VpnStateCell>().snapshot();
-    matches!(state, VpnState::Running { .. })
+    let state = app.state::<EngineStateCell>().snapshot();
+    matches!(state, EngineState::Running { .. })
 }
 
 /// Plan B 新增:返回当前 VPN 生命周期状态快照。冷启动 / WebView 热重载时
-/// 前端用这个命令拉取一次后再订阅 `vpn://state` 事件,避免事件丢失。
+/// 前端用这个命令拉取一次后再订阅 `engine-state` 事件,避免事件丢失。
 #[tauri::command]
-pub fn get_vpn_state(app: AppHandle) -> VpnState {
-    app.state::<VpnStateCell>().snapshot()
+pub fn get_engine_state(app: AppHandle) -> EngineState {
+    app.state::<EngineStateCell>().snapshot()
 }
 
 /// Plan B 新增:从 `Failed` 状态显式回到 `Idle`,供前端弹窗关闭等场景调用。
 /// 其它状态下为 no-op。
 #[tauri::command]
-pub fn clear_vpn_error(app: AppHandle) {
-    let cur = app.state::<VpnStateCell>().snapshot();
-    if matches!(cur, VpnState::Failed { .. }) {
+pub fn clear_engine_error(app: AppHandle) {
+    let cur = app.state::<EngineStateCell>().snapshot();
+    if matches!(cur, EngineState::Failed { .. }) {
         let _ = transition(&app, Intent::ClearFailure);
     }
 }

@@ -27,7 +27,7 @@ use tauri::{AppHandle, Manager};
 use tokio::net::TcpStream;
 use tokio::time::{sleep, timeout, Instant};
 
-use super::state_machine::{transition, Intent, VpnState, VpnStateCell};
+use super::state_machine::{transition, Intent, EngineState, EngineStateCell};
 
 const POLL_INTERVAL: Duration = Duration::from_millis(200);
 const STARTUP_TIMEOUT: Duration = Duration::from_secs(20);
@@ -41,8 +41,8 @@ pub fn spawn(app: AppHandle, start_epoch: u64) {
         let deadline = Instant::now() + STARTUP_TIMEOUT;
         loop {
             // Superseded check (generation guard).
-            let snap = app.state::<VpnStateCell>().snapshot();
-            if !matches!(snap, VpnState::Starting { .. }) || snap.epoch() != start_epoch {
+            let snap = app.state::<EngineStateCell>().snapshot();
+            if !matches!(snap, EngineState::Starting { .. }) || snap.epoch() != start_epoch {
                 log::debug!(
                     "[readiness] superseded (kind={}, epoch={}, captured={}), exiting",
                     snap.kind(),

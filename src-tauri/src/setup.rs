@@ -15,7 +15,7 @@ pub fn app_setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>>
     }
 
     app.manage(crate::state::AppData::new());
-    app.manage(crate::engine::state_machine::VpnStateCell::new());
+    app.manage(crate::engine::state_machine::EngineStateCell::new());
 
     // Purge must run before copy_database_files so the resource-bundled v2 defaults
     // are not clobbered by a later v1 cleanup pass.
@@ -191,7 +191,7 @@ pub(crate) fn spawn_lifecycle_listener(app_handle: &tauri::AppHandle) {
                         log::info!("System did wake");
                     }
                     SystemEvent::NetworkDown => {
-                        log::info!("[network] NetworkDown — cancelling any pending VPN restart");
+                        log::info!("[network] NetworkDown — cancelling any pending engine restart");
                         network_restart_epoch.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                         network_down_at = Some(std::time::SystemTime::now());
                     }
@@ -199,7 +199,7 @@ pub(crate) fn spawn_lifecycle_listener(app_handle: &tauri::AppHandle) {
                         log::info!("[network] NetworkUp");
                         // 立即重设 TUN DNS —— 幂等操作,无需防抖。Wi-Fi 切换后系统
                         // 会把活动接口 DNS 重置回 DHCP 下发的服务器,哪怕后续的
-                        // VPN 重启被 MIN_OUTAGE 过滤掉,这一步仍然保证 DNS 继续
+                        // engine 重启被 MIN_OUTAGE 过滤掉,这一步仍然保证 DNS 继续
                         // 指向 TUN 网关。
                         //
                         // 延迟 1s 再做一次,兜底系统在 NetworkUp 事件之后的"慢一拍"
@@ -223,7 +223,7 @@ pub(crate) fn spawn_lifecycle_listener(app_handle: &tauri::AppHandle) {
                             continue;
                         }
                         log::info!(
-                            "[network] outage {:.1}s — scheduling VPN restart in {}s",
+                            "[network] outage {:.1}s — scheduling engine restart in {}s",
                             outage.as_secs_f32(),
                             DEBOUNCE_SECS
                         );
@@ -238,22 +238,22 @@ pub(crate) fn spawn_lifecycle_listener(app_handle: &tauri::AppHandle) {
                             if epoch_arc.load(std::sync::atomic::Ordering::Relaxed)
                                 != current_epoch
                             {
-                                log::info!("[network] epoch changed, aborting VPN restart");
+                                log::info!("[network] epoch changed, aborting engine restart");
                                 return;
                             }
                             let Some((mode, path)) = crate::core::get_running_config() else {
                                 return;
                             };
                             log::info!(
-                                "[network] network stable, restarting VPN (mode: {:?})",
+                                "[network] network stable, restarting engine (mode: {:?})",
                                 mode
                             );
                             if let Err(e) = crate::core::stop(h.clone()).await {
-                                log::error!("[network] stop VPN failed: {}", e);
+                                log::error!("[network] stop engine failed: {}", e);
                             } else if let Err(e) = crate::core::start(h, path, mode).await {
-                                log::error!("[network] restart VPN failed: {}", e);
+                                log::error!("[network] restart engine failed: {}", e);
                             } else {
-                                log::info!("[network] VPN restarted after network recovery");
+                                log::info!("[network] engine restarted after network recovery");
                             }
                         });
                     }
