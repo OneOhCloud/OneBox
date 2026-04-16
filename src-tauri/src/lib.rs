@@ -1,11 +1,7 @@
+mod app;
 mod commands;
 mod core;
-mod database;
 pub mod engine;
-mod events;
-mod plugins;
-mod setup;
-mod state;
 mod utils;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -44,10 +40,10 @@ pub fn run() {
         );
     }
 
-    let migrations = database::get_migrations();
+    let migrations = app::database::get_migrations();
     let builder = tauri::Builder::default();
 
-    plugins::register_plugins(builder, migrations)
+    app::plugins::register_plugins(builder, migrations)
         .invoke_handler(tauri::generate_handler![
             commands::network::get_lan_ip,
             commands::network::ping_google,
@@ -74,12 +70,12 @@ pub fn run() {
             engine::engine_probe,
             engine::engine_ensure_installed,
         ])
-        .setup(setup::app_setup)
-        .on_menu_event(events::on_menu_event)
-        .on_window_event(events::on_window_event)
+        .setup(app::setup::app_setup)
+        .on_menu_event(app::events::on_menu_event)
+        .on_window_event(app::events::on_window_event)
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
-        .run(events::on_run_event)
+        .run(app::events::on_run_event)
 }
 
 #[cfg(test)]

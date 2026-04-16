@@ -4,7 +4,7 @@ use tauri::Manager;
 
 use crate::engine::state_machine::{transition, EngineState, EngineStateCell, Intent};
 use crate::engine::{EngineManager, PlatformEngine, EVENT_STATUS_CHANGED};
-use crate::state::{AppData, LogType};
+use crate::app::state::{AppData, LogType};
 
 use super::log::{create_singbox_log_writer, write_singbox_log};
 use super::{ProcessManager, ProxyMode};

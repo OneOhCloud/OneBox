@@ -245,7 +245,7 @@ fn _ipaddr_unused(_: IpAddr) {}
 /// the-proxy would misrank the list).
 #[tauri::command]
 pub async fn get_optimal_local_dns_server(app: AppHandle) -> Option<String> {
-    use crate::state::AppData;
+    use crate::app::state::AppData;
 
     let app_data = app.state::<AppData>();
     let running = {

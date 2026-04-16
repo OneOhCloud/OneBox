@@ -103,7 +103,7 @@ pub async fn fetch_config_with_optimal_dns(
     url: String,
     user_agent: String,
 ) -> Result<FetchConfigResponse, String> {
-    use crate::state::AppData;
+    use crate::app::state::AppData;
 
     let parsed_url = Url::parse(&url).map_err(|e| e.to_string())?;
     let hostname = parsed_url

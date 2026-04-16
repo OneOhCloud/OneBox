@@ -5,7 +5,7 @@ use lazy_static::lazy_static;
 use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Manager};
 
-use crate::state::AppData;
+use crate::app::state::AppData;
 use crate::engine::state_machine::{transition, Intent, EngineState, EngineStateCell};
 use crate::engine::{readiness, EVENT_STATUS_CHANGED};
 use crate::engine::{PlatformEngine, EngineManager};

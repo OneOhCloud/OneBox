@@ -73,7 +73,7 @@ pub fn on_run_event(app_handle: &AppHandle, event: RunEvent) {
         // 可以确保 applicationShouldTerminate: 能正确拦截关机事件。
         #[cfg(any(target_os = "windows", target_os = "macos"))]
         RunEvent::Ready => {
-            crate::setup::spawn_lifecycle_listener(app_handle);
+            crate::app::setup::spawn_lifecycle_listener(app_handle);
         }
         // 进程退出前的最后清理点（belt-and-suspenders）。
         // 无论何种退出路径（用户退出、系统关机、SIGTERM），RunEvent::Exit
