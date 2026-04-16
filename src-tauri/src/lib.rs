@@ -20,7 +20,7 @@ pub fn run() {
         let raw_args: Vec<String> = std::env::args().collect();
         if let Some(pos) = raw_args.iter().position(|a| a == "--onebox-tun-helper") {
             let helper_args: Vec<String> = raw_args[pos + 1..].to_vec();
-            let code = engine::windows_native::run_helper(&helper_args);
+            let code = engine::windows::native::run_helper(&helper_args);
             std::process::exit(code);
         }
     }
@@ -72,8 +72,8 @@ pub fn run() {
             command::open_directory,
             command::get_app_version,
             command::get_pending_deep_link,
-            engine::macos_helper::helper_ping,
-            engine::macos_helper::helper_install,
+            engine::macos::helper::helper_ping,
+            engine::macos::helper::helper_install,
         ])
         .setup(setup::app_setup)
         .on_menu_event(events::on_menu_event)

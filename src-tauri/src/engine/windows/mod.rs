@@ -6,7 +6,8 @@ use tauri::Emitter;
 use tauri_plugin_shell::process::Command as TauriCommand;
 
 use crate::engine::helper::extract_tun_gateway_from_config;
-use crate::engine::windows_native;
+pub mod native;
+use self::native as windows_native;
 use crate::engine::EngineManager;
 
 // 默认绕过列表

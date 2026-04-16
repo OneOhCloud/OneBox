@@ -17,18 +17,18 @@ fn main() {
     println!("cargo:rerun-if-env-changed=ACCELERATE_URL");
 
     // Compile the Objective-C XPC client shim used to talk to the macOS
-    // privileged helper (see src/engine/macos_helper.m).
+    // privileged helper (see src/engine/macos/helper.m).
     #[cfg(target_os = "macos")]
     {
         cc::Build::new()
-            .file("src/engine/macos_helper.m")
+            .file("src/engine/macos/helper.m")
             .flag("-fobjc-arc")
             .flag("-fmodules")
             .compile("onebox_helper_client");
         println!("cargo:rustc-link-lib=framework=Foundation");
         println!("cargo:rustc-link-lib=framework=ServiceManagement");
         println!("cargo:rustc-link-lib=framework=Security");
-        println!("cargo:rerun-if-changed=src/engine/macos_helper.m");
+        println!("cargo:rerun-if-changed=src/engine/macos/helper.m");
     }
 
     tauri_build::build()

@@ -1,4 +1,6 @@
-use super::macos_helper;
+pub mod helper;
+
+use self::helper as macos_helper;
 use crate::engine::helper::extract_tun_gateway_from_config;
 use crate::engine::EngineManager;
 use crate::engine::EVENT_TAURI_LOG;

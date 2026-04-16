@@ -33,18 +33,15 @@ pub trait EngineManager {
 }
 
 pub mod helper;
+pub mod readiness;
+pub mod state_machine;
+
 #[cfg(target_os = "linux")]
 pub mod linux;
 #[cfg(target_os = "macos")]
 pub mod macos;
-#[cfg(target_os = "macos")]
-pub mod macos_helper;
-pub mod readiness;
-pub mod state_machine;
 #[cfg(target_os = "windows")]
 pub mod windows;
-#[cfg(target_os = "windows")]
-pub mod windows_native;
 
 #[cfg(target_os = "linux")]
 pub use linux::LinuxEngine as PlatformEngine;

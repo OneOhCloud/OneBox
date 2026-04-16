@@ -280,7 +280,7 @@ async fn restart_tun_send_safe(
     .map_err(|e| format!("restart start_tun_via_helper failed: {}", e))?;
 
     // Wire exit-event bridge for the new process instance.
-    let mut exit_rx = crate::engine::macos_helper::subscribe_sing_box_exits();
+    let mut exit_rx = crate::engine::macos::helper::subscribe_sing_box_exits();
     let exit_app = app.clone();
     let exit_mode = Arc::new(ProxyMode::TunProxy);
     tokio::spawn(async move {
@@ -523,7 +523,7 @@ pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Resu
     // feeds into handle_process_termination via the existing state machine.
     #[cfg(target_os = "macos")]
     if !is_system_proxy {
-        let mut exit_rx = crate::engine::macos_helper::subscribe_sing_box_exits();
+        let mut exit_rx = crate::engine::macos::helper::subscribe_sing_box_exits();
         let exit_app = app.clone();
         let exit_mode = Arc::new(mode.clone());
         tokio::spawn(async move {
@@ -1125,7 +1125,7 @@ pub async fn reload_config(app: tauri::AppHandle, is_tun: bool) -> Result<String
         // Non-TUN and non-macOS: direct pkill (sing-box runs as user).
         #[cfg(target_os = "macos")]
         if is_privileged {
-            tokio::task::spawn_blocking(crate::engine::macos_helper::api::reload_sing_box)
+            tokio::task::spawn_blocking(crate::engine::macos::helper::api::reload_sing_box)
                 .await
                 .map_err(|e| format!("reload join error: {}", e))?
                 .map_err(|e| format!("helper reload_sing_box failed: {}", e))?;
