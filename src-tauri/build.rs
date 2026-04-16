@@ -17,9 +17,13 @@ fn main() {
     println!("cargo:rerun-if-env-changed=ACCELERATE_URL");
 
     // Compile the Objective-C XPC client shim used to talk to the macOS
-    // privileged helper (see src/engine/macos/helper.m).
-    #[cfg(target_os = "macos")]
-    {
+    // privileged helper (see src/engine/macos/helper.m). Gate on the
+    // TARGET's os, not the host's: a bare `#[cfg(target_os = ...)]`
+    // inside a build script resolves against the HOST, so a macOS host
+    // cross-compiling to Linux/Windows would otherwise try (and fail)
+    // to run clang over ObjC here. `CARGO_CFG_TARGET_OS` is Cargo's
+    // standard way to inspect the target from a build script.
+    if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("macos") {
         cc::Build::new()
             .file("src/engine/macos/helper.m")
             .flag("-fobjc-arc")

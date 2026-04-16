@@ -239,7 +239,7 @@ impl EngineManager for WindowsEngine {
                 // SystemProxy setting may linger across mode switches on
                 // Windows; best-effort unset so browsers stop pointing at
                 // the mixed port.
-                if let Err(e) = unset_system_proxy(app).await {
+                if let Err(e) = clear_system_proxy(app).await {
                     log::warn!("Failed to unset proxy: {}", e);
                     let _ = app.emit(
                         EVENT_TAURI_LOG,
@@ -260,7 +260,7 @@ impl EngineManager for WindowsEngine {
         let Some(mode) = mode else { return Ok(()); };
         match mode.as_ref() {
             crate::engine::ProxyMode::SystemProxy => {
-                if let Err(e) = unset_system_proxy(app).await {
+                if let Err(e) = clear_system_proxy(app).await {
                     log::warn!("Failed to unset proxy: {}", e);
                     let _ = app.emit(
                         EVENT_TAURI_LOG,
