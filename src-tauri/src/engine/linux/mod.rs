@@ -276,20 +276,34 @@ impl EngineManager for LinuxEngine {
         stop_tun_process()
     }
 
-    fn reapply_dns_override(config_path: &str) -> Option<(String, String)> {
-        match apply_system_dns_override(config_path) {
-            Ok(info) => Some(info),
-            Err(e) => {
-                log::warn!("[dns] NetworkUp re-apply failed: {}", e);
-                None
+    fn on_network_up(_app: &AppHandle) {
+        // NetworkUp → new default interface may need DNS overriding again.
+        // Reads the current config from ProcessManager; refreshes the stored
+        // (iface, original_dns) tuple so the later teardown uses the right one.
+        let config_path = {
+            let manager = crate::core::ProcessManager::acquire();
+            match manager.config_path.as_ref() {
+                Some(p) => p.as_str().to_string(),
+                None => return,
             }
+        };
+        match apply_system_dns_override(&config_path) {
+            Ok(info) => {
+                let mut manager = crate::core::ProcessManager::acquire();
+                manager.dns_override = Some(info);
+            }
+            Err(e) => log::warn!("[dns] NetworkUp re-apply failed: {}", e),
         }
     }
 
-    fn restore_dns_after_termination(
-        _was_user_stop: bool,
-        dns_info: Option<(String, String)>,
-    ) {
+    fn on_process_terminated(_app: &AppHandle, _was_user_stop: bool) {
+        // Read the teardown state that `core::start` stashed at boot.
+        // Note the Linux restore is interface-scoped and stateful — without
+        // the captured (iface, original_dns) we have nothing to restore to.
+        let dns_info = {
+            let manager = crate::core::ProcessManager::acquire();
+            manager.dns_override.clone()
+        };
         if let Some((iface, original_dns)) = dns_info {
             log::info!(
                 "[dns] TUN process terminated — restoring [{}] DNS to {}",
@@ -306,7 +320,7 @@ impl EngineManager for LinuxEngine {
         }
     }
 
-    async fn reload_engine(_app: &AppHandle, _is_tun: bool) -> Result<(), String> {
+    async fn restart(_app: &AppHandle) -> Result<(), String> {
         // Helper's `reload` verb bundles `pkill -HUP sing-box` and
         // `resolvectl flush-caches` in one pkexec call. The flush is needed
         // because systemd-resolved honors sing-box's 600s FakeIP TTL, so

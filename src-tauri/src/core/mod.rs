@@ -415,38 +415,27 @@ pub fn clear_engine_error(app: AppHandle) {
     }
 }
 
-#[cfg(any(target_os = "macos", target_os = "linux"))]
-pub fn reapply_tun_dns_override_if_active() {
-    let manager = ProcessManager::acquire();
-    let is_tun = manager
-        .mode
-        .as_ref()
-        .map(|m| matches!(**m, ProxyMode::TunProxy))
-        .unwrap_or(false);
+/// Notify the platform engine of a system NetworkUp event (Wi-Fi switch,
+/// wake from sleep, DHCP renewal). Implementations that override DNS
+/// re-apply the override on the new active interface; others are no-ops.
+/// We still gate on "is the engine actually running in TUN mode" here so
+/// `on_network_up` doesn't try to touch DNS when the user hasn't started
+/// a session.
+pub fn reapply_tun_dns_override_if_active(app: &AppHandle) {
+    let is_tun = {
+        let manager = ProcessManager::acquire();
+        manager
+            .mode
+            .as_ref()
+            .map(|m| matches!(**m, ProxyMode::TunProxy))
+            .unwrap_or(false)
+    };
     if !is_tun {
         return;
     }
-    let config_path = match manager.config_path.as_ref().cloned() {
-        Some(c) => c,
-        None => return,
-    };
-    drop(manager);
-
     ::log::info!("[dns] NetworkUp — re-applying TUN gateway DNS override");
-    let result = PlatformEngine::reapply_dns_override(&config_path);
-
-    // Linux returns updated (iface, dns) that must be stored back.
-    #[cfg(target_os = "linux")]
-    if let Some(override_info) = result {
-        let mut mgr = ProcessManager::acquire();
-        mgr.dns_override = Some(override_info);
-    }
-    #[cfg(not(target_os = "linux"))]
-    let _ = result;
+    PlatformEngine::on_network_up(app);
 }
-
-#[cfg(target_os = "windows")]
-pub fn reapply_tun_dns_override_if_active() {}
 
 #[cfg(any(target_os = "macos", target_os = "windows"))]
 pub fn get_running_config() -> Option<(ProxyMode, String)> {
@@ -485,7 +474,7 @@ pub async fn reload_config(app: tauri::AppHandle, is_tun: bool) -> Result<String
         };
 
         ::log::info!("Reloading config");
-        PlatformEngine::reload_engine(&app, is_tun).await?;
+        PlatformEngine::restart(&app).await?;
 
         if needs_proxy_reset {
             ::log::info!("SystemProxy mode detected, waiting for reload and resetting proxy");

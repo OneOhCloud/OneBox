@@ -204,10 +204,11 @@ pub(crate) fn spawn_lifecycle_listener(app_handle: &tauri::AppHandle) {
                         //
                         // 延迟 1s 再做一次,兜底系统在 NetworkUp 事件之后的"慢一拍"
                         // DNS 写入(DHCP 续租、IPv6 RA、NetworkManager dispatcher 等)。
-                        crate::core::reapply_tun_dns_override_if_active();
-                        tauri::async_runtime::spawn(async {
+                        crate::core::reapply_tun_dns_override_if_active(&handle);
+                        let handle_for_retry = handle.clone();
+                        tauri::async_runtime::spawn(async move {
                             tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-                            crate::core::reapply_tun_dns_override_if_active();
+                            crate::core::reapply_tun_dns_override_if_active(&handle_for_retry);
                         });
                         let down_at = match network_down_at.take() {
                             Some(t) => t,

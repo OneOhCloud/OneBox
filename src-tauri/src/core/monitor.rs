@@ -98,22 +98,23 @@ pub(super) async fn handle_process_termination(
         }
     }
 
-    let (should_cleanup, was_user_initiated_stop, captured_dns_override) = {
-        let mut manager = ProcessManager::acquire();
-
+    // Phase 1: confirm the exiting process belongs to the mode we think is
+    // active, and decide whether this was a user-initiated stop. Do NOT
+    // reset ProcessManager yet — the platform's on_process_terminated hook
+    // below may need to read teardown state (e.g. Linux dns_override) that
+    // lives there.
+    let (should_cleanup, was_user_initiated_stop) = {
+        let manager = ProcessManager::acquire();
         let matches = manager
             .mode
             .as_ref()
             .map(|m| **m == **process_mode)
             .unwrap_or(false);
-
         if matches {
             log::info!("Cleaning up resources after process termination");
-            let was_stopping = manager.is_stopping;
-            let dns_info = manager.reset();
-            (true, was_stopping, dns_info)
+            (true, manager.is_stopping)
         } else {
-            (false, false, None)
+            (false, false)
         }
     };
 
@@ -129,11 +130,13 @@ pub(super) async fn handle_process_termination(
     }
 
     if matches!(**process_mode, ProxyMode::TunProxy) {
-        PlatformEngine::restore_dns_after_termination(
-            was_user_initiated_stop,
-            captured_dns_override,
-        );
+        PlatformEngine::on_process_terminated(app_handle, was_user_initiated_stop);
     }
+
+    // Phase 2: now that platform teardown has run and consumed whatever state
+    // it needed, reset ProcessManager. The old `reset()` return value is
+    // ignored — dns_override consumption is a platform concern.
+    let _ = ProcessManager::acquire().reset();
 
     if let Err(e) = app_handle.emit(EVENT_STATUS_CHANGED, payload.clone()) {
         log::error!("Failed to emit status-changed event: {}", e);

@@ -278,10 +278,11 @@ impl EngineManager for WindowsEngine {
         stop_tun_process()
     }
 
-    fn restore_dns_after_termination(
-        was_user_stop: bool,
-        _dns_info: Option<(String, String)>,
-    ) {
+    // Windows has no NetworkUp DNS re-apply — DNS override lives in the
+    // service process which reads interface state on start. Default no-op
+    // from the trait is fine.
+
+    fn on_process_terminated(_app: &AppHandle, was_user_stop: bool) {
         if was_user_stop {
             log::info!(
                 "[dns] user-initiated stop; service already reset DNS, skipping UAC fallback"
@@ -296,7 +297,7 @@ impl EngineManager for WindowsEngine {
         }
     }
 
-    async fn reload_engine(_app: &AppHandle, _is_tun: bool) -> Result<(), String> {
+    async fn restart(_app: &AppHandle) -> Result<(), String> {
         // Windows service is driven by SCM; SIGHUP is not a thing. The
         // "reload" is a stop+start of OneBoxTunService, with the service
         // itself running `ipconfig /flushdns` from SYSTEM context during

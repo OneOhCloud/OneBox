@@ -278,28 +278,43 @@ impl EngineManager for MacOSEngine {
         stop_tun_process()
     }
 
-    fn reapply_dns_override(config_path: &str) -> Option<(String, String)> {
-        if let Err(e) = apply_system_dns_override(config_path) {
+    fn on_network_up(_app: &AppHandle) {
+        // Re-apply the TUN gateway DNS override on the new active service.
+        // Called from the onebox_lifecycle NetworkUp handler; reads the
+        // current config from ProcessManager since the trait deliberately
+        // does not expose it.
+        let config_path = {
+            let manager = crate::core::ProcessManager::acquire();
+            match manager.config_path.as_ref() {
+                Some(p) => p.as_str().to_string(),
+                None => return, // engine not running; nothing to re-apply
+            }
+        };
+        if let Err(e) = apply_system_dns_override(&config_path) {
             log::warn!("[dns] NetworkUp re-apply failed: {}", e);
         }
-        None
     }
 
-    fn restore_dns_after_termination(
-        _was_user_stop: bool,
-        _dns_info: Option<(String, String)>,
-    ) {
+    fn on_process_terminated(_app: &AppHandle, _was_user_stop: bool) {
         log::info!("[dns] TUN process terminated — resetting all services to DHCP");
         if let Err(e) = restore_system_dns() {
             log::warn!("[dns] fallback restore_system_dns failed: {}", e);
         }
     }
 
-    async fn reload_engine(_app: &AppHandle, is_tun: bool) -> Result<(), String> {
-        // TUN mode: sing-box runs as root under the XPC helper — ask the
-        // helper to SIGHUP it, then flush the OS resolver cache.
-        // SystemProxy mode: sing-box runs as the current user, pkill is enough;
-        // DNS isn't overridden so no cache flush is needed.
+    async fn restart(_app: &AppHandle) -> Result<(), String> {
+        // Read the current mode from shared state. TUN mode means sing-box
+        // runs as root under the XPC helper — ask the helper to SIGHUP it,
+        // then flush the OS resolver cache. SystemProxy mode means sing-box
+        // runs as the current user so `pkill -HUP` is enough, and DNS isn't
+        // overridden so no cache flush is needed.
+        let is_tun = {
+            let manager = crate::core::ProcessManager::acquire();
+            matches!(
+                manager.mode.as_ref().map(|m| m.as_ref()),
+                Some(crate::core::ProxyMode::TunProxy)
+            )
+        };
         if is_tun {
             tokio::task::spawn_blocking(macos_helper::api::reload_sing_box)
                 .await
