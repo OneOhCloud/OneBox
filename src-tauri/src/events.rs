@@ -81,9 +81,9 @@ pub fn on_run_event(app_handle: &AppHandle, event: RunEvent) {
         // applicationShouldTerminate: 未被调用或 lifecycle shutdown handler
         // 执行失败，代理也能被可靠清除。
         RunEvent::Exit => {
-            use crate::vpn::unset_proxy_on_shutdown;
+            use crate::engine::cleanup_on_shutdown;
             log::info!("[exit] RunEvent::Exit fired, performing final proxy cleanup");
-            unset_proxy_on_shutdown();
+            cleanup_on_shutdown();
         }
         _ => {
             #[cfg(not(target_os = "macos"))]

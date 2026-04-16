@@ -131,7 +131,6 @@ export const useProxyMode = () => {
  */
 export const useVPNOperations = () => {
     const vpnState = useVpnState();
-    const [privilegedDialog, setPrivilegedDialog] = useState(false);
     const { setActiveScreen, deepLinkApplyUrl, setDeepLinkApplyUrl } = useContext(NavContext);
 
     // 从权威状态派生出兼容变量
@@ -172,18 +171,11 @@ export const useVPNOperations = () => {
                 try {
                     await vpnServiceManager.start();
                 } catch (error: any) {
-                    if (error?.message?.includes('REQUIRE_PRIVILEGE')) {
-                        setPrivilegedDialog(true);
-                    } else {
-                        console.error('启动服务失败:', error);
-                    }
+                    console.error('启动服务失败:', error);
                 }
             },
             onError: async (error) => {
                 await onSyncError(error);
-            },
-            onRequirePrivileged: () => {
-                setPrivilegedDialog(true);
             },
         });
     };
@@ -260,10 +252,8 @@ export const useVPNOperations = () => {
     return {
         isOperating: isLoading,
         operationStatus,
-        privilegedDialog,
         isLoading,
         isRunning,
-        setPrivilegedDialog,
         startService,
         restartService,
         toggleService,

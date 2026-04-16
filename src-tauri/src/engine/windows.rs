@@ -1,13 +1,13 @@
-use crate::vpn::EVENT_TAURI_LOG;
+use crate::engine::EVENT_TAURI_LOG;
 use anyhow;
 use onebox_sysproxy_rs::Sysproxy;
 use tauri::AppHandle;
 use tauri::Emitter;
 use tauri_plugin_shell::process::Command as TauriCommand;
 
-use crate::vpn::helper::extract_tun_gateway_from_config;
-use crate::vpn::windows_native;
-use crate::vpn::VpnProxy;
+use crate::engine::helper::extract_tun_gateway_from_config;
+use crate::engine::windows_native;
+use crate::engine::EngineManager;
 
 // 默认绕过列表
 pub static DEFAULT_BYPASS: &str = "localhost;127.*;192.168.*;10.*;172.16.*;172.17.*;172.18.*;172.19.*;172.20.*;172.21.*;172.22.*;172.23.*;172.24.*;172.25.*;172.26.*;172.27.*;172.28.*;172.29.*;172.30.*;172.31.*;<local>";
@@ -242,9 +242,9 @@ pub fn restart_privileged_command(sidecar_path: String, path: String) -> Result<
 }
 
 /// Windows平台的VPN代理实现
-pub struct WindowsVpnProxy;
+pub struct WindowsEngine;
 
-impl VpnProxy for WindowsVpnProxy {
+impl EngineManager for WindowsEngine {
     async fn set_proxy(app: &AppHandle) -> anyhow::Result<()> {
         set_proxy(app).await
     }

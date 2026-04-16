@@ -4,47 +4,33 @@ import { useEffect } from "react";
 import { InfoCircle, Power } from 'react-bootstrap-icons';
 import Body from '../components/home/body';
 import { ProxyMode, useModeIndicator, useProxyMode, useVPNOperations } from "../components/home/hooks";
-import AuthDialog from '../components/settings/auth-dialog';
 import { useSubscriptions } from '../hooks/useDB';
 import { t } from "../utils/helper";
 
 import './home.css';
 
 export default function HomePage() {
-  // 使用自定义hooks管理状态和逻辑
   const { data: subscriptions } = useSubscriptions();
   const { selectedMode, initializeMode, changeMode } = useProxyMode();
   const {
     isLoading,
     isRunning,
     operationStatus,
-    privilegedDialog,
-    setPrivilegedDialog,
-    startService,
     toggleService,
     restartService,
     mutate
   } = useVPNOperations();
   const { indicatorStyle, modeButtonsRef } = useModeIndicator(selectedMode);
 
-  // 派生状态
   const isEmpty = !subscriptions?.length;
 
-  // 初始化效果
   useEffect(() => {
     mutate();
     initializeMode();
-
   }, []);
 
-  /**
-   * 处理模式切换
-   */
   const handleModeChange = async (mode: ProxyMode) => {
-    // 必须先保存当前的模式
     await changeMode(mode);
-
-    // 如果服务正在运行或加载中，需要重启服务
     if (isLoading || isRunning) {
       await restartService(isEmpty);
     }
@@ -54,12 +40,6 @@ export default function HomePage() {
     await restartService(isEmpty);
   }
 
-
-
-  /**
-   * 获取状态文本显示。Plan B 后 operationStatus / isLoading / isRunning
-   * 都从权威状态机派生,按 kind 直接 switch 即可,不再需要回退链。
-   */
   const getStatusText = () => {
     switch (operationStatus) {
       case 'starting':
@@ -73,16 +53,6 @@ export default function HomePage() {
 
   return (
     <div className="bg-gray-50 flex flex-col items-center justify-center p-6 w-full  h-[calc(100dvh-56px)]">
-      {/* 权限认证对话框 */}
-      <AuthDialog
-        onAuthSuccess={async () => {
-          setPrivilegedDialog(false);
-          await startService(isEmpty);
-        }}
-        open={privilegedDialog}
-        onClose={() => setPrivilegedDialog(false)}
-      />
-
       {/* 主开关按钮 */}
       <label className={`cursor-pointer ${isLoading ? 'pointer-events-none' : ''}`}>
         <input type="checkbox" checked={isRunning} onChange={() => { }} className="hidden" />
@@ -122,14 +92,12 @@ export default function HomePage() {
 
       {/* 状态文本显示 */}
       <div
-
         className={
           clsx(
             "w-full text-center text-sm mb-2 flex items-center justify-center ",
             isLoading || isRunning ? "text-blue-500" : "text-gray-400",
           )
         }
-
       >
         <InfoCircle size={16} className="mr-1.5 text-gray-300" />
         <span className="text-base capitalize">
@@ -139,7 +107,6 @@ export default function HomePage() {
 
       {/* 模式切换器 */}
       <div className="bg-gray-100 p-1 rounded-xl mb-4 inline-flex relative" ref={modeButtonsRef}>
-        {/* 动画指示器 */}
         <span
           className="absolute top-1 bottom-1 bg-white rounded-lg shadow-sm transition-all duration-300 ease-in-out"
           style={{
@@ -148,7 +115,6 @@ export default function HomePage() {
           }}
         />
 
-        {/* 模式按钮 */}
         {(['rules', 'global'] as const).map((mode) => (
           <div key={mode} className='tooltip text-xs  tooltip-delayed'>
             <div className="tooltip-content">
@@ -159,7 +125,7 @@ export default function HomePage() {
             <button
               data-mode={mode}
               className={`
-                capitalize relative px-4 py-1 rounded-lg transition-colors duration-300 
+                capitalize relative px-4 py-1 rounded-lg transition-colors duration-300
                 ${selectedMode === mode ? 'text-black' : 'text-gray-500 hover:text-gray-700'}
               `}
               onClick={() => handleModeChange(mode)}
@@ -167,7 +133,6 @@ export default function HomePage() {
               {t(mode)}
             </button>
           </div>
-
         ))}
       </div>
 

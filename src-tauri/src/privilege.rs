@@ -7,7 +7,7 @@
 pub async fn is_privileged(_password: Option<String>) -> bool {
     #[cfg(target_os = "macos")]
     {
-        crate::helper_client::api::ping().is_ok()
+        crate::engine::macos_helper::api::ping().is_ok()
     }
     #[cfg(target_os = "linux")]
     {
@@ -24,12 +24,4 @@ pub async fn is_privileged(_password: Option<String>) -> bool {
     {
         false
     }
-}
-
-/// Legacy command kept for frontend compatibility. Password is no longer
-/// stored on any platform — all privilege escalation is handled by the
-/// platform's native mechanism (helper, pkexec, or service).
-#[tauri::command]
-pub async fn save_privilege_password_to_keyring(_password: String) -> bool {
-    true
 }

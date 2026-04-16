@@ -1,15 +1,14 @@
 mod command;
 mod core;
 mod database;
+pub mod engine;
 mod events;
-mod helper_client;
 mod lan;
 mod plugins;
 mod privilege;
 mod setup;
 mod state;
 mod utils;
-pub mod vpn;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -22,7 +21,7 @@ pub fn run() {
         let raw_args: Vec<String> = std::env::args().collect();
         if let Some(pos) = raw_args.iter().position(|a| a == "--onebox-tun-helper") {
             let helper_args: Vec<String> = raw_args[pos + 1..].to_vec();
-            let code = vpn::windows_native::run_helper(&helper_args);
+            let code = engine::windows_native::run_helper(&helper_args);
             std::process::exit(code);
         }
     }
@@ -75,9 +74,8 @@ pub fn run() {
             command::get_app_version,
             command::get_pending_deep_link,
             privilege::is_privileged,
-            privilege::save_privilege_password_to_keyring,
-            helper_client::helper_ping,
-            helper_client::helper_install,
+            engine::macos_helper::helper_ping,
+            engine::macos_helper::helper_install,
         ])
         .setup(setup::app_setup)
         .on_menu_event(events::on_menu_event)

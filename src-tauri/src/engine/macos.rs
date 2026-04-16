@@ -1,7 +1,7 @@
-use crate::helper_client;
-use crate::vpn::helper::extract_tun_gateway_from_config;
-use crate::vpn::VpnProxy;
-use crate::vpn::EVENT_TAURI_LOG;
+use super::macos_helper;
+use crate::engine::helper::extract_tun_gateway_from_config;
+use crate::engine::EngineManager;
+use crate::engine::EVENT_TAURI_LOG;
 use anyhow;
 use onebox_sysproxy_rs::Sysproxy;
 use std::process::Command;
@@ -81,11 +81,11 @@ pub async fn unset_proxy(app: &AppHandle) -> anyhow::Result<()> {
 /// Blocks the calling thread while the SMJobBless authorization prompt is
 /// shown; callers must invoke from `spawn_blocking` / background.
 pub fn ensure_helper_installed() -> Result<(), String> {
-    match helper_client::api::ping() {
+    match macos_helper::api::ping() {
         Ok(_) => Ok(()),
         Err(_) => {
             log::info!("[helper] not responding, triggering SMJobBless install...");
-            helper_client::api::install()
+            macos_helper::api::install()
         }
     }
 }
@@ -107,7 +107,7 @@ pub fn start_tun_via_helper(app: &AppHandle, config_path: &str) -> Result<i32, S
         .unwrap_or(false);
 
     if enable_bypass_router {
-        if let Err(e) = helper_client::api::set_ip_forwarding(true) {
+        if let Err(e) = macos_helper::api::set_ip_forwarding(true) {
             log::warn!("[helper] set_ip_forwarding(true) failed: {}", e);
         }
     }
@@ -117,7 +117,7 @@ pub fn start_tun_via_helper(app: &AppHandle, config_path: &str) -> Result<i32, S
         log::warn!("[dns] apply_system_dns_override failed: {}", e);
     }
 
-    let pid = helper_client::api::start_sing_box(config_path)?;
+    let pid = macos_helper::api::start_sing_box(config_path)?;
     log::info!("[helper] sing-box started, pid={}", pid);
     Ok(pid)
 }
@@ -132,20 +132,20 @@ pub fn stop_tun_process() -> Result<(), String> {
         log::warn!("[dns] restore_system_dns failed: {}", e);
     }
 
-    helper_client::api::stop_sing_box()?;
+    macos_helper::api::stop_sing_box()?;
     log::info!("[helper] SIGTERM sent to sing-box");
 
     std::thread::sleep(std::time::Duration::from_millis(500));
 
-    if let Err(e) = helper_client::api::set_ip_forwarding(false) {
+    if let Err(e) = macos_helper::api::set_ip_forwarding(false) {
         log::warn!("[helper] set_ip_forwarding(false) failed: {}", e);
     }
 
-    if let Err(e) = helper_client::api::remove_tun_routes(TUN_INTERFACE_NAME) {
+    if let Err(e) = macos_helper::api::remove_tun_routes(TUN_INTERFACE_NAME) {
         log::warn!("[helper] remove_tun_routes({}) failed: {}", TUN_INTERFACE_NAME, e);
     }
 
-    helper_client::api::flush_dns_cache().ok();
+    macos_helper::api::flush_dns_cache().ok();
     Ok(())
 }
 
@@ -218,8 +218,8 @@ pub fn apply_system_dns_override(config_path: &str) -> Result<(), String> {
         .ok_or_else(|| format!("could not extract TUN gateway from {}", config_path))?;
     let service = detect_active_network_service()?;
     log::info!("[dns] override → {} for [{}]", gateway, service);
-    helper_client::api::set_dns_servers(&service, &gateway)?;
-    helper_client::api::flush_dns_cache().ok();
+    macos_helper::api::set_dns_servers(&service, &gateway)?;
+    macos_helper::api::flush_dns_cache().ok();
     Ok(())
 }
 
@@ -233,11 +233,11 @@ pub fn restore_system_dns() -> Result<(), String> {
         services.len()
     );
     for svc in &services {
-        if let Err(e) = helper_client::api::set_dns_servers(svc, "empty") {
+        if let Err(e) = macos_helper::api::set_dns_servers(svc, "empty") {
             log::warn!("[dns] failed to reset [{}]: {}", svc, e);
         }
     }
-    helper_client::api::flush_dns_cache().ok();
+    macos_helper::api::flush_dns_cache().ok();
     Ok(())
 }
 
@@ -249,9 +249,9 @@ pub fn restore_system_dns() -> Result<(), String> {
 // compiler; they delegate or no-op.
 // ============================================================================
 
-pub struct MacOSVpnProxy;
+pub struct MacOSEngine;
 
-impl VpnProxy for MacOSVpnProxy {
+impl EngineManager for MacOSEngine {
     async fn set_proxy(_app: &AppHandle) -> anyhow::Result<()> {
         set_proxy(_app).await
     }

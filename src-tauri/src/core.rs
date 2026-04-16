@@ -10,11 +10,11 @@ use tauri::{AppHandle, Manager};
 #[cfg(target_os = "linux")]
 use crate::privilege;
 use crate::state::{AppData, LogType};
-use crate::vpn::state_machine::{transition, Intent, VpnState, VpnStateCell};
+use crate::engine::state_machine::{transition, Intent, VpnState, VpnStateCell};
 #[cfg(not(target_os = "macos"))]
-use crate::vpn::helper;
-use crate::vpn::{readiness, EVENT_STATUS_CHANGED};
-use crate::vpn::{PlatformVpnProxy, VpnProxy};
+use crate::engine::helper;
+use crate::engine::{readiness, EVENT_STATUS_CHANGED};
+use crate::engine::{PlatformEngine, EngineManager};
 use tauri::Emitter;
 use tauri_plugin_shell::process::CommandChild;
 use tauri_plugin_shell::ShellExt;
@@ -275,14 +275,14 @@ async fn restart_tun_send_safe(
     let app_c = app.clone();
     let path_c = path.as_ref().clone();
     let _pid = tokio::task::spawn_blocking(move || {
-        crate::vpn::macos::start_tun_via_helper(&app_c, &path_c)
+        crate::engine::macos::start_tun_via_helper(&app_c, &path_c)
     })
     .await
     .map_err(|e| format!("restart join error: {}", e))?
     .map_err(|e| format!("restart start_tun_via_helper failed: {}", e))?;
 
     // Wire exit-event bridge for the new process instance.
-    let mut exit_rx = crate::helper_client::subscribe_sing_box_exits();
+    let mut exit_rx = crate::engine::macos_helper::subscribe_sing_box_exits();
     let exit_app = app.clone();
     let exit_mode = Arc::new(ProxyMode::TunProxy);
     tokio::spawn(async move {
@@ -361,7 +361,7 @@ async fn bypass_router_watchdog(app: tauri::AppHandle, path: Arc<String>) {
         }
 
         // stop_tun_process is now passwordless (helper-backed)
-        let stop_result = tokio::task::spawn_blocking(crate::vpn::macos::stop_tun_process).await;
+        let stop_result = tokio::task::spawn_blocking(crate::engine::macos::stop_tun_process).await;
         if let Err(e) = stop_result.map_err(|e| e.to_string()).and_then(|r| r) {
             log::error!("[bypass_router_watchdog] stop_tun_process failed: {}", e);
             let mut manager = PROCESS_MANAGER.lock().unwrap_or_else(|e| e.into_inner());
@@ -427,7 +427,7 @@ pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Resu
             {
                 // macOS: auto-install helper, start sing-box via XPC. The helper
                 // owns the root process; no TauriCommand is produced.
-                tokio::task::spawn_blocking(crate::vpn::macos::ensure_helper_installed)
+                tokio::task::spawn_blocking(crate::engine::macos::ensure_helper_installed)
                     .await
                     .map_err(|e| format!("helper install join error: {}", e))?
                     .map_err(|e| format!("helper install failed: {}", e))?;
@@ -435,7 +435,7 @@ pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Resu
                 let app_c = app.clone();
                 let path_c = path.clone();
                 let _pid = tokio::task::spawn_blocking(move || {
-                    crate::vpn::macos::start_tun_via_helper(&app_c, &path_c)
+                    crate::engine::macos::start_tun_via_helper(&app_c, &path_c)
                 })
                 .await
                 .map_err(|e| format!("start_tun join error: {}", e))?
@@ -450,7 +450,7 @@ pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Resu
                 // override + sing-box start happen in a single pkexec call.
                 #[cfg(target_os = "linux")]
                 let dns_override_info: Option<(String, String)> = {
-                    match crate::vpn::linux::prepare_dns_override(&path) {
+                    match crate::engine::linux::prepare_dns_override(&path) {
                         Ok(info) => {
                             let mut mgr =
                                 PROCESS_MANAGER.lock().unwrap_or_else(|e| e.into_inner());
@@ -467,14 +467,14 @@ pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Resu
                 match helper::get_sidecar_path(Path::new("sing-box")) {
                     Ok(sidecar_path) => {
                         #[cfg(target_os = "linux")]
-                        let cmd = crate::vpn::linux::create_privileged_command(
+                        let cmd = crate::engine::linux::create_privileged_command(
                             &app,
                             sidecar_path,
                             path.clone(),
                             dns_override_info.as_ref(),
                         );
                         #[cfg(not(target_os = "linux"))]
-                        let cmd = PlatformVpnProxy::create_privileged_command(
+                        let cmd = PlatformEngine::create_privileged_command(
                             &app,
                             sidecar_path,
                             path.clone(),
@@ -525,7 +525,7 @@ pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Resu
     // feeds into handle_process_termination via the existing state machine.
     #[cfg(target_os = "macos")]
     if !is_system_proxy {
-        let mut exit_rx = crate::helper_client::subscribe_sing_box_exits();
+        let mut exit_rx = crate::engine::macos_helper::subscribe_sing_box_exits();
         let exit_app = app.clone();
         let exit_mode = Arc::new(mode.clone());
         tokio::spawn(async move {
@@ -589,9 +589,9 @@ pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Resu
 
     // 设置或取消系统代理
     let proxy_result = if is_system_proxy {
-        PlatformVpnProxy::set_proxy(&app).await
+        PlatformEngine::set_proxy(&app).await
     } else {
-        PlatformVpnProxy::unset_proxy(&app).await
+        PlatformEngine::unset_proxy(&app).await
     };
 
     if let Err(e) = proxy_result {
@@ -753,7 +753,7 @@ async fn handle_process_termination(
 
     // 清理系统代理设置
     if matches!(**process_mode, ProxyMode::SystemProxy) {
-        if let Err(e) = PlatformVpnProxy::unset_proxy(app_handle).await {
+        if let Err(e) = PlatformEngine::unset_proxy(app_handle).await {
             log::error!("Failed to unset proxy after process termination: {}", e);
         }
     }
@@ -770,7 +770,7 @@ async fn handle_process_termination(
             // macOS DNS restore goes through the privileged helper — no
             // password needed. Always callable, never "no password captured".
             log::info!("[dns] TUN process terminated — resetting all services to DHCP");
-            if let Err(e) = crate::vpn::macos::restore_system_dns() {
+            if let Err(e) = crate::engine::macos::restore_system_dns() {
                 log::warn!("[dns] fallback restore_system_dns failed: {}", e);
             }
         }
@@ -783,7 +783,7 @@ async fn handle_process_termination(
                     original_dns
                 );
                 if let Err(e) =
-                    crate::vpn::linux::restore_system_dns(&iface, &original_dns)
+                    crate::engine::linux::restore_system_dns(&iface, &original_dns)
                 {
                     log::warn!("[dns] fallback restore_system_dns failed: {}", e);
                 }
@@ -811,7 +811,7 @@ async fn handle_process_termination(
                 log::warn!(
                     "[dns] TUN process terminated unexpectedly — requesting UAC DNS restore"
                 );
-                if let Err(e) = crate::vpn::windows::restore_system_dns() {
+                if let Err(e) = crate::engine::windows::restore_system_dns() {
                     log::warn!("[dns] fallback restore_system_dns failed: {}", e);
                 }
             }
@@ -888,7 +888,7 @@ pub async fn stop(app: tauri::AppHandle) -> Result<(), String> {
     if let Some(mode) = mode {
         match mode.as_ref() {
             ProxyMode::SystemProxy => {
-                PlatformVpnProxy::unset_proxy(&app).await.ok();
+                PlatformEngine::unset_proxy(&app).await.ok();
 
                 #[cfg(unix)]
                 if let Some(child) = child {
@@ -918,7 +918,7 @@ pub async fn stop(app: tauri::AppHandle) -> Result<(), String> {
                 // macOS: helper-backed stop, no password needed.
                 #[cfg(target_os = "macos")]
                 {
-                    crate::vpn::macos::stop_tun_process().map_err(|e| {
+                    crate::engine::macos::stop_tun_process().map_err(|e| {
                         log::error!("Failed to stop TUN process: {}", e);
                         e
                     })?;
@@ -932,7 +932,7 @@ pub async fn stop(app: tauri::AppHandle) -> Result<(), String> {
                             PROCESS_MANAGER.lock().unwrap_or_else(|e| e.into_inner());
                         mgr.dns_override.clone()
                     };
-                    crate::vpn::linux::stop_tun_and_restore_dns(dns_info.as_ref())
+                    crate::engine::linux::stop_tun_and_restore_dns(dns_info.as_ref())
                         .map_err(|e| {
                             log::error!("Failed to stop TUN process: {}", e);
                             e
@@ -940,7 +940,7 @@ pub async fn stop(app: tauri::AppHandle) -> Result<(), String> {
                 }
                 #[cfg(target_os = "windows")]
                 {
-                    PlatformVpnProxy::stop_tun_process().map_err(|e| {
+                    PlatformEngine::stop_tun_process().map_err(|e| {
                         log::error!("Failed to stop TUN process: {}", e);
                         e
                     })?;
@@ -1058,11 +1058,11 @@ pub fn reapply_tun_dns_override_if_active() {
 
     log::info!("[dns] NetworkUp — re-applying TUN gateway DNS override");
     #[cfg(target_os = "macos")]
-    if let Err(e) = crate::vpn::macos::apply_system_dns_override(&config_path) {
+    if let Err(e) = crate::engine::macos::apply_system_dns_override(&config_path) {
         log::warn!("[dns] NetworkUp re-apply failed: {}", e);
     }
     #[cfg(target_os = "linux")]
-    match crate::vpn::linux::apply_system_dns_override(&config_path) {
+    match crate::engine::linux::apply_system_dns_override(&config_path) {
         Ok(override_info) => {
             let mut mgr = PROCESS_MANAGER.lock().unwrap_or_else(|e| e.into_inner());
             mgr.dns_override = Some(override_info);
@@ -1127,7 +1127,7 @@ pub async fn reload_config(app: tauri::AppHandle, is_tun: bool) -> Result<String
         // Non-TUN and non-macOS: direct pkill (sing-box runs as user).
         #[cfg(target_os = "macos")]
         if is_privileged {
-            tokio::task::spawn_blocking(crate::helper_client::api::reload_sing_box)
+            tokio::task::spawn_blocking(crate::engine::macos_helper::api::reload_sing_box)
                 .await
                 .map_err(|e| format!("reload join error: {}", e))?
                 .map_err(|e| format!("helper reload_sing_box failed: {}", e))?;
@@ -1150,7 +1150,7 @@ pub async fn reload_config(app: tauri::AppHandle, is_tun: bool) -> Result<String
             // Linux: sing-box runs as root (via pkexec). Route through the
             // polkit-authorized helper so no auth prompt is needed.
             let output = Command::new("pkexec")
-                .args([crate::vpn::linux::HELPER_PATH, "reload"])
+                .args([crate::engine::linux::HELPER_PATH, "reload"])
                 .output()
                 .map_err(|e| format!("Failed to send SIGHUP via helper: {}", e))?;
             if !output.status.success() {
@@ -1167,7 +1167,7 @@ pub async fn reload_config(app: tauri::AppHandle, is_tun: bool) -> Result<String
             tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
 
             // 重新设置系统代理，确保代理配置生效
-            if let Err(e) = PlatformVpnProxy::set_proxy(&app).await {
+            if let Err(e) = PlatformEngine::set_proxy(&app).await {
                 log::error!("Failed to reset system proxy after reload: {}", e);
                 return Err(format!("Config reloaded but failed to reset proxy: {}", e));
             }
@@ -1192,7 +1192,7 @@ pub async fn reload_config(app: tauri::AppHandle, is_tun: bool) -> Result<String
         let sidecar_path = helper::get_sidecar_path(Path::new("sing-box"))
             .map_err(|e| format!("Failed to get sidecar path: {}", e))?;
 
-        PlatformVpnProxy::restart(sidecar_path, config_path);
+        PlatformEngine::restart(sidecar_path, config_path);
         Ok("Configuration reload attempted by restarting process".to_string())
     }
 

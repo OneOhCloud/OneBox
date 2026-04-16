@@ -5,8 +5,8 @@ use tauri::AppHandle;
 use tauri_plugin_shell::process::Command as TauriCommand;
 use tauri_plugin_shell::ShellExt;
 
-use crate::vpn::helper::extract_tun_gateway_from_config;
-use crate::vpn::VpnProxy;
+use crate::engine::helper::extract_tun_gateway_from_config;
+use crate::engine::EngineManager;
 
 // 默认绕过列表
 pub static DEFAULT_BYPASS: &str =
@@ -253,10 +253,9 @@ pub fn restore_system_dns(iface: &str, original_dns: &str) -> Result<(), String>
     Ok(())
 }
 
-/// Linux platform VPN proxy implementation.
-pub struct LinuxVpnProxy;
+pub struct LinuxEngine;
 
-impl VpnProxy for LinuxVpnProxy {
+impl EngineManager for LinuxEngine {
     async fn set_proxy(_app: &AppHandle) -> anyhow::Result<()> {
         set_proxy(_app).await
     }

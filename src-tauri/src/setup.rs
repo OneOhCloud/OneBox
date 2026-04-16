@@ -15,7 +15,7 @@ pub fn app_setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>>
     }
 
     app.manage(crate::state::AppData::new());
-    app.manage(crate::vpn::state_machine::VpnStateCell::new());
+    app.manage(crate::engine::state_machine::VpnStateCell::new());
 
     // Purge must run before copy_database_files so the resource-bundled v2 defaults
     // are not clobbered by a later v1 cleanup pass.
@@ -266,18 +266,18 @@ pub(crate) fn spawn_lifecycle_listener(app_handle: &tauri::AppHandle) {
 
 #[cfg(any(target_os = "windows", target_os = "macos"))]
 fn handle_shutting_down(shutdown_handle: onebox_lifecycle::ShutdownHandle) {
-    use crate::vpn::unset_proxy_on_shutdown;
+    use crate::engine::cleanup_on_shutdown;
     log::info!("[lifecycle] received ShuttingDown event");
-    unset_proxy_on_shutdown();
+    cleanup_on_shutdown();
     shutdown_handle.allow();
     log::info!("[lifecycle] shutdown allowed");
 }
 
 #[cfg(any(target_os = "windows", target_os = "macos"))]
 fn handle_will_power_off() {
-    use crate::vpn::unset_proxy_on_shutdown;
+    use crate::engine::cleanup_on_shutdown;
     log::info!("[lifecycle] received WillPowerOff event");
-    unset_proxy_on_shutdown();
+    cleanup_on_shutdown();
     log::info!("System proxy unset on power off");
 }
 

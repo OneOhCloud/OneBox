@@ -4,16 +4,14 @@ use tauri_plugin_shell::process::Command as TauriCommand;
 pub const EVENT_TAURI_LOG: &str = "tauri-log";
 pub const EVENT_STATUS_CHANGED: &str = "status-changed";
 
-/// VPN代理操作的trait定义
+/// Platform-specific sing-box engine management trait.
 ///
-/// `async fn` in trait 不带 `Send` 边界,但本 trait 的所有实现都是平台特定 struct
-/// 上的 inherent fn 转发,调用方(core.rs)不会跨线程持有 Future。允许该警告。
+/// Each platform implements proxy setup/teardown and privileged TUN operations
+/// via its native mechanism (pkexec on Linux, XPC helper on macOS, SCM service
+/// on Windows).
 #[allow(async_fn_in_trait)]
-pub trait VpnProxy {
-    /// 设置系统代理
+pub trait EngineManager {
     async fn set_proxy(app: &AppHandle) -> anyhow::Result<()>;
-
-    /// 取消系统代理
     async fn unset_proxy(app: &AppHandle) -> anyhow::Result<()>;
 
     /// Build the platform-specific privileged command to start sing-box in TUN mode.
@@ -39,6 +37,8 @@ pub mod helper;
 pub mod linux;
 #[cfg(target_os = "macos")]
 pub mod macos;
+#[cfg(target_os = "macos")]
+pub mod macos_helper;
 pub mod readiness;
 pub mod state_machine;
 #[cfg(target_os = "windows")]
@@ -46,17 +46,16 @@ pub mod windows;
 #[cfg(target_os = "windows")]
 pub mod windows_native;
 
-// 平台适配器，使用编译时平台选择
 #[cfg(target_os = "linux")]
-pub use linux::LinuxVpnProxy as PlatformVpnProxy;
+pub use linux::LinuxEngine as PlatformEngine;
 #[cfg(target_os = "macos")]
-pub use macos::MacOSVpnProxy as PlatformVpnProxy;
+pub use macos::MacOSEngine as PlatformEngine;
 #[cfg(target_os = "windows")]
-pub use windows::WindowsVpnProxy as PlatformVpnProxy;
+pub use windows::WindowsEngine as PlatformEngine;
 
-pub fn unset_proxy_on_shutdown() {
+/// Clean up system proxy settings on app shutdown.
+pub fn cleanup_on_shutdown() {
     use onebox_sysproxy_rs::Sysproxy;
-    // 关机前先清理系统代理设置，避免下次开机网络
     let mut sysproxy = match Sysproxy::get_system_proxy() {
         Ok(proxy) => proxy,
         Err(e) => {
