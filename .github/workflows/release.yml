@@ -207,6 +207,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Copy artifacts from ${{ needs.resolve.outputs.copy_from_tag }} to ${{ needs.resolve.outputs.tag_name }}
+        timeout-minutes: 15
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           COPY_FROM_TAG: ${{ needs.resolve.outputs.copy_from_tag }}
@@ -214,6 +215,26 @@ jobs:
           RELEASE_NAME: ${{ needs.resolve.outputs.release_name }}
           PRERELEASE: ${{ needs.resolve.outputs.prerelease }}
         run: |
+          set -euo pipefail
+
+          # gh release upload/download occasionally hangs on GitHub's release
+          # API. Without a step timeout the job would sit for 6h (default).
+          # Retry each network call up to 3 times with exponential backoff.
+          retry() {
+            local max=$1; shift
+            local delay=5 n=1
+            until "$@"; do
+              if [ $n -ge $max ]; then
+                echo "::error::command failed after $n attempts: $*"
+                return 1
+              fi
+              echo "::warning::attempt $n/$max failed, retrying in ${delay}s..."
+              sleep "$delay"
+              delay=$((delay * 2))
+              n=$((n + 1))
+            done
+          }
+
           # Get upstream release body
           CHANGELOG=$(gh release view "$COPY_FROM_TAG" --json body -q '.body')
 
@@ -231,7 +252,7 @@ jobs:
 
           # Download and re-upload assets
           TEMP_DIR=$(mktemp -d)
-          gh release download "$COPY_FROM_TAG" --dir "$TEMP_DIR" --pattern '*' 2>/dev/null || true
+          retry 3 gh release download "$COPY_FROM_TAG" --dir "$TEMP_DIR" --pattern '*'
 
           FILE_COUNT=$(ls -1 "$TEMP_DIR" 2>/dev/null | wc -l)
           if [ "$FILE_COUNT" -gt 0 ]; then
@@ -241,7 +262,7 @@ jobs:
               echo "✅ Updated latest.json URLs to point to $TAG_NAME"
             fi
 
-            gh release upload "$TAG_NAME" "$TEMP_DIR"/* --clobber
+            retry 3 gh release upload "$TAG_NAME" "$TEMP_DIR"/* --clobber
             echo "✅ Copied $FILE_COUNT assets from $COPY_FROM_TAG to $TAG_NAME"
           else
             echo "::warning::No assets found in $COPY_FROM_TAG release"
