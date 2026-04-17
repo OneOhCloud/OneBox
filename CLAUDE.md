@@ -5,17 +5,19 @@
 **Table of contents**:
 
 1. **User-visible text** — UI copy, toasts, CHANGELOG; never say "订阅" / "subscription"
-2. **Reading third-party source** — clone upstream at the pinned version, don't rely on web search
-3. **Deep link bug triage** — log-first checklist (Rust saw it? hot/cold? parsed? timing?)
-4. **Logging discipline** — write logs anticipating triage (companion to §3)
-5. **Release workflow triggers** — one workflow, four channels, `make bump` only
-6. **GitHub CLI access** — `gh` is the preferred interface for this repo
-7. **Verifying Linux from a macOS host** — `make linux-check`; commits are not transport
-8. **Workflows that need my hands** — `scripts/tmp-*.sh` with manual gates + sanity checks
-9. **Design Philosophy** — principles driving DNS / template subsystems
-10. **Windows Platform Implementation Philosophy** — native Win32 over PowerShell
-11. **Step-by-step semantic analysis** — expand every verb in a sequence before inserting adjacent to it
-12. **Subsystem deep-dives** — DNS override, config templates, update argv suppression (in `docs/claude/`)
+2. **Hashed domain allowlist is a secret** — never write the pre-image in code, comments, docs, commits, or logs
+3. **Reading third-party source** — clone upstream at the pinned version, don't rely on web search
+4. **Deep link bug triage** — log-first checklist (Rust saw it? hot/cold? parsed? timing?)
+5. **Logging discipline** — write logs anticipating triage (companion to §4)
+6. **Release workflow triggers** — one workflow, four channels, `make bump` only
+7. **GitHub CLI access** — `gh` is the preferred interface for this repo
+8. **Test-first cadence** — write fn → write test → run local → pass → next; CI runs both layers
+9. **Verifying Linux from a macOS host** — `make linux-check`; commits are not transport
+10. **Workflows that need my hands** — `scripts/tmp-*.sh` with manual gates + sanity checks
+11. **Design Philosophy** — principles driving DNS / template subsystems
+12. **Windows Platform Implementation Philosophy** — native Win32 over PowerShell
+13. **Step-by-step semantic analysis** — expand every verb in a sequence before inserting adjacent to it
+14. **Subsystem deep-dives** — DNS override, config templates, update argv suppression (in `docs/claude/`)
 
 ### Meta-rule: when rules tension against each other
 
@@ -69,6 +71,35 @@ Why: it's a local config store, not a SaaS service — "subscription" misleads u
 
 Bad: `Fixed bypass-router mode where the Mixed inbound listened on 127.0.0.1, making LAN hosts unreachable`
 Good: `Fixed bypass-router mode not handling DNS and traffic from other devices on the LAN`
+
+## Hashed domain allowlist is a secret
+
+The compile-time hash lists (`KNOWN_HOST_SHA256_LIST` in
+`src-tauri/src/commands/whitelist.rs`, the mirror arrays in OneBoxRN's
+`profile-loader.ts` / `domain-verification.ts` / `BackgroundConfigWorker.kt` /
+`BackgroundConfigRefresh.swift`) are SHA256 digests **precisely because
+the pre-image must not be visible in source**. The digest is the full
+public surface; revealing which domain or suffix it corresponds to
+defeats the purpose.
+
+Rules:
+
+- Never write the plaintext domain/suffix in any comment, docstring,
+  variable name, test case, commit message, PR description, or log
+  line — whether in this repo or in OneBoxRN.
+- Never grep-test by echoing "sha256 of X is Y" in conversation or in
+  commit bodies; compute offline, paste only the hex.
+- CHANGELOG entries that add a new approved host must describe the
+  user-visible change ("expanded config import to additional servers")
+  without naming the host.
+- If you catch yourself writing a hint like `// sha256("example.com")`,
+  strip it. The hash already documents what it does — it approves some
+  subtree; which subtree is intentionally opaque from the code.
+
+Why: the hash allowlist is the only thing between an attacker with a
+OneBox build and the set of domains we trust enough to auto-apply. Any
+leak of the pre-image turns the hash check into a publicly-documented
+string comparison.
 
 ## Reading third-party source
 
@@ -194,6 +225,25 @@ gh issue view <n> --json title,body,comments
 No GitHub MCP server is installed on this host (only Gmail / Drive /
 Calendar MCPs are registered). `gh` covers every CI and repo-diagnostic
 need `gh api` can reach, and is the preferred interface for this repo.
+
+## Test-first cadence
+
+Project restatement of the global "Write-test-first cadence" rule in `~/.claude/CLAUDE.md` § Testing. Kept here because OneBox ships pure helpers in both Rust and TS (hostname-suffix verification, URL parsers, state reducers, config mergers) where the cost of a unit test is near-zero and the bug classes caught would otherwise only surface on a specific platform at runtime — exactly the bugs that are most expensive to debug after shipping.
+
+**Harnesses available in this repo:**
+
+| Layer | How to run locally | Where CI runs it |
+|---|---|---|
+| Rust (`src-tauri`) | `cargo test --manifest-path src-tauri/Cargo.toml --lib` | `.github/workflows/test.yml` → `rust` job |
+| Frontend (Vite + React) | `bun run test` (vitest) | `.github/workflows/test.yml` → `frontend` job |
+
+Both jobs run on every push and PR and block merges on red. When authoring a new test worth keeping, wire it into the matching layer so CI exercises it automatically on the next push; disposable `scripts/tmp-*.sh` harnesses stay disposable and get deleted in the same merge cycle.
+
+**Cadence**: write function → write test → run locally → pass → next step. Applies to all new pure helpers (parsers, decoders, hash glue, state transitions); skip is allowed for UI/view code with no business logic, but must be declared rather than silent.
+
+**Escape hatch**: when a function's effect is only observable via TCC prompts, system authorization dialogs, `/Applications`-installed signed builds, or live DNS state, raise it up per the global escape-hatch rule — ask whether to ship a `scripts/tmp-*.sh` manual-gate harness, defer to human review, or record the gap. Never claim "tested" when you only eyeballed the change.
+
+**End-of-session curation**: after the task is complete, list every new test and propose which belong in the permanent pipeline (`test.yml` vs. one-off `tmp-*.sh`). Wait for my explicit call before wiring anything new into shared CI.
 
 ## Verifying Linux from a macOS host: never commit just to transport
 

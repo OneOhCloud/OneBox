@@ -130,19 +130,34 @@ function App() {
   useEffect(() => {
     // 统一入口：从 Rust 拉取并消费 pending deep link（take() 保证幂等）
     const processPending = () => {
-      invoke<{ data: string; apply: boolean } | null>('get_pending_deep_link').then((payload) => {
+      invoke<{ data: string; apply: boolean } | null>('get_pending_deep_link').then(async (payload) => {
         if (!payload) return;
+        let decoded: string;
         try {
-          const decoded = atob(payload.data);
-          if (payload.apply) {
-            setActiveScreen('home');
-            setDeepLinkApplyUrl(decoded);
-          } else {
-            setDeepLinkUrl(decoded);
-            setActiveScreen('configuration');
-          }
+          decoded = atob(payload.data);
         } catch (e) {
           console.error('Failed to decode pending deep link:', e);
+          return;
+        }
+        // apply=1 只允许经过验证的域名生效；未验证域名回退到 apply=0
+        // 的行为（打开配置页，不自动应用）。验证失败时 Rust 端已记录
+        // warn 日志。
+        let apply = payload.apply;
+        if (apply) {
+          try {
+            const verified = await invoke<boolean>('verify_deep_link_url', { url: decoded });
+            if (!verified) apply = false;
+          } catch (e) {
+            console.warn('verify_deep_link_url failed, treating as unverified:', e);
+            apply = false;
+          }
+        }
+        if (apply) {
+          setActiveScreen('home');
+          setDeepLinkApplyUrl(decoded);
+        } else {
+          setDeepLinkUrl(decoded);
+          setActiveScreen('configuration');
         }
       });
     };

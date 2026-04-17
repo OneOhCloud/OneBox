@@ -52,6 +52,7 @@ pub fn run() {
             commands::network::check_captive_portal_status,
             commands::dns::get_optimal_local_dns_server,
             commands::config_fetch::fetch_config_with_optimal_dns,
+            commands::config_fetch::verify_deep_link_url,
             core::stop,
             core::start,
             core::is_running,

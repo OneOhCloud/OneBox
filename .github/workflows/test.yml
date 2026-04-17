@@ -8,7 +8,9 @@ permissions:
   contents: read
 
 jobs:
-  test:
+  # Frontend unit tests (vitest). Lightweight — no Rust toolchain, no
+  # Linux system deps. Runs in parallel with the cargo job below.
+  frontend:
     runs-on: ubuntu-latest
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -26,5 +28,39 @@ jobs:
       - name: Install Dependencies
         run: bun install
 
-      - name: Run Tests
+      - name: Run Frontend Tests
         run: bun run test
+
+  # Rust unit tests (cargo test) — compiles the tauri lib crate, so the
+  # same apt prereqs as a Linux release build are required to satisfy
+  # webkit2gtk / appindicator dependencies at link time.
+  rust:
+    runs-on: ubuntu-24.04
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Linux Dependencies
+        run: |
+          sudo apt update
+          sudo apt install libwebkit2gtk-4.1-dev \
+            build-essential \
+            curl \
+            wget \
+            file \
+            libxdo-dev \
+            libssl-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev
+
+      - name: Set Up Rust Toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+
+      - name: Run Rust Tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml --lib

@@ -13,9 +13,16 @@ use tauri_plugin_store::StoreExt;
 
 /// Compile-time known-good SHA256 list. Add entries here as hosts are
 /// approved in-tree; the remote list is the looser/faster path.
+///
+/// Each entry is the SHA256 of an approved suffix label (never the full
+/// hostname in plaintext). `config_fetch::verify_hostname` enumerates
+/// suffix candidates shortest-first and returns true on the first match,
+/// so broader entries approve broader subtrees. Never record the
+/// pre-image of any entry in this file, other source, or commit history.
 pub(crate) const KNOWN_HOST_SHA256_LIST: &[&str] = &[
     "183a5526e76751b07cd57236bc8f253d5424e02a3fc7da7c30f80919e975125a",
     "59fe86216c23236fb4c6ab50cd8d1e261b7cad754e3e7cab33058df5b32d12e1",
+    "61e245b4e5c234b00865ab0f47ad1cc4a9b37dbc50159febea7e6dcaee8ce050",
 ];
 
 const WHITELIST_REMOTE_URL: &str = "https://www.sing-box.net/verified_subscriptions_sha256.txt";
