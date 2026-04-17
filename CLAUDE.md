@@ -14,7 +14,8 @@
 8. **Workflows that need my hands** — `scripts/tmp-*.sh` with manual gates + sanity checks
 9. **Design Philosophy** — six principles driving DNS / template subsystems
 10. **Windows Platform Implementation Philosophy** — native Win32 over PowerShell
-11. **Subsystem deep-dives** — DNS override, config templates, update argv suppression (in `docs/claude/`)
+11. **Step-by-step semantic analysis** — expand every verb in a sequence before inserting adjacent to it
+12. **Subsystem deep-dives** — DNS override, config templates, update argv suppression (in `docs/claude/`)
 
 ### Meta-rule: when rules tension against each other
 
@@ -314,24 +315,50 @@ Build a small CLI binary that exposes each Win32 entry point as a subcommand, wi
 
 ---
 
+## Step-by-step semantic analysis for sequential code
+
+Cross-cuts every subsystem in this project. When inserting, reordering, or removing a step in a sequence (app startup, shutdown, lifecycle hooks, state transitions, request pipelines), **expand each verb into the concrete system-state change it causes** before deciding where the new step goes:
+
+- "stop the X process" → tears down a virtual NIC? releases a listening port? invalidates a cache?
+- "register the plugin" → appears in the plugin registry immediately, or on the next event-loop tick?
+- "probe Y" → what packet, from which process context, through which routing layer?
+
+Then verify the new step's semantic preconditions hold at its insertion point, and its postconditions stay valid for every subsequent step that depends on them.
+
+**Inability to expand a verb is a signal, not a speedbump.** Stop and read the code, or write a minimal probe. Do NOT route around the gap with "it probably works" or "I'll handle edge cases later".
+
+Where this has bitten in OneBox:
+
+- **TUN lifecycle** — see the probe-after-kill walkthrough in [`docs/claude/dns-override.md`](docs/claude/dns-override.md) § "Methodology reminder". The bug came from treating `stop_sing_box` as "stop a process" rather than "take down the virtual NIC that's still capturing this process's UDP probes".
+- **Deep-link registration timing** — `on_open_url` can fire before the plugin is fully registered; the Windows/Linux cold-start fallback in `app/setup.rs` exists because we expanded "plugin register" and found a race window.
+- **`app_setup` ordering** — deep links arriving before vs. after the webview is ready produce different failure modes; see the triage checklist § "Timing relative to app setup progress".
+
+Project-scoped restatement of the global `Step-by-step Semantic Analysis` rule in `~/.claude/CLAUDE.md`, kept here because OneBox's bugs cluster at sequence boundaries — always worth re-reading before editing a lifecycle path.
+
+---
+
 ## Subsystem deep-dives
 
-Three subsystems have their own design documents in [`docs/claude/`](docs/claude/). They are **not** loaded into the default CLAUDE.md context — read them on demand when working in the relevant code. Each is self-contained and linkable from PR descriptions.
+Three subsystems have their own design documents in [`docs/claude/`](docs/claude/). They are **not** loaded into the default CLAUDE.md context — you must fetch them explicitly.
+
+**Trigger to fetch a deep-dive**: (a) you are about to edit a file in that section's *Read before editing* list, or (b) the user's report describes behaviour that subsystem covers (DNS leaks / stale DNS after stop, template-cache drift between built-in and remote, deep-link re-imports after an update). When either triggers, Read the linked file *before* proposing a fix.
+
+Each deep-dive is self-contained and linkable from PR descriptions.
 
 ### DNS override flow → [`docs/claude/dns-override.md`](docs/claude/dns-override.md)
 
-System DNS is pointed at the TUN gateway IP on TUN start, because `mDNSResponder` / `systemd-resolved` / Windows `Dnscache` bind their upstream sockets directly to physical interfaces (`IP_BOUND_IF`, `SO_BINDTODEVICE`, SMHNR) and would otherwise bypass the route table entirely. Restore is **targeted on macOS/Linux** (reapply captured originals; macOS adds a UDP/53 probe + public-DNS fallback that must run *after* `stop_sing_box` so probes actually egress the physical NIC) and **scorched-earth on Windows** (blank `NameServer` on every non-TUN adapter). The deep-dive covers the `DNS_CAPTURED` invariants, the two-phase restore-before-kill-then-verify ordering on macOS, and everything the module deliberately does NOT do.
+**Read before editing**: `src-tauri/src/engine/macos/mod.rs`, `engine/linux/mod.rs`, `engine/windows/native.rs`, `commands/dns.rs`, `tun-service/src/dns.rs`, `core/monitor.rs::handle_process_termination`.
 
-Read before editing: `src-tauri/src/engine/macos/mod.rs`, `engine/linux/mod.rs`, `engine/windows/native.rs`, `commands/dns.rs`, `tun-service/src/dns.rs`, `core/monitor.rs::handle_process_termination`.
+System DNS is pointed at the TUN gateway IP on TUN start, because `mDNSResponder` / `systemd-resolved` / Windows `Dnscache` would otherwise bypass the route table via direct socket bindings. Restore is **targeted on macOS/Linux** (reapply captured originals) and **scorched-earth on Windows** (blank `NameServer` on every non-TUN adapter). **Trap** — macOS restore intentionally straddles `stop_sing_box`: the "obvious" all-before-kill ordering is wrong, and any edit to the TUN-stop sequence without reading the deep-dive will likely re-introduce the probe-after-kill bug. The deep-dive also covers the `DNS_CAPTURED` invariants, the verify-and-fallback pass, and everything the module deliberately does NOT do.
 
 ### Config template loading flow → [`docs/claude/config-template-loading.md`](docs/claude/config-template-loading.md)
 
-Templates come from one source of truth (`OneOhCloud/conf-template`); both the build-time snapshot (`src/config/templates/generated.ts`, produced by `scripts/sync-templates.ts` via the pre-build hook and an explicit CI step) and the SWR-refreshed runtime cache (`tauri-plugin-store`) are snapshots of that same upstream. The read path never blocks on network; the write path refreshes in the background. A schema-versioned cache key plus a scorched-earth legacy-purge at mount prevents poisoned caches from surviving a client upgrade.
+**Read before editing**: `scripts/sync-templates.ts`, `src/config/merger/*`, `src/config/templates/*`, `src/hooks/useSwr.ts`, `src/single/store.ts`, or when bumping sing-box version / the cache schema.
 
-Read before editing: `scripts/sync-templates.ts`, `src/config/merger/*`, `src/config/templates/*`, `src/hooks/useSwr.ts`, `src/single/store.ts`, or when bumping sing-box version / the cache schema.
+Templates come from one source of truth (`OneOhCloud/conf-template`); both the build-time snapshot (`src/config/templates/generated.ts`, produced by `scripts/sync-templates.ts` via the pre-build hook and an explicit CI step) and the SWR-refreshed runtime cache (`tauri-plugin-store`) are snapshots of that same upstream. The read path never blocks on network; the write path refreshes in the background. A schema-versioned cache key plus a scorched-earth legacy-purge at mount prevents poisoned caches from surviving a client upgrade.
 
 ### Update-driven relaunch: deep-link argv suppression → [`docs/claude/update-argv-suppression.md`](docs/claude/update-argv-suppression.md)
 
-`tauri-plugin-updater` on Windows/Linux forwards the process's argv to the newly-installed binary on relaunch. If the app was launched via `onebox-networktools://...`, the URL re-appears in argv and the deep-link plugin re-imports it on every update. Suppression uses a 5-minute timestamped marker in the settings store, with a closed write path and a TTL that must never be extended — both invariants, if broken, make the suppression silently wrong. macOS is unaffected (its deep links come through Cocoa `application:openURLs:`, not argv).
+**Read before editing**: `src-tauri/src/app/setup.rs` deep-link handling, `src/components/settings/updater*.tsx`, `src/utils/update.ts`.
 
-Read before editing: `src-tauri/src/app/setup.rs` deep-link handling, `src/components/settings/updater*.tsx`, `src/utils/update.ts`.
+`tauri-plugin-updater` on Windows/Linux forwards the process's argv to the newly-installed binary on relaunch. If the app was launched via `onebox-networktools://...`, the URL re-appears in argv and the deep-link plugin re-imports it on every update. Suppression uses a 5-minute timestamped marker in the settings store, with a closed write path and a TTL that must never be extended — both invariants, if broken, make the suppression silently wrong. macOS is unaffected (its deep links come through Cocoa `application:openURLs:`, not argv).
