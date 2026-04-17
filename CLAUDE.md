@@ -7,14 +7,15 @@
 1. **User-visible text** — UI copy, toasts, CHANGELOG; never say "订阅" / "subscription"
 2. **Reading third-party source** — clone upstream at the pinned version, don't rely on web search
 3. **Deep link bug triage** — log-first checklist (Rust saw it? hot/cold? parsed? timing?)
-4. **Release workflow triggers** — one workflow, four channels, `make bump` only
-5. **GitHub CLI access** — `gh` is the preferred interface for this repo
-6. **Verifying Linux from a macOS host** — `make linux-check`; commits are not transport
-7. **Workflows that need my hands** — `scripts/tmp-*.sh` with manual gates + sanity checks
-8. **Design Philosophy** — principles driving DNS / template subsystems
-9. **Windows Platform Implementation Philosophy** — native Win32 over PowerShell
-10. **Step-by-step semantic analysis** — expand every verb in a sequence before inserting adjacent to it
-11. **Subsystem deep-dives** — DNS override, config templates, update argv suppression (in `docs/claude/`)
+4. **Logging discipline** — write logs anticipating triage (companion to §3)
+5. **Release workflow triggers** — one workflow, four channels, `make bump` only
+6. **GitHub CLI access** — `gh` is the preferred interface for this repo
+7. **Verifying Linux from a macOS host** — `make linux-check`; commits are not transport
+8. **Workflows that need my hands** — `scripts/tmp-*.sh` with manual gates + sanity checks
+9. **Design Philosophy** — principles driving DNS / template subsystems
+10. **Windows Platform Implementation Philosophy** — native Win32 over PowerShell
+11. **Step-by-step semantic analysis** — expand every verb in a sequence before inserting adjacent to it
+12. **Subsystem deep-dives** — DNS override, config templates, update argv suppression (in `docs/claude/`)
 
 ### Meta-rule: when rules tension against each other
 
@@ -117,6 +118,46 @@ Triage checklist — run in order, stop at the first step that answers the quest
 5. **Timing relative to app setup progress.** Compare the deep-link timestamp to `Copying database files`, `User-Agent:`, and `captive.oneoh.cloud status:` — these mark `app_setup()` progress. A deep link arriving *before* the webview is ready is a different bug from one arriving after, and the fix lands in a different place.
 
 If the log doesn't contain the failure reproduction, **ask the user to reproduce and attach fresh logs** before speculating. The source has several plausible race windows; the log pins down which one actually fired.
+
+## Logging discipline: write logs anticipating triage
+
+The deep-link triage checklist above works because the logs carry **stable grep markers**. Every new subsystem that mutates runtime state (engine lifecycle, helpers, DNS, updates, deep links) must ship with the same property — not as a retrofit after someone reports a bug.
+
+This is the project-scoped restatement of the global `Logging Discipline` rule in `~/.claude/CLAUDE.md`. Kept here because OneBox's failure-triage workflow is almost entirely log-driven (GUI app, signed-build-only, TCC-gated helper — attaching a debugger is rarely an option), so every log-level mistake has an amplified cost.
+
+### Level discipline
+
+- `info!` — state transitions (something actually changed) and lifecycle heartbeats (thread spawned / run loop entered / watcher died). Anything a reader would list when asked "what did this subsystem do in the last minute?".
+- `debug!` — per-call preambles, hot-path **no-op branches**, value traces. Anything that fires on unrelated system twitches (DHCP renew, Bonjour update, Wi-Fi scan, cache invalidation). At info these turn the log into noise and bury real transitions.
+- `warn!` / `error!` — failures with actionable context (what failed, what input, what was expected).
+
+Concrete case that bit this project: the SCDynamicStore DNS watcher (`engine/macos/dns_watcher.rs`) fires on every external DNS twitch, including round-trips from our own writes. The first version put the "already set to gateway, nothing to do" branch in `reapply_on_active_primary` at info — one external write produced 9–13 info lines, drowning the 3 that actually recorded the state change. Demoted to debug; the round-trip is now detectable only when the log level is raised.
+
+### Stable `[subsystem]` prefix
+
+Every log line carries a short, stable prefix so triage reduces to a pipeline of `grep` commands. Currently in use (not exhaustive — run `grep -Eo '\[[a-z-]+\]' OneBox.log | sort -u` to enumerate):
+
+- `[engine-state]` — lifecycle state machine transitions, with `epoch=N`.
+- `[dns]` / `[dns-watch]` — DNS override state machine and SCDynamicStore watcher.
+- `[helper]` / `[helper-bridge]` — macOS privileged XPC helper install / ping / exit bridging.
+- `[network]` — lifecycle NetworkUp / NetworkDown + debounced engine restart.
+- `[reload]` — config reload (SIGHUP + DNS cache flush).
+- `[dns] phase 1` / `[dns] phase 2` — the two restore phases straddling `stop_sing_box` (see `docs/claude/dns-override.md`).
+
+New subsystems pick one short, stable prefix and stick with it. Renaming silently invalidates every playbook / deep-dive / triage checklist that greps for it, including this file and `docs/claude/*.md`.
+
+### The heartbeat exception
+
+A log line that prints on every event even when nothing changed is redundant by construction — **unless** it's the only external evidence the subsystem is alive. OneBox keeps `[dns-watch] change event` at info for exactly that reason: a silent watcher thread that exits `CFRunLoop::run_current` unexpectedly would otherwise be undetectable until DNS drifts and a user complains. Accept low-level info redundancy in exchange for observability — it's cheaper than a periodic timer-based heartbeat.
+
+### Ship-day checklist
+
+Before merging a new subsystem that writes a log line:
+
+1. List the plausible failure modes (never fires / fires but wrong branch / silently dies / races another subsystem).
+2. Write the `grep` recipe that distinguishes each from the others. Example: *"watcher dead"* → `grep '\[dns-watch\] CFRunLoop exited'`; *"watcher alive but decision wrong"* → `grep '\[dns-watch\] change event'` followed by checking for a subsequent `[dns] apply: (fresh|external write detected|primary switched)`.
+3. If any failure mode has no distinguishing marker, add one before merging.
+4. Put the recipe table in the subsystem's deep-dive (`docs/claude/<name>.md`) alongside the code references. Commit messages rot; `docs/claude/*.md` is the durable home.
 
 ## Release workflow triggers
 

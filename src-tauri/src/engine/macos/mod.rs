@@ -1,3 +1,4 @@
+pub mod dns_watcher;
 pub mod helper;
 pub(crate) mod watchdog;
 
@@ -12,41 +13,63 @@ use tauri_plugin_store::StoreExt;
 pub const TUN_INTERFACE_NAME: &str = "utun233";
 
 // ----------------------------------------------------------------------------
-// DNS capture stash
+// Active-primary DNS override slot
 //
-// Every network service we override gets its pre-override DNS recorded here.
-// `apply_system_dns_override` appends on first touch; it never overwrites an
-// existing entry, so a second apply on the same service (e.g. NetworkUp
-// re-trigger after we already wrote the TUN gateway) doesn't clobber the real
-// original with our own gateway IP. On stop/crash the stash is drained and
-// each captured entry is written back.
+// OneBox only cares about the currently active (primary) network service —
+// non-primary services' DNS is irrelevant to the leak surface because the OS
+// resolver binds to the primary. This slot holds at most one entry:
 //
-// Value format: `"empty"` if the service had no DNS set (DHCP default), or
-// a space-separated list of IPv4/IPv6 addresses.
+//   service   display name ("Wi-Fi", "Ethernet", ...)
+//   captured  pre-override DNS ("empty" for DHCP default, or space-joined IPs).
+//             Updated live by dns_watcher whenever an external party (user via
+//             System Settings / networksetup, another VPN, MDM) rewrites DNS
+//             on this service during TUN — so restore always uses the user's
+//             most recent intent, not a frozen TUN-start snapshot.
+//   gateway   the TUN gateway IP we're writing. Stored here so the watcher
+//             can re-apply without re-reading the sing-box config.
+//
+// State transitions (driven by `apply_system_dns_override`):
+//   None                                           — TUN inactive
+//   None         → Some{svc_A, captured_A, gw}     — TUN start on primary A
+//   Some{A,...}  → Some{svc_B, captured_B, gw}     — primary switched A → B;
+//                                                    A gets its captured_A
+//                                                    written back before B is
+//                                                    captured.
+//   Some{A,...}  → Some{A, captured', gw}          — external DNS write on A;
+//                                                    captured' = new value,
+//                                                    re-override to gw.
+//   Some{A,...}  → None                            — TUN stop; A gets its
+//                                                    captured_A written back.
 // ----------------------------------------------------------------------------
-static DNS_CAPTURED: Mutex<Vec<(String, String)>> = Mutex::new(Vec::new());
-
-fn capture_if_new(service: &str, original: String) {
-    let mut stash = DNS_CAPTURED.lock().unwrap_or_else(|e| e.into_inner());
-    if let Some((_, prev)) = stash.iter().find(|(s, _)| s == service) {
-        log::info!(
-            "[dns] capture skip [{}] — already stashed as '{}' (ignoring new read '{}')",
-            service,
-            prev,
-            original
-        );
-        return;
-    }
-    log::info!("[dns] capture new [{}] original='{}'", service, original);
-    stash.push((service.to_string(), original));
-    log::info!("[dns] stash size now {}", stash.len());
+#[derive(Clone, Debug)]
+pub(crate) struct ActiveOverride {
+    pub service: String,
+    pub captured: String,
+    pub gateway: String,
 }
 
-fn take_all_captured() -> Vec<(String, String)> {
-    let mut stash = DNS_CAPTURED.lock().unwrap_or_else(|e| e.into_inner());
-    let drained = std::mem::take(&mut *stash);
-    log::info!("[dns] drain stash: {} service(s)", drained.len());
-    drained
+static ACTIVE_OVERRIDE: Mutex<Option<ActiveOverride>> = Mutex::new(None);
+
+pub(crate) fn active_override_snapshot() -> Option<ActiveOverride> {
+    ACTIVE_OVERRIDE
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .clone()
+}
+
+fn take_active_override() -> Option<ActiveOverride> {
+    let mut slot = ACTIVE_OVERRIDE.lock().unwrap_or_else(|e| e.into_inner());
+    let taken = slot.take();
+    if let Some(ref a) = taken {
+        log::info!(
+            "[dns] drain slot: service='{}' captured='{}'",
+            a.service,
+            a.captured
+        );
+    } else {
+        log::info!("[dns] drain slot: empty");
+    }
+    taken
 }
 
 // ============================================================================
@@ -93,6 +116,11 @@ pub fn start_tun_via_helper(app: &AppHandle, config_path: &str) -> Result<i32, S
         log::warn!("[dns] apply_system_dns_override failed: {}", e);
     }
 
+    // Start the SCDynamicStore watcher once per app lifetime. It's a no-op
+    // when ACTIVE_OVERRIDE is None, so it's safe to leave running after TUN
+    // stops. See `dns_watcher` for the callback contract.
+    dns_watcher::ensure_started();
+
     let pid = macos_helper::api::start_sing_box(config_path)?;
     log::info!("[helper] sing-box started, pid={}", pid);
     Ok(pid)
@@ -113,8 +141,8 @@ pub fn start_tun_via_helper(app: &AppHandle, config_path: &str) -> Result<i32, S
 ///      the fallback never fires.
 pub async fn stop_tun_process() -> Result<(), String> {
     log::info!("[dns] user-stop: beginning DNS restore sequence");
-    let captured = take_all_captured();
-    let applied = apply_captured_originals_sync(&captured);
+    let taken = take_active_override();
+    let applied = apply_captured_originals_sync(taken.as_ref());
 
     log::info!("[helper] sending SIGTERM to sing-box");
     macos_helper::api::stop_sing_box()?;
@@ -132,7 +160,7 @@ pub async fn stop_tun_process() -> Result<(), String> {
         log::info!("[helper] TUN routes removed on {}", TUN_INTERFACE_NAME);
     }
 
-    verify_and_fallback(&applied).await;
+    verify_and_fallback(applied.as_ref()).await;
 
     macos_helper::api::flush_dns_cache().ok();
     log::info!("[dns] user-stop: restore sequence complete");
@@ -211,59 +239,166 @@ fn read_service_dns(service: &str) -> String {
     }
 }
 
-/// Point system DNS at the TUN gateway. Detect the currently active network
-/// service, capture its pre-override DNS (first touch only), apply via the
-/// privileged helper, flush cache.
+/// Point system DNS at the TUN gateway. The single entry point that drives
+/// the ACTIVE_OVERRIDE state machine; safe to call repeatedly from TUN start,
+/// the NetworkUp lifecycle event, and the dns_watcher callback.
+///
+/// Handles three transitions:
+/// 1. slot None, no primary detected — no-op.
+/// 2. slot None, or slot.service differs from the newly-detected primary —
+///    restore the old service's captured value (if any), then capture the new
+///    service's current DNS and override it.
+/// 3. slot.service matches the new primary and current DNS != gateway —
+///    update slot.captured to the observed value (user's latest intent) and
+///    re-override to the gateway.
 pub fn apply_system_dns_override(config_path: &str) -> Result<(), String> {
     let gateway = extract_tun_gateway_from_config(config_path)
         .ok_or_else(|| format!("could not extract TUN gateway from {}", config_path))?;
-    let service = detect_active_network_service()?;
-
-    // Capture the service's current DNS before we overwrite it. If we've
-    // already touched this service (re-apply after NetworkUp), skip so the
-    // stash keeps the true original instead of our own gateway IP.
-    let original = read_service_dns(&service);
-    log::info!("[dns] read [{}] current DNS = '{}'", service, original);
-    capture_if_new(&service, original.clone());
-    log::info!("[dns] override [{}] → {}", service, gateway);
-    macos_helper::api::set_dns_servers(&service, &gateway)?;
-    macos_helper::api::flush_dns_cache().ok();
-    log::info!("[dns] override applied + cache flushed for [{}]", service);
-    Ok(())
+    reapply_on_active_primary(&gateway)
 }
 
-/// Write captured originals back, synchronously. Returns the subset that
-/// the helper accepted — those are the entries eligible for the post-kill
-/// verify pass.
+/// Same logic as `apply_system_dns_override` but with the gateway IP already
+/// known. Called from dns_watcher when a change event fires; the gateway
+/// lives in the slot so the watcher doesn't need the sing-box config path.
+pub(crate) fn reapply_on_active_primary(gateway: &str) -> Result<(), String> {
+    let new_service = detect_active_network_service()?;
+    let current = read_service_dns(&new_service);
+    // Per-call preamble is debug: it fires on every watcher callback, most of
+    // which round-trip our own writes and end in the no-op branch. Log readers
+    // diagnosing an issue can raise the log level; the interesting-branch info
+    // lines below carry the same service/value context.
+    log::debug!(
+        "[dns] apply: active='{}' current='{}' target='{}'",
+        new_service,
+        current,
+        gateway
+    );
+
+    let mut slot = ACTIVE_OVERRIDE.lock().unwrap_or_else(|e| e.into_inner());
+    match slot.as_ref() {
+        Some(prev) if prev.service == new_service => {
+            if current == gateway {
+                // Hot path: our own write just round-tripped through
+                // SCDynamicStore. Debug-only so it doesn't drown the
+                // interesting transitions.
+                log::debug!(
+                    "[dns] apply: [{}] already set to gateway, nothing to do",
+                    new_service
+                );
+                return Ok(());
+            }
+            // External write on our current primary. Treat the observed
+            // value as the user's latest intent — restore will honour it
+            // when TUN stops.
+            log::info!(
+                "[dns] apply: external write detected on [{}] (was captured='{}' → now '{}'), updating captured",
+                new_service,
+                prev.captured,
+                current
+            );
+            let mut updated = prev.clone();
+            updated.captured = current;
+            updated.gateway = gateway.to_string();
+            *slot = Some(updated);
+            drop(slot); // release lock before syscalls
+            macos_helper::api::set_dns_servers(&new_service, gateway)?;
+            macos_helper::api::flush_dns_cache().ok();
+            log::info!("[dns] apply: re-override [{}] → {}", new_service, gateway);
+            Ok(())
+        }
+        Some(prev) => {
+            // Primary switched (e.g. Wi-Fi → Ethernet). Write the previous
+            // service's captured value back before we touch the new one, so
+            // the user's DNS on the now-idle interface is preserved exactly
+            // as they had it before TUN took over.
+            log::info!(
+                "[dns] apply: primary switched '{}' → '{}', restoring old service first",
+                prev.service,
+                new_service
+            );
+            let prev_snap = prev.clone();
+            drop(slot);
+            if let Err(e) = macos_helper::api::set_dns_servers(&prev_snap.service, &prev_snap.captured) {
+                log::warn!(
+                    "[dns] apply: restore old [{}] → '{}' failed: {}",
+                    prev_snap.service,
+                    prev_snap.captured,
+                    e
+                );
+            } else {
+                log::info!(
+                    "[dns] apply: restored old [{}] → '{}'",
+                    prev_snap.service,
+                    prev_snap.captured
+                );
+            }
+
+            // Capture new service's current DNS (or the user's latest
+            // intent), override, record slot.
+            log::info!(
+                "[dns] apply: capture new [{}] original='{}'",
+                new_service,
+                current
+            );
+            macos_helper::api::set_dns_servers(&new_service, gateway)?;
+            macos_helper::api::flush_dns_cache().ok();
+            let mut slot = ACTIVE_OVERRIDE.lock().unwrap_or_else(|e| e.into_inner());
+            *slot = Some(ActiveOverride {
+                service: new_service.clone(),
+                captured: current,
+                gateway: gateway.to_string(),
+            });
+            log::info!("[dns] apply: override [{}] → {}", new_service, gateway);
+            Ok(())
+        }
+        None => {
+            // Fresh TUN start. Capture, override, record.
+            log::info!(
+                "[dns] apply: fresh override, capture [{}] original='{}'",
+                new_service,
+                current
+            );
+            macos_helper::api::set_dns_servers(&new_service, gateway)?;
+            macos_helper::api::flush_dns_cache().ok();
+            *slot = Some(ActiveOverride {
+                service: new_service.clone(),
+                captured: current,
+                gateway: gateway.to_string(),
+            });
+            log::info!("[dns] apply: override [{}] → {}", new_service, gateway);
+            Ok(())
+        }
+    }
+}
+
+/// Write the slot's captured value back, synchronously. Returns the
+/// (service, captured) pair when the helper accepted the write — that's the
+/// entry eligible for the post-kill verify pass.
 ///
 /// Must run **before** sing-box is killed so the physical NIC default
 /// route never briefly inherits the stale `172.19.0.1` gateway IP that
 /// becomes unreachable the moment TUN tears down.
-fn apply_captured_originals_sync(captured: &[(String, String)]) -> Vec<(String, String)> {
-    if captured.is_empty() {
-        log::info!("[dns] phase 1 (pre-kill write): stash empty, skipping");
-        return Vec::new();
-    }
+fn apply_captured_originals_sync(taken: Option<&ActiveOverride>) -> Option<(String, String)> {
+    let Some(active) = taken else {
+        log::info!("[dns] phase 1 (pre-kill write): slot empty, skipping");
+        return None;
+    };
     log::info!(
-        "[dns] phase 1 (pre-kill write): restoring {} service(s)",
-        captured.len()
+        "[dns] phase 1 (pre-kill write): restoring [{}] → '{}'",
+        active.service,
+        active.captured
     );
-    let mut applied = Vec::with_capacity(captured.len());
-    for (service, original) in captured {
-        log::info!("[dns] phase 1 → [{}] write '{}'", service, original);
-        if let Err(e) = macos_helper::api::set_dns_servers(service, original) {
-            log::warn!("[dns] phase 1 [{}] write failed: {}", service, e);
-            continue;
-        }
-        applied.push((service.clone(), original.clone()));
+    if let Err(e) = macos_helper::api::set_dns_servers(&active.service, &active.captured) {
+        log::warn!(
+            "[dns] phase 1 [{}] write failed: {}",
+            active.service,
+            e
+        );
+        return None;
     }
     macos_helper::api::flush_dns_cache().ok();
-    log::info!(
-        "[dns] phase 1 done: {}/{} service(s) written, cache flushed",
-        applied.len(),
-        captured.len()
-    );
-    applied
+    log::info!("[dns] phase 1 done, cache flushed");
+    Some((active.service.clone(), active.captured.clone()))
 }
 
 /// Probe each restored DNS server on UDP/53. If **none** of a service's
@@ -272,64 +407,64 @@ fn apply_captured_originals_sync(captured: &[(String, String)]) -> Vec<(String, 
 /// disappeared). Must only run AFTER sing-box has exited and TUN has been
 /// removed — otherwise every probe is routed through TUN → proxy and all
 /// servers look reachable, producing bogus "everything's fine" results.
-async fn verify_and_fallback(applied: &[(String, String)]) {
-    if applied.is_empty() {
+async fn verify_and_fallback(applied: Option<&(String, String)>) {
+    let Some((service, original)) = applied else {
         log::info!("[dns] phase 2 (post-kill verify): nothing to verify, skipping");
         return;
-    }
+    };
     log::info!(
-        "[dns] phase 2 (post-kill verify): probing {} service(s)",
-        applied.len()
+        "[dns] phase 2 (post-kill verify): probing [{}] '{}'",
+        service,
+        original
     );
-    for (service, original) in applied {
-        if original == "empty" {
-            // Back to DHCP defaults — there's no single IP to probe; trust
-            // whatever DHCP hands out.
-            log::info!("[dns] phase 2 [{}] kept DHCP default (no probe)", service);
-            continue;
+    if original == "empty" {
+        // Back to DHCP defaults — there's no single IP to probe; trust
+        // whatever DHCP hands out.
+        log::info!("[dns] phase 2 [{}] kept DHCP default (no probe)", service);
+        return;
+    }
+    let mut alive_ip: Option<String> = None;
+    for ip in original.split_whitespace() {
+        log::info!("[dns] phase 2 probe [{}] → {} ...", service, ip);
+        if crate::commands::dns::probe_dns_reachable(ip).await {
+            alive_ip = Some(ip.to_string());
+            break;
         }
-        let mut alive_ip: Option<String> = None;
-        for ip in original.split_whitespace() {
-            log::info!("[dns] phase 2 probe [{}] → {} ...", service, ip);
-            if crate::commands::dns::probe_dns_reachable(ip).await {
-                alive_ip = Some(ip.to_string());
-                break;
-            }
-        }
-        if let Some(ip) = alive_ip {
-            log::info!(
-                "[dns] phase 2 [{}] {} alive, keeping original '{}'",
-                service,
-                ip,
-                original
-            );
-            continue;
-        }
-        log::warn!(
-            "[dns] phase 2 [{}] all of '{}' unreachable — racing public resolvers",
+    }
+    if let Some(ip) = alive_ip {
+        log::info!(
+            "[dns] phase 2 [{}] {} alive, keeping original '{}'",
             service,
+            ip,
             original
         );
-        match crate::commands::dns::get_best_dns_server().await {
-            Some(best) => {
-                log::info!("[dns] phase 2 [{}] best public DNS = {}", service, best);
-                if let Err(e) = macos_helper::api::set_dns_servers(service, &best) {
-                    log::warn!(
-                        "[dns] phase 2 fallback write [{}] → {} failed: {}",
-                        service,
-                        best,
-                        e
-                    );
-                } else {
-                    log::info!("[dns] phase 2 [{}] fell back to {}", service, best);
-                }
-            }
-            None => {
+        macos_helper::api::flush_dns_cache().ok();
+        return;
+    }
+    log::warn!(
+        "[dns] phase 2 [{}] all of '{}' unreachable — racing public resolvers",
+        service,
+        original
+    );
+    match crate::commands::dns::get_best_dns_server().await {
+        Some(best) => {
+            log::info!("[dns] phase 2 [{}] best public DNS = {}", service, best);
+            if let Err(e) = macos_helper::api::set_dns_servers(service, &best) {
                 log::warn!(
-                    "[dns] phase 2 [{}] get_best_dns_server returned None; leaving as-is",
-                    service
+                    "[dns] phase 2 fallback write [{}] → {} failed: {}",
+                    service,
+                    best,
+                    e
                 );
+            } else {
+                log::info!("[dns] phase 2 [{}] fell back to {}", service, best);
             }
+        }
+        None => {
+            log::warn!(
+                "[dns] phase 2 [{}] get_best_dns_server returned None; leaving as-is",
+                service
+            );
         }
     }
     macos_helper::api::flush_dns_cache().ok();
@@ -346,9 +481,9 @@ async fn verify_and_fallback(applied: &[(String, String)]) {
 /// (e.g. Ethernet while TUN ran over Wi-Fi) is preserved.
 pub async fn restore_system_dns() -> Result<(), String> {
     log::info!("[dns] crash-path restore: sing-box already exited, running write + verify");
-    let captured = take_all_captured();
-    let applied = apply_captured_originals_sync(&captured);
-    verify_and_fallback(&applied).await;
+    let taken = take_active_override();
+    let applied = apply_captured_originals_sync(taken.as_ref());
+    verify_and_fallback(applied.as_ref()).await;
     log::info!("[dns] crash-path restore: complete");
     Ok(())
 }
@@ -526,10 +661,10 @@ impl EngineManager for MacOSEngine {
         // check would eventually notice TUN is gone, but only after the
         // next 4h sleep, which is too slow.
         watchdog::cancel();
-        log::info!("[dns] TUN process terminated — restoring captured originals");
-        // Async restore runs fire-and-forget. take_all_captured drains the
-        // stash so if the user-stop path already consumed it, this lands as
-        // a harmless no-op (captured list empty → early return).
+        log::info!("[dns] TUN process terminated — restoring captured original");
+        // Async restore runs fire-and-forget. take_active_override drains
+        // the slot so if the user-stop path already consumed it, this lands
+        // as a harmless no-op (slot None → early return).
         tauri::async_runtime::spawn(async {
             if let Err(e) = restore_system_dns().await {
                 log::warn!("[dns] fallback restore_system_dns failed: {}", e);

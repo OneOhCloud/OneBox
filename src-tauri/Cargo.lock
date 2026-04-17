@@ -3427,6 +3427,7 @@ version = "1.0.0"
 dependencies = [
  "anyhow",
  "cc",
+ "core-foundation 0.9.4",
  "env_logger",
  "filetime",
  "flate2",
@@ -3442,6 +3443,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
+ "system-configuration",
  "tauri",
  "tauri-build",
  "tauri-plugin-autostart",
