@@ -50,28 +50,17 @@ Meta-rule: **whenever the user will read the string, use the shortest product-ac
 
 ### Never say "subscription" / "订阅"
 
-All user-facing copy — i18n values, toast text, placeholders, labels,
-button captions, aria-labels, fallback names shown in a list — must use
-**"配置"** (Chinese) and **"Config"** (English) when referring to the
-user's saved server configurations. Avoid every variant of:
+Use **"配置"** (Chinese) and **"Config"** (English) when referring to the user's saved server configurations. Avoid every variant of:
 
 - `订阅` / `订阅管理` / `订阅列表` / `订阅链接` / `订阅文件`
 - `配置文件` (use the shorter `配置` instead)
 - `subscription` / `subscriptions` / `Subscription(s)`
 
-Rule of thumb: shortest possible term wins. `配置` (2 chars) beats
-`配置文件` (4 chars) beats `订阅配置` (4 chars). English: `Config`
-beats `Configuration` beats `Subscription`.
+Shortest possible term wins: `配置` (2 chars) beats `配置文件` (4 chars) beats `订阅配置` (4 chars). English: `Config` beats `Configuration` beats `Subscription`.
 
-Why: the product is a local config store for sing-box server profiles,
-not a SaaS subscription service. The word "subscription" misleads new
-users into expecting billing / renewal / account flows that don't
-exist. Calling it a `配置` / `Config` tells users what it actually is.
+Why: it's a local config store, not a SaaS service — "subscription" misleads users into expecting billing / account flows that don't exist.
 
-This only governs **display text**. Code identifiers can keep legacy
-names (`addSubscription`, `GET_SUBSCRIPTIONS_LIST_SWR_KEY`, i18n
-keys like `add_subscription`) to avoid a disruptive rename. Values
-the user reads on screen must use the new vocabulary.
+**Boundary**: this only governs **display text**. Code identifiers (`addSubscription`, `GET_SUBSCRIPTIONS_LIST_SWR_KEY`, i18n keys like `add_subscription`) keep legacy names to avoid a disruptive rename.
 
 ### CHANGELOG entries
 
@@ -281,25 +270,24 @@ it, pauses again for me to click Ping, then scrapes the unified log for
 
 ## Design Philosophy
 
-These principles drive the template-cache and DNS-override subsystems (see "Subsystem deep-dives" below). Apply them to new code that touches system state or long-lived caches.
+These principles drive the template-cache and DNS-override subsystems. Apply them to new code that touches system state or long-lived caches.
+
+**Overarching trade-off** — *accept small edge-case data loss for crash-safety and simplicity.*
+A scorched-earth purge might delete a fringe store key or reset a Windows adapter OneBox didn't care about — these are acceptable. What is **not** acceptable: leaving the system in a half-applied state because replay logic couldn't unwind it correctly. macOS DNS restore is the documented exception — it tracks per-service originals because user complaints about losing manual DNS outweighed scorched-earth's simplicity *in that specific case*. That exception's shape (a concrete user-visible harm, not abstract elegance) is the template all future exceptions should follow.
 
 **1. State belongs to ground truth, not to our code that manipulates it.**
 If the OS / filesystem / store already holds the canonical state, don't shadow it with a snapshot. We are thin orchestrators of system-native operations, not state managers.
 
 **2. Operations are idempotent — no guards, no "only call if needed" checks.**
-Every mutation can be run repeatedly without harm. This means callers never have to track "did I already do X?", and crash-recovery paths can call the operation unconditionally.
+Every mutation can be run repeatedly without harm. Callers never track "did I already do X?"; crash-recovery paths call operations unconditionally.
 
-**3. Cleanup is targeted on macOS/Linux, scorched-earth on Windows.**
-macOS and Linux capture the touched service/interface's pre-override DNS and re-apply it on stop — any service we never touched is left alone. Windows enumerates all non-TUN adapters and blanks their `NameServer` registry value to DHCP default. The split exists because Windows' per-adapter stateful registry primitive makes targeted restore expensive, while macOS/Linux have cheap per-service/iface restore primitives. (See [`docs/claude/dns-override.md`](docs/claude/dns-override.md)'s "What we deliberately DON'T do" section for the macOS-specific history of *why* it's no longer scorched-earth on that platform.)
+**3. Reads and writes are decoupled. Stale reads are allowed.**
+The read path is fast, local, never blocks on network. The write path refreshes in the background. The two don't synchronize — reads may return old data while writes are mid-flight, and that's fine.
 
-**4. Reads and writes are decoupled. Stale reads are allowed.**
-The read path is fast, local, never blocks on network. The write path refreshes in the background. The two paths don't synchronize — the read may return old data while a write is mid-flight, and that's fine.
-
-**5. System-native semantics > reinvented state.**
+**4. System-native semantics > reinvented state.**
 Each platform has its own "revert to default" primitive (macOS `networksetup empty`, Linux `resolvectl revert`, Windows `-ResetServerAddresses`, `store.delete`). Use them. Don't re-implement their effect with our own snapshot/replay logic.
 
-**6. Trade-off bias: accept small edge-case data loss for crash-safety and simplicity.**
-A scorched-earth purge might delete a fringe store key or reset a Windows adapter OneBox didn't care about. These are acceptable. What is *not* acceptable: leaving the system in a half-applied state because our replay logic couldn't unwind it correctly. Note: macOS DNS restore *does* track per-service originals because user-facing complaints about losing manual DNS outweighed the simplicity of scorched-earth. Windows keeps the scorched-earth default because the stateful-registry alternative is complex and Windows users rarely hand-configure DNS on secondary adapters.
+**Corollary of #1 + #4** — cross-platform cleanup shape follows the native primitive. Targeted where per-unit revert is cheap (macOS/Linux DNS: reapply captured originals). Scorched-earth where state tracking would be expensive (Windows per-adapter `HKLM\...\NameServer`: blank the whole category and let DHCP repopulate). See [`docs/claude/dns-override.md`](docs/claude/dns-override.md) § "What we deliberately DON'T do" for the macOS-specific history of *why* it's no longer scorched-earth on that platform.
 
 **One-liner**: *Tell the system to start and stop; let the system decide what "stopped" means.*
 
