@@ -1,26 +1,43 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { getStoreValue, setStoreValue } from "../../single/store";
 import { SSI_STORE_KEY, Subscription } from "../../types/definition";
 import { t } from "../../utils/helper";
+import {
+    AppleSelectMenu,
+    AppleSelectOption,
+    AppleSelectPlaceholder,
+} from "./apple-select-menu";
 
 type SubscriptionProps = {
     data: Subscription[] | undefined;
     isLoading: boolean;
     onUpdate: (identifier: string, isUpdate: boolean) => void;
+};
+
+const LOCAL_FILE_SENTINEL = 32503680000000;
+
+function formatExpireHint(expire: number): string | null {
+    if (expire === LOCAL_FILE_SENTINEL) {
+        return t("local_file_no_expire");
+    }
+    try {
+        return `${t("expired_at")} ${new Date(expire).toLocaleDateString("zh-CN")}`;
+    } catch {
+        return null;
+    }
 }
 
 export default function SelectSub({ data, isLoading, onUpdate }: SubscriptionProps) {
-    const [selected, setSelected] = useState<string>('');
+    const [selected, setSelected] = useState<string>("");
 
     useEffect(() => {
         const syncDisplay = async () => {
             if (!data?.length) return;
             const savedId = await getStoreValue(SSI_STORE_KEY);
-            const item = data.find(i => i.identifier === savedId);
+            const item = data.find((i) => i.identifier === savedId);
             if (item) {
                 setSelected(item.identifier);
             } else {
-                // Saved subscription was deleted or no prior selection — fall back to first item
                 setSelected(data[0].identifier);
                 await setStoreValue(SSI_STORE_KEY, data[0].identifier);
             }
@@ -28,44 +45,78 @@ export default function SelectSub({ data, isLoading, onUpdate }: SubscriptionPro
         syncDisplay();
     }, [data]);
 
-    const updateSubscription = async (item: Subscription) => {
+    const options = useMemo<AppleSelectOption<string>[]>(() => {
+        return (
+            data?.map((item) => ({
+                value: item.identifier,
+                key: item.identifier,
+                raw: item,
+            })) ?? []
+        );
+    }, [data]);
+
+    if (isLoading) {
+        return (
+            <AppleSelectPlaceholder tone="loading">
+                <span className="inline-flex items-center gap-2">
+                    <span className="inline-block size-3 rounded-full bg-blue-500/20 animate-pulse" />
+                    {t("loading")}
+                </span>
+            </AppleSelectPlaceholder>
+        );
+    }
+
+    if (!data?.length) {
+        return (
+            <AppleSelectPlaceholder>{t("no_subscription")}</AppleSelectPlaceholder>
+        );
+    }
+
+    const selectedItem = data.find((i) => i.identifier === selected);
+
+    const updateSubscription = async (identifier: string) => {
+        const item = data.find((i) => i.identifier === identifier);
+        if (!item) return;
         const prevId = await getStoreValue(SSI_STORE_KEY);
         setSelected(item.identifier);
         await setStoreValue(SSI_STORE_KEY, item.identifier);
         onUpdate(item.identifier, prevId !== item.identifier);
-    }
-
-    if (isLoading) {
-        return <div className="select select-sm  select-ghost border-[0.8px] border-gray-200 ">
-            <span className="loading loading-spinner loading-xs mr-2"></span>
-            {
-                /* 正在加载... */
-                t("loading")
-            }
-        </div>;
-    }
-
-    if (!data?.length) {
-        return <div className="select select-sm  select-ghost border-[0.8px] border-gray-200 ">
-            {
-                /* 暂无订阅配置 */
-                t("no_subscription")
-            }
-        </div>;
-    }
+    };
 
     return (
-        <select
+        <AppleSelectMenu<string>
             value={selected}
-            onChange={e => {
-                const item = data.find(item => item.identifier === e.target.value);
-                if (item) updateSubscription(item);
+            options={options}
+            onChange={updateSubscription}
+            menuMaxHeight={256}
+            renderTrigger={() => (
+                <span className="block truncate text-[14px] font-medium text-gray-900">
+                    {selectedItem?.name ?? t("no_subscription")}
+                </span>
+            )}
+            renderOption={({ option, isSelected }) => {
+                const sub = option.raw as Subscription | undefined;
+                if (!sub) return null;
+                const hint = formatExpireHint(sub.expire_time);
+                return (
+                    <div className="flex flex-col min-w-0">
+                        <span
+                            className={`truncate text-[14px] ${
+                                isSelected
+                                    ? "text-blue-600 font-semibold"
+                                    : "text-gray-900 font-medium"
+                            }`}
+                        >
+                            {sub.name}
+                        </span>
+                        {hint && (
+                            <span className="truncate text-[11px] text-gray-400 mt-0.5">
+                                {hint}
+                            </span>
+                        )}
+                    </div>
+                );
             }}
-            className="select select-sm  select-ghost border-[0.8px] border-gray-200 "
-        >
-            {data.map(item => (
-                <option key={item.identifier} value={item.identifier} className="py-1">{item.name}</option>
-            ))}
-        </select>
+        />
     );
 }

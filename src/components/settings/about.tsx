@@ -1,40 +1,77 @@
 import { invoke } from "@tauri-apps/api/core";
-import { openUrl } from '@tauri-apps/plugin-opener';
+import { openUrl } from "@tauri-apps/plugin-opener";
+import { AnimatePresence, motion } from "framer-motion";
 import { useContext, useEffect, useState } from "react";
-import { Github, Globe, InfoCircleFill, XLg } from "react-bootstrap-icons";
-import { toast } from 'sonner';
+import {
+    ChevronRight,
+    Clipboard,
+    Github,
+    Globe,
+    InfoCircleFill,
+    X,
+} from "react-bootstrap-icons";
+import { toast } from "sonner";
 import { NavContext } from "../../single/context";
 import { aboutText } from "../../types/copyright";
-import { GITHUB_URL, OFFICIAL_WEBSITE, OsInfo } from "../../types/definition";
-import { formatOsInfo, getOsInfo, getSingBoxUserAgent, t } from "../../utils/helper";
+import {
+    GITHUB_URL,
+    OFFICIAL_WEBSITE,
+    OsInfo,
+} from "../../types/definition";
+import {
+    formatOsInfo,
+    getOsInfo,
+    getSingBoxUserAgent,
+    t,
+} from "../../utils/helper";
+import oneboxLogoUrl from "../../assets/onebox-logo.png";
+import { Portal } from "../common/portal";
 import { SettingItem } from "./common";
-
-interface AboutProps {
-    onClose: () => void;
-}
-
-interface InfoItemProps {
-    label: string;
-    value: string;
-}
 
 const getVersion = async () => {
     const version = await invoke<string>("version");
     return version;
-}
+};
 
-// 信息项组件
-function InfoItem({ label, value }: InfoItemProps) {
+/**
+ * iOS-style About sheet.
+ *
+ * Hero: app-icon tile in the systemBlue gradient + app name + version.
+ * Section 1 — Device info: grouped-card rows (OS, kernel tappable to show
+ * the raw version dump, User-Agent tappable to copy).
+ * Section 2 — Links: website + GitHub rows with chevrons.
+ * Footer: small copyright blob, then a developer-options escape hatch.
+ *
+ * Nested `CoreInfoSheet` replaces the old `<dialog>` element to keep
+ * z-index and styling under the same roof as the rest of the About UI.
+ */
+export default function AboutItem() {
+    const [isOpen, setIsOpen] = useState(false);
+
+    useEffect(() => {
+        if (isOpen) {
+            document.body.classList.add("overflow-hidden");
+        } else {
+            document.body.classList.remove("overflow-hidden");
+        }
+        return () => {
+            document.body.classList.remove("overflow-hidden");
+        };
+    }, [isOpen]);
+
     return (
-        <div className="flex justify-between py-2 px-3">
-            <span className="text-sm text-gray-700 capitalize">{label}</span>
-            <span className="text-sm text-gray-500">{value}</span>
-        </div>
+        <>
+            <SettingItem
+                icon={<InfoCircleFill className="text-[#007AFF]" size={22} />}
+                title={t("about")}
+                onPress={() => setIsOpen(true)}
+            />
+            {isOpen && <AboutSheet onClose={() => setIsOpen(false)} />}
+        </>
     );
 }
 
-// 关于组件
-function About({ onClose }: AboutProps) {
+function AboutSheet({ onClose }: { onClose: () => void }) {
     const [osInfo, setOsInfo] = useState<OsInfo>({
         appVersion: "",
         osArch: "x86",
@@ -43,186 +80,403 @@ function About({ onClose }: AboutProps) {
         osLocale: "",
     });
     const [ua, setUa] = useState<string>("");
-    const [version, setVersion] = useState<string>("");
+    const [versionDump, setVersionDump] = useState<string>("");
     const [coreVersion, setCoreVersion] = useState<string>("");
+    const [showCoreInfo, setShowCoreInfo] = useState(false);
     const { setActiveScreen } = useContext(NavContext);
 
     useEffect(() => {
-        getOsInfo().then((info) => {
-            setOsInfo(info)
-        }
-        ).catch((e) => {
-            console.error(e)
-        })
+        getOsInfo().then(setOsInfo).catch(console.error);
+        getSingBoxUserAgent().then(setUa).catch(console.error);
+        getVersion()
+            .then((v) => {
+                try {
+                    const core = v.split("\n")[0].trim().split(" ")[2]?.trim() ?? "";
+                    setCoreVersion(core);
+                } catch {
+                    // fall back to empty core version
+                }
+                setVersionDump(v);
+            })
+            .catch(console.error);
+    }, []);
 
-        getSingBoxUserAgent().then((ua) => {
-            setUa(ua)
-        }
-        ).catch((e) => {
-            console.error(e)
-        })
-
-        getVersion().then((version) => {
-            console.log("version", version)
-            const coreVersion = version.split("\n")[0].trim().split(" ")[2].trim();
-            setCoreVersion(coreVersion)
-            setVersion(version as string)
-        }
-        ).catch((e) => {
-            console.error(e)
-        })
-
-
-    }, [])
+    const copyUa = () => {
+        toast.promise(navigator.clipboard.writeText(ua), {
+            loading: t("copying"),
+            success: t("copy_success"),
+            error: t("copy_error"),
+        });
+    };
 
     return (
-        <>
-            <dialog id="core_info_modal" className="modal modal-bottom sm:modal-middle">
-                <div className="modal-box p-4 bg-gray-50">
-                    <h3 className="font-bold text-lg  uppercase">{
-                        // 内核信息1
-                        t("core_info")
-                    }</h3>
-                    <div className="p-4 bg-white rounded-lg mt-2">
-                        <div className='whitespace-pre-wrap overflow-x-auto  font-mono text-xs'>
-                            {version}
-                        </div>
-                    </div>
-                    <div className="modal-action">
-                        <form method="dialog">
-                            <button className="btn btn-sm capitalize">{t("close")}</button>
-                        </form>
-                    </div>
-                </div>
-                <form method="dialog" className="modal-backdrop">
-                    <button className="capitalize">{t("close")}</button>
-                </form>
-            </dialog>
-
-            <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center pointer-events-none">
-                <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-none max-w-md w-full max-h-screen overflow-hidden flex flex-col pointer-events-auto">
-                    {/* 标题栏 */}
-                    <div className="flex justify-between items-center px-4 py-3 border-b border-gray-100">
-                        <div className="text-lg font-semibold capitalize">{t("about")}</div>
-                        <button
-                            onClick={onClose}
-                            className="p-1 rounded-full hover:bg-gray-100"
-                        >
-                            <XLg size={16} className="text-gray-500" />
-                        </button>
-                    </div>
-
-                    {/* 应用信息 */}
-                    <div className="px-6 pt-6 pb-4 text-center">
-
-
-                        <h2 className="text-xl font-bold">OneBox</h2>
-                        <p className="text-gray-500 text-xs mt-1"> {t("version") + " " + osInfo.appVersion}</p>
-                    </div>
-
-                    {/* 合并系统信息和版权信息到一个可滚动区域 */}
-                    <div className="flex-1 overflow-auto px-4 py-3 bg-gray-50 rounded-t-2xl ">
-                        {/* 系统信息部分 */}
-                        <h3 className="text-sm font-medium text-gray-500 mb-2 capitalize">{t("system_info")}</h3>
-                        <div className="bg-white rounded-lg divide-y divide-gray-50 mb-4">
-                            <InfoItem label={t("os")} value={formatOsInfo(osInfo.osType, osInfo.osArch)} />
-                            <div onClick={() => {
-                                // @ts-ignore
-                                document.getElementById('core_info_modal').showModal()
-                            }}>
-                                <InfoItem label={t("kernel_version")} value={coreVersion} />
-                            </div>
-
-                            <div className='w-full flex justify-center'>
-                                <div className="overflow-x-auto  max-w-65 py-2 rounded-md">
-                                    <p className="text-gray-500/50 text-[0.8rem] mt-1 whitespace-nowrap  cursor-pointer" onClick={async () => {
-                                        const handleCopy = async (ua: string) => {
-                                            await navigator.clipboard.writeText(ua);
-                                        }
-                                        toast.promise(handleCopy(ua), {
-                                            loading: t("copying"),
-                                            success: t("copy_success"),
-                                            error: t("copy_error"),
-                                        });
-
-                                    }}>{ua}</p>
-                                </div>
-
-                            </div>
-
-
-                        </div>
-
-                        {/* 版权信息部分 */}
-                        <div className='flex justify-between  items-center mb-2'>
-                            <h3 className="text-sm font-medium text-gray-500  capitalize">{t("copyright")}</h3>
-                            <div className='flex gap-1  '>
-
-                                <button className='btn  btn-circle btn-sm  border-0 ' onClick={() => openUrl(OFFICIAL_WEBSITE)}>
-                                    <Globe className="text-[#007AFF]" size={20} />
-                                </button>
-
-                                <button className='btn btn-circle  btn-sm  border-0' onClick={() => openUrl(GITHUB_URL)}>
-                                    <Github className="text-[#007AFF]" size={20} />
-
-                                </button>
-                            </div>
-                        </div>
-                        <div
-                            className='bg-white p-2 rounded-lg'
-                        >
-                            <pre className="text-xs text-gray-600 whitespace-pre-wrap overflow-x-auto">
-                                {aboutText}
-                            </pre>
-                        </div>
-
-                        <div>
-                            <button
-                                className="mt-4 btn btn-sm  btn-secondary w-full capitalize"
-                                onClick={() => {
-                                    setActiveScreen('developer_options');
-                                    onClose();
-                                }}
+        <Portal>
+            <AnimatePresence>
+                <motion.div
+                    key="about-sheet"
+                    className="fixed inset-0 z-50 flex items-end sm:items-center justify-center px-3 pb-3"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.18 }}
+                >
+                    <div
+                        className="absolute inset-0"
+                        style={{
+                            background: "rgba(15, 23, 42, 0.42)",
+                            backdropFilter: "blur(6px)",
+                            WebkitBackdropFilter: "blur(6px)",
+                        }}
+                        onClick={onClose}
+                    />
+                    <motion.div
+                        className="relative w-full max-w-[340px] bg-[#F2F2F7] rounded-[18px] overflow-hidden flex flex-col"
+                        style={{
+                            maxHeight: "calc(100dvh - 80px)",
+                            boxShadow:
+                                "0 22px 48px -12px rgba(15, 23, 42, 0.32), 0 4px 14px rgba(15, 23, 42, 0.08)",
+                        }}
+                        initial={{ y: 24, opacity: 0, scale: 0.96 }}
+                        animate={{ y: 0, opacity: 1, scale: 1 }}
+                        exit={{ y: 12, opacity: 0, scale: 0.98 }}
+                        transition={{
+                            duration: 0.26,
+                            ease: [0.32, 0.72, 0, 1],
+                        }}
+                    >
+                        {/* Title bar */}
+                        <div className="relative flex items-center justify-center h-11 shrink-0 bg-white">
+                            <h3
+                                className="text-[15px] font-semibold tracking-[-0.01em] capitalize"
+                                style={{ color: "var(--onebox-label)" }}
                             >
-                                {t("developer_options")}
+                                {t("about")}
+                            </h3>
+                            <button
+                                type="button"
+                                onClick={onClose}
+                                className="absolute right-2 top-2 size-7 rounded-full flex items-center justify-center transition-colors active:bg-[rgba(60,60,67,0.08)]"
+                                aria-label={t("close")}
+                            >
+                                <X
+                                    size={18}
+                                    style={{
+                                        color: "var(--onebox-label-secondary)",
+                                    }}
+                                />
                             </button>
                         </div>
 
-                    </div>
+                        <div className="flex-1 overflow-y-auto">
+                            {/* Hero */}
+                            <div className="flex flex-col items-center pt-6 pb-7 bg-white">
+                                <img
+                                    src={oneboxLogoUrl}
+                                    alt="OneBox"
+                                    className="size-[72px] rounded-[20px] mb-3.5"
+                                    style={{
+                                        boxShadow:
+                                            "0 12px 28px -8px rgba(15, 23, 42, 0.18), 0 2px 4px rgba(15, 23, 42, 0.06)",
+                                    }}
+                                />
+                                <h2
+                                    className="text-[22px] font-semibold tracking-[-0.02em]"
+                                    style={{ color: "var(--onebox-label)" }}
+                                >
+                                    OneBox
+                                </h2>
+                                <p
+                                    className="text-[13px] mt-1"
+                                    style={{
+                                        color: "var(--onebox-label-secondary)",
+                                    }}
+                                >
+                                    {t("version")} {osInfo.appVersion}
+                                </p>
+                            </div>
 
+                            <div className="px-4 pt-5 pb-5 space-y-5">
+                                {/* Device info */}
+                                <section>
+                                    <SectionLabel>{t("system_info")}</SectionLabel>
+                                    <div className="onebox-grouped-card">
+                                        <InfoRow
+                                            label={t("os")}
+                                            value={formatOsInfo(
+                                                osInfo.osType,
+                                                osInfo.osArch,
+                                            )}
+                                        />
+                                        <InfoRow
+                                            label={t("kernel_version")}
+                                            value={coreVersion}
+                                            chevron
+                                            onPress={() => setShowCoreInfo(true)}
+                                        />
+                                        <UaRow ua={ua} onCopy={copyUa} />
+                                    </div>
+                                </section>
 
-                </div>
-            </div>
-        </>
+                                {/* Links */}
+                                <section>
+                                    <SectionLabel>{t("copyright")}</SectionLabel>
+                                    <div className="onebox-grouped-card">
+                                        <LinkRow
+                                            icon={
+                                                <Globe
+                                                    size={18}
+                                                    style={{
+                                                        color: "var(--onebox-blue)",
+                                                    }}
+                                                />
+                                            }
+                                            label="Website"
+                                            onPress={() => openUrl(OFFICIAL_WEBSITE)}
+                                        />
+                                        <LinkRow
+                                            icon={
+                                                <Github
+                                                    size={18}
+                                                    style={{
+                                                        color: "var(--onebox-blue)",
+                                                    }}
+                                                />
+                                            }
+                                            label="GitHub"
+                                            onPress={() => openUrl(GITHUB_URL)}
+                                        />
+                                    </div>
+                                </section>
+
+                                {/* Copyright text */}
+                                <div
+                                    className="rounded-[14px] px-3 py-2.5 text-[11px] leading-relaxed"
+                                    style={{
+                                        background: "rgba(118, 118, 128, 0.08)",
+                                        color: "var(--onebox-label-secondary)",
+                                    }}
+                                >
+                                    <pre className="whitespace-pre-wrap overflow-x-auto font-sans">
+                                        {aboutText}
+                                    </pre>
+                                </div>
+
+                                {/* Dev-options escape */}
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setActiveScreen("developer_options");
+                                        onClose();
+                                    }}
+                                    className="w-full h-10 rounded-[12px] text-[13px] font-medium transition-colors active:bg-[rgba(60,60,67,0.06)]"
+                                    style={{
+                                        background: "#FFFFFF",
+                                        color: "var(--onebox-label)",
+                                        boxShadow:
+                                            "0 1px 2.5px rgba(15, 23, 42, 0.04)",
+                                    }}
+                                >
+                                    {t("developer_options")}
+                                </button>
+                            </div>
+                        </div>
+                    </motion.div>
+                </motion.div>
+            </AnimatePresence>
+
+            {showCoreInfo && (
+                <CoreInfoSheet
+                    versionDump={versionDump}
+                    onClose={() => setShowCoreInfo(false)}
+                />
+            )}
+        </Portal>
     );
 }
 
-export default function AboutItem() {
-    const [showAbout, setShowAbout] = useState(false);
-    // 当模态框打开时阻止背景滚动
-    useEffect(() => {
-        if (showAbout) {
-            document.body.classList.add('overflow-hidden');
-        } else {
-            document.body.classList.remove('overflow-hidden');
-        }
+// ---- Pieces --------------------------------------------------------------
 
-        // 清理函数
-        return () => {
-            document.body.classList.remove('overflow-hidden');
-        };
-    }, [showAbout]);
-
+function SectionLabel({ children }: { children: React.ReactNode }) {
     return (
-        <div>
-            {showAbout && <About onClose={() => setShowAbout(false)} />}
-
-            <SettingItem
-                icon={<InfoCircleFill className="text-[#007AFF]" size={22} />}
-                title={t("about")}
-                onPress={() => setShowAbout(true)}
-            />
-        </div>
-    )
+        <h4
+            className="px-4 mb-1.5 text-[11px] font-semibold uppercase tracking-[0.04em]"
+            style={{ color: "var(--onebox-label-secondary)" }}
+        >
+            {children}
+        </h4>
+    );
 }
 
+function InfoRow({
+    label,
+    value,
+    chevron,
+    onPress,
+}: {
+    label: string;
+    value: string;
+    chevron?: boolean;
+    onPress?: () => void;
+}) {
+    const Tag: any = onPress ? "button" : "div";
+    return (
+        <Tag
+            onClick={onPress}
+            className={`w-full flex items-center gap-3 px-4 py-2.5 text-left ${
+                onPress
+                    ? "transition-colors active:bg-[rgba(60,60,67,0.04)]"
+                    : ""
+            }`}
+        >
+            <span
+                className="flex-1 min-w-0 text-[14px] tracking-[-0.005em] capitalize truncate"
+                style={{ color: "var(--onebox-label)" }}
+            >
+                {label}
+            </span>
+            <span
+                className="text-[13px] tracking-[-0.005em] truncate"
+                style={{ color: "var(--onebox-label-secondary)" }}
+            >
+                {value}
+            </span>
+            {chevron && (
+                <ChevronRight
+                    size={13}
+                    style={{ color: "rgba(60, 60, 67, 0.28)" }}
+                />
+            )}
+        </Tag>
+    );
+}
+
+function UaRow({ ua, onCopy }: { ua: string; onCopy: () => void }) {
+    return (
+        <button
+            type="button"
+            onClick={onCopy}
+            className="w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors active:bg-[rgba(60,60,67,0.04)]"
+        >
+            <span
+                className="shrink-0 text-[14px] tracking-[-0.005em] capitalize"
+                style={{ color: "var(--onebox-label)" }}
+            >
+                User-Agent
+            </span>
+            <span
+                className="flex-1 min-w-0 text-right text-[11px] truncate font-mono"
+                style={{ color: "var(--onebox-label-secondary)" }}
+            >
+                {ua}
+            </span>
+            <Clipboard
+                size={13}
+                style={{ color: "rgba(60, 60, 67, 0.35)" }}
+            />
+        </button>
+    );
+}
+
+function LinkRow({
+    icon,
+    label,
+    onPress,
+}: {
+    icon: React.ReactNode;
+    label: string;
+    onPress: () => void;
+}) {
+    return (
+        <button
+            type="button"
+            onClick={onPress}
+            className="w-full flex items-center gap-3 px-4 py-3 text-left transition-colors active:bg-[rgba(60,60,67,0.04)]"
+        >
+            <div className="size-7 flex items-center justify-center shrink-0">
+                {icon}
+            </div>
+            <span
+                className="flex-1 min-w-0 text-[15px] tracking-[-0.005em]"
+                style={{ color: "var(--onebox-label)" }}
+            >
+                {label}
+            </span>
+            <ChevronRight
+                size={13}
+                style={{ color: "rgba(60, 60, 67, 0.28)" }}
+            />
+        </button>
+    );
+}
+
+function CoreInfoSheet({
+    versionDump,
+    onClose,
+}: {
+    versionDump: string;
+    onClose: () => void;
+}) {
+    return (
+        <AnimatePresence>
+            <motion.div
+                key="core-info"
+                className="fixed inset-0 z-[60] flex items-center justify-center px-4"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.18 }}
+            >
+                <div
+                    className="absolute inset-0"
+                    style={{
+                        background: "rgba(15, 23, 42, 0.4)",
+                        backdropFilter: "blur(6px)",
+                        WebkitBackdropFilter: "blur(6px)",
+                    }}
+                    onClick={onClose}
+                />
+                <motion.div
+                    className="relative w-full max-w-[320px] bg-white rounded-[14px] overflow-hidden flex flex-col"
+                    style={{
+                        maxHeight: "calc(100dvh - 100px)",
+                        boxShadow:
+                            "0 22px 48px -12px rgba(15, 23, 42, 0.3), 0 4px 14px rgba(15, 23, 42, 0.08)",
+                    }}
+                    initial={{ scale: 0.94, y: 8 }}
+                    animate={{ scale: 1, y: 0 }}
+                    exit={{ scale: 0.96, y: 4 }}
+                    transition={{ duration: 0.22, ease: [0.32, 0.72, 0, 1] }}
+                >
+                    <h3
+                        className="text-[16px] font-semibold text-center pt-4 pb-3 px-5 tracking-[-0.01em] capitalize"
+                        style={{ color: "var(--onebox-label)" }}
+                    >
+                        {t("core_info")}
+                    </h3>
+                    <div className="flex-1 overflow-y-auto px-4 pb-4">
+                        <div
+                            className="rounded-xl px-3 py-2.5 text-[11px] leading-relaxed font-mono whitespace-pre-wrap break-all"
+                            style={{
+                                background: "rgba(118, 118, 128, 0.08)",
+                                color: "var(--onebox-label-secondary)",
+                            }}
+                        >
+                            {versionDump}
+                        </div>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="w-full h-11 text-[14px] font-semibold transition-colors active:bg-[rgba(0,122,255,0.08)] shrink-0"
+                        style={{
+                            color: "var(--onebox-blue)",
+                            borderTop: "0.5px solid var(--onebox-separator)",
+                        }}
+                    >
+                        {t("close")}
+                    </button>
+                </motion.div>
+            </motion.div>
+        </AnimatePresence>
+    );
+}

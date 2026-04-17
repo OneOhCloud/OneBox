@@ -1,141 +1,117 @@
-import clsx from 'clsx';
-
-import { useEffect } from "react";
-import { InfoCircle, Power } from 'react-bootstrap-icons';
-import Body from '../components/home/body';
-import { ProxyMode, useModeIndicator, useProxyMode, useVPNOperations } from "../components/home/hooks";
-import { useSubscriptions } from '../hooks/useDB';
+import { useEffect, useMemo } from "react";
+import Body from "../components/home/body";
+import { DeepLinkApplyProgressModal } from "../components/home/deep-link-apply-progress-modal";
+import {
+    ProxyMode,
+    useModeIndicator,
+    useProxyMode,
+    useVPNOperations,
+} from "../components/home/hooks";
+import { ModeSwitcher } from "../components/home/mode-switcher";
+import { PowerToggle } from "../components/home/power-toggle";
+import { StatusDisplay } from "../components/home/status-display";
+import { useSubscriptions } from "../hooks/useDB";
 import { t } from "../utils/helper";
 
-import './home.css';
+import "./home.css";
 
+// Layout targets the actual available area: 371×514 px
+// (600 window - 30 titlebar - 56 tab bar). Everything is vertically
+// rhythmed against that budget so there's no scrolling.
 export default function HomePage() {
-  const { data: subscriptions } = useSubscriptions();
-  const { selectedMode, initializeMode, changeMode } = useProxyMode();
-  const {
-    isLoading,
-    isRunning,
-    operationStatus,
-    toggleService,
-    restartService,
-  } = useVPNOperations();
-  const { indicatorStyle, modeButtonsRef } = useModeIndicator(selectedMode);
+    const { data: subscriptions } = useSubscriptions();
+    const { selectedMode, initializeMode, changeMode } = useProxyMode();
+    const {
+        isLoading,
+        isRunning,
+        operationStatus,
+        toggleService,
+        restartService,
+        applyPhase,
+        applyErrorMessage,
+        closeApplyModal,
+    } = useVPNOperations();
+    const { indicatorStyle, modeButtonsRef } = useModeIndicator(selectedMode);
 
-  const isEmpty = !subscriptions?.length;
+    const isEmpty = !subscriptions?.length;
 
-  useEffect(() => {
-    initializeMode();
-  }, []);
+    useEffect(() => {
+        initializeMode();
+    }, []);
 
-  const handleModeChange = async (mode: ProxyMode) => {
-    await changeMode(mode);
-    if (isLoading || isRunning) {
-      await restartService(isEmpty);
-    }
-  };
-
-  const handleUpdate = async () => {
-    await restartService(isEmpty);
-  }
-
-  const getStatusText = () => {
-    switch (operationStatus) {
-      case 'starting':
-        return t('connecting');
-      case 'stopping':
-        return t('switching');
-      default:
-        return isRunning ? t('connected') : t('not_connected');
-    }
-  };
-
-  return (
-    <div className="bg-gray-50 flex flex-col items-center justify-center p-6 w-full  h-[calc(100dvh-56px)]">
-      {/* 主开关按钮 */}
-      <label className={`cursor-pointer ${isLoading ? 'pointer-events-none' : ''}`}>
-        <input type="checkbox" checked={isRunning} onChange={() => { }} className="hidden" />
-        <div
-          className="relative w-36 h-36 mb-6"
-          onClick={!isLoading ? () => toggleService(isEmpty) : undefined}
-        >
-          {/* 背景圆环动画 */}
-          <div className="absolute inset-0 bg-blue-100 rounded-full opacity-10"></div>
-          <div className="absolute inset-2 bg-blue-100 rounded-full opacity-20"></div>
-          <div className="absolute inset-4 bg-blue-100 rounded-full opacity-30"></div>
-
-          {/* 中心按钮 */}
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div
-              className={
-                clsx(
-                  "bg-white rounded-full w-24 h-24 flex items-center justify-center shadow-md transition-all duration-300 ease-in-out",
-                  isRunning ? "ring-2 ring-blue-500" : "",
-                  isLoading ? "ring-1 ring-blue-500  opacity-80" : "hover:scale-105"
-                )
-              }
-            >
-              <Power
-                size={40}
-                className={
-                  clsx(
-                    "transition-colors duration-300",
-                    isLoading || isRunning ? "text-blue-500" : "text-gray-400"
-                  )
-                }
-              />
-            </div>
-          </div>
-        </div>
-      </label>
-
-      {/* 状态文本显示 */}
-      <div
-        className={
-          clsx(
-            "w-full text-center text-sm mb-2 flex items-center justify-center ",
-            isLoading || isRunning ? "text-blue-500" : "text-gray-400",
-          )
+    const handleModeChange = async (mode: ProxyMode) => {
+        await changeMode(mode);
+        if (isLoading || isRunning) {
+            await restartService(isEmpty);
         }
-      >
-        <InfoCircle size={16} className="mr-1.5 text-gray-300" />
-        <span className="text-base capitalize">
-          {getStatusText()}
-        </span>
-      </div>
+    };
 
-      {/* 模式切换器 */}
-      <div className="bg-gray-100 p-1 rounded-xl mb-4 inline-flex relative" ref={modeButtonsRef}>
-        <span
-          className="absolute top-1 bottom-1 bg-white rounded-lg shadow-sm transition-all duration-300 ease-in-out"
-          style={{
-            left: `${indicatorStyle.left}px`,
-            width: `${indicatorStyle.width}px`
-          }}
-        />
+    const handleUpdate = async () => {
+        await restartService(isEmpty);
+    };
 
-        {(['rules', 'global'] as const).map((mode) => (
-          <div key={mode} className='tooltip text-xs  tooltip-delayed'>
-            <div className="tooltip-content">
-              <div className="text-xs max-w-55 whitespace-normal">
-                {t(`${mode}_tip`)}
-              </div>
+    const statusText = useMemo(() => {
+        switch (operationStatus) {
+            case "starting":
+                return t("connecting");
+            case "stopping":
+                return t("switching");
+            default:
+                return isRunning ? t("connected") : t("not_connected");
+        }
+    }, [operationStatus, isRunning]);
+
+    const phase: "idle" | "connecting" | "on" = isLoading
+        ? "connecting"
+        : isRunning
+            ? "on"
+            : "idle";
+
+    return (
+        <div
+            className="onebox-home relative w-full h-[calc(100dvh-56px)] overflow-hidden"
+            data-phase={phase}
+        >
+            {/* systemBlue aura — only rendered when the tile is active or
+                connecting. Same design vocabulary as the warm glow under
+                an active HomeKit accessory. Idle shows no decoration. */}
+            <div className="onebox-aura" aria-hidden />
+
+            {/* Content */}
+            <div className="relative h-full flex flex-col items-center px-5 pt-5 pb-5">
+                <PowerToggle
+                    isRunning={Boolean(isRunning)}
+                    isLoading={isLoading}
+                    onClick={() => toggleService(isEmpty)}
+                />
+
+                <div className="mt-4">
+                    <StatusDisplay statusText={statusText} phase={phase} />
+                </div>
+
+                <div className="mt-5">
+                    <ModeSwitcher
+                        selectedMode={selectedMode}
+                        onModeChange={handleModeChange}
+                        indicatorStyle={indicatorStyle}
+                        containerRef={modeButtonsRef}
+                    />
+                </div>
+
+                <div className="mt-5 w-full flex-1 min-h-0">
+                    <Body
+                        isRunning={Boolean(isRunning)}
+                        onUpdate={handleUpdate}
+                    />
+                </div>
             </div>
-            <button
-              data-mode={mode}
-              className={`
-                capitalize relative px-4 py-1 rounded-lg transition-colors duration-300
-                ${selectedMode === mode ? 'text-black' : 'text-gray-500 hover:text-gray-700'}
-              `}
-              onClick={() => handleModeChange(mode)}
-            >
-              {t(mode)}
-            </button>
-          </div>
-        ))}
-      </div>
 
-      {/* 主体内容 */}
-      <Body isRunning={Boolean(isRunning)} onUpdate={handleUpdate} />
-    </div>
-  );
+            <DeepLinkApplyProgressModal
+                visible={applyPhase !== null}
+                phase={applyPhase ?? "init"}
+                errorMessage={applyErrorMessage}
+                onClose={closeApplyModal}
+            />
+        </div>
+    );
 }

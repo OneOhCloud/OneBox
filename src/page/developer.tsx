@@ -17,46 +17,37 @@ const appWindow = getCurrentWindow();
 
 export default function Page() {
     return (
-        <div className="bg-gray-50 overflow-y-auto h-[calc(100vh-40px)]">
-            <div className="container mx-auto p-4 max-w-md  ">
-                <div className="mb-6 rounded-xl overflow-hidden bg-white shadow-none">
-                    <div className="divide-y divide-gray-50">
-                        <ToggleDev />
-                        <ToggleDHCP />
-                        <ToggleBypassRouter />
-                        <ToggleLocalConfig />
-
-                    </div>
+        <div className="onebox-scrollpage">
+            <div className="onebox-page-inner">
+                <div className="onebox-grouped-card mb-5">
+                    <ToggleDev />
+                    <ToggleDHCP />
+                    <ToggleBypassRouter />
+                    <ToggleLocalConfig />
                 </div>
 
-                <div className="rounded-xl overflow-hidden bg-white shadow-none ">
-                    <div className="divide-y divide-gray-50">
-                        <StageSetting />
-                        <TunStackSetting />
-
-                        <DNSSettingsItem />
-                        <UASettingsItem />
-                        <HelperPing />
-                        <SettingItem
-                            icon={<Binoculars className="w-5 h-5 text-gray-500" />}
-
-                            title={t("open_advanced_settings")}
-                            subTitle={t("open_log_desc")}
-                            disabled={false}
-                            onPress={() => {
-                                invoke('create_window', {
-                                    app: appWindow,
-                                    title: "Log",
-                                    label: "sing-box-log",
-                                    windowTag: "sing-box-log",
-                                })
-                            }}
-                        />
-                    </div>
+                <div className="onebox-grouped-card">
+                    <StageSetting />
+                    <TunStackSetting />
+                    <DNSSettingsItem />
+                    <UASettingsItem />
+                    <HelperPing />
+                    <SettingItem
+                        icon={<Binoculars className="w-5 h-5 text-gray-500" />}
+                        title={t("open_advanced_settings")}
+                        subTitle={t("open_log_desc")}
+                        disabled={false}
+                        onPress={() => {
+                            invoke('create_window', {
+                                app: appWindow,
+                                title: "Log",
+                                label: "sing-box-log",
+                                windowTag: "sing-box-log",
+                            })
+                        }}
+                    />
                 </div>
             </div>
         </div>
-    )
-
-
+    );
 }

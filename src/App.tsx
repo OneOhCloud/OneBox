@@ -220,7 +220,7 @@ function App() {
       <UpdateProvider>
         <Toaster position="top-center" toastOptions={{ duration: 2000 }} />
 
-        <main className="relative bg-gray-50 flex flex-col h-screen">
+        <main className="onebox-surface relative flex flex-col h-screen">
           {activeScreen === 'home' &&
             <div className='absolute inset-0  z-2   max-h-max flex justify-end p-1'>
               <Suspense >
@@ -230,7 +230,7 @@ function App() {
           }
           <Body activeScreen={activeScreen} lang={language} />
 
-          <div className="dock  dock-sm  bg-gray-50 border-0 ">
+          <div className="dock dock-sm border-0">
             <button
               onClick={() => setActiveScreen('home')}
               className={` ${activeScreen === 'home' ? 'text-blue-500' : ''}`}

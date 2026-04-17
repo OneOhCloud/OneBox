@@ -1,5 +1,30 @@
 # OneBox — Project Notes for Claude
 
+## UI terminology: never say "subscription" / "订阅"
+
+All user-facing copy — i18n values, toast text, placeholders, labels,
+button captions, aria-labels, fallback names shown in a list — must use
+**"配置"** (Chinese) and **"Config"** (English) when referring to the
+user's saved server configurations. Avoid every variant of:
+
+- `订阅` / `订阅管理` / `订阅列表` / `订阅链接` / `订阅文件`
+- `配置文件` (use the shorter `配置` instead)
+- `subscription` / `subscriptions` / `Subscription(s)`
+
+Rule of thumb: shortest possible term wins. `配置` (2 chars) beats
+`配置文件` (4 chars) beats `订阅配置` (4 chars). English: `Config`
+beats `Configuration` beats `Subscription`.
+
+Why: the product is a local config store for sing-box server profiles,
+not a SaaS subscription service. The word "subscription" misleads new
+users into expecting billing / renewal / account flows that don't
+exist. Calling it a `配置` / `Config` tells users what it actually is.
+
+This only governs **display text**. Code identifiers can keep legacy
+names (`addSubscription`, `GET_SUBSCRIPTIONS_LIST_SWR_KEY`, i18n
+keys like `add_subscription`) to avoid a disruptive rename. Values
+the user reads on screen must use the new vocabulary.
+
 ## Reading third-party source
 
 Several moving parts in this project come from code we don't own: `sing-box`,

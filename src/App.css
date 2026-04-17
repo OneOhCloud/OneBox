@@ -168,7 +168,122 @@ input, textarea, [contenteditable="true"] {
    themes: light --default, light --prefersdark;
  }
 
-:root { text-autospace: normal; }
+:root {
+  text-autospace: normal;
+
+  /* Apple system tokens.
+     Values taken from Apple HIG — not Tailwind defaults, which skew
+     cooler/greener. Using Tailwind's blue-500 (#3B82F6) for an Apple
+     app reads noticeably "off" next to system chrome. */
+  --onebox-bg: #F2F2F7;                 /* systemGroupedBackground (light) */
+  --onebox-label: #1C1C1E;              /* label (primary) */
+  --onebox-label-secondary: rgba(60, 60, 67, 0.6);
+  --onebox-label-tertiary: rgba(60, 60, 67, 0.3);
+  --onebox-separator: rgba(60, 60, 67, 0.18);
+  --onebox-blue: #007AFF;               /* systemBlue (light) */
+  --onebox-blue-hover: #409CFF;
+  --onebox-blue-deep: #0062CC;
+}
+
+/* Unify whole-app chrome so the dock doesn't look like a different surface
+   from the content. daisyUI's .dock sets its own bg — override here. */
+main.onebox-surface,
+main.onebox-surface .dock {
+  background: var(--onebox-bg);
+}
+
+/* ==========================================================================
+ * Apple iOS 26 grouped-list primitives.
+ *
+ * Use these across Settings / Configuration / Developer / Router pages so
+ * every scrolling list page reads as one app, not one-off daisyUI defaults.
+ * ========================================================================== */
+
+/* A full-height scrolling page. Drop into any page root — no width caps,
+   no bg. The parent <main class="onebox-surface"> provides colour. */
+.onebox-scrollpage {
+  height: calc(100dvh - 56px); /* matches dock height; same calc as home */
+  width: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* A card that holds one group of rows. Shadow is at Apple "ambient" level
+   (barely visible on #F2F2F7) — elevation is suggested by the colour
+   contrast between the white cell fill and grey bg, not by a heavy drop. */
+.onebox-grouped-card {
+  background: #FFFFFF;
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 1px 2.5px rgba(15, 23, 42, 0.04);
+}
+
+/* Same surface as a grouped card but WITHOUT the automatic inset separator
+   between children. Use for free-form content (empty states, info blocks,
+   composite forms). Using .onebox-grouped-card for these leaks a 0.5px
+   hairline wherever you have multiple children — that's a bug, not a
+   "iOS" feature. Apple does not draw lines between free-form blocks. */
+.onebox-plain-card {
+  background: #FFFFFF;
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 1px 2.5px rgba(15, 23, 42, 0.04);
+}
+
+/* Separator between rows inside a grouped card. Apple uses 0.5px hairlines
+   at very low alpha — invisible on dark mode, a whisper on light. Applied
+   as a ::before on each child except the first so we can rely on child
+   composition rather than fiddling with divide-y utilities. */
+.onebox-grouped-card > * + * {
+  position: relative;
+}
+
+.onebox-grouped-card > * + *::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 16px; /* inset separator — starts after the leading icon column */
+  right: 0;
+  height: 0.5px;
+  background: var(--onebox-separator);
+  pointer-events: none;
+}
+
+/* Uppercase section label above a grouped card. Matches UITableView
+   section headers in light mode Settings. */
+.onebox-section-label {
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--onebox-label-secondary);
+  padding: 0 16px 6px 16px;
+}
+
+/* Page-wide content width cap. Keeps long settings pages readable on wide
+   windows, but does nothing on the fixed 371px OneBox window. */
+.onebox-page-inner {
+  max-width: 28rem; /* 448px */
+  margin: 0 auto;
+  padding: 16px;
+}
+
+/* iOS-style toggle. Overrides daisyUI defaults to match Apple systemGreen
+   on (#34C759) and a neutral tinted grey track off. Specified via
+   !important only because daisyUI's own `.toggle:checked` utility has
+   equivalent specificity. */
+.onebox-toggle {
+  --tglbg: rgba(120, 120, 128, 0.18) !important;
+  background-color: rgba(120, 120, 128, 0.18) !important;
+  border-color: transparent !important;
+  color: #FFFFFF !important;
+}
+
+.onebox-toggle:checked {
+  --tglbg: #34C759 !important;
+  background-color: #34C759 !important;
+  border-color: transparent !important;
+}
 
 
 

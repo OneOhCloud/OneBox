@@ -1,225 +1,270 @@
-import { confirm, message } from '@tauri-apps/plugin-dialog';
-import { exit, relaunch } from '@tauri-apps/plugin-process';
-import { type Update } from '@tauri-apps/plugin-updater';
-import { useEffect, useState } from "react";
-import { CheckCircle, CloudArrowUpFill } from "react-bootstrap-icons";
+import { confirm, message } from "@tauri-apps/plugin-dialog";
+import { exit, relaunch } from "@tauri-apps/plugin-process";
+import { type Update } from "@tauri-apps/plugin-updater";
+import clsx from "clsx";
+import { useState } from "react";
+import {
+    CheckCircleFill,
+    ChevronRight,
+    CloudArrowDownFill,
+    CloudArrowUpFill,
+    CloudCheckFill,
+} from "react-bootstrap-icons";
 import { t, vpnServiceManager } from "../../utils/helper";
-import { SettingItem } from "./common";
 import { useUpdate } from "./update-context";
 
-// 更新安装确认处理逻辑
+type UpdaterPhase = "idle" | "available" | "downloading" | "ready";
+
+/**
+ * Single updater row that morphs between four states. The outer cell
+ * stays in the grouped-card; only the inner title/subtitle/badge/progress
+ * swap out. Inline progress bar lives in the row body rather than below
+ * the card so users see activity where their eyes already are.
+ */
+function UpdaterRow({
+    phase,
+    version,
+    progress,
+    disabled,
+    onPress,
+}: {
+    phase: UpdaterPhase;
+    version?: string;
+    progress: number;
+    disabled?: boolean;
+    onPress: () => void;
+}) {
+    const { Icon, iconColor, iconBg, title, subtitle, badge } = renderCopy(
+        phase,
+        version,
+        progress,
+    );
+
+    return (
+        <button
+            type="button"
+            disabled={disabled}
+            onClick={() => !disabled && onPress()}
+            className={clsx(
+                "w-full flex items-center gap-3 px-4 py-3 text-left transition-colors",
+                disabled
+                    ? "opacity-50 cursor-not-allowed"
+                    : "active:bg-[rgba(60,60,67,0.06)] hover:bg-[rgba(60,60,67,0.025)]",
+            )}
+        >
+            <div
+                className="size-7 rounded-[8px] flex items-center justify-center shrink-0"
+                style={{ background: iconBg }}
+            >
+                <Icon size={18} style={{ color: iconColor }} />
+            </div>
+
+            <div className="flex-1 min-w-0">
+                <div
+                    className="text-[15px] tracking-[-0.005em] truncate"
+                    style={{ color: "var(--onebox-label)" }}
+                >
+                    {title}
+                </div>
+                {subtitle && (
+                    <div
+                        className="text-[12px] truncate mt-0.5"
+                        style={{ color: "var(--onebox-label-secondary)" }}
+                    >
+                        {subtitle}
+                    </div>
+                )}
+                {phase === "downloading" && (
+                    <div
+                        className="mt-2 h-[3px] rounded-full overflow-hidden"
+                        style={{ background: "rgba(60, 60, 67, 0.1)" }}
+                    >
+                        <div
+                            className="h-full rounded-full"
+                            style={{
+                                width: `${Math.min(progress, 100)}%`,
+                                background: "var(--onebox-blue)",
+                                transition:
+                                    "width 300ms cubic-bezier(0.32, 0.72, 0, 1)",
+                            }}
+                        />
+                    </div>
+                )}
+            </div>
+
+            {badge && <div className="shrink-0">{badge}</div>}
+
+            {phase !== "downloading" && (
+                <ChevronRight
+                    size={13}
+                    className="shrink-0"
+                    style={{ color: "rgba(60, 60, 67, 0.28)" }}
+                />
+            )}
+        </button>
+    );
+}
+
+function renderCopy(
+    phase: UpdaterPhase,
+    version: string | undefined,
+    progress: number,
+) {
+    switch (phase) {
+        case "available":
+            return {
+                Icon: CloudArrowDownFill,
+                iconColor: "var(--onebox-blue)",
+                iconBg: "rgba(0, 122, 255, 0.1)",
+                title: t("update_available", "Update available"),
+                subtitle: version ? `v${version}` : undefined,
+                badge: <NewBadge />,
+            };
+        case "downloading":
+            return {
+                Icon: CloudArrowDownFill,
+                iconColor: "var(--onebox-blue)",
+                iconBg: "rgba(0, 122, 255, 0.1)",
+                title: t("downloading", "Downloading"),
+                subtitle: `${Math.floor(progress)}%`,
+                badge: null,
+            };
+        case "ready":
+            return {
+                Icon: CloudCheckFill,
+                iconColor: "#34C759",
+                iconBg: "rgba(52, 199, 89, 0.12)",
+                title: t("install_new_update", "Install New Update"),
+                subtitle: version
+                    ? t("update_ready_hint", `v${version} ready to install`)
+                    : undefined,
+                badge: (
+                    <CheckCircleFill
+                        size={18}
+                        style={{ color: "#34C759" }}
+                    />
+                ),
+            };
+        case "idle":
+        default:
+            return {
+                Icon: CloudArrowUpFill,
+                iconColor: "var(--onebox-label-secondary)",
+                iconBg: "rgba(118, 118, 128, 0.12)",
+                title: t("update", "Update"),
+                subtitle: undefined,
+                badge: null,
+            };
+    }
+}
+
+function NewBadge() {
+    return (
+        <span
+            className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold tracking-wide"
+            style={{
+                background: "#FF3B30",
+                color: "#FFFFFF",
+                boxShadow: "0 1px 2px rgba(255, 59, 48, 0.3)",
+            }}
+        >
+            NEW
+        </span>
+    );
+}
+
+// ---- Business logic (unchanged) -----------------------------------------
+
 function useUpdateInstallation(isSimulating: boolean) {
     const confirmInstallation = async (updateInfo: Update) => {
         const confirmed = await confirm(t("update_downloaded"), {
             title: t("update_install"),
-            kind: 'info',
+            kind: "info",
         });
-
         if (confirmed) {
             try {
                 if (isSimulating) {
                     await exit();
                     return;
                 }
-                // 安装更新
                 await vpnServiceManager.stop();
                 setTimeout(async () => {
                     await updateInfo.install();
                     await relaunch();
                 }, 2000);
-
             } catch (error) {
-                console.error('Installation error:', error);
-                await message(t('update_install_failed'), {
-                    title: t('error'),
-                    kind: 'error'
+                console.error("Installation error:", error);
+                await message(t("update_install_failed"), {
+                    title: t("error"),
+                    kind: "error",
                 });
             }
         }
     };
-
     return { confirmInstallation };
 }
 
-// 更新操作处理逻辑
 function useUpdateHandler() {
-    const {
-        updateInfo,
-        downloadComplete,
-        downloading,
-        checkAndDownloadUpdate
-    } = useUpdate();
-
+    const { updateInfo, downloadComplete, downloading, checkAndDownloadUpdate } =
+        useUpdate();
     const [isUpdating, setIsUpdating] = useState(false);
-    const [isClicked, setIsClicked] = useState(false);
 
-    const handleUpdateClick = async (confirmInstallation: (update: Update) => Promise<void>) => {
-        console.log("Button clicked, setting isClicked to true");
-        setIsClicked(true);
-
-        if (isUpdating) {
-            console.log("Already updating, returning early");
-            return;
-        }
-
+    const handleUpdateClick = async (
+        confirmInstallation: (u: Update) => Promise<void>,
+    ) => {
+        if (isUpdating) return;
         setIsUpdating(true);
-
         try {
-            // 如果已经下载完成，直接进入安装确认流程
             if (downloadComplete && updateInfo) {
-                console.log("Download complete, confirming installation");
                 await confirmInstallation(updateInfo);
                 return;
             }
-
-            // 如果正在下载，不做任何操作，只显示进度
-            if (downloading) {
-                console.log("Already downloading, showing progress only");
-                return;
-            }
-
-            // 开始检查和下载更新
-            console.log("Starting update check and download");
+            if (downloading) return;
             const result = await checkAndDownloadUpdate();
-
             if (!result) {
-                await message(
-                    t('no_update_available'), {
-                    title: t('update'),
-                    kind: 'info',
+                await message(t("no_update_available"), {
+                    title: t("update"),
+                    kind: "info",
                 });
-                // 如果没有更新，重置 isClicked
-                console.log("No update available, resetting isClicked");
-                setIsClicked(false);
             }
         } catch (error) {
-            console.error('Error during update:', error);
-            // 发生错误时重置 isClicked
-            console.log("Error occurred, resetting isClicked");
-            setIsClicked(false);
+            console.error("Error during update:", error);
         } finally {
             setIsUpdating(false);
         }
     };
 
-    return {
-        isUpdating,
-        isClicked,
-        handleUpdateClick,
-        setIsClicked
-    };
+    return { isUpdating, handleUpdateClick };
 }
 
-// 下载进度显示组件
-function DownloadProgress({
-    downloadProgress,
-    isVisible
-}: {
-    downloadProgress: number;
-    isVisible: boolean;
-}) {
-    if (!isVisible) return null;
+// ---- Main export --------------------------------------------------------
 
-    return (
-        <div className="animate-fadeIn">
-            <div
-                className="h-0.5 bg-primary rounded-2xl transition-all duration-300 ease-out"
-                style={{ width: `${downloadProgress}%` }}
-            />
-        </div>
-    );
-}
-// 更新按钮组件
-function UpdateButton({
-    isSimulating,
-    updateInfo,
-    downloadComplete,
-    isUpdating,
-    onUpdateClick,
-    onInstallClick
-}: {
-    isSimulating: boolean;
-    updateInfo: Update | null;
-    downloadComplete: boolean;
-    isUpdating: boolean;
-    onUpdateClick: () => void;
-    onInstallClick: () => void;
-}) {
-    const updateAvailable = !!updateInfo;
-
-    // 如果已下载完成且用户已点击，显示安装按钮
-    if (downloadComplete && updateInfo) {
-        return (
-            <SettingItem
-                icon={<CloudArrowUpFill className="text-[#34C759]" size={22} />}
-                title={t("install_new_update")}
-                badge={<CheckCircle className="text-[#34C759] mr-2" size={20} />}
-                onPress={onInstallClick}
-            />
-        );
-    }
-
-    // 默认更新按钮
-    return (
-        <SettingItem
-            icon={<CloudArrowUpFill className="text-[#34C759]" size={22} />}
-            title={isSimulating ? "模拟更新" : t("update")}
-            badge={updateAvailable ? <span className="badge badge-sm bg-[#FF3B30] border-[#FF3B30] text-white mr-2">New</span> : undefined}
-            onPress={onUpdateClick}
-            disabled={isUpdating}
-        />
-    );
-}
-
-// 调试日志组件（开发环境使用）
-function useDebugLogging(downloading: boolean, isClicked: boolean, downloadProgress: number, downloadComplete: boolean) {
-    useEffect(() => {
-        console.log("downloading 状态变化:", downloading);
-    }, [downloading]);
-
-    useEffect(() => {
-        console.log("isClicked 状态变化:", isClicked);
-        console.log("downloadProgress:", downloadProgress, "downloadComplete:", downloadComplete);
-    }, [isClicked, downloadProgress, downloadComplete]);
-
-
-}
-
-// 主组件
 export default function UpdaterItem() {
     const {
         updateInfo,
         downloadComplete,
         downloading,
         downloadProgress,
-        isSimulating
+        isSimulating,
     } = useUpdate();
-
     const { confirmInstallation } = useUpdateInstallation(isSimulating);
-    const { isUpdating, isClicked, handleUpdateClick } = useUpdateHandler();
+    const { isUpdating, handleUpdateClick } = useUpdateHandler();
 
-    // 调试日志
-    isSimulating && useDebugLogging(downloading, isClicked, downloadProgress, downloadComplete);
-
-    const onUpdateClick = () => handleUpdateClick(confirmInstallation);
-    const onInstallClick = () => updateInfo && confirmInstallation(updateInfo);
+    const phase: UpdaterPhase = downloadComplete && updateInfo
+        ? "ready"
+        : downloading
+            ? "downloading"
+            : updateInfo
+                ? "available"
+                : "idle";
 
     return (
-        <>
-            <UpdateButton
-                updateInfo={updateInfo}
-                isUpdating={isUpdating}
-                isSimulating={isSimulating}
-                onUpdateClick={onUpdateClick}
-                onInstallClick={onInstallClick}
-                downloadComplete={downloadComplete}
-
-            />
-
-            <DownloadProgress
-                downloadProgress={downloadProgress}
-                isVisible={isClicked && downloadProgress > 0 && !downloadComplete}
-            />
-        </>
+        <UpdaterRow
+            phase={phase}
+            version={updateInfo?.version}
+            progress={downloadProgress}
+            disabled={isUpdating && phase === "idle"}
+            onPress={() => handleUpdateClick(confirmInstallation)}
+        />
     );
 }

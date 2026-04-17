@@ -1,298 +1,246 @@
-import { openUrl } from "@tauri-apps/plugin-opener"
-import bytes from "bytes"
-import { AnimatePresence, motion } from "framer-motion"
-import React, { useEffect, useState } from "react"
-import { ArrowClockwise, CaretDownFill, CaretUpFill, Trash } from "react-bootstrap-icons"
-import { mutate } from "swr"
-import { deleteSubscription } from "../../action/db"
-import { useUpdateSubscription } from "../../action/subscription-hooks"
-import { contentVariants, itemVariants } from "../../page/variants"
-import { GET_SUBSCRIPTIONS_LIST_SWR_KEY, Subscription } from "../../types/definition"
-import { t } from "../../utils/helper"
-import Avatar from "./avatar"
+import { openUrl } from "@tauri-apps/plugin-opener";
+import bytes from "bytes";
+import clsx from "clsx";
+import { AnimatePresence, motion } from "framer-motion";
+import React, { useEffect, useState } from "react";
+import { ArrowClockwise, ChevronDown, Trash3 } from "react-bootstrap-icons";
+import { mutate } from "swr";
+import { deleteSubscription } from "../../action/db";
+import { useUpdateSubscription } from "../../action/subscription-hooks";
+import { GET_SUBSCRIPTIONS_LIST_SWR_KEY, Subscription } from "../../types/definition";
+import { t } from "../../utils/helper";
+import Avatar from "./avatar";
 
 interface SubscriptionItemProps {
-    item: Subscription
-    expanded: string
-    setExpanded: (id: string) => void
-    onUpdateDone: () => void
+    item: Subscription;
+    expanded: string;
+    setExpanded: (id: string) => void;
+    onUpdateDone: () => void;
 }
 
-interface ItemDetailsProps {
-    identifier: string
-    visible: boolean
-    remainingDays: string
-    trafficDetails: string
-    onUpdate: () => Promise<void>
-    onDelete: () => Promise<void>
-    loading: boolean
-}
+const LOCAL_FILE_SENTINEL = 32503680000000;
 
-const ANIMATION_STYLES = {
-    willChange: "transform, opacity, height, clip-path",
-    backfaceVisibility: "hidden" as const
-}
-
-
-
-
-const ItemDetails: React.FC<ItemDetailsProps> = ({
-    identifier,
-    visible,
-    remainingDays,
-    trafficDetails,
-    onUpdate,
-    onDelete,
-    loading
-}) => {
-
-    const handleUpdateClick = async () => {
-        try {
-            await onUpdate()
-            await mutate(GET_SUBSCRIPTIONS_LIST_SWR_KEY)
-        } catch (error) {
-            console.error("Failed to update subscription:", error)
-        } finally {
-        }
-    }
-
-
-    return (
-        <AnimatePresence initial={false}>
-            {visible && (
-                <motion.div
-                    variants={itemVariants}
-                    initial="hidden"
-                    animate="visible"
-                    exit="exit"
-                    key={identifier}
-                    className="overflow-hidden"
-                    style={ANIMATION_STYLES}
-                >
-                    <motion.div
-                        variants={contentVariants}
-                        className="flex flex-col gap-2 px-4 py-4 bg-gray-100 rounded-b"
-                    >
-                        <div className="flex flex-col gap-2">
-                            <div className="flex items-center justify-between">
-                                <div className="flex gap-2">
-                                    <span className="text-xs text-gray-400 capitalize">{t("traffic_detail")}</span>
-                                    <span className="text-xs text-blue-500">{trafficDetails}</span>
-                                </div>
-                                <button
-                                    className="btn btn-xs btn-ghost btn-circle border-0"
-                                    onClick={handleUpdateClick}
-                                    disabled={loading}
-                                >
-                                    {loading ? (
-                                        <span className="text-gray-400 size-[0.8rem] loading loading-spinner" />
-                                    ) : (
-                                        <ArrowClockwise className="size-[0.8rem] text-gray-400" />
-                                    )}
-                                </button>
-                            </div>
-
-                            <div className="flex items-center justify-between">
-                                <div className="flex gap-2">
-                                    <span className="text-xs text-gray-400 capitalize">{t("remaining_days")}</span>
-                                    <span className="text-xs text-blue-500">{remainingDays}</span>
-                                </div>
-                                <button
-                                    className="btn btn-xs btn-ghost btn-circle border-0 transition-colors"
-                                    onClick={onDelete}
-                                >
-                                    <Trash className="size-[0.8rem] text-gray-400" />
-                                </button>
-                            </div>
-                        </div>
-                    </motion.div>
-                </motion.div>
-            )}
-        </AnimatePresence>
-    )
-}
-
-
-
-type SubscriptionItemSkeletonProps = {
-    action: 'update' | 'delete'
-    expanded: boolean
-}
-
-function SubscriptionItemSkeleton(props: SubscriptionItemSkeletonProps) {
-    return (
-        <li>
-            <div className="list-row items-center">
-                <div className="bg-gray-300 rounded-full size-10 animate-pulse" />
-                <div className="max-w-40 flex flex-col gap-2">
-                    <div className=" truncate text-sm animate-pulse text-gray-500" >{
-
-                        props.action === 'delete' ? t("deleting_subscription") : t("updating")
-
-                    }</div>
-                    <div className="bg-gray-300 text-xs flex items-center " >
-                        <progress
-                            className="progress h-1 animate-pulse"
-                            value={0}
-                            max="100"
-                        />
-                    </div>
-                </div>
-                <button
-                    className="btn btn-ghost btn-xs btn-circle border-0 transition-colors animate-pulse"
-                >
-                    <div className="size-[0.8rem] bg-gray-300 rounded-full" />
-
-                </button>
-            </div>
-            {
-                props.expanded && <div
-                    className="flex flex-col gap-2 px-4 py-4 bg-gray-100 rounded-b"
-                >
-                    <div className="flex flex-col gap-2">
-                        <div className="flex items-center justify-between">
-                            <div className="flex gap-2">
-                                <div className="bg-gray-300 h-4 w-20 rounded animate-pulse" />
-                            </div>
-                            <div className="bg-gray-300 rounded-full size-6 animate-pulse" />
-                        </div>
-
-                        <div className="flex items-center justify-between">
-                            <div className="flex gap-2">
-                                <div className="bg-gray-300 h-4 w-20 rounded animate-pulse" />
-                            </div>
-                            <div className="bg-gray-300 rounded-full size-6 animate-pulse" />
-                        </div>
-                    </div>
-                </div>
-            }
-        </li>
-    )
-}
-
+const messageStyles = {
+    error: { color: "#FF3B30", bg: "rgba(255, 59, 48, 0.1)" },
+    success: { color: "#34C759", bg: "rgba(52, 199, 89, 0.12)" },
+    warning: { color: "#FF9500", bg: "rgba(255, 149, 0, 0.1)" },
+} as const;
 
 export const SubscriptionItem: React.FC<SubscriptionItemProps> = ({
     item,
     expanded,
     setExpanded,
-    onUpdateDone
+    onUpdateDone,
 }) => {
+    const isExpanded = expanded === item.identifier;
+    const usage = Math.floor((item.used_traffic / item.total_traffic) * 100);
+    const danger = usage >= 100;
+    const remainingDays = Math.floor(
+        (item.expire_time - item.last_update_time) / (1000 * 60 * 60 * 24),
+    );
+    const isLocalFile = item.expire_time === LOCAL_FILE_SENTINEL;
 
-    const usage = Math.floor((item.used_traffic / item.total_traffic) * 100)
-    const remainingDays = Math.floor((item.expire_time - item.last_update_time) / (1000 * 60 * 60 * 24))
-    const trafficDetailsText = `${bytes(item.used_traffic)} /${bytes(item.total_traffic)}`
-    const remainingDaysText = `${remainingDays} ${t("days")}`
-    const handleToggleExpand = () => setExpanded(expanded === item.identifier ? '' : item.identifier)
-    const handleWebsiteClick = () => openUrl(item.official_website)
-    const { update, resetMessage, loading, message, messageType } = useUpdateSubscription()
+    const trafficText = `${bytes(item.used_traffic) ?? "0"} / ${bytes(item.total_traffic) ?? "0"}`;
+    const remainingText = isLocalFile
+        ? t("local_file_no_expire")
+        : `${remainingDays} ${t("days")}`;
 
+    const { update, resetMessage, loading, message, messageType } =
+        useUpdateSubscription();
     const [isDeleting, setIsDeleting] = useState(false);
-
 
     useEffect(() => {
         if (!loading) {
-            const timer = setTimeout(() => {
-                resetMessage()
-            }, 5000);
+            const timer = setTimeout(() => resetMessage(), 5000);
             return () => clearTimeout(timer);
         }
     }, [loading, message]);
 
     useEffect(() => {
         const handleUpdateEvent = async () => {
-            await update(item.identifier)
-            onUpdateDone()
-        }
-        window.addEventListener("update-all-subscriptions", handleUpdateEvent)
+            await update(item.identifier);
+            onUpdateDone();
+        };
+        window.addEventListener("update-all-subscriptions", handleUpdateEvent);
         return () => {
-            window.removeEventListener("update-all-subscriptions", handleUpdateEvent)
-        }
-    }, [item.identifier])
+            window.removeEventListener(
+                "update-all-subscriptions",
+                handleUpdateEvent,
+            );
+        };
+    }, [item.identifier]);
 
     const handleDelete = async () => {
         setIsDeleting(true);
-        await deleteSubscription(item.identifier)
-        await new Promise(resolve => setTimeout(resolve, 100));
+        await deleteSubscription(item.identifier);
+        await new Promise((resolve) => setTimeout(resolve, 100));
         setIsDeleting(false);
-        await mutate(GET_SUBSCRIPTIONS_LIST_SWR_KEY)
-    }
+        await mutate(GET_SUBSCRIPTIONS_LIST_SWR_KEY);
+    };
 
-    if (loading || isDeleting) {
+    const handleUpdate = async () => {
+        await update(item.identifier);
+        await mutate(GET_SUBSCRIPTIONS_LIST_SWR_KEY);
+    };
 
-        return <SubscriptionItemSkeleton
-            action={isDeleting ? 'delete' : 'update'}
-            expanded={expanded === item.identifier}
-        />
-    }
+    const handleToggleExpand = () => {
+        setExpanded(isExpanded ? "" : item.identifier);
+    };
 
-    const Title = () => {
-        if (message && messageType) {
-            let colorClass = '';
-            switch (messageType) {
-                case 'error':
-                    colorClass = 'text-red-500';
-                    break;
-                case 'success':
-                    return <div className="truncate text-sm">{item.name}</div>;
-                default:
-                    colorClass = 'text-yellow-500';
-            }
-            return (
-                <div
-                    className={`text-xs ${colorClass}`}
-                    style={{
-                        maxWidth: '10rem',
-                        overflowX: 'auto',
-                        whiteSpace: 'nowrap',
-                        WebkitOverflowScrolling: 'touch',
-                    }}
-                >
-                    {message}
-                </div>
-            );
+    const handleAvatarClick = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (item.official_website && item.official_website.startsWith("http")) {
+            openUrl(item.official_website);
         }
-        return <div className="truncate text-sm">{item.name}</div>;
-    }
+    };
 
+    const isBusy = loading || isDeleting;
+    const progressWidth = Math.min(usage, 100);
+    const progressColor = danger ? "#FF3B30" : "var(--onebox-blue)";
 
+    const pillStyle =
+        message && messageType && messageStyles[messageType as keyof typeof messageStyles];
+
+    const titleText = isDeleting
+        ? t("deleting_subscription")
+        : loading
+            ? t("updating")
+            : item.name;
 
     return (
-        <li key={item.identifier}>
-            <div className="list-row items-center">
-                <div onClick={handleWebsiteClick}>
-                    <Avatar url={item.official_website} danger={usage >= 100} />
+        <li>
+            <button
+                type="button"
+                onClick={isBusy ? undefined : handleToggleExpand}
+                disabled={isBusy}
+                className={clsx(
+                    "w-full flex items-center gap-3 px-4 py-3 text-left",
+                    "transition-colors duration-150",
+                    !isBusy &&
+                        "hover:bg-[rgba(60,60,67,0.025)] active:bg-[rgba(60,60,67,0.06)]",
+                    isBusy && "opacity-60",
+                )}
+            >
+                <div onClick={handleAvatarClick}>
+                    <Avatar url={item.official_website} danger={danger} />
                 </div>
-                <div className="max-w-40 flex flex-col gap-2">
-                    <Title />
-                    <div className="text-xs flex items-center">
-                        <progress
-                            className={`progress h-1 ${usage >= 100 ? 'bg-red-400 [&::-webkit-progress-bar]:bg-red-200 [&::-webkit-progress-value]:bg-red-400' : ''}`}
-                            value={usage}
-                            max="100"
+
+                <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5">
+                        <span
+                            className="text-[14.5px] font-medium truncate tracking-[-0.01em]"
+                            style={{
+                                color: danger
+                                    ? "#FF3B30"
+                                    : "var(--onebox-label)",
+                            }}
+                        >
+                            {titleText}
+                        </span>
+                        {pillStyle && (
+                            <span
+                                className="shrink-0 inline-flex items-center px-1.5 py-[1px] rounded-md text-[10px] font-medium whitespace-nowrap"
+                                style={{
+                                    color: pillStyle.color,
+                                    background: pillStyle.bg,
+                                }}
+                            >
+                                {message}
+                            </span>
+                        )}
+                    </div>
+
+                    <div
+                        className="mt-0.5 text-[11px] tabular-nums truncate"
+                        style={{ color: "var(--onebox-label-secondary)" }}
+                    >
+                        {isLocalFile ? (
+                            remainingText
+                        ) : (
+                            <>
+                                {trafficText}
+                                <span className="mx-1.5 opacity-50">·</span>
+                                {remainingText}
+                            </>
+                        )}
+                    </div>
+
+                    <div
+                        className={clsx(
+                            "mt-1.5 h-[3px] rounded-full overflow-hidden",
+                            isBusy && "animate-pulse",
+                        )}
+                        style={{ background: "rgba(60, 60, 67, 0.09)" }}
+                    >
+                        <div
+                            className="h-full rounded-full"
+                            style={{
+                                width: `${progressWidth}%`,
+                                background: progressColor,
+                                transition: "width 400ms cubic-bezier(0.32, 0.72, 0, 1), background 280ms",
+                            }}
                         />
                     </div>
                 </div>
-                <button
-                    className="btn btn-ghost btn-xs btn-circle border-0 transition-colors"
-                    onClick={handleToggleExpand}
-                >
-                    {expanded === item.identifier ? (
-                        <CaretUpFill className="size-[0.8rem]" />
-                    ) : (
-                        <CaretDownFill className="size-[0.8rem]" />
-                    )}
-                </button>
-            </div>
 
-            <ItemDetails
-                loading={loading}
-                onDelete={handleDelete}
-                onUpdate={async () => update(item.identifier)}
-                identifier={item.identifier}
-                visible={expanded === item.identifier}
-                remainingDays={remainingDaysText}
-                trafficDetails={trafficDetailsText}
-            />
+                <ChevronDown
+                    size={12}
+                    className="shrink-0"
+                    style={{
+                        color: "rgba(60, 60, 67, 0.3)",
+                        transition: "transform 220ms cubic-bezier(0.32, 0.72, 0, 1)",
+                        transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)",
+                    }}
+                />
+            </button>
+
+            <AnimatePresence initial={false}>
+                {isExpanded && !isBusy && (
+                    <motion.div
+                        key="actions"
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: "auto", opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{
+                            duration: 0.22,
+                            ease: [0.32, 0.72, 0, 1],
+                        }}
+                        className="overflow-hidden"
+                    >
+                        <div
+                            className="flex relative"
+                            style={{
+                                borderTop: "0.5px solid var(--onebox-separator)",
+                            }}
+                        >
+                            <button
+                                type="button"
+                                onClick={handleUpdate}
+                                className="flex-1 py-2.5 flex items-center justify-center gap-1.5 text-[13px] font-medium transition-colors active:bg-[rgba(0,122,255,0.06)]"
+                                style={{ color: "var(--onebox-blue)" }}
+                            >
+                                <ArrowClockwise size={13} />
+                                <span>{t("update")}</span>
+                            </button>
+                            <div
+                                className="w-px my-1.5"
+                                style={{
+                                    background: "var(--onebox-separator)",
+                                }}
+                            />
+                            <button
+                                type="button"
+                                onClick={handleDelete}
+                                className="flex-1 py-2.5 flex items-center justify-center gap-1.5 text-[13px] font-medium transition-colors active:bg-[rgba(255,59,48,0.06)]"
+                                style={{ color: "#FF3B30" }}
+                            >
+                                <Trash3 size={13} />
+                                <span>{t("delete")}</span>
+                            </button>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </li>
-    )
-}
+    );
+};

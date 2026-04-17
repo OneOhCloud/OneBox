@@ -1,8 +1,22 @@
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { useState } from "react";
-import { CheckCircle, CloudArrowDown, ExclamationTriangle, InfoCircle, Plus, XCircle } from "react-bootstrap-icons";
-import { MessageType, ValidationErrors, useModalState } from "../../action/modal-state-hook";
+import {
+    CheckCircleFill,
+    CloudArrowDownFill,
+    ExclamationTriangleFill,
+    InfoCircleFill,
+    Plus,
+    XCircleFill,
+} from "react-bootstrap-icons";
+import {
+    MessageType,
+    ValidationErrors,
+    useModalState,
+} from "../../action/modal-state-hook";
 import { t } from "../../utils/helper";
+import { IOSTextField } from "../common/ios-text-field";
+
+// ---- Form step ---------------------------------------------------------
 
 interface FormStepProps {
     name: string;
@@ -14,62 +28,53 @@ interface FormStepProps {
     onAdd: () => void;
 }
 
-interface LoadingStepProps {
-    loading: boolean;
-}
-
-interface ResultStepProps {
-    message: string;
-    messageType: MessageType;
-    onClose: () => void;
-}
-
-const FormStep: React.FC<FormStepProps> = ({ name, url, errors, onNameChange, onUrlChange, onClose, onAdd }) => (
+const FormStep: React.FC<FormStepProps> = ({
+    name,
+    url,
+    errors,
+    onNameChange,
+    onUrlChange,
+    onClose,
+    onAdd,
+}) => (
     <>
-        <h3 className="font-medium text-xs text-gray-700 mb-4">
+        <h3
+            className="text-[16px] font-semibold text-center pt-5 pb-3.5 px-5 tracking-[-0.01em]"
+            style={{ color: "var(--onebox-label)" }}
+        >
             {t("add_subscription")}
         </h3>
-        <div className="flex flex-col gap-6">
-            <div>
-                <input
-                    className={`w-full px-2 py-1 text-xs rounded border ${errors.name
-                        ? 'border-red-400 focus:border-red-500 focus:ring-1 focus:ring-red-500'
-                        : 'border-gray-300 focus:border-gray-400 focus:ring-1 focus:ring-gray-400'
-                        } outline-none transition-colors`}
-                    type="text"
-                    placeholder={t("name_placeholder_1")}
-                    value={name}
-                    onChange={(e) => onNameChange(e.target.value)}
-                />
-                {errors.name && (
-                    <p className="text-red-500 text-xs mt-1">{errors.name}</p>
-                )}
-            </div>
-            <div>
-                <input
-                    className={`w-full px-2 py-1 text-xs rounded border ${errors.url
-                        ? 'border-red-400 focus:border-red-500 focus:ring-1 focus:ring-red-500'
-                        : 'border-gray-300 focus:border-gray-400 focus:ring-1 focus:ring-gray-400'
-                        } outline-none transition-colors`}
-                    type="text"
-                    placeholder={t("name_placeholder_2")}
-                    value={url}
-                    onChange={(e) => onUrlChange(e.target.value)}
-                />
-                {errors.url && (
-                    <p className="text-red-500 text-xs mt-1">{errors.url}</p>
-                )}
-            </div>
+        <div className="px-4 pb-4 space-y-2.5">
+            <IOSTextField
+                placeholder={t("name_placeholder_1")}
+                value={name}
+                onChange={onNameChange}
+                error={errors.name}
+            />
+            <IOSTextField
+                placeholder={t("name_placeholder_2")}
+                value={url}
+                onChange={onUrlChange}
+                error={errors.url}
+            />
         </div>
-        <div className="flex justify-end gap-2 mt-6">
+        <div
+            className="grid grid-cols-2"
+            style={{ borderTop: "0.5px solid var(--onebox-separator)" }}
+        >
             <button
-                className="px-3 py-1 text-xs rounded bg-transparent hover:bg-gray-100 text-gray-600 transition-colors"
+                className="h-11 text-[14px] transition-colors active:bg-[rgba(60,60,67,0.05)]"
+                style={{ color: "var(--onebox-blue)" }}
                 onClick={onClose}
             >
                 {t("close")}
             </button>
             <button
-                className="px-3 py-1 text-xs rounded bg-gray-600 hover:bg-gray-700 text-white transition-colors"
+                className="h-11 text-[14px] font-semibold transition-colors active:bg-[rgba(0,122,255,0.08)]"
+                style={{
+                    color: "var(--onebox-blue)",
+                    borderLeft: "0.5px solid var(--onebox-separator)",
+                }}
                 onClick={onAdd}
             >
                 {t("add")}
@@ -78,86 +83,160 @@ const FormStep: React.FC<FormStepProps> = ({ name, url, errors, onNameChange, on
     </>
 );
 
-const LoadingStep: React.FC<LoadingStepProps> = () => (
-    <div className="flex flex-col items-center justify-center min-h-30 py-8">
-        <div className="relative w-16 h-16 flex items-center justify-center">
-            <CloudArrowDown className="text-gray-400 w-16 h-16" />
-            <motion.div
-                className="absolute left-0 w-full h-1 pointer-events-none"
-                style={{ background: 'linear-gradient(to bottom, rgba(156,163,175,0.0), rgba(156,163,175,0.3), rgba(156,163,175,0.0))', borderRadius: '8px' }}
-                initial={{ top: 0 }}
-                animate={{ top: [0, 48] }}
-                transition={{ duration: 1.2, repeat: Infinity, repeatType: "loop", ease: "linear" }}
+// ---- Loading step ------------------------------------------------------
+
+const LoadingStep: React.FC = () => (
+    <div className="flex flex-col items-center justify-center py-8 px-5">
+        <div
+            className="size-11 rounded-[12px] flex items-center justify-center mb-3"
+            style={{ background: "rgba(0, 122, 255, 0.1)" }}
+        >
+            <CloudArrowDownFill
+                size={22}
+                style={{ color: "var(--onebox-blue)" }}
             />
         </div>
-        <span className="text-base font-medium tracking-wide animate-pulse">
-            {t('adding_subscription')}
-        </span>
+        <div
+            className="text-[14px] font-medium tracking-[-0.005em]"
+            style={{ color: "var(--onebox-label)" }}
+        >
+            {t("adding_subscription")}
+        </div>
     </div>
 );
 
-const ResultStep: React.FC<ResultStepProps> = ({ message, messageType, onClose }) => {
-    let IconComponent = InfoCircle;
-    // 统一暗灰色
-    const iconClass = "w-16 h-16 text-gray-500";
-    let textClass = "text-gray-700";
-    switch (messageType) {
-        case "success":
-            IconComponent = CheckCircle;
-            break;
-        case "error":
-            IconComponent = XCircle;
-            break;
-        case "warning":
-            IconComponent = ExclamationTriangle;
-            break;
-        default:
-            IconComponent = InfoCircle;
-    }
-    return (
-        <div className="flex flex-col items-center justify-center min-h-30 py-2">
-            <IconComponent className={iconClass} />
+// ---- Result step -------------------------------------------------------
 
-            <div className={`mt-4 text-sm font-medium tracking-wide ${textClass}`}>
-                {message}
-            </div>
+interface ResultStepProps {
+    message: string;
+    messageType: MessageType;
+    onClose: () => void;
+}
 
-            <button
-                className="mt-2 px-4 py-1.5 text-sm rounded bg-gray-600 hover:bg-gray-700 text-white transition-colors shadow"
-                onClick={onClose}
-            >
-                {t('close')}
-            </button>
-        </div>
-    );
-};
-
-
-export function AddSubConfigurationModal() {
-    const [isHovering, setIsHovering] = useState(false);
-    const { open, step, name, url, errors, message, messageType, loading, openModal, closeModal, onNameChange, onUrlChange, submit } = useModalState();
+const ResultStep: React.FC<ResultStepProps> = ({
+    message,
+    messageType,
+    onClose,
+}) => {
+    const config = (() => {
+        switch (messageType) {
+            case "success":
+                return {
+                    Icon: CheckCircleFill,
+                    color: "#34C759",
+                    bg: "rgba(52, 199, 89, 0.12)",
+                };
+            case "error":
+                return {
+                    Icon: XCircleFill,
+                    color: "#FF3B30",
+                    bg: "rgba(255, 59, 48, 0.1)",
+                };
+            case "warning":
+                return {
+                    Icon: ExclamationTriangleFill,
+                    color: "#FF9500",
+                    bg: "rgba(255, 149, 0, 0.1)",
+                };
+            default:
+                return {
+                    Icon: InfoCircleFill,
+                    color: "var(--onebox-blue)",
+                    bg: "rgba(0, 122, 255, 0.1)",
+                };
+        }
+    })();
+    const { Icon, color, bg } = config;
 
     return (
         <>
-            <button
-                className="p-1 rounded-full hover:bg-gray-100 transition-colors border-0 bg-transparent cursor-pointer"
-                onMouseEnter={() => setIsHovering(true)}
-                onMouseLeave={() => setIsHovering(false)}
-                onClick={() => openModal()}
-            >
-                <motion.div
-                    animate={{ rotate: isHovering ? 90 : 0 }}
-                    transition={{ duration: 0.3, ease: "easeInOut" }}
+            <div className="flex flex-col items-center py-6 px-5">
+                <div
+                    className="size-11 rounded-[12px] flex items-center justify-center mb-3"
+                    style={{ background: bg }}
                 >
-                    <Plus className="size-6 text-blue-600" />
-                </motion.div>
+                    <Icon size={22} style={{ color }} />
+                </div>
+                <p
+                    className="text-[14px] font-medium text-center leading-snug tracking-[-0.005em]"
+                    style={{ color: "var(--onebox-label)" }}
+                >
+                    {message}
+                </p>
+            </div>
+            <button
+                className="w-full h-11 text-[14px] font-semibold transition-colors active:bg-[rgba(0,122,255,0.08)]"
+                style={{
+                    color: "var(--onebox-blue)",
+                    borderTop: "0.5px solid var(--onebox-separator)",
+                }}
+                onClick={onClose}
+            >
+                {t("close")}
             </button>
+        </>
+    );
+};
 
+// ---- Trigger + dialog --------------------------------------------------
+
+/**
+ * Hook that returns an `openModal` callback and a ready-to-render
+ * `ModalElement`. Configuration page mounts the ModalElement at its root
+ * so the modal persists across the EmptyState → list transition that
+ * happens when submit succeeds (previously the modal was unmounted
+ * mid-flow and the user never saw the success result step).
+ */
+export function useSubscriptionModalController() {
+    const {
+        open,
+        step,
+        name,
+        url,
+        errors,
+        message,
+        messageType,
+        openModal,
+        closeModal,
+        onNameChange,
+        onUrlChange,
+        submit,
+    } = useModalState();
+
+    const ModalElement = (
+        <AnimatePresence>
             {open && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
-                    <div className="absolute inset-0 bg-gray-400/60" onClick={closeModal} />
-                    <div className="relative bg-white rounded-lg p-3 w-80 max-w-full min-h-45 flex flex-col justify-center">
-                        {step === 'form' && (
+                <motion.div
+                    className="fixed inset-0 z-50 flex items-center justify-center px-4"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.18 }}
+                >
+                    <div
+                        className="absolute inset-0"
+                        style={{
+                            background: "rgba(15, 23, 42, 0.38)",
+                            backdropFilter: "blur(6px)",
+                            WebkitBackdropFilter: "blur(6px)",
+                        }}
+                        onClick={closeModal}
+                    />
+                    <motion.div
+                        className="relative w-full max-w-[290px] bg-white rounded-[14px] overflow-hidden"
+                        style={{
+                            boxShadow:
+                                "0 22px 48px -12px rgba(15, 23, 42, 0.3), 0 4px 14px rgba(15, 23, 42, 0.08)",
+                        }}
+                        initial={{ scale: 0.92, y: 8 }}
+                        animate={{ scale: 1, y: 0 }}
+                        exit={{ scale: 0.94, y: 4 }}
+                        transition={{
+                            duration: 0.22,
+                            ease: [0.32, 0.72, 0, 1],
+                        }}
+                    >
+                        {step === "form" && (
                             <FormStep
                                 name={name}
                                 url={url}
@@ -168,17 +247,51 @@ export function AddSubConfigurationModal() {
                                 onAdd={submit}
                             />
                         )}
-                        {step === 'loading' && <LoadingStep loading={loading} />}
-                        {step === 'result' && (
+                        {step === "loading" && <LoadingStep />}
+                        {step === "result" && (
                             <ResultStep
                                 message={message}
                                 messageType={messageType}
                                 onClose={closeModal}
                             />
                         )}
-                    </div>
-                </div>
+                    </motion.div>
+                </motion.div>
             )}
-        </>
+        </AnimatePresence>
+    );
+
+    return { openModal: () => openModal(), ModalElement };
+}
+
+/**
+ * Plus-icon trigger button — used as the Configuration header action.
+ * Stateless; the parent owns the modal controller and passes `onOpen`.
+ */
+export function AddSubscriptionTriggerButton({
+    onOpen,
+}: {
+    onOpen: () => void;
+}) {
+    const [isHovering, setIsHovering] = useState(false);
+    return (
+        <button
+            type="button"
+            className="p-1.5 rounded-full transition-colors active:bg-[rgba(0,122,255,0.08)]"
+            onMouseEnter={() => setIsHovering(true)}
+            onMouseLeave={() => setIsHovering(false)}
+            onClick={onOpen}
+            aria-label={t("add_subscription")}
+        >
+            <motion.div
+                animate={{ rotate: isHovering ? 90 : 0 }}
+                transition={{ duration: 0.25, ease: "easeOut" }}
+            >
+                <Plus
+                    className="size-5"
+                    style={{ color: "var(--onebox-blue)" }}
+                />
+            </motion.div>
+        </button>
     );
 }

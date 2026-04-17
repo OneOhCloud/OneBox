@@ -199,7 +199,7 @@ async function _insertSubscription(url: string, name?: string): Promise<string |
 
         const db = await getDataBaseInstance();
         const resolvedName = (!name || name === '默认配置')
-            ? getRemoteNameByContentDisposition(response.headers['content-disposition'] || '') || '订阅'
+            ? getRemoteNameByContentDisposition(response.headers['content-disposition'] || '') || '配置'
             : name;
         const { upload, download, total, expire } = getRemoteInfoBySubscriptionUserinfo(
             response.headers['subscription-userinfo'] || ''
@@ -253,7 +253,7 @@ export async function addSubscription(url: string, name: string | undefined) {
         const officialWebsite = response.headers['official-website'] || 'https://sing-box.net'
 
         if (name === undefined || name === '' || name === "默认配置") {
-            name = getRemoteNameByContentDisposition(response.headers['content-disposition'] || '') || '订阅'
+            name = getRemoteNameByContentDisposition(response.headers['content-disposition'] || '') || '配置'
         }
 
         const { upload, download, total, expire } = getRemoteInfoBySubscriptionUserinfo(response.headers['subscription-userinfo'] || '')

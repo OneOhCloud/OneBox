@@ -1,19 +1,18 @@
 .tooltip-delayed {
-  /* 自定义变量 */
-  --show-delay: 800ms;  /* 显示延迟1秒 */
-  --hide-delay: 0ms;     /* 隐藏无延迟 */
-  --show-duration: 200ms; /* 显示过渡持续时间 */
-  --hide-duration: 100ms; /* 隐藏过渡持续时间 */
+  --show-delay: 800ms;
+  --hide-delay: 0ms;
+  --show-duration: 200ms;
+  --hide-duration: 100ms;
 }
-/* 默认状态 - 快速消失 */
+
 .tooltip-delayed > .tooltip-content,
 .tooltip-delayed[data-tip]:before,
 .tooltip-delayed:after {
-  transition: 
-    opacity var(--hide-duration) cubic-bezier(0.4, 0, 0.2, 1) var(--hide-delay), 
+  transition:
+    opacity var(--hide-duration) cubic-bezier(0.4, 0, 0.2, 1) var(--hide-delay),
     transform var(--hide-duration) cubic-bezier(0.4, 0, 0.2, 1) var(--hide-delay);
 }
-/* 悬停状态 - 延迟显示 */
+
 .tooltip-delayed.tooltip-open > .tooltip-content,
 .tooltip-delayed.tooltip-open:before,
 .tooltip-delayed.tooltip-open:after,
@@ -24,7 +23,140 @@
 .tooltip-delayed:has(:focus-visible) > .tooltip-content,
 .tooltip-delayed:has(:focus-visible):before,
 .tooltip-delayed:has(:focus-visible):after {
-  transition: 
-    opacity var(--show-duration) cubic-bezier(0.4, 0, 0.2, 1) var(--show-delay), 
+  transition:
+    opacity var(--show-duration) cubic-bezier(0.4, 0, 0.2, 1) var(--show-delay),
     transform var(--show-duration) cubic-bezier(0.4, 0, 0.2, 1) var(--show-delay);
+}
+
+/* ==========================================================================
+ * Apple system aesthetic.
+ *
+ * No backdrop-filter, no decorative colour orbs. Apple's own apps (Settings,
+ * Control Center, HomeKit) sit on flat systemGroupedBackground and convey
+ * material through gradient fills + inset specular + outer shadow. That's
+ * what we do here. Interactive colour is systemBlue (#007AFF), not the
+ * Tailwind blue-500 default.
+ * ========================================================================== */
+
+.onebox-home {
+  background: var(--onebox-bg);
+}
+
+/* ---- Active-state aura --------------------------------------------------
+ * Only rendered when the tile is on or connecting. A soft systemBlue glow
+ * beneath the tile — same family as the warm halo under a HomeKit light
+ * when it's switched on. Idle shows nothing.
+ * ---------------------------------------------------------------------- */
+
+.onebox-aura {
+  position: absolute;
+  top: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 240px;
+  height: 240px;
+  border-radius: 50%;
+  pointer-events: none;
+  filter: blur(44px);
+  opacity: 0;
+  z-index: 0;
+  background: radial-gradient(circle, rgba(0, 122, 255, 0.3) 0%, transparent 66%);
+  transition: opacity 400ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.onebox-home[data-phase="on"] .onebox-aura {
+  opacity: 1;
+}
+
+.onebox-home[data-phase="connecting"] .onebox-aura {
+  opacity: 0.55;
+}
+
+/* ---- Power tile ---------------------------------------------------------
+ * Optical glass, no backdrop-filter.
+ * ---------------------------------------------------------------------- */
+
+.onebox-tile {
+  position: relative;
+  z-index: 1;
+  transition:
+    background 280ms cubic-bezier(0.32, 0.72, 0, 1),
+    box-shadow 280ms cubic-bezier(0.32, 0.72, 0, 1),
+    transform 140ms cubic-bezier(0.32, 0.72, 0, 1);
+  will-change: transform;
+}
+
+.onebox-tile--idle,
+.onebox-tile--connecting {
+  background: linear-gradient(
+    140deg,
+    #FFFFFF 0%,
+    #FAFAFC 52%,
+    #F2F2F6 100%
+  );
+  box-shadow:
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.98),
+    inset 1.5px 0 0 rgba(255, 255, 255, 0.65),
+    inset 0 -1px 0 rgba(60, 60, 67, 0.08),
+    0 12px 28px -10px rgba(15, 23, 42, 0.12),
+    0 2px 6px rgba(15, 23, 42, 0.04);
+}
+
+.onebox-tile--on {
+  background: linear-gradient(
+    140deg,
+    #4DA3FF 0%,
+    #007AFF 52%,
+    #0062CC 100%
+  );
+  box-shadow:
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.42),
+    inset 1.5px 0 0 rgba(255, 255, 255, 0.22),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.15),
+    0 14px 32px -10px rgba(0, 122, 255, 0.4),
+    0 2px 8px rgba(0, 122, 255, 0.18);
+}
+
+.onebox-tile:hover:not(:disabled) {
+  transform: translateY(-0.5px);
+}
+
+.onebox-tile:active:not(:disabled) {
+  transform: scale(0.975);
+  transition-duration: 120ms;
+}
+
+/* ---- Segmented control --------------------------------------------------
+ * Matches iOS 26 UISegmentedControl: translucent grey trough, opaque white
+ * pill, minimal shadow.
+ * ---------------------------------------------------------------------- */
+
+.onebox-segmented {
+  /* Bright-airy trough — roughly half the opacity of Apple's default
+     UISegmentedControl track (0.16) so the active pill (pure white)
+     reads as clearly elevated rather than sinking into a grey well. */
+  background: rgba(118, 118, 128, 0.09);
+  box-shadow: inset 0 0.5px 0.5px rgba(60, 60, 67, 0.03);
+}
+
+.onebox-segmented-pill {
+  background: #FFFFFF;
+  box-shadow:
+    inset 0 0.5px 0 rgba(255, 255, 255, 1),
+    0 2px 5px rgba(15, 23, 42, 0.09),
+    0 1px 2px rgba(15, 23, 42, 0.05);
+  /* Slightly snappier than 300ms — matches the brisk feel. */
+  transition: left 240ms cubic-bezier(0.32, 0.72, 0, 1),
+              width 240ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+/* ---- Status row dot pulse (connecting only) ----------------------------- */
+
+@keyframes onebox-dot-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.4; transform: scale(0.85); }
+}
+
+.onebox-dot-pulse {
+  animation: onebox-dot-pulse 1.8s cubic-bezier(0.45, 0, 0.55, 1) infinite;
 }

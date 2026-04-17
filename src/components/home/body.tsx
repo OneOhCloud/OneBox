@@ -1,92 +1,72 @@
-import { useEffect, useState } from "react";
-import { Shield } from "react-bootstrap-icons";
 import { useSubscriptions } from "../../hooks/useDB";
-import { getStoreValue } from "../../single/store";
-import { SSI_STORE_KEY, Subscription } from "../../types/definition";
 import { t, vpnServiceManager } from "../../utils/helper";
 import { AppleNetworkStatus, GoogleNetworkStatus } from "./network-check";
 import SelectSub from "./select-config";
 import SelectNode from "./select-node";
 
-const formatDate = (prefix: string, date: number) => {
-    if (date === 32503680000000) {
-        // 是本地文件
-        return t("local_file_no_expire")
-    } else {
-        return `${prefix} ${new Date(date).toLocaleDateString('zh-CN')}`
-    }
+function SectionLabel({
+    children,
+    trailing,
+}: {
+    children: React.ReactNode;
+    trailing?: React.ReactNode;
+}) {
+    return (
+        <div className="flex items-center justify-between px-1 mb-1.5">
+            <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-500 capitalize">
+                {children}
+            </span>
+            {trailing && (
+                <div className="flex items-center gap-2">{trailing}</div>
+            )}
+        </div>
+    );
+}
 
-};
-
-export default function Body({ isRunning, onUpdate }: { isRunning: boolean, onUpdate: () => void }) {
-    const [sub, setSub] = useState<Subscription>();
+export default function Body({
+    isRunning,
+    onUpdate,
+}: {
+    isRunning: boolean;
+    onUpdate: () => void;
+}) {
     const { data, isLoading } = useSubscriptions();
 
-    useEffect(() => {
-        if (!data?.length) return;
-        getStoreValue(SSI_STORE_KEY).then(savedId => {
-            setSub(data.find(i => i.identifier === savedId) ?? data[0]);
-        });
-    }, [data]);
-
-    const handleUpdate = async (identifier: string, isUpdate: boolean) => {
+    const handleUpdate = async (_identifier: string, isUpdate: boolean) => {
         try {
-            setSub(data?.find(item => item.identifier === identifier));
             if (isUpdate && isRunning) {
                 await vpnServiceManager.syncConfig({});
-                onUpdate()
+                onUpdate();
             }
         } catch (error) {
             console.error(t("update_config_failed") + ":", error);
         }
     };
 
-
-
     return (
-        <div className='w-full h-full flex flex-col space-y-6 justify-between ' >
-            <div>
-                <div className="fieldset w-full">
-                    <div className="fieldset-legend min-w-67.5">
-                        <div className="capitalize">
-                            {
-                                t("current_subscription")
-                            }
-                        </div>
-                        <div className="flex gap-2 px-2 items-center">
-
+        <div className="w-full space-y-4">
+            <section className="w-full">
+                <SectionLabel
+                    trailing={
+                        <>
                             <AppleNetworkStatus />
                             <GoogleNetworkStatus isRunning={isRunning} />
-                        </div>
-                    </div>
-                    <SelectSub onUpdate={handleUpdate} data={data} isLoading={isLoading} />
-                </div>
-                <div className="fieldset w-full">
-                    <div className="fieldset-legend min-w-67.5 capitalize">
-                        {t("node_selection")}
-                    </div>
-                    <SelectNode isRunning={isRunning} />
-                </div>
-            </div>
-            <div>
-                {sub && (
-                    <div className="w-full  ">
-                        <div className="flex items-center justify-center">
-                            <Shield size={14} className="text-gray-400 mr-1" />
-                            <span className="text-xs text-gray-400 capitalize">
-                                {t("current_subscription")}
-                            </span>
-                        </div>
+                        </>
+                    }
+                >
+                    {t("current_subscription")}
+                </SectionLabel>
+                <SelectSub
+                    onUpdate={handleUpdate}
+                    data={data}
+                    isLoading={isLoading}
+                />
+            </section>
 
-                        <div className="flex items-center justify-center mt-1">
-                            <span className="text-xs text-blue-500 ">
-
-                                {formatDate(t("expired_at"), sub.expire_time)}
-                            </span>
-                        </div>
-                    </div>
-                )}
-            </div>
+            <section className="w-full">
+                <SectionLabel>{t("node_selection")}</SectionLabel>
+                <SelectNode isRunning={isRunning} />
+            </section>
         </div>
     );
 }

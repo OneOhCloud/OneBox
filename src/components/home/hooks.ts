@@ -9,6 +9,7 @@ import { NavContext } from "../../single/context";
 import { getStoreValue, setStoreValue } from "../../single/store";
 import { GET_SUBSCRIPTIONS_LIST_SWR_KEY, RULE_MODE_STORE_KEY, SSI_STORE_KEY } from "../../types/definition";
 import { t, vpnServiceManager } from "../../utils/helper";
+import type { DeepLinkApplyPhase } from "./deep-link-apply-progress-modal";
 
 
 
@@ -133,6 +134,14 @@ export const useVPNOperations = () => {
     const engineState = useEngineState();
     const { setActiveScreen, deepLinkApplyUrl, setDeepLinkApplyUrl } = useContext(NavContext);
 
+    // Deep-link apply=1 progress surface. `null` = modal hidden.
+    const [applyPhase, setApplyPhase] = useState<DeepLinkApplyPhase | null>(null);
+    const [applyErrorMessage, setApplyErrorMessage] = useState<string>('');
+    // Epoch at the moment we enter the 'start' phase. Only engine transitions
+    // past this epoch can close the modal — avoids a stale `running` snapshot
+    // (e.g. the previous subscription) flipping us to 'done' prematurely.
+    const applyEpochRef = useRef<number>(-1);
+
     // 从权威状态派生出兼容变量
     const isRunning = engineState.kind === 'running';
     const isLoading = engineState.kind === 'starting' || engineState.kind === 'stopping';
@@ -144,14 +153,48 @@ export const useVPNOperations = () => {
                 : 'idle';
 
     // 失败状态:弹窗提示并回到 Idle,避免前端永久卡在 failed。
+    // Suppressed while the apply modal is live — the modal surfaces the error
+    // instead, to avoid a double prompt.
     useEffect(() => {
         if (engineState.kind !== 'failed') return;
+        if (applyPhase !== null) return;
         const reason = engineState.reason;
         (async () => {
             await message(`${t('connect_failed')}: ${reason}`, { title: t('error'), kind: 'error' });
             await clearEngineError();
         })();
-    }, [engineState.kind === 'failed' ? engineState.epoch : null]);
+    }, [engineState.kind === 'failed' ? engineState.epoch : null, applyPhase]);
+
+    // Drive apply modal to 'done' / 'error' based on engine transitions that
+    // happen after we issued the start command.
+    useEffect(() => {
+        if (applyPhase !== 'start') return;
+        if (engineState.epoch <= applyEpochRef.current) return;
+        if (engineState.kind === 'running') {
+            setApplyPhase('done');
+        } else if (engineState.kind === 'failed') {
+            setApplyErrorMessage(engineState.reason || t('connect_failed'));
+            setApplyPhase('error');
+            clearEngineError().catch(() => { });
+        }
+    }, [applyPhase, engineState.kind, engineState.epoch]);
+
+    // Backstop timeout: if the engine never transitions (silent IPC failure or
+    // indefinite connect attempt), flip to error after 45s so the modal never
+    // wedges.
+    useEffect(() => {
+        if (applyPhase !== 'start') return;
+        const timer = setTimeout(() => {
+            setApplyErrorMessage(t('connect_failed'));
+            setApplyPhase('error');
+        }, 45000);
+        return () => clearTimeout(timer);
+    }, [applyPhase]);
+
+    const closeApplyModal = () => {
+        setApplyPhase(null);
+        setApplyErrorMessage('');
+    };
 
     const stopService = async () => {
         try {
@@ -177,12 +220,22 @@ export const useVPNOperations = () => {
     };
 
     // apply=1 deep link: import subscription, switch to it, then start.
+    // Phase state drives the progress modal so users get clear feedback during
+    // the 10-20s cold-start window instead of staring at a frozen UI.
     useEffect(() => {
         if (!deepLinkApplyUrl) return;
         const url = deepLinkApplyUrl;
         setDeepLinkApplyUrl('');
 
+        setApplyErrorMessage('');
+        setApplyPhase('init');
+
         (async () => {
+            // Brief 'init' dwell so the modal can render its entrance animation
+            // before the first real work starts.
+            await new Promise(r => setTimeout(r, 350));
+            setApplyPhase('import');
+
             try {
                 const id = await insertSubscription(url);
                 if (!id) throw new Error(t('add_subscription_failed'));
@@ -192,12 +245,23 @@ export const useVPNOperations = () => {
                     vpnServiceManager.stop().catch(() => { }),
                 ]);
             } catch {
-                await message(t('add_subscription_failed'), { title: t('error'), kind: 'error' });
+                setApplyErrorMessage(t('add_subscription_failed'));
+                setApplyPhase('error');
                 return;
             }
 
-            performSyncAndStart(async () => {
-                await message(t('connect_failed'), { title: t('error'), kind: 'error' });
+            // Snapshot the current engine epoch; only transitions past this
+            // epoch count for the apply-modal 'done' check.
+            applyEpochRef.current = engineState.epoch;
+            setApplyPhase('start');
+
+            performSyncAndStart(async (error) => {
+                setApplyErrorMessage(
+                    typeof error === 'string' && error
+                        ? error
+                        : t('connect_failed')
+                );
+                setApplyPhase('error');
             });
         })();
     }, [deepLinkApplyUrl]);
@@ -252,6 +316,9 @@ export const useVPNOperations = () => {
         startService,
         restartService,
         toggleService,
+        applyPhase,
+        applyErrorMessage,
+        closeApplyModal,
     };
 };
 

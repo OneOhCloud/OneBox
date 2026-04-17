@@ -1,37 +1,47 @@
-import { platform } from '@tauri-apps/plugin-os';
+import { platform } from "@tauri-apps/plugin-os";
 import { useEffect, useState } from "react";
 import { Ethernet } from "react-bootstrap-icons";
 import { getStoreValue, setStoreValue } from "../../single/store";
-import { TUN_STACK_STORE_KEY } from '../../types/definition';
+import { TUN_STACK_STORE_KEY } from "../../types/definition";
 import { t } from "../../utils/helper";
+import {
+    RadioOption,
+    RadioOptionList,
+} from "../common/radio-option-list";
+import { SettingsModal } from "../common/settings-modal";
 import { SettingItem } from "./common";
 
 type TunStackType = "system" | "gvisor" | "mixed";
 
 const GvisorUnsupportedPlatforms: string[] = [
-    // macOS 平台不支持 system stack 
-    // EN: macOS platform does not support system stack
+    // macOS 平台不支持 system stack
     "macos",
 ];
 
 export default function TunStackSetting() {
-    const [isSystemTunUnsupported, setIsSystemTunUnsupported] = useState(false)
-    const defaultStack: TunStackType = isSystemTunUnsupported ? "gvisor" : "system";
+    const [isSystemTunUnsupported, setIsSystemTunUnsupported] = useState(false);
+    const defaultStack: TunStackType = isSystemTunUnsupported
+        ? "gvisor"
+        : "system";
     const [tunStack, setTunStack] = useState<TunStackType>(defaultStack);
-    const [selectedStack, setSelectedStack] = useState<TunStackType>(defaultStack);
+    const [selectedStack, setSelectedStack] =
+        useState<TunStackType>(defaultStack);
     const [modalOpen, setModalOpen] = useState(false);
 
     useEffect(() => {
-        setIsSystemTunUnsupported(GvisorUnsupportedPlatforms.includes(platform()))
+        setIsSystemTunUnsupported(
+            GvisorUnsupportedPlatforms.includes(platform()),
+        );
     }, []);
 
     useEffect(() => {
         const loadState = async () => {
             try {
-                const state: TunStackType = await getStoreValue(TUN_STACK_STORE_KEY, defaultStack);
+                const state: TunStackType = await getStoreValue(
+                    TUN_STACK_STORE_KEY,
+                    defaultStack,
+                );
                 if (isSystemTunUnsupported && state !== "gvisor") {
-                    // 在不支持 system stack 的平台上强制使用 gvisor stack
-                    // EN: Force gvisor stack on platforms that do not support system stack
                     await setStoreValue(TUN_STACK_STORE_KEY, "gvisor");
                     setTunStack("gvisor");
                     setSelectedStack("gvisor");
@@ -39,23 +49,24 @@ export default function TunStackSetting() {
                     setTunStack(state);
                     setSelectedStack(state);
                 }
-            } catch (error) {
-                console.warn("Error loading tun stack state, using system default.");
+            } catch {
+                console.warn(
+                    "Error loading tun stack state, using system default.",
+                );
                 if (isSystemTunUnsupported) {
                     setTunStack("gvisor");
                     setSelectedStack("gvisor");
                 }
             }
         };
-
         loadState();
     }, []);
 
     const handleSave = async () => {
         try {
-            // 在不支持 gvisor 的平台上阻止保存非 gvisor 的选项
-            // EN: Prevent saving non-gvisor options on platforms that do not support gvisor
-            const valueToSave = isSystemTunUnsupported ? "gvisor" : selectedStack;
+            const valueToSave = isSystemTunUnsupported
+                ? "gvisor"
+                : selectedStack;
             await setStoreValue(TUN_STACK_STORE_KEY, valueToSave);
             setTunStack(valueToSave);
             setModalOpen(false);
@@ -64,88 +75,49 @@ export default function TunStackSetting() {
         }
     };
 
-    if (isSystemTunUnsupported) {
-        return null;
-    }
+    if (isSystemTunUnsupported) return null;
+
+    const options: RadioOption<TunStackType>[] = [
+        {
+            key: "system",
+            label: t("system_stack"),
+            disabled: isSystemTunUnsupported,
+        },
+        { key: "gvisor", label: t("gvisor_stack") },
+        {
+            key: "mixed",
+            label: t("mixed_stack"),
+            disabled: isSystemTunUnsupported,
+        },
+    ];
 
     return (
         <>
             <SettingItem
                 icon={<Ethernet className="text-[#34C759]" size={22} />}
                 title={t("tun_stack")}
-                badge={<span className="mx-2 text-sm">{t(`${tunStack}_stack`)}</span>}
+                badge={<span>{t(`${tunStack}_stack`)}</span>}
                 subTitle={t("tun_stack_desc")}
                 onPress={() => {
-                    if (!isSystemTunUnsupported) {
-                        setModalOpen(true);
-                        setSelectedStack(tunStack);
-                    }
+                    setModalOpen(true);
+                    setSelectedStack(tunStack);
                 }}
                 disabled={isSystemTunUnsupported}
             />
 
-            {modalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
-                    <div className="bg-white dark:bg-[#2C2C2E] p-6 rounded-xl w-80 max-w-md shadow-xl border border-gray-200 dark:border-[#3A3A3C]">
-                        <h3 className="text-center text-lg font-medium mb-4 dark:text-white">{t("select_tun_stack")}</h3>
-
-                        <div className="bg-[#F2F2F7] dark:bg-[#1C1C1E] rounded-xl overflow-hidden mb-6">
-                            <label className="flex items-center px-4 py-3 cursor-pointer border-b border-gray-200 dark:border-[#3A3A3C]">
-                                <div className={`flex-1 dark:text-white ${isSystemTunUnsupported ? "text-gray-400 dark:text-gray-500" : ""}`}>{t("system_stack")}</div>
-                                <input
-                                    type="radio"
-                                    name="tun-stack"
-                                    className="appearance-none w-5 h-5 rounded-full border-2 border-[#007AFF] checked:bg-[#007AFF] checked:border-[#007AFF] relative
-                                    before:content-[''] before:absolute before:w-2 before:h-2 before:bg-white before:rounded-full before:top-1/2 before:left-1/2 before:-translate-x-1/2 before:-translate-y-1/2 before:opacity-0 checked:before:opacity-100 disabled:opacity-50 disabled:border-gray-400 disabled:cursor-not-allowed"
-                                    checked={selectedStack === "system"}
-                                    onChange={() => setSelectedStack("system")}
-                                    disabled={isSystemTunUnsupported}
-                                />
-                            </label>
-
-                            <label className="flex items-center px-4 py-3 cursor-pointer border-b border-gray-200 dark:border-[#3A3A3C]">
-                                <div className="flex-1 dark:text-white">{t("gvisor_stack")}</div>
-                                <input
-                                    type="radio"
-                                    name="tun-stack"
-                                    className="appearance-none w-5 h-5 rounded-full border-2 border-[#007AFF] checked:bg-[#007AFF] checked:border-[#007AFF] relative
-                                    before:content-[''] before:absolute before:w-2 before:h-2 before:bg-white before:rounded-full before:top-1/2 before:left-1/2 before:-translate-x-1/2 before:-translate-y-1/2 before:opacity-0 checked:before:opacity-100"
-                                    checked={selectedStack === "gvisor"}
-                                    onChange={() => setSelectedStack("gvisor")}
-                                />
-                            </label>
-
-                            <label className="flex items-center px-4 py-3 cursor-pointer">
-                                <div className={`flex-1 dark:text-white ${isSystemTunUnsupported ? "text-gray-400 dark:text-gray-500" : ""}`}>{t("mixed_stack")}</div>
-                                <input
-                                    type="radio"
-                                    name="tun-stack"
-                                    className="appearance-none w-5 h-5 rounded-full border-2 border-[#007AFF] checked:bg-[#007AFF] checked:border-[#007AFF] relative
-                                    before:content-[''] before:absolute before:w-2 before:h-2 before:bg-white before:rounded-full before:top-1/2 before:left-1/2 before:-translate-x-1/2 before:-translate-y-1/2 before:opacity-0 checked:before:opacity-100 disabled:opacity-50 disabled:border-gray-400 disabled:cursor-not-allowed"
-                                    checked={selectedStack === "mixed"}
-                                    onChange={() => setSelectedStack("mixed")}
-                                    disabled={isSystemTunUnsupported}
-                                />
-                            </label>
-                        </div>
-
-                        <div className="flex justify-between gap-4">
-                            <button
-                                className="flex-1 py-2.5 rounded-full text-[#007AFF] font-medium hover:bg-[#F2F2F7] dark:hover:bg-[#3A3A3C] transition-colors"
-                                onClick={() => setModalOpen(false)}
-                            >
-                                {t("cancel")}
-                            </button>
-                            <button
-                                className="flex-1 py-2.5 rounded-full bg-[#007AFF] text-white font-medium hover:bg-[#0071EB] transition-colors"
-                                onClick={handleSave}
-                            >
-                                {t("confirm")}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
+            <SettingsModal
+                isOpen={modalOpen}
+                onClose={() => setModalOpen(false)}
+                title={t("select_tun_stack")}
+                confirmLabel={t("confirm")}
+                onConfirm={handleSave}
+            >
+                <RadioOptionList
+                    value={selectedStack}
+                    onChange={setSelectedStack}
+                    options={options}
+                />
+            </SettingsModal>
         </>
     );
 }

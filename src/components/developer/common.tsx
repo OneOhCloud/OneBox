@@ -1,21 +1,14 @@
-import {
-    ChevronRight
-} from 'react-bootstrap-icons';
-
-
+import { ChevronRight } from 'react-bootstrap-icons';
 
 interface SettingItemProps {
     icon: React.ReactNode;
     title: string;
     subTitle?: string;
-
     badge?: string | React.ReactNode;
     onPress?: () => void;
     disabled?: boolean;
-
 }
 
-// 带开关的设置项接口定义
 interface ToggleSettingProps {
     icon: React.ReactNode;
     title: string;
@@ -24,65 +17,97 @@ interface ToggleSettingProps {
     onToggle: () => void;
 }
 
-
-
-
-// 设置项组件
+// Mirror of settings/common.tsx so both Settings and Developer pages share
+// one visual contract without creating a cross-domain import.
 export function SettingItem({
     icon,
     title,
-    badge,
     subTitle,
+    badge,
     onPress = () => { },
-    disabled = false
+    disabled = false,
 }: SettingItemProps) {
     return (
-        <div
-            className={
-                `flex items-center justify-between p-4 cursor-pointer transition-colors ${disabled ? 'cursor-not-allowed opacity-50' : 'hover:bg-gray-100 dark:hover:bg-[#3A3A3C]'}`
-            }
-            onClick={() => {
-                !disabled && onPress()
-            }}
+        <button
+            type="button"
+            disabled={disabled}
+            onClick={() => { !disabled && onPress(); }}
+            className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors ${
+                disabled
+                    ? 'opacity-50 cursor-not-allowed'
+                    : 'hover:bg-[rgba(60,60,67,0.025)] active:bg-[rgba(60,60,67,0.06)]'
+            }`}
         >
-            <div className="flex items-center">
-                <div className="mr-4">{icon}</div>
-                <div>
-                    <div className="text-[#1C1C1E] capitalize">{title}</div>
-                    {subTitle && <div className="text-xs text-[#8E8E93]">{subTitle}</div>}
+            <div className="size-7 flex items-center justify-center shrink-0">
+                {icon}
+            </div>
+            <div className="flex-1 min-w-0">
+                <div
+                    className="text-[15px] tracking-[-0.005em] truncate capitalize"
+                    style={{ color: 'var(--onebox-label)' }}
+                >
+                    {title}
                 </div>
+                {subTitle && (
+                    <div
+                        className="text-[12px] truncate mt-0.5"
+                        style={{ color: 'var(--onebox-label-secondary)' }}
+                    >
+                        {subTitle}
+                    </div>
+                )}
             </div>
-            <div className="flex items-center">
-                {badge}
-                <ChevronRight className="text-[#C7C7CC]" size={16} />
-            </div>
-        </div>
+            {badge && (
+                <div
+                    className="text-[13px] tracking-[-0.005em] shrink-0"
+                    style={{ color: 'var(--onebox-label-secondary)' }}
+                >
+                    {badge}
+                </div>
+            )}
+            <ChevronRight
+                size={13}
+                className="shrink-0"
+                style={{ color: 'rgba(60, 60, 67, 0.28)' }}
+            />
+        </button>
     );
 }
 
-// 带开关的设置项组件
 export function ToggleSetting({
     icon,
     title,
     subTitle,
     isEnabled,
-    onToggle
+    onToggle,
 }: ToggleSettingProps) {
     return (
-        <div className="flex items-center justify-between p-4  cursor-default transition-colors">
-            <div className="flex items-center">
-                <div className="mr-4">{icon}</div>
-                <div>
-                    <div className="text-[#1C1C1E] capitalize">{title}</div>
-                    {subTitle && <div className="text-xs text-[#8E8E93]">{subTitle}</div>}
+        <label className="w-full flex items-center gap-3 px-4 py-3 cursor-pointer">
+            <div className="size-7 flex items-center justify-center shrink-0">
+                {icon}
+            </div>
+            <div className="flex-1 min-w-0">
+                <div
+                    className="text-[15px] tracking-[-0.005em] truncate capitalize"
+                    style={{ color: 'var(--onebox-label)' }}
+                >
+                    {title}
                 </div>
+                {subTitle && (
+                    <div
+                        className="text-[12px] truncate mt-0.5"
+                        style={{ color: 'var(--onebox-label-secondary)' }}
+                    >
+                        {subTitle}
+                    </div>
+                )}
             </div>
             <input
                 type="checkbox"
-                className="toggle toggle-sm	 bg-[#E9E9EB] border-[#E9E9EB] checked:text-white checked:bg-[#34C759] checked:border-[#34C759]"
+                className="toggle toggle-sm onebox-toggle shrink-0"
                 checked={isEnabled}
                 onChange={onToggle}
             />
-        </div>
+        </label>
     );
 }

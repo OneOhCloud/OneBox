@@ -8,40 +8,30 @@ import UpdaterItem from '../components/settings/updater';
 import { useVersion } from '../hooks/useVersion';
 import { t } from '../utils/helper';
 
-
-
 export default function Settings() {
   const version = useVersion();
 
-
   return (
-    <div className="bg-gray-50 overflow-y-auto h-[calc(100vh-40px)]">
-      <div className="container mx-auto p-4 max-w-md  ">
-        <div className="mb-6 rounded-xl overflow-hidden bg-white shadow-none">
-          <div className="divide-y divide-gray-50">
-            <ToggleAutoStart />
-            <ToggleLan />
-            <ToggleTun />
-            <ToggleLanguage />
-          </div>
+    <div className="onebox-scrollpage">
+      <div className="onebox-page-inner">
+        <div className="onebox-grouped-card mb-5">
+          <ToggleAutoStart />
+          <ToggleLan />
+          <ToggleTun />
+          <ToggleLanguage />
         </div>
 
-        <div className="rounded-xl overflow-hidden bg-white shadow-none ">
-          <div className="divide-y divide-gray-50">
-            <RouterSettingsItem />
-            <UpdaterItem />
-            <AboutItem />
-          </div>
+        <div className="onebox-grouped-card">
+          <RouterSettingsItem />
+          <UpdaterItem />
+          <AboutItem />
         </div>
-        <div className="text-center text-[#8E8E93] text-sm mt-8">
+
+        <div className="text-center text-[11px] mt-6 mb-2" style={{ color: 'var(--onebox-label-tertiary)' }}>
           <p>{t("version")} {version}</p>
-          <p className="mt-1">© 2025 OneOh Cloud</p>
+          <p className="mt-0.5">© 2025 OneOh Cloud</p>
         </div>
       </div>
     </div>
-  )
+  );
 }
-
-
-
-
