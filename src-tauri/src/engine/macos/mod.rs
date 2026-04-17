@@ -28,14 +28,25 @@ static DNS_CAPTURED: Mutex<Vec<(String, String)>> = Mutex::new(Vec::new());
 
 fn capture_if_new(service: &str, original: String) {
     let mut stash = DNS_CAPTURED.lock().unwrap_or_else(|e| e.into_inner());
-    if !stash.iter().any(|(s, _)| s == service) {
-        stash.push((service.to_string(), original));
+    if let Some((_, prev)) = stash.iter().find(|(s, _)| s == service) {
+        log::info!(
+            "[dns] capture skip [{}] — already stashed as '{}' (ignoring new read '{}')",
+            service,
+            prev,
+            original
+        );
+        return;
     }
+    log::info!("[dns] capture new [{}] original='{}'", service, original);
+    stash.push((service.to_string(), original));
+    log::info!("[dns] stash size now {}", stash.len());
 }
 
 fn take_all_captured() -> Vec<(String, String)> {
     let mut stash = DNS_CAPTURED.lock().unwrap_or_else(|e| e.into_inner());
-    std::mem::take(&mut *stash)
+    let drained = std::mem::take(&mut *stash);
+    log::info!("[dns] drain stash: {} service(s)", drained.len());
+    drained
 }
 
 // ============================================================================
@@ -101,11 +112,13 @@ pub fn start_tun_via_helper(app: &AppHandle, config_path: &str) -> Result<i32, S
 ///      through TUN → through the proxy → every server looks reachable and
 ///      the fallback never fires.
 pub async fn stop_tun_process() -> Result<(), String> {
+    log::info!("[dns] user-stop: beginning DNS restore sequence");
     let captured = take_all_captured();
     let applied = apply_captured_originals_sync(&captured);
 
+    log::info!("[helper] sending SIGTERM to sing-box");
     macos_helper::api::stop_sing_box()?;
-    log::info!("[helper] SIGTERM sent to sing-box");
+    log::info!("[helper] SIGTERM sent to sing-box, waiting 500ms for TUN teardown");
 
     tokio::time::sleep(std::time::Duration::from_millis(500)).await;
 
@@ -115,11 +128,14 @@ pub async fn stop_tun_process() -> Result<(), String> {
 
     if let Err(e) = macos_helper::api::remove_tun_routes(TUN_INTERFACE_NAME) {
         log::warn!("[helper] remove_tun_routes({}) failed: {}", TUN_INTERFACE_NAME, e);
+    } else {
+        log::info!("[helper] TUN routes removed on {}", TUN_INTERFACE_NAME);
     }
 
     verify_and_fallback(&applied).await;
 
     macos_helper::api::flush_dns_cache().ok();
+    log::info!("[dns] user-stop: restore sequence complete");
     Ok(())
 }
 
@@ -207,15 +223,12 @@ pub fn apply_system_dns_override(config_path: &str) -> Result<(), String> {
     // already touched this service (re-apply after NetworkUp), skip so the
     // stash keeps the true original instead of our own gateway IP.
     let original = read_service_dns(&service);
+    log::info!("[dns] read [{}] current DNS = '{}'", service, original);
     capture_if_new(&service, original.clone());
-    log::info!(
-        "[dns] override → {} for [{}] (captured original: {})",
-        gateway,
-        service,
-        original
-    );
+    log::info!("[dns] override [{}] → {}", service, gateway);
     macos_helper::api::set_dns_servers(&service, &gateway)?;
     macos_helper::api::flush_dns_cache().ok();
+    log::info!("[dns] override applied + cache flushed for [{}]", service);
     Ok(())
 }
 
@@ -228,20 +241,28 @@ pub fn apply_system_dns_override(config_path: &str) -> Result<(), String> {
 /// becomes unreachable the moment TUN tears down.
 fn apply_captured_originals_sync(captured: &[(String, String)]) -> Vec<(String, String)> {
     if captured.is_empty() {
-        log::info!("[dns] no captured services; nothing to restore");
+        log::info!("[dns] phase 1 (pre-kill write): stash empty, skipping");
         return Vec::new();
     }
-    log::info!("[dns] restore (phase 1, pre-kill): {} service(s)", captured.len());
+    log::info!(
+        "[dns] phase 1 (pre-kill write): restoring {} service(s)",
+        captured.len()
+    );
     let mut applied = Vec::with_capacity(captured.len());
     for (service, original) in captured {
-        log::info!("[dns] restore [{}] → {}", service, original);
+        log::info!("[dns] phase 1 → [{}] write '{}'", service, original);
         if let Err(e) = macos_helper::api::set_dns_servers(service, original) {
-            log::warn!("[dns] restore [{}] failed: {}", service, e);
+            log::warn!("[dns] phase 1 [{}] write failed: {}", service, e);
             continue;
         }
         applied.push((service.clone(), original.clone()));
     }
     macos_helper::api::flush_dns_cache().ok();
+    log::info!(
+        "[dns] phase 1 done: {}/{} service(s) written, cache flushed",
+        applied.len(),
+        captured.len()
+    );
     applied
 }
 
@@ -253,43 +274,66 @@ fn apply_captured_originals_sync(captured: &[(String, String)]) -> Vec<(String, 
 /// servers look reachable, producing bogus "everything's fine" results.
 async fn verify_and_fallback(applied: &[(String, String)]) {
     if applied.is_empty() {
+        log::info!("[dns] phase 2 (post-kill verify): nothing to verify, skipping");
         return;
     }
+    log::info!(
+        "[dns] phase 2 (post-kill verify): probing {} service(s)",
+        applied.len()
+    );
     for (service, original) in applied {
         if original == "empty" {
             // Back to DHCP defaults — there's no single IP to probe; trust
             // whatever DHCP hands out.
+            log::info!("[dns] phase 2 [{}] kept DHCP default (no probe)", service);
             continue;
         }
-        let mut any_alive = false;
+        let mut alive_ip: Option<String> = None;
         for ip in original.split_whitespace() {
+            log::info!("[dns] phase 2 probe [{}] → {} ...", service, ip);
             if crate::commands::dns::probe_dns_reachable(ip).await {
-                any_alive = true;
+                alive_ip = Some(ip.to_string());
                 break;
             }
         }
-        if any_alive {
+        if let Some(ip) = alive_ip {
+            log::info!(
+                "[dns] phase 2 [{}] {} alive, keeping original '{}'",
+                service,
+                ip,
+                original
+            );
             continue;
         }
         log::warn!(
-            "[dns] restored [{}] DNS ({}) unreachable — falling back to best public DNS",
+            "[dns] phase 2 [{}] all of '{}' unreachable — racing public resolvers",
             service,
             original
         );
-        if let Some(best) = crate::commands::dns::get_best_dns_server().await {
-            if let Err(e) = macos_helper::api::set_dns_servers(service, &best) {
+        match crate::commands::dns::get_best_dns_server().await {
+            Some(best) => {
+                log::info!("[dns] phase 2 [{}] best public DNS = {}", service, best);
+                if let Err(e) = macos_helper::api::set_dns_servers(service, &best) {
+                    log::warn!(
+                        "[dns] phase 2 fallback write [{}] → {} failed: {}",
+                        service,
+                        best,
+                        e
+                    );
+                } else {
+                    log::info!("[dns] phase 2 [{}] fell back to {}", service, best);
+                }
+            }
+            None => {
                 log::warn!(
-                    "[dns] fallback set_dns_servers [{}] → {}: {}",
-                    service,
-                    best,
-                    e
+                    "[dns] phase 2 [{}] get_best_dns_server returned None; leaving as-is",
+                    service
                 );
-            } else {
-                log::info!("[dns] [{}] fell back to {}", service, best);
             }
         }
     }
     macos_helper::api::flush_dns_cache().ok();
+    log::info!("[dns] phase 2 done, cache flushed");
 }
 
 /// Crash-path restore (called from `on_process_terminated`). sing-box has
@@ -301,9 +345,11 @@ async fn verify_and_fallback(applied: &[(String, String)]) {
 /// reset. Any manual DNS the user configured on an untouched interface
 /// (e.g. Ethernet while TUN ran over Wi-Fi) is preserved.
 pub async fn restore_system_dns() -> Result<(), String> {
+    log::info!("[dns] crash-path restore: sing-box already exited, running write + verify");
     let captured = take_all_captured();
     let applied = apply_captured_originals_sync(&captured);
     verify_and_fallback(&applied).await;
+    log::info!("[dns] crash-path restore: complete");
     Ok(())
 }
 
