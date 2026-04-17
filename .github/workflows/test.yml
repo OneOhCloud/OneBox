@@ -33,7 +33,11 @@ jobs:
 
   # Rust unit tests (cargo test) — compiles the tauri lib crate, so the
   # same apt prereqs as a Linux release build are required to satisfy
-  # webkit2gtk / appindicator dependencies at link time.
+  # webkit2gtk / appindicator dependencies at link time. The tauri build
+  # script also validates every `externalBin` in tauri.conf.json exists
+  # on disk, so we pre-stage the sing-box sidecar via the same script
+  # release.yml uses — otherwise `cargo test` fails at build-script time
+  # with "resource path binaries/sing-box-... doesn't exist".
   rust:
     runs-on: ubuntu-24.04
     env:
@@ -53,6 +57,20 @@ jobs:
             libssl-dev \
             libayatana-appindicator3-dev \
             librsvg2-dev
+
+      - name: Set Up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+
+      - name: Set Up Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install Frontend Dependencies
+        run: bun install
+
+      - name: Download Sidecar Binaries
+        run: bun run scripts/download-binaries.ts
 
       - name: Set Up Rust Toolchain
         uses: dtolnay/rust-toolchain@stable
