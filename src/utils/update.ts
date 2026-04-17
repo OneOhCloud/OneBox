@@ -1,7 +1,9 @@
 import { check, type Update } from "@tauri-apps/plugin-updater";
 import { getStoreValue, setStoreValue } from "../single/store";
-import { LAST_UPDATE_CHECK_TIME_KEY, STAGE_VERSION_STORE_KEY } from "../types/definition";
+import { LAST_SIGNATURE_FAILURE_TIME_KEY, LAST_UPDATE_CHECK_TIME_KEY, STAGE_VERSION_STORE_KEY } from "../types/definition";
 import { getSingBoxUserAgent } from "./helper";
+
+export const SIGNATURE_FAILURE_COOLDOWN_MS = 1000 * 60 * 60; // 1 hour
 
 export const checkUpdate = async () => {
 
@@ -41,6 +43,36 @@ export const getLastUpdateCheckTime = async (): Promise<number> => {
 
 export const setLastUpdateCheckTime = async (time: number): Promise<void> => {
     await setStoreValue(LAST_UPDATE_CHECK_TIME_KEY, time);
+};
+
+export const getLastSignatureFailureTime = async (): Promise<number> => {
+    const t = await getStoreValue(LAST_SIGNATURE_FAILURE_TIME_KEY, 0);
+    return typeof t === 'number' ? t : 0;
+};
+
+export const setLastSignatureFailureTime = async (time: number): Promise<void> => {
+    await setStoreValue(LAST_SIGNATURE_FAILURE_TIME_KEY, time);
+};
+
+// Updater plugin surfaces verifier mismatches as a string containing
+// "signature verification failed". Stale CDN edges occasionally serve a
+// `latest.json` that points at a binary whose .sig hasn't propagated yet —
+// retrying within the same hour will keep failing, so we throttle.
+export const isSignatureVerificationError = (error: unknown): boolean => {
+    const msg = error instanceof Error ? error.message : String(error ?? '');
+    return /signature verification failed/i.test(msg);
+};
+
+// Returns the timestamp at which the throttle expires, or 0 if not throttled.
+// Only stable is throttled — beta/dev publish too frequently for an hour-long
+// cooldown to be useful, and a CDN miss there usually clears within minutes.
+export const getSignatureThrottleUntil = async (): Promise<number> => {
+    const stage = await getStoreValue(STAGE_VERSION_STORE_KEY, "stable");
+    if (stage !== "stable") return 0;
+    const last = await getLastSignatureFailureTime();
+    if (last === 0) return 0;
+    const until = last + SIGNATURE_FAILURE_COOLDOWN_MS;
+    return until > Date.now() ? until : 0;
 };
 
 // Downloads the update and records the version in store.

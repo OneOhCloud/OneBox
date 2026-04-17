@@ -1,11 +1,17 @@
 import { type Update } from '@tauri-apps/plugin-updater';
 import { createContext, ReactNode, useContext, useEffect, useRef, useState } from 'react';
+import { getStoreValue } from '../../single/store';
+import { STAGE_VERSION_STORE_KEY } from '../../types/definition';
 import {
     checkUpdate,
     downloadUpdateIfNeeded,
     getLastUpdateCheckTime,
+    getSignatureThrottleUntil,
     getUpdateInterval,
+    isSignatureVerificationError,
+    setLastSignatureFailureTime,
     setLastUpdateCheckTime,
+    SIGNATURE_FAILURE_COOLDOWN_MS,
 } from '../../utils/update';
 
 interface UpdateContextType {
@@ -15,6 +21,9 @@ interface UpdateContextType {
     lastCheckTime: number | null;
     downloadProgress: number;
     downloadComplete: boolean;
+    // Timestamp (ms epoch) at which the stable-channel signature-failure
+    // throttle expires, or 0 if not throttled.
+    signatureThrottleUntil: number;
     checkAndDownloadUpdate: () => Promise<Update | null>;
     // Call after switching update channel. Reads the new channel's interval and
     // the persisted last-check timestamp; triggers an immediate check only if
@@ -30,9 +39,16 @@ export function UpdateProvider({ children }: { children: ReactNode }) {
     const [downloading, setDownloading] = useState(false);
     const [downloadProgress, setDownloadProgress] = useState(0);
     const [lastCheckTime, setLastCheckTime] = useState<number | null>(null);
+    const [signatureThrottleUntil, setSignatureThrottleUntil] = useState(0);
     const [isSimulating] = useState(false); // 设置为 true 可以进行模拟测试
 
     const checkingRef = useRef(false);
+    const signatureThrottleUntilRef = useRef(0);
+
+    const setSignatureThrottleUntilSync = (v: number) => {
+        signatureThrottleUntilRef.current = v;
+        setSignatureThrottleUntil(v);
+    };
     // Refs mirror state so async closures always read current values,
     // avoiding stale captures in setTimeout callbacks.
     const downloadingRef = useRef(false);
@@ -61,6 +77,11 @@ export function UpdateProvider({ children }: { children: ReactNode }) {
         if (downloadingRef.current) {
             console.log('Update is downloading...');
             return updateInfo;
+        }
+
+        if (signatureThrottleUntilRef.current > Date.now()) {
+            console.log('Update check throttled after signature failure');
+            return null;
         }
 
         checkingRef.current = true;
@@ -123,6 +144,14 @@ export function UpdateProvider({ children }: { children: ReactNode }) {
         } catch (error) {
             console.error('Error during update:', error);
             setDownloadingSync(false);
+            if (isSignatureVerificationError(error)) {
+                const stage = await getStoreValue(STAGE_VERSION_STORE_KEY, 'stable');
+                if (stage === 'stable') {
+                    const now = Date.now();
+                    await setLastSignatureFailureTime(now);
+                    setSignatureThrottleUntilSync(now + SIGNATURE_FAILURE_COOLDOWN_MS);
+                }
+            }
             return null;
         } finally {
             checkingRef.current = false;
@@ -190,6 +219,14 @@ export function UpdateProvider({ children }: { children: ReactNode }) {
             }
         });
 
+        // Restore signature-throttle expiry so a relaunch within the cooldown
+        // window keeps the manual button disabled.
+        getSignatureThrottleUntil().then((until) => {
+            if (!cancelled && until > 0) {
+                setSignatureThrottleUntilSync(until);
+            }
+        });
+
         poll();
 
         return () => {
@@ -197,6 +234,19 @@ export function UpdateProvider({ children }: { children: ReactNode }) {
             clearTimeout(timeoutId);
         };
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+    // Clear the in-memory throttle once its absolute expiry has passed so the
+    // UI re-enables the manual button without needing a re-render trigger.
+    useEffect(() => {
+        if (signatureThrottleUntil === 0) return;
+        const remaining = signatureThrottleUntil - Date.now();
+        if (remaining <= 0) {
+            setSignatureThrottleUntilSync(0);
+            return;
+        }
+        const id = setTimeout(() => setSignatureThrottleUntilSync(0), remaining);
+        return () => clearTimeout(id);
+    }, [signatureThrottleUntil]);
 
     return (
         <UpdateContext.Provider value={{
@@ -207,6 +257,7 @@ export function UpdateProvider({ children }: { children: ReactNode }) {
             downloading,
             downloadProgress,
             lastCheckTime,
+            signatureThrottleUntil,
             isSimulating
         }}>
             {children}

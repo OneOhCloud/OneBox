@@ -37,7 +37,6 @@ function UpdaterRow({
     const { Icon, iconColor, iconBg, title, subtitle, badge } = renderCopy(
         phase,
         version,
-        progress,
     );
 
     return (
@@ -46,14 +45,14 @@ function UpdaterRow({
             disabled={disabled}
             onClick={() => !disabled && onPress()}
             className={clsx(
-                "w-full flex items-center gap-3 px-4 py-3 text-left transition-colors",
+                "relative w-full flex items-center gap-3 px-4 py-3 text-left transition-colors",
                 disabled
                     ? "opacity-50 cursor-not-allowed"
                     : "active:bg-[rgba(60,60,67,0.06)] hover:bg-[rgba(60,60,67,0.025)]",
             )}
         >
             <div
-                className="size-7 rounded-[8px] flex items-center justify-center shrink-0"
+                className="size-7 rounded-lg flex items-center justify-center shrink-0"
                 style={{ background: iconBg }}
             >
                 <Icon size={18} style={{ color: iconColor }} />
@@ -74,25 +73,18 @@ function UpdaterRow({
                         {subtitle}
                     </div>
                 )}
-                {phase === "downloading" && (
-                    <div
-                        className="mt-2 h-[3px] rounded-full overflow-hidden"
-                        style={{ background: "rgba(60, 60, 67, 0.1)" }}
-                    >
-                        <div
-                            className="h-full rounded-full"
-                            style={{
-                                width: `${Math.min(progress, 100)}%`,
-                                background: "var(--onebox-blue)",
-                                transition:
-                                    "width 300ms cubic-bezier(0.32, 0.72, 0, 1)",
-                            }}
-                        />
-                    </div>
-                )}
             </div>
 
-            {badge && <div className="shrink-0">{badge}</div>}
+            {phase === "downloading" ? (
+                <span
+                    className="shrink-0 text-[13px] font-medium tabular-nums min-w-8.5 text-right"
+                    style={{ color: "var(--onebox-blue)" }}
+                >
+                    {Math.floor(progress)}%
+                </span>
+            ) : (
+                badge && <div className="shrink-0">{badge}</div>
+            )}
 
             {phase !== "downloading" && (
                 <ChevronRight
@@ -101,6 +93,23 @@ function UpdaterRow({
                     style={{ color: "rgba(60, 60, 67, 0.28)" }}
                 />
             )}
+
+            {phase === "downloading" && (
+                <div
+                    className="absolute inset-x-0 bottom-0 h-0.5 overflow-hidden"
+                    style={{ background: "rgba(60, 60, 67, 0.1)" }}
+                >
+                    <div
+                        className="h-full"
+                        style={{
+                            width: `${Math.min(progress, 100)}%`,
+                            background: "var(--onebox-blue)",
+                            transition:
+                                "width 300ms cubic-bezier(0.32, 0.72, 0, 1)",
+                        }}
+                    />
+                </div>
+            )}
         </button>
     );
 }
@@ -108,7 +117,6 @@ function UpdaterRow({
 function renderCopy(
     phase: UpdaterPhase,
     version: string | undefined,
-    progress: number,
 ) {
     switch (phase) {
         case "available":
@@ -126,7 +134,7 @@ function renderCopy(
                 iconColor: "var(--onebox-blue)",
                 iconBg: "rgba(0, 122, 255, 0.1)",
                 title: t("downloading", "Downloading"),
-                subtitle: `${Math.floor(progress)}%`,
+                subtitle: version ? `v${version}` : undefined,
                 badge: null,
             };
         case "ready":
@@ -245,6 +253,7 @@ export default function UpdaterItem() {
         downloadComplete,
         downloading,
         downloadProgress,
+        signatureThrottleUntil,
         isSimulating,
     } = useUpdate();
     const { confirmInstallation } = useUpdateInstallation(isSimulating);
@@ -258,12 +267,16 @@ export default function UpdaterItem() {
                 ? "available"
                 : "idle";
 
+    // Throttle disables the click only for click paths that would re-trigger
+    // a download; an already-finished download is still safe to install.
+    const throttled = signatureThrottleUntil > Date.now() && phase !== "ready";
+
     return (
         <UpdaterRow
             phase={phase}
             version={updateInfo?.version}
             progress={downloadProgress}
-            disabled={isUpdating && phase === "idle"}
+            disabled={(isUpdating && phase === "idle") || throttled}
             onPress={() => handleUpdateClick(confirmInstallation)}
         />
     );
