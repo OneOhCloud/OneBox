@@ -21,6 +21,10 @@ on:
       - feature/beta
       - main
 
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: write
 
