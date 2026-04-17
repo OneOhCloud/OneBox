@@ -22,7 +22,7 @@
 
 ## 软件截图
 
-|![主页](./docs/image/zh/Home.png)|![配置](./docs/image/zh/Config.png)|![设置](./docs/image/zh/Settings.png)|
+|![主页](./.github/assets/zh/Home.png)|![配置](./.github/assets/zh/Config.png)|![设置](./.github/assets/zh/Settings.png)|
 |:---:|:---:|:---:|
 
 

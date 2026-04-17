@@ -26,7 +26,7 @@ A cross-platform GUI client based on [sing-box](https://github.com/SagerNet/sing
 
 ## Screenshots
 
-|![Home](./docs/image/en/Home.png)|![Config](./docs/image/en/Config.png)|![Settings](./docs/image/en/Settings.png)|
+|![Home](./.github/assets/en/Home.png)|![Config](./.github/assets/en/Config.png)|![Settings](./.github/assets/en/Settings.png)|
 |:---:|:---:|:---:|
 
 
