@@ -4,6 +4,14 @@ on:
   push:
   pull_request:
 
+# Cancel any in-progress test run on the same ref when a new push
+# arrives. Test runs are pure regression — the latest commit's result
+# is what matters, older runs become wasted minutes as soon as they
+# are superseded.
+concurrency:
+  group: test-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
