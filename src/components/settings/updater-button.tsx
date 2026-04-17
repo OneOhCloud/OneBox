@@ -37,7 +37,7 @@ export default function UpdaterButton() {
         <button
             type="button"
             onClick={handleInstall}
-            className="inline-flex items-center gap-1 h-[22px] px-2 rounded-full transition-all active:brightness-95"
+            className="inline-flex items-center gap-1 h-5.5 px-2 rounded-full transition-all active:brightness-95"
             style={{
                 background:
                     "linear-gradient(140deg, #4DA3FF 0%, #007AFF 100%)",

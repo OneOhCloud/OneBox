@@ -1,0 +1,10 @@
+#!/usr/bin/env sh
+
+# Enforce Tailwind canonical class policy.
+# See scripts/check-tailwind-canonical.ts for scope and rationale.
+bun run check:tailwind || {
+    echo ""
+    echo "❌ Tailwind canonical check failed."
+    echo "   Run 'bun run check:tailwind:fix' to auto-convert, or fix manually."
+    exit 1
+}

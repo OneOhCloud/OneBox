@@ -294,7 +294,7 @@ function RuleRow({
     return (
         <div className="group flex items-center gap-2.5 px-3 py-2.5">
             <span
-                className="inline-flex items-center justify-center h-[18px] px-1.5 rounded text-[10px] font-semibold tracking-wide shrink-0"
+                className="inline-flex items-center justify-center h-4.5 px-1.5 rounded text-[10px] font-semibold tracking-wide shrink-0"
                 style={{
                     background: color.bg,
                     color: color.fg,
@@ -347,7 +347,7 @@ function Segmented<T extends string>({
 }) {
     return (
         <div
-            className="grid gap-1 p-[3px] rounded-xl"
+            className="grid gap-1 p-0.75 rounded-xl"
             style={{
                 background: "rgba(118, 118, 128, 0.09)",
                 gridTemplateColumns: `repeat(${options.length}, 1fr)`,

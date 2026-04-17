@@ -66,13 +66,13 @@ export function RadioOptionList<T extends string>({
                             disabled={opt.disabled}
                             className="
                                 shrink-0 appearance-none
-                                size-[18px] rounded-full
+                                size-4.5 rounded-full
                                 border-[1.5px] border-[rgba(60,60,67,0.28)]
                                 checked:border-[var(--onebox-blue)]
                                 checked:bg-[var(--onebox-blue)]
                                 relative
                                 before:content-[''] before:absolute
-                                before:w-[6px] before:h-[6px]
+                                before:w-1.5 before:h-1.5
                                 before:bg-white before:rounded-full
                                 before:top-1/2 before:left-1/2
                                 before:-translate-x-1/2 before:-translate-y-1/2

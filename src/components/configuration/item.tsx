@@ -139,7 +139,7 @@ export const SubscriptionItem: React.FC<SubscriptionItemProps> = ({
                         </span>
                         {pillStyle && (
                             <span
-                                className="shrink-0 inline-flex items-center px-1.5 py-[1px] rounded-md text-[10px] font-medium whitespace-nowrap"
+                                className="shrink-0 inline-flex items-center px-1.5 py-0.25 rounded-md text-[10px] font-medium whitespace-nowrap"
                                 style={{
                                     color: pillStyle.color,
                                     background: pillStyle.bg,
@@ -167,7 +167,7 @@ export const SubscriptionItem: React.FC<SubscriptionItemProps> = ({
 
                     <div
                         className={clsx(
-                            "mt-1.5 h-[3px] rounded-full overflow-hidden",
+                            "mt-1.5 h-0.75 rounded-full overflow-hidden",
                             isBusy && "animate-pulse",
                         )}
                         style={{ background: "rgba(60, 60, 67, 0.09)" }}

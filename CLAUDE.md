@@ -7,21 +7,20 @@
 1. **User-visible text** — UI copy, toasts, CHANGELOG; never say "订阅" / "subscription"
 2. **Reading third-party source** — clone upstream at the pinned version, don't rely on web search
 3. **Deep link bug triage** — log-first checklist (Rust saw it? hot/cold? parsed? timing?)
-4. **Frontend: respect the Tailwind / linter hints** — canonical classes, not arbitrary brackets
-5. **Release workflow triggers** — one workflow, four channels, `make bump` only
-6. **GitHub CLI access** — `gh` is the preferred interface for this repo
-7. **Verifying Linux from a macOS host** — `make linux-check`; commits are not transport
-8. **Workflows that need my hands** — `scripts/tmp-*.sh` with manual gates + sanity checks
-9. **Design Philosophy** — six principles driving DNS / template subsystems
-10. **Windows Platform Implementation Philosophy** — native Win32 over PowerShell
-11. **Step-by-step semantic analysis** — expand every verb in a sequence before inserting adjacent to it
-12. **Subsystem deep-dives** — DNS override, config templates, update argv suppression (in `docs/claude/`)
+4. **Release workflow triggers** — one workflow, four channels, `make bump` only
+5. **GitHub CLI access** — `gh` is the preferred interface for this repo
+6. **Verifying Linux from a macOS host** — `make linux-check`; commits are not transport
+7. **Workflows that need my hands** — `scripts/tmp-*.sh` with manual gates + sanity checks
+8. **Design Philosophy** — principles driving DNS / template subsystems
+9. **Windows Platform Implementation Philosophy** — native Win32 over PowerShell
+10. **Step-by-step semantic analysis** — expand every verb in a sequence before inserting adjacent to it
+11. **Subsystem deep-dives** — DNS override, config templates, update argv suppression (in `docs/claude/`)
 
 ### Meta-rule: when rules tension against each other
 
 **User-visible expression chases current; internal code identifiers chase stable.**
 
-Concrete case: UI copy must move from `订阅` to `配置`, but the function `addSubscription()` stays — because renaming it touches dozens of call sites for zero user-facing benefit. Another: Tailwind `suggestCanonicalClasses` hints should be taken (user-facing via dev velocity + future refactors), but we don't globally rename `miexdGlobalConfig` typos in removed code (would break `git blame` for zero gain).
+Concrete case: UI copy must move from `订阅` to `配置`, but the function `addSubscription()` stays — because renaming it touches dozens of call sites for zero user-facing benefit.
 
 When in doubt: ask "what breaks if I change this?" If only a reader's eye is involved, follow the newer rule. If call sites or external references break, preserve the old shape.
 
@@ -39,6 +38,7 @@ When in doubt: ask "what breaks if I change this?" If only a reader's eye is inv
 - Style preferences with no downstream consequence.
 - Anything `rg` + a minute of reading would turn up reliably.
 - Detailed subsystem walk-throughs — put those in `docs/claude/<name>.md` and link from the "Subsystem deep-dives" section.
+- Rules that can be encoded as tooling — move the rule into the tool and delete the prose. Example: the "canonical Tailwind classes over arbitrary px" policy used to live here; it now lives in `scripts/check-tailwind-canonical.ts` + a `.husky/pre-commit` gate, so this doc no longer carries it.
 
 Rule of thumb for sedimenting a new entry: if you catch yourself explaining the same thing across three different conversations, write it down. If it's a one-off, don't — this file's value is inverse to its length.
 
@@ -117,41 +117,6 @@ Triage checklist — run in order, stop at the first step that answers the quest
 5. **Timing relative to app setup progress.** Compare the deep-link timestamp to `Copying database files`, `User-Agent:`, and `captive.oneoh.cloud status:` — these mark `app_setup()` progress. A deep link arriving *before* the webview is ready is a different bug from one arriving after, and the fix lands in a different place.
 
 If the log doesn't contain the failure reproduction, **ask the user to reproduce and attach fresh logs** before speculating. The source has several plausible race windows; the log pins down which one actually fired.
-
-## Frontend: respect the Tailwind / linter hints
-
-We use Tailwind v4 (dynamic spacing via `--spacing`, default 4px/unit) plus
-the `tailwindcss-intellisense` extension. When the extension emits a
-`suggestCanonicalClasses` hint ("The class `w-[22px]` can be written as
-`w-5.5`"), **take it** rather than leaving the arbitrary bracket form in
-place. Reasons:
-
-- Arbitrary values (`w-[22px]`, `left-[11px]`) bypass the theme scale and
-  are harder to refactor later.
-- The canonical form (`w-5.5`, `left-2.75`) participates in the spacing
-  theme — if we ever change `--spacing`, the layout scales uniformly.
-- Reviewers and future contributors expect the canonical form, and a
-  mixed style makes diffs noisier.
-
-Rule of thumb: if the pixel value is an integer multiple of `--spacing`
-(4px by default), use the canonical class. Examples:
-
-| Arbitrary      | Canonical   |
-|----------------|-------------|
-| `w-[22px]`     | `w-5.5`     |
-| `h-[22px]`     | `h-5.5`     |
-| `left-[11px]`  | `left-2.75` |
-| `min-h-[24px]` | `min-h-6`   |
-
-Keep the arbitrary form only when the value doesn't fit the spacing
-scale (e.g. `text-[10px]` — default text sizes start at `text-xs` = 12px)
-or when the property has no theme-backed canonical form
-(`tracking-[0.22em]`, custom `shadow-[…]` with multi-parameter values).
-
-The same principle extends to every Tailwind-IntelliSense severity-4
-hint (unnecessary negative modifier, deprecated class, unknown-modifier
-reorder, etc.) — treat them as review-ready lints, not suggestions to
-ignore.
 
 ## Release workflow triggers
 

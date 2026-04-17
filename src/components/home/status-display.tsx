@@ -26,7 +26,7 @@ export function StatusDisplay({ statusText, phase }: StatusDisplayProps) {
             <span
                 aria-hidden
                 className={clsx(
-                    "inline-block size-[5px] rounded-full",
+                    "inline-block size-1.25 rounded-full",
                     "transition-colors duration-300 ease-out",
                     phase === "connecting" && "onebox-dot-pulse",
                 )}

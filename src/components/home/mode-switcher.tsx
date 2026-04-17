@@ -27,11 +27,11 @@ export function ModeSwitcher(props: ModeSwitcherProps) {
     return (
         <div
             ref={containerRef}
-            className="onebox-segmented relative inline-flex p-[3px] rounded-full"
+            className="onebox-segmented relative inline-flex p-0.75 rounded-full"
         >
             <span
                 aria-hidden
-                className="onebox-segmented-pill absolute top-[3px] bottom-[3px] rounded-full"
+                className="onebox-segmented-pill absolute top-0.75 bottom-0.75 rounded-full"
                 style={{
                     left: `${indicatorStyle.left}px`,
                     width: `${indicatorStyle.width}px`,
