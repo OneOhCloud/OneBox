@@ -87,8 +87,7 @@ async fn run(app: AppHandle, path: Arc<String>) {
 
         RESTART_IN_PROGRESS.store(true, Ordering::SeqCst);
 
-        let stop_result = tokio::task::spawn_blocking(super::stop_tun_process).await;
-        if let Err(e) = stop_result.map_err(|e| e.to_string()).and_then(|r| r) {
+        if let Err(e) = super::stop_tun_process().await {
             log::error!("[bypass_router_watchdog] stop_tun_process failed: {}", e);
             RESTART_IN_PROGRESS.store(false, Ordering::SeqCst);
             continue;

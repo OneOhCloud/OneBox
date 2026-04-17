@@ -25,6 +25,13 @@ export const LAST_UPDATE_CHECK_TIME_KEY = 'last_update_check_time_key'
 // 手动检查更新，避免反复触发服务器缓存导致的失败。
 export const LAST_SIGNATURE_FAILURE_TIME_KEY = 'last_signature_failure_time_key'
 
+// 更新安装触发时间戳（ms）。tauri-plugin-updater 把当前进程 argv 通过 NSIS
+// `/ARGS` 原样转发给新 exe，包括深链 URL —— 冷启动时会被识别成"新的深链",
+// 造成每次更新重启都重复 import + apply。install() 之前写入这个 key，Rust
+// 冷启动 setup 读到且在 5 分钟内则跳过 argv 深链。best-effort 清除；即使
+// 清除失败，TTL 保证最多 5 分钟后自动失效，避免死锁深链功能。
+export const UPDATE_SUPPRESS_ARGV_DEEPLINK_AT_KEY = 'update_suppress_argv_deeplink_at'
+
 // 允许局域网连接
 export const ALLOWLAN_STORE_KEY = 'allow_lan_key'
 // 是否启用 tun 模式

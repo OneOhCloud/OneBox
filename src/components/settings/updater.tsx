@@ -11,6 +11,7 @@ import {
     CloudCheckFill,
 } from "react-bootstrap-icons";
 import { t, vpnServiceManager } from "../../utils/helper";
+import { markPendingUpdateRelaunch } from "../../utils/update";
 import { useUpdate } from "./update-context";
 
 type UpdaterPhase = "idle" | "available" | "downloading" | "ready";
@@ -197,6 +198,7 @@ function useUpdateInstallation(isSimulating: boolean) {
                 }
                 await vpnServiceManager.stop();
                 setTimeout(async () => {
+                    await markPendingUpdateRelaunch();
                     await updateInfo.install();
                     await relaunch();
                 }, 2000);

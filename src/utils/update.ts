@@ -1,6 +1,6 @@
 import { check, type Update } from "@tauri-apps/plugin-updater";
 import { getStoreValue, setStoreValue } from "../single/store";
-import { LAST_SIGNATURE_FAILURE_TIME_KEY, LAST_UPDATE_CHECK_TIME_KEY, STAGE_VERSION_STORE_KEY } from "../types/definition";
+import { LAST_SIGNATURE_FAILURE_TIME_KEY, LAST_UPDATE_CHECK_TIME_KEY, STAGE_VERSION_STORE_KEY, UPDATE_SUPPRESS_ARGV_DEEPLINK_AT_KEY } from "../types/definition";
 import { getSingBoxUserAgent } from "./helper";
 
 export const SIGNATURE_FAILURE_COOLDOWN_MS = 1000 * 60 * 60; // 1 hour
@@ -73,6 +73,13 @@ export const getSignatureThrottleUntil = async (): Promise<number> => {
     if (last === 0) return 0;
     const until = last + SIGNATURE_FAILURE_COOLDOWN_MS;
     return until > Date.now() ? until : 0;
+};
+
+// Marks the imminent update-driven relaunch so Rust's cold-start deep-link
+// branch suppresses the argv URL that tauri-plugin-updater forwards to the
+// new exe via NSIS `/ARGS`. Must be awaited (store.save) before install().
+export const markPendingUpdateRelaunch = async (): Promise<void> => {
+    await setStoreValue(UPDATE_SUPPRESS_ARGV_DEEPLINK_AT_KEY, { at: Date.now() });
 };
 
 // Downloads the update and records the version in store.

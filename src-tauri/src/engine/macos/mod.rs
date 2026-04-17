@@ -6,9 +6,37 @@ use crate::engine::helper::extract_tun_gateway_from_config;
 use crate::engine::sysproxy::{clear_system_proxy, set_system_proxy};
 use crate::engine::EngineManager;
 use std::process::Command;
+use std::sync::Mutex;
 use tauri::AppHandle;
 use tauri_plugin_store::StoreExt;
 pub const TUN_INTERFACE_NAME: &str = "utun233";
+
+// ----------------------------------------------------------------------------
+// DNS capture stash
+//
+// Every network service we override gets its pre-override DNS recorded here.
+// `apply_system_dns_override` appends on first touch; it never overwrites an
+// existing entry, so a second apply on the same service (e.g. NetworkUp
+// re-trigger after we already wrote the TUN gateway) doesn't clobber the real
+// original with our own gateway IP. On stop/crash the stash is drained and
+// each captured entry is written back.
+//
+// Value format: `"empty"` if the service had no DNS set (DHCP default), or
+// a space-separated list of IPv4/IPv6 addresses.
+// ----------------------------------------------------------------------------
+static DNS_CAPTURED: Mutex<Vec<(String, String)>> = Mutex::new(Vec::new());
+
+fn capture_if_new(service: &str, original: String) {
+    let mut stash = DNS_CAPTURED.lock().unwrap_or_else(|e| e.into_inner());
+    if !stash.iter().any(|(s, _)| s == service) {
+        stash.push((service.to_string(), original));
+    }
+}
+
+fn take_all_captured() -> Vec<(String, String)> {
+    let mut stash = DNS_CAPTURED.lock().unwrap_or_else(|e| e.into_inner());
+    std::mem::take(&mut *stash)
+}
 
 // ============================================================================
 // Helper-backed TUN lifecycle
@@ -62,17 +90,24 @@ pub fn start_tun_via_helper(app: &AppHandle, config_path: &str) -> Result<i32, S
 /// Stop TUN mode: restore DNS, kill sing-box, disable IP forwarding, clean
 /// routes, flush DNS cache. All operations go through the privileged helper.
 ///
-/// Restore DNS runs first (before kill) so the user's network isn't left
-/// pointing at an unreachable TUN gateway if the kill step fails.
-pub fn stop_tun_process() -> Result<(), String> {
-    if let Err(e) = restore_system_dns() {
-        log::warn!("[dns] restore_system_dns failed: {}", e);
-    }
+/// Split into two restore phases so verification probes don't leak through
+/// the still-live TUN:
+///   1. **pre-kill** — synchronously write captured originals back. This must
+///      run before sing-box is killed so the physical NIC's default route
+///      inherits a working DNS the instant TUN tears down.
+///   2. **post-kill** — probe each restored DNS for reachability; if all fail
+///      swap in the best public resolver. Probing earlier is useless: while
+///      sing-box is alive, every UDP/53 packet from this process gets routed
+///      through TUN → through the proxy → every server looks reachable and
+///      the fallback never fires.
+pub async fn stop_tun_process() -> Result<(), String> {
+    let captured = take_all_captured();
+    let applied = apply_captured_originals_sync(&captured);
 
     macos_helper::api::stop_sing_box()?;
     log::info!("[helper] SIGTERM sent to sing-box");
 
-    std::thread::sleep(std::time::Duration::from_millis(500));
+    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
 
     if let Err(e) = macos_helper::api::set_ip_forwarding(false) {
         log::warn!("[helper] set_ip_forwarding(false) failed: {}", e);
@@ -81,6 +116,8 @@ pub fn stop_tun_process() -> Result<(), String> {
     if let Err(e) = macos_helper::api::remove_tun_routes(TUN_INTERFACE_NAME) {
         log::warn!("[helper] remove_tun_routes({}) failed: {}", TUN_INTERFACE_NAME, e);
     }
+
+    verify_and_fallback(&applied).await;
 
     macos_helper::api::flush_dns_cache().ok();
     Ok(())
@@ -131,50 +168,142 @@ fn detect_active_network_service() -> Result<String, String> {
     Err(format!("could not map interface {} to a network service", iface))
 }
 
-/// All macOS network services, minus the title line and any disabled services
-/// (prefixed with `*` in networksetup's output). Does NOT require root.
-fn list_all_network_services() -> Result<Vec<String>, String> {
-    let out = Command::new("networksetup")
-        .arg("-listallnetworkservices")
+/// Read the DNS servers currently configured on a network service.
+/// Returns `"empty"` when no DNS is set (DHCP default), otherwise
+/// space-separated IPs. Does NOT require root.
+fn read_service_dns(service: &str) -> String {
+    let out = match Command::new("networksetup")
+        .args(["-getdnsservers", service])
         .output()
-        .map_err(|e| format!("networksetup -listallnetworkservices failed: {}", e))?;
+    {
+        Ok(o) => o,
+        Err(e) => {
+            log::warn!("[dns] -getdnsservers [{}] failed: {}", service, e);
+            return "empty".to_string();
+        }
+    };
     let stdout = String::from_utf8_lossy(&out.stdout);
-    Ok(stdout
+    let ips: Vec<&str> = stdout
         .lines()
-        .skip(1)
         .map(|l| l.trim())
-        .filter(|l| !l.is_empty() && !l.starts_with('*'))
-        .map(|l| l.to_string())
-        .collect())
+        .filter(|l| !l.is_empty() && l.parse::<std::net::IpAddr>().is_ok())
+        .collect();
+    if ips.is_empty() {
+        "empty".to_string()
+    } else {
+        ips.join(" ")
+    }
 }
 
 /// Point system DNS at the TUN gateway. Detect the currently active network
-/// service, apply via the privileged helper, flush cache.
+/// service, capture its pre-override DNS (first touch only), apply via the
+/// privileged helper, flush cache.
 pub fn apply_system_dns_override(config_path: &str) -> Result<(), String> {
     let gateway = extract_tun_gateway_from_config(config_path)
         .ok_or_else(|| format!("could not extract TUN gateway from {}", config_path))?;
     let service = detect_active_network_service()?;
-    log::info!("[dns] override → {} for [{}]", gateway, service);
+
+    // Capture the service's current DNS before we overwrite it. If we've
+    // already touched this service (re-apply after NetworkUp), skip so the
+    // stash keeps the true original instead of our own gateway IP.
+    let original = read_service_dns(&service);
+    capture_if_new(&service, original.clone());
+    log::info!(
+        "[dns] override → {} for [{}] (captured original: {})",
+        gateway,
+        service,
+        original
+    );
     macos_helper::api::set_dns_servers(&service, &gateway)?;
     macos_helper::api::flush_dns_cache().ok();
     Ok(())
 }
 
-/// Restore system DNS by iterating every network service and resetting each
-/// to `empty` (DHCP default). Stateless, idempotent, works even while TUN
-/// is still up.
-pub fn restore_system_dns() -> Result<(), String> {
-    let services = list_all_network_services()?;
-    log::info!(
-        "[dns] restore: resetting {} services → empty (DHCP)",
-        services.len()
-    );
-    for svc in &services {
-        if let Err(e) = macos_helper::api::set_dns_servers(svc, "empty") {
-            log::warn!("[dns] failed to reset [{}]: {}", svc, e);
+/// Write captured originals back, synchronously. Returns the subset that
+/// the helper accepted — those are the entries eligible for the post-kill
+/// verify pass.
+///
+/// Must run **before** sing-box is killed so the physical NIC default
+/// route never briefly inherits the stale `172.19.0.1` gateway IP that
+/// becomes unreachable the moment TUN tears down.
+fn apply_captured_originals_sync(captured: &[(String, String)]) -> Vec<(String, String)> {
+    if captured.is_empty() {
+        log::info!("[dns] no captured services; nothing to restore");
+        return Vec::new();
+    }
+    log::info!("[dns] restore (phase 1, pre-kill): {} service(s)", captured.len());
+    let mut applied = Vec::with_capacity(captured.len());
+    for (service, original) in captured {
+        log::info!("[dns] restore [{}] → {}", service, original);
+        if let Err(e) = macos_helper::api::set_dns_servers(service, original) {
+            log::warn!("[dns] restore [{}] failed: {}", service, e);
+            continue;
+        }
+        applied.push((service.clone(), original.clone()));
+    }
+    macos_helper::api::flush_dns_cache().ok();
+    applied
+}
+
+/// Probe each restored DNS server on UDP/53. If **none** of a service's
+/// captured servers respond, swap it for `get_best_dns_server` so the user
+/// isn't stranded on a stale IP (e.g. a Wi-Fi router that has since
+/// disappeared). Must only run AFTER sing-box has exited and TUN has been
+/// removed — otherwise every probe is routed through TUN → proxy and all
+/// servers look reachable, producing bogus "everything's fine" results.
+async fn verify_and_fallback(applied: &[(String, String)]) {
+    if applied.is_empty() {
+        return;
+    }
+    for (service, original) in applied {
+        if original == "empty" {
+            // Back to DHCP defaults — there's no single IP to probe; trust
+            // whatever DHCP hands out.
+            continue;
+        }
+        let mut any_alive = false;
+        for ip in original.split_whitespace() {
+            if crate::commands::dns::probe_dns_reachable(ip).await {
+                any_alive = true;
+                break;
+            }
+        }
+        if any_alive {
+            continue;
+        }
+        log::warn!(
+            "[dns] restored [{}] DNS ({}) unreachable — falling back to best public DNS",
+            service,
+            original
+        );
+        if let Some(best) = crate::commands::dns::get_best_dns_server().await {
+            if let Err(e) = macos_helper::api::set_dns_servers(service, &best) {
+                log::warn!(
+                    "[dns] fallback set_dns_servers [{}] → {}: {}",
+                    service,
+                    best,
+                    e
+                );
+            } else {
+                log::info!("[dns] [{}] fell back to {}", service, best);
+            }
         }
     }
     macos_helper::api::flush_dns_cache().ok();
+}
+
+/// Crash-path restore (called from `on_process_terminated`). sing-box has
+/// already exited by the time this runs, so we can do write + verify back
+/// to back without the "probe leaks through TUN" hazard that forces the
+/// user-stop path in `stop_tun_process` to split the phases.
+///
+/// Services we never touched are left alone — this is NOT a scorched-earth
+/// reset. Any manual DNS the user configured on an untouched interface
+/// (e.g. Ethernet while TUN ran over Wi-Fi) is preserved.
+pub async fn restore_system_dns() -> Result<(), String> {
+    let captured = take_all_captured();
+    let applied = apply_captured_originals_sync(&captured);
+    verify_and_fallback(&applied).await;
     Ok(())
 }
 
@@ -318,7 +447,7 @@ impl EngineManager for MacOSEngine {
                 tokio::time::sleep(std::time::Duration::from_millis(500)).await;
             }
             crate::engine::ProxyMode::TunProxy => {
-                stop_tun_process().map_err(|e| {
+                stop_tun_process().await.map_err(|e| {
                     log::error!("Failed to stop TUN process: {}", e);
                     e
                 })?;
@@ -351,10 +480,15 @@ impl EngineManager for MacOSEngine {
         // check would eventually notice TUN is gone, but only after the
         // next 4h sleep, which is too slow.
         watchdog::cancel();
-        log::info!("[dns] TUN process terminated — resetting all services to DHCP");
-        if let Err(e) = restore_system_dns() {
-            log::warn!("[dns] fallback restore_system_dns failed: {}", e);
-        }
+        log::info!("[dns] TUN process terminated — restoring captured originals");
+        // Async restore runs fire-and-forget. take_all_captured drains the
+        // stash so if the user-stop path already consumed it, this lands as
+        // a harmless no-op (captured list empty → early return).
+        tauri::async_runtime::spawn(async {
+            if let Err(e) = restore_system_dns().await {
+                log::warn!("[dns] fallback restore_system_dns failed: {}", e);
+            }
+        });
     }
 
     async fn ensure_installed(_app: &AppHandle) -> Result<(), String> {

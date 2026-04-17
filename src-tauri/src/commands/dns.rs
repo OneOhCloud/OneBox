@@ -104,6 +104,17 @@ pub(crate) async fn probe_dns_server(
     }
 }
 
+/// Probe a single DNS server and return whether it replied within 500 ms.
+/// Reuses `probe_dns_server`'s channel to observe success. Currently only
+/// the macOS DNS-restore path consumes this; kept `pub(crate)` so Linux /
+/// Windows can reach for it too without a second helper.
+#[allow(dead_code)]
+pub(crate) async fn probe_dns_reachable(dns: &str) -> bool {
+    let (tx, mut rx) = mpsc::channel::<(String, std::time::Duration)>(1);
+    probe_dns_server(dns.to_string(), Some(tx)).await;
+    rx.recv().await.is_some()
+}
+
 /// Race every DNS server in DNSSERVERDICT in parallel; return the first
 /// one that replies. Falls back to 223.5.5.5 if all fail.
 pub async fn get_best_dns_server() -> Option<String> {

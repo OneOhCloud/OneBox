@@ -249,8 +249,8 @@ If the OS / filesystem / store already holds the canonical state, don't shadow i
 **2. Operations are idempotent — no guards, no "only call if needed" checks.**
 Every mutation can be run repeatedly without harm. This means callers never have to track "did I already do X?", and crash-recovery paths can call the operation unconditionally.
 
-**3. Cleanup is scorched-earth where viable; targeted restore where the default-primitive would be destructive.**
-macOS and Windows enumerate all non-TUN interfaces and reset them to DHCP defaults (`networksetup -setdnsservers … empty` / clear the Windows `NameServer` registry value). The OS treats these as "back to default" and the operation is idempotent — no list of "things I touched" is needed. Linux does *not* have a safe equivalent (`resolvectl revert` in "foreign" resolv.conf mode erases NetworkManager/netplan-managed static DNS), so the Linux engine captures `(iface, original_dns)` at start and re-applies the captured value on stop. This is the one place Design Philosophy #6's trade-off bias bends: we track Linux-only teardown state, because the alternative is destroying the user's config.
+**3. Cleanup is targeted on macOS/Linux, scorched-earth on Windows.**
+macOS and Linux capture the touched service/interface's pre-override DNS and re-apply it on stop — any service we never touched is left alone. Windows enumerates all non-TUN adapters and blanks their `NameServer` registry value to DHCP default, because Windows' per-adapter stateful registry primitive makes targeted restore expensive and the blast radius of resetting every adapter is already accepted by Design Philosophy #6 for that platform. macOS used to also be scorched-earth (`networksetup -setdnsservers <svc> empty` on every service) but that destroyed the user's manual DNS on interfaces OneBox never had reason to touch; the current targeted design is in `engine/macos/mod.rs::DNS_CAPTURED`.
 
 **4. Reads and writes are decoupled. Stale reads are allowed.**
 The read path is fast, local, never blocks on network. The write path refreshes in the background. The two paths don't synchronize — the read may return old data while a write is mid-flight, and that's fine.
@@ -259,7 +259,7 @@ The read path is fast, local, never blocks on network. The write path refreshes 
 Each platform has its own "revert to default" primitive (macOS `networksetup empty`, Linux `resolvectl revert`, Windows `-ResetServerAddresses`, `store.delete`). Use them. Don't re-implement their effect with our own snapshot/replay logic.
 
 **6. Trade-off bias: accept small edge-case data loss for crash-safety and simplicity.**
-A stateless reset might nuke a user's unrelated manual DNS on Ethernet; a scorched-earth purge might delete a fringe store key. These are acceptable. What is not acceptable: leaving the system in a half-applied state because our replay logic couldn't unwind it correctly.
+A scorched-earth purge might delete a fringe store key or reset a Windows adapter OneBox didn't care about. These are acceptable. What is *not* acceptable: leaving the system in a half-applied state because our replay logic couldn't unwind it correctly. Note: macOS DNS restore *does* track per-service originals because user-facing complaints about losing manual DNS outweighed the simplicity of scorched-earth. Windows keeps the scorched-earth default because the stateful-registry alternative is complex and Windows users rarely hand-configure DNS on secondary adapters.
 
 **One-liner**: *Tell the system to start and stop; let the system decide what "stopped" means.*
 
@@ -267,7 +267,7 @@ A stateless reset might nuke a user's unrelated manual DNS on Ethernet; a scorch
 
 ## System DNS Override Flow
 
-Core principle: **on all three platforms, DNS override is a single directed "set" on the active (or every non-TUN) interface. Restore is scorched-earth on macOS and Windows (enumerate → reset), and targeted on Linux (re-apply captured original) because `resolvectl revert` would destroy NetworkManager/netplan static DNS.**
+Core principle: **DNS override is a single directed "set" on the active (or every non-TUN) interface. Restore is targeted on macOS and Linux (re-apply per-service/iface captured originals; verify + fall back to best public DNS if the original is unreachable), and scorched-earth on Windows (enumerate → blank registry) because Windows' per-adapter restore would require a lot more state tracking for little user benefit.**
 
 ### Why DNS needs overriding at all
 
@@ -277,30 +277,35 @@ Pointing system DNS at the TUN gateway (e.g. `172.19.0.1`) forces every query in
 
 ### Apply (on TUN start)
 
-| Platform | Detection | Write mechanism | Runs as |
-|---|---|---|---|
-| macOS | `route -n get default` → `networksetup -listallhardwareports` to map iface → service | `networksetup -setdnsservers <service> <gw>` via privileged XPC helper | root (helper) |
-| Linux | `ip route get 1.1.1.1` for active iface, `nmcli` / `resolvectl status` to capture original DNS | `resolvectl dns <iface> <gw>` via `pkexec` shell helper | root (pkexec) |
-| Windows | `tun_service::dns::enumerate_interfaces` — non-TUN adapters that already have an IP | `tun_service::dns::apply_override(gateway)` → per-iface `set_interface_dns` writes the `HKLM\SYSTEM\…\Interfaces\{GUID}\NameServer` registry value | SYSTEM (service) |
+| Platform | Detection | Capture (before write) | Write mechanism | Runs as |
+|---|---|---|---|---|
+| macOS | `route -n get default` → `networksetup -listallhardwareports` to map iface → service | `networksetup -getdnsservers <service>` → append `(service, original)` to `DNS_CAPTURED` **only if service not already captured** | `networksetup -setdnsservers <service> <gw>` via privileged XPC helper | root (helper) |
+| Linux | `ip route get 1.1.1.1` for active iface, `nmcli` / `resolvectl status` to capture original DNS | stashed into `DNS_OVERRIDE` `Mutex<Option<(String, String)>>` | `resolvectl dns <iface> <gw>` via `pkexec` shell helper | root (pkexec) |
+| Windows | `tun_service::dns::enumerate_interfaces` — non-TUN adapters that already have an IP | not captured (scorched-earth restore) | `tun_service::dns::apply_override(gateway)` → per-iface `set_interface_dns` writes the `HKLM\SYSTEM\…\Interfaces\{GUID}\NameServer` registry value | SYSTEM (service) |
 
-The TUN gateway IP comes from `engine::common::helper::extract_tun_gateway_from_config` parsing the rendered sing-box config. **Linux additionally stashes** `(iface, original_dns)` into the private `DNS_OVERRIDE` `Mutex` static inside `engine/linux/mod.rs` — that's the *only* DNS-specific in-process state we keep, and it's scoped to Linux.
+The TUN gateway IP comes from `engine::common::helper::extract_tun_gateway_from_config` parsing the rendered sing-box config.
+
+**In-process state we keep**:
+- macOS: `DNS_CAPTURED: Mutex<Vec<(service, original_dns)>>` in `engine/macos/mod.rs`. Append-only while TUN runs; `NetworkUp` re-applies to the new active service but never overwrites an existing capture (the on-disk value we'd read back now is our own TUN gateway, not the true original).
+- Linux: `DNS_OVERRIDE: Mutex<Option<(iface, original)>>` in `engine/linux/mod.rs`.
+- Windows: none — restore iterates live adapter state instead.
 
 ### Restore (on TUN stop / crash / reload)
 
 | Platform | Strategy | Implementation |
 |---|---|---|
-| macOS | Scorched-earth: enumerate all network services, set each to `empty` (DHCP default) | `engine/macos/mod.rs::restore_system_dns` via helper `networksetup -setdnsservers <service> empty` |
+| macOS | Targeted + verify + fallback, split into two phases: **(pre-kill)** write each captured `(service, original)` back; **(post-kill)** probe each on UDP/53 with a 500 ms per-server timeout; if all of a service's captured servers fail, swap in `commands::dns::get_best_dns_server` (fastest-responding public DNS). Services never captured are left untouched. | `engine/macos/mod.rs::apply_captured_originals_sync` + `verify_and_fallback`; called in order from `stop_tun_process` with `stop_sing_box` + route cleanup in between. Helper call: `networksetup -setdnsservers <service> <original-or-best>` |
 | Linux | Targeted: re-apply captured original DNS to the one iface we touched | `engine/linux/mod.rs::restore_system_dns(iface, original)` via pkexec `resolvectl dns` |
 | Windows | Scorched-earth: blank `NameServer` on every non-TUN adapter with an IP → DHCP default | Two parallel copies of `reset_all_interfaces_dns` (native Win32 registry writes): `tun_service::dns` runs it inside the SCM service on normal stop; `engine/windows/native.rs` runs it via UAC self-elevation on the crash-recovery path |
 
 Restore is called from two paths:
 
 1. **User-initiated stop** — `PlatformEngine::stop(app)`:
-   - macOS: `stop_tun_process` restores DNS **before** killing sing-box via helper.
-   - Linux: `stop_tun_and_restore_dns(take_dns_override())` drains the stash and does restore + pkill in one pkexec call.
+   - macOS: `stop_tun_process` (async) drains `DNS_CAPTURED`, runs `apply_captured_originals_sync` (phase 1), kills sing-box, removes TUN routes, then runs `verify_and_fallback` (phase 2). The phases **must** straddle `stop_sing_box`: while sing-box is alive, every UDP/53 probe from the OneBox process gets routed through TUN → the proxy → every server looks reachable and the fallback never fires. Phase 1's drain means the crash-recovery path below becomes a no-op.
+   - Linux: `stop_tun_and_restore_dns(take_dns_override())` drains the stash and does restore + pkill in one pkexec call. No verify phase.
    - Windows: SCM stop; the service's own stop handler calls `reset_all_interfaces_dns` before reporting STOPPED.
 2. **Process exited** (crash, external kill, reload) — `core::monitor::handle_process_termination` calls `PlatformEngine::on_process_terminated(app, was_user_stop)`:
-   - macOS: re-runs scorched-earth `restore_system_dns` (idempotent; no-op if stop already ran).
+   - macOS: spawns the async `restore_system_dns` fire-and-forget. Because sing-box is already dead by the time this runs, the write + verify + fallback can run back-to-back without the phase split — probes hit the physical NIC directly. If the user-stop path already drained `DNS_CAPTURED`, this returns early (empty stash).
    - Linux: `take_dns_override()` — drained on user-stop path, so this is a no-op there; on crash it's the only restore that runs.
    - Windows: if `!was_user_stop`, self-elevates via UAC to re-run `reset_all_interfaces_dns` (crash path only); user-stop path already cleaned up via the service.
 
@@ -308,14 +313,18 @@ On top of restore, `PlatformEngine::restart` (the config-reload path) also flush
 
 ### What we deliberately DON'T do
 
-- **No backup file.** The prior design wrote `/tmp/onebox-dns-backup.tsv`. Deleted. macOS/Windows use the OS's "back to DHCP" primitive; Linux uses a process-local `Mutex<Option<(String, String)>>` that dies with the process.
-- **No "only restore if we applied" guard.** Every termination path calls restore. Cost is a few ms of no-op `setdnsservers empty` / registry writes. Benefit: immune to crashes between apply and restore.
-- **No attempt to preserve the user's manual DNS on unrelated interfaces** (macOS/Windows). If Ethernet had `1.1.1.1` set manually while Wi-Fi was running OneBox, stop will reset Ethernet too. Accepted trade-off — see Design Philosophy #6. Linux does preserve the one iface it touched, because `resolvectl revert` would erase NM/netplan static DNS.
+- **No backup file.** The prior design wrote `/tmp/onebox-dns-backup.tsv`. Deleted. Windows uses the OS's "back to DHCP" primitive; macOS and Linux use process-local `Mutex` stashes that die with the process.
+- **No "only restore if we applied" guard.** Every termination path calls restore. On macOS/Linux the capture stash is authoritative — if it's empty, restore is a no-op; if it has entries, restore runs unconditionally. Benefit: immune to crashes between apply and restore.
+- **No attempt to preserve the user's manual DNS on unrelated Windows adapters.** If Ethernet had `1.1.1.1` set manually while Wi-Fi was running OneBox, Windows stop will reset Ethernet too. Accepted trade-off — see Design Philosophy #6. macOS and Linux preserve untouched interfaces because their per-service/iface restore primitives are cheap; Windows' `HKLM\…\Interfaces\{GUID}` per-adapter state would require tracking which GUIDs we touched across service restarts, not worth it.
+- **macOS: no write-time DNS override re-capture.** When `NetworkUp` fires (Wi-Fi flap, interface switch), `apply_system_dns_override` runs again, but `DNS_CAPTURED` only appends if the service isn't already present. Re-capturing would read back our own TUN gateway IP as the "original" and clobber the real original on stop.
+
+**DNS_CAPTURED invariant (macOS)**: append-only during the TUN session, drained exactly once by `take_all_captured`. **Never** overwrite an existing entry. If you add a code path that mutates it, the "manual DNS survives TUN" property breaks.
 
 ### Files
 
 - `src-tauri/src/engine/common/helper.rs` — `extract_tun_gateway_from_config` (parses the rendered config for the TUN inbound's IPv4).
-- `src-tauri/src/engine/macos/mod.rs` — `apply_system_dns_override` / `restore_system_dns`, `detect_active_network_service`, `list_all_network_services`, `stop_tun_process`. XPC calls go to the privileged helper in `engine/macos/helper.{rs,m}`.
+- `src-tauri/src/engine/macos/mod.rs` — `DNS_CAPTURED` stash, `apply_system_dns_override` (captures + writes), `apply_captured_originals_sync` + `verify_and_fallback` (the two restore phases), `restore_system_dns` (crash-path wrapper), `read_service_dns`, `detect_active_network_service`, `list_all_network_services`, `stop_tun_process`. XPC calls go to the privileged helper in `engine/macos/helper.{rs,m}`.
+- `src-tauri/src/commands/dns.rs` — `probe_dns_reachable` (single-server UDP/53 liveness probe, 500 ms timeout) and `get_best_dns_server` (races 29 public resolvers, picks the fastest). Consumed by the macOS verify pass.
 - `src-tauri/src/engine/linux/mod.rs` — `apply_system_dns_override` / `restore_system_dns`, `detect_active_iface`, `capture_original_dns`, `stop_tun_and_restore_dns` (pkexec), and the private `DNS_OVERRIDE` stash. Shell helper at `src-tauri/resources/linux/onebox-tun-helper` runs as root.
 - `src-tauri/src/engine/windows/native.rs` — `enumerate_interfaces`, `reset_all_interfaces_dns`, `self_elevate_helper` (used on the crash-recovery restore path). Pure native Win32 registry writes, no PowerShell.
 - `src-tauri/tun-service/src/dns.rs` — the SCM service's own copy of the same interface-enumeration + apply/reset logic, called from `service_main` on normal start and stop.
@@ -326,6 +335,42 @@ On top of restore, `PlatformEngine::restart` (the config-reload path) also flush
 In `stop_tun_process` (macOS) / `stop_tun_and_restore_dns` (Linux) we restore DNS **first**, then kill sing-box. If we killed sing-box first, TUN tears down, the default route reverts to the physical NIC, and for ~500 ms the system DNS still points at an unreachable `172.19.0.1` — every app's DNS lookup times out during that window. Restoring first overwrites the stale gateway while it's still addressable.
 
 Windows doesn't need an explicit order here: the reset runs inside the service process before the SCM state transitions to STOPPED, so by the time the TUN is removed the registry's `NameServer` values are already cleared.
+
+### Why the macOS verify phase runs AFTER kill
+
+The user-stop path on macOS intentionally straddles `stop_sing_box` with its two DNS phases. The reason is counter-intuitive: while sing-box is alive, every UDP packet this process emits — including the DNS probes in `verify_and_fallback` — gets picked up by the TUN device and routed through the active outbound proxy. So every public DNS we probe looks reachable regardless of whether the physical network can actually reach it. The fallback to `get_best_dns_server` would never fire, and a captured DNS that's been dead for hours (e.g. a Wi-Fi gateway IP the user has since roamed away from) would stay configured, leaving the system unable to resolve anything after TUN goes away. Only once `stop_sing_box` + `remove_tun_routes` run do probes egress through the physical NIC and report truthful liveness. That's why phase 1 (write) must happen before the kill (for the restore-before-kill reason above) but phase 2 (probe + fallback) must happen after.
+
+The crash path (`on_process_terminated`) doesn't need this split — sing-box is already dead when the monitor fires.
+
+### Methodology reminder: expand every verb in the TUN lifecycle
+
+When editing any step in the TUN start/stop/restart sequence, **expand the verb into its concrete system-state effect** before deciding where a new step goes. "`stop_sing_box`" is not "stop a process" — it is "tear down the `utun233` device so the kernel no longer captures this process's outbound packets". "`remove_tun_routes`" is not "clean up" — it is "delete the routes that tell the kernel to hand `172.19.0.1` to TUN". A step that emits packets from this process (probe, telemetry, health check, log upload) must check whether **TUN is still the default route at the insertion point**. If yes, the packet is captured by TUN and routed through the proxy — it tells you nothing about the physical network. The probe-after-kill bug in this module's history came from treating `stop_sing_box` as an abstract "stop the process" rather than "take down the virtual NIC". Rule of thumb: if you cannot state, in one sentence, what observable kernel / socket / routing state changes across a given step boundary, stop and read the code for that step before inserting anything adjacent. See also `~/.claude/CLAUDE.md` → *Step-by-step Semantic Analysis*.
+
+---
+
+## Update-driven relaunch: deep-link argv suppression
+
+`tauri-plugin-updater` on Windows (NSIS) and on macOS/Linux (via `tauri::process::restart`) forwards the current process's `argv` to the freshly-installed binary when it relaunches. Concretely, the NSIS installer is invoked with `/ARGS <original-argv>` so the new exe boots with the same command line as the one being replaced. `tauri-plugin-deep-link::handle_cli_arguments` runs at plugin-init time on Windows/Linux and populates its `current` URL slot from argv — so an app originally launched via `onebox-networktools://config?...&apply=1` will see the URL back in argv on every update-relaunch. Without a guard, the post-update cold-start path in `app/setup.rs` re-imports + re-applies the original payload.
+
+**Mechanism**:
+
+- JS side, immediately before `updateInfo.install()`, writes `{ at: Date.now() }` to the `update_suppress_argv_deeplink_at` key in the settings store (`src/utils/update.ts::markPendingUpdateRelaunch`, called from both `updater.tsx` and `updater-button.tsx`).
+- Rust side, in the cold-start Windows/Linux argv branch of `app/setup.rs`, reads + `delete`s the key (both best-effort). If the read returned a timestamp within `UPDATE_SUPPRESS_TTL_MS` of now, the argv-carried deep link is discarded. Otherwise it's processed normally.
+- TTL is 5 minutes. NSIS install → relaunch finishes in seconds in practice, so the TTL is a safety net for the "install crashed after writing the marker but before relaunching" scenario.
+
+**Critical invariants** — breaking either one makes the suppression mechanism silently wrong:
+
+1. **Closed write path.** `markPendingUpdateRelaunch` is the **only** code that ever writes this key. Rust's read path **must not** re-write it. If a future change adds a second writer, the mental model collapses and the suppression can fire in unrelated flows.
+2. **Never extend the TTL.** The whole point of the timestamp is that it **ages out**. A stuck marker must self-heal within `UPDATE_SUPPRESS_TTL_MS`. Don't add "refresh on read", don't extend the TTL to hours, don't add a bool-equivalent that never expires. If the read path's `delete` fails (store locked, disk full, process killed mid-save), the TTL is the only thing preventing permanent deep-link death — and deep links failing silently is considered more fatal than a single accidental re-import.
+
+**What about macOS?** macOS deep links don't go through argv — they're delivered via the Cocoa `application:openURLs:` delegate and only appear through `on_open_url`. So the `#[cfg(any(windows, target_os = "linux"))]` gate matches exactly the platforms where the argv-replay bug exists. macOS never needs to write or read this key.
+
+**Files**:
+
+- `src/types/definition.ts` — `UPDATE_SUPPRESS_ARGV_DEEPLINK_AT_KEY` constant.
+- `src/utils/update.ts` — `markPendingUpdateRelaunch`.
+- `src/components/settings/updater.tsx`, `src/components/settings/updater-button.tsx` — call sites (always immediately before `updateInfo.install()`).
+- `src-tauri/src/app/setup.rs` — `should_suppress_argv_deeplink`, `UPDATE_SUPPRESS_KEY`, `UPDATE_SUPPRESS_TTL_MS`, call site inside the cold-start `get_current` branch.
 
 ---
 

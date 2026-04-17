@@ -2,6 +2,7 @@ import { confirm } from "@tauri-apps/plugin-dialog";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { CloudArrowUpFill } from "react-bootstrap-icons";
 import { t, vpnServiceManager } from "../../utils/helper";
+import { markPendingUpdateRelaunch } from "../../utils/update";
 import { useUpdate } from "./update-context";
 
 /**
@@ -21,6 +22,7 @@ export default function UpdaterButton() {
             if (confirmed) {
                 await vpnServiceManager.stop();
                 await new Promise((resolve) => setTimeout(resolve, 2000));
+                await markPendingUpdateRelaunch();
                 await updateInfo.install();
                 await relaunch();
             }

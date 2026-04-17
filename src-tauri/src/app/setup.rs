@@ -2,9 +2,25 @@ use tauri::Emitter;
 use tauri::Manager;
 use tauri_plugin_deep_link::DeepLinkExt;
 use tauri_plugin_http::reqwest;
+#[cfg(any(windows, target_os = "linux"))]
+use tauri_plugin_store::StoreExt;
 use url::Url;
 
 use crate::utils::show_dashboard;
+
+// Key mirrors `UPDATE_SUPPRESS_ARGV_DEEPLINK_AT_KEY` in
+// `src/types/definition.ts`. JS writes `{ at: <ms> }` before
+// `updateInfo.install()`; Rust reads it once on cold-start to decide
+// whether the argv-carried URL is a genuine user click or an NSIS replay
+// of the original launch argv.
+#[cfg(any(windows, target_os = "linux"))]
+const UPDATE_SUPPRESS_KEY: &str = "update_suppress_argv_deeplink_at";
+
+// Max age of the suppression marker. Set to 5 min: NSIS install + relaunch
+// finishes in seconds even on slow hardware, so anything older is a stale
+// residue from a failed update and must NOT keep suppressing deep links.
+#[cfg(any(windows, target_os = "linux"))]
+const UPDATE_SUPPRESS_TTL_MS: u128 = 5 * 60 * 1000;
 
 /// App 初始化逻辑，对应 Builder::setup 闭包
 pub fn app_setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
@@ -62,19 +78,70 @@ pub fn app_setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>>
     // before on_open_url was registered, so the event was missed.
     // Directly write to pending_deep_link now so the frontend can retrieve it
     // synchronously via get_pending_deep_link once the webview is ready.
+    //
+    // Exception: tauri-plugin-updater forwards the original argv to the new
+    // exe via NSIS `/ARGS`. Without this guard, every post-update cold-start
+    // would replay the launch URL and re-import + re-apply. We cooperate with
+    // JS: `markPendingUpdateRelaunch` writes a timestamp just before
+    // `updateInfo.install()`, and we read + drop it here. Deletion is
+    // best-effort; the TTL check is the authoritative guard so a stuck marker
+    // can only suppress deep links for at most `UPDATE_SUPPRESS_TTL_MS`
+    // before self-healing.
     #[cfg(any(windows, target_os = "linux"))]
     if let Ok(Some(urls)) = app.deep_link().get_current() {
-        if let Some(payload) = urls.first().and_then(extract_deep_link_data) {
-            log::info!(
-                "Cold-start deep link config data: {} apply={}",
-                payload.data,
-                payload.apply
-            );
-            store_pending_deep_link(&app.state::<crate::app::state::AppData>(), payload);
+        let argv_url = urls.first().and_then(extract_deep_link_data);
+        if let Some(payload) = argv_url {
+            if should_suppress_argv_deeplink(app.handle()) {
+                log::info!(
+                    "Cold-start deep link suppressed (post-update replay): data-len={} apply={}",
+                    payload.data.len(),
+                    payload.apply
+                );
+            } else {
+                log::info!(
+                    "Cold-start deep link config data: {} apply={}",
+                    payload.data,
+                    payload.apply
+                );
+                store_pending_deep_link(&app.state::<crate::app::state::AppData>(), payload);
+            }
         }
     }
 
     Ok(())
+}
+
+/// Read, check TTL, best-effort delete the suppression marker. Returns
+/// `true` when the argv deep link must be discarded (fresh marker found).
+///
+/// Invariants:
+/// - Only `markPendingUpdateRelaunch` (JS) ever WRITES this key.
+/// - This function ONLY reads + deletes — never rewrites.
+/// - Delete failure is non-fatal: TTL expiry will eventually free the flag.
+#[cfg(any(windows, target_os = "linux"))]
+fn should_suppress_argv_deeplink(app: &tauri::AppHandle) -> bool {
+    let Some(store) = app.get_store("settings.json") else {
+        return false;
+    };
+    let raw = store.get(UPDATE_SUPPRESS_KEY);
+    // Always try to clear — even if we decide NOT to suppress (stale marker),
+    // dropping it now prevents a future false positive from the same residue.
+    let _ = store.delete(UPDATE_SUPPRESS_KEY);
+    let _ = store.save();
+
+    let Some(value) = raw else {
+        return false;
+    };
+    let Some(at_ms) = value.get("at").and_then(|v| v.as_u64()) else {
+        return false;
+    };
+    let now_ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis())
+        .unwrap_or(0);
+    // Saturating subtraction handles wall-clock going backwards (NTP step).
+    let age = now_ms.saturating_sub(at_ms as u128);
+    age < UPDATE_SUPPRESS_TTL_MS
 }
 
 // ── Deep Link ──────────────────────────────────────────────────────
