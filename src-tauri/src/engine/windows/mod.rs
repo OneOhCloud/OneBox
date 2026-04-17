@@ -1,7 +1,6 @@
 use crate::engine::EVENT_TAURI_LOG;
 use tauri::AppHandle;
 use tauri::Emitter;
-use tauri_plugin_shell::process::Command as TauriCommand;
 
 use crate::engine::helper::extract_tun_gateway_from_config;
 use crate::engine::sysproxy::{clear_system_proxy, set_system_proxy};
@@ -48,7 +47,7 @@ fn bundled_service_exe_path() -> Option<std::path::PathBuf> {
         .find(|p| p.exists())
 }
 
-/// Start the TUN mode via the Windows service.
+/// Start TUN mode via the Windows SCM service.
 ///
 /// Flow:
 ///   1. Locate the bundled service binary.
@@ -57,40 +56,32 @@ fn bundled_service_exe_path() -> Option<std::path::PathBuf> {
 ///      (synchronous wait on the elevated child process).
 ///   3. Extract the TUN gateway from the sing-box config.
 ///   4. Non-elevated `StartServiceW` with `[config, gateway, sidecar]`.
-///   5. Return `None` — sing-box runs inside the service process; no child
-///      handle in the parent. The readiness prober drives `Starting → Running`
-///      via the clash API, and the Windows service watchdog in `core.rs`
-///      synthesises `handle_process_termination` on service exit.
+///
+/// sing-box runs inside the service process — no child handle comes back
+/// to the parent. The caller wires `ProcessManager.child = None` and relies
+/// on `watchdog::spawn` to synthesize `handle_process_termination` on
+/// service exit; readiness is driven by the clash-API prober.
 #[cfg(target_os = "windows")]
-pub fn create_privileged_command(
+pub fn start_tun_service(
     _app: &AppHandle,
     sidecar_path: String,
     path: String,
-) -> Option<TauriCommand> {
+) -> Result<(), String> {
     use tun_service::scm;
 
-    let bundled = match bundled_service_exe_path() {
-        Some(p) => p,
-        None => {
-            log::error!(
-                "[service] cannot locate bundled tun-service.exe next to OneBox.exe; \
-                 release bundling via externalBin is still TODO"
-            );
-            return None;
-        }
-    };
+    let bundled = bundled_service_exe_path().ok_or_else(|| {
+        "cannot locate bundled tun-service.exe next to OneBox.exe; \
+         release bundling via externalBin is still TODO"
+            .to_string()
+    })?;
 
     // Fast path: only pop UAC if the installed service is missing or stale.
     let freshness = scm::check_freshness(&bundled);
     log::info!("[service] freshness = {:?}", freshness);
     if !matches!(freshness, scm::Freshness::UpToDate) {
         let bundled_s = bundled.to_string_lossy().into_owned();
-        if let Err(e) =
-            windows_native::self_elevate_helper("install-service", &[bundled_s.as_str()])
-        {
-            log::error!("[service] elevated install-service failed: {}", e);
-            return None;
-        }
+        windows_native::self_elevate_helper("install-service", &[bundled_s.as_str()])
+            .map_err(|e| format!("elevated install-service failed: {}", e))?;
         log::info!("[service] install-service helper completed");
     }
 
@@ -107,12 +98,8 @@ pub fn create_privileged_command(
         gateway.clone()
     };
 
-    if let Err(e) =
-        scm::start_service_with_args(&[path.as_str(), gateway_arg.as_str(), sidecar_path.as_str()])
-    {
-        log::error!("[service] start_service_with_args failed: {}", e);
-        return None;
-    }
+    scm::start_service_with_args(&[path.as_str(), gateway_arg.as_str(), sidecar_path.as_str()])
+        .map_err(|e| format!("start_service_with_args failed: {}", e))?;
 
     log::info!(
         "[service] OneBoxTunService started (config={}, gateway={}, sidecar={})",
@@ -124,7 +111,7 @@ pub fn create_privileged_command(
         },
         sidecar_path
     );
-    None
+    Ok(())
 }
 
 /// Stop TUN mode: ask the Windows service to stop. The service resets DNS
@@ -213,28 +200,22 @@ impl EngineManager for WindowsEngine {
                 }
             }
             crate::engine::ProxyMode::TunProxy => {
-                let sidecar_path = crate::engine::helper::get_sidecar_path(
-                    std::path::Path::new("sing-box"),
-                )
-                .map_err(|e| format!("Failed to get sidecar path: {}", e))?;
-                let cmd = create_privileged_command(app, sidecar_path, config_path.clone())
-                    .ok_or_else(|| "service command not available".to_string())?;
-                let (rx, child) = cmd.spawn().map_err(|e| format!("spawn failed: {}", e))?;
-                crate::core::monitor::spawn_process_monitor(
-                    app.clone(),
-                    rx,
-                    Arc::new(mode.clone()),
-                );
+                let sidecar_path =
+                    crate::engine::helper::get_sidecar_path(std::path::Path::new("sing-box"))
+                        .map_err(|e| format!("Failed to get sidecar path: {}", e))?;
+                start_tun_service(app, sidecar_path, config_path.clone())?;
+
                 let mode_arc = Arc::new(mode);
                 {
                     let mut mgr = crate::core::ProcessManager::acquire();
                     mgr.mode = Some(Arc::clone(&mode_arc));
                     mgr.config_path = Some(Arc::new(config_path));
-                    mgr.child = Some(child);
+                    mgr.child = None; // managed by the SCM service
                     mgr.is_stopping = false;
                 }
-                // Poll the SCM service state so external kills / crashes
-                // surface through the normal process_monitor path.
+                // sing-box runs inside the service — no child rx to monitor.
+                // The watchdog polls SCM state and synthesizes
+                // handle_process_termination on external kills / crashes.
                 watchdog::spawn(app.clone(), mode_arc);
                 // SystemProxy setting may linger across mode switches on
                 // Windows; best-effort unset so browsers stop pointing at
@@ -257,7 +238,9 @@ impl EngineManager for WindowsEngine {
             mgr.is_stopping = true;
             (mgr.mode.clone(), mgr.child.take())
         };
-        let Some(mode) = mode else { return Ok(()); };
+        let Some(mode) = mode else {
+            return Ok(());
+        };
         match mode.as_ref() {
             crate::engine::ProxyMode::SystemProxy => {
                 if let Err(e) = clear_system_proxy(app).await {
@@ -292,9 +275,7 @@ impl EngineManager for WindowsEngine {
                 "[dns] user-initiated stop; service already reset DNS, skipping UAC fallback"
             );
         } else {
-            log::warn!(
-                "[dns] TUN process terminated unexpectedly — requesting UAC DNS restore"
-            );
+            log::warn!("[dns] TUN process terminated unexpectedly — requesting UAC DNS restore");
             if let Err(e) = restore_system_dns() {
                 log::warn!("[dns] fallback restore_system_dns failed: {}", e);
             }
@@ -316,10 +297,13 @@ impl EngineManager for WindowsEngine {
     }
 
     async fn probe(_app: &AppHandle) -> Result<String, String> {
+        // DEMAND_START: Stopped is the normal idle state (service will
+        // start on TUN toggle), Running means TUN is active right now.
+        // Both report as healthy; only NotInstalled is a failure.
         use tun_service::scm::QueriedState;
         match tun_service::scm::query_state() {
             QueriedState::Running => Ok("running".into()),
-            QueriedState::Stopped => Ok("stopped".into()),
+            QueriedState::Stopped => Ok("available".into()),
             QueriedState::StartPending => Ok("start-pending".into()),
             QueriedState::StopPending => Ok("stop-pending".into()),
             QueriedState::Other => Ok("other".into()),

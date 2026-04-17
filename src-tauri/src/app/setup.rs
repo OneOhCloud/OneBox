@@ -48,6 +48,14 @@ pub fn app_setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>>
         app.deep_link().register_all()?;
     }
 
+    // On Windows release builds the NSIS installer writes HKLM. But any
+    // prior `tauri dev` run wrote HKCU pointing at the dev exe, and HKCU
+    // wins over HKLM during protocol resolution — so deep links launch a
+    // stale/missing dev binary and silently fail. Scrub HKCU so HKLM
+    // becomes authoritative; no-op if HKCU was never populated.
+    #[cfg(all(not(debug_assertions), windows))]
+    clear_stale_hkcu_deep_link();
+
     register_deep_link(app);
 
     // Cold-start on Windows/Linux: handle_cli_arguments() ran during plugin init,
@@ -57,7 +65,11 @@ pub fn app_setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>>
     #[cfg(any(windows, target_os = "linux"))]
     if let Ok(Some(urls)) = app.deep_link().get_current() {
         if let Some(payload) = urls.first().and_then(extract_deep_link_data) {
-            log::info!("Cold-start deep link config data: {} apply={}", payload.data, payload.apply);
+            log::info!(
+                "Cold-start deep link config data: {} apply={}",
+                payload.data,
+                payload.apply
+            );
             store_pending_deep_link(&app.state::<crate::app::state::AppData>(), payload);
         }
     }
@@ -74,18 +86,32 @@ fn extract_deep_link_data(url: &Url) -> Option<crate::app::state::DeepLinkPayloa
     }
     let params: std::collections::HashMap<_, _> = url.query_pairs().collect();
     let data = params.get("data")?.to_string();
-    let apply = params
-        .get("apply")
-        .map(|v| v == "1")
-        .unwrap_or(false);
+    let apply = params.get("apply").map(|v| v == "1").unwrap_or(false);
     Some(crate::app::state::DeepLinkPayload { data, apply })
 }
 
 /// 将 deep link payload 写入 pending state
-fn store_pending_deep_link(app_data: &crate::app::state::AppData, payload: crate::app::state::DeepLinkPayload) {
+fn store_pending_deep_link(
+    app_data: &crate::app::state::AppData,
+    payload: crate::app::state::DeepLinkPayload,
+) {
     if let Ok(mut pending) = app_data.pending_deep_link.lock() {
         *pending = Some(payload);
     }
+}
+
+#[cfg(all(not(debug_assertions), windows))]
+fn clear_stale_hkcu_deep_link() {
+    use windows::core::PCWSTR;
+    use windows::Win32::System::Registry::{RegDeleteTreeW, HKEY_CURRENT_USER};
+    let path: Vec<u16> = "Software\\Classes\\oneoh-networktools\0"
+        .encode_utf16()
+        .collect();
+    let rc = unsafe { RegDeleteTreeW(HKEY_CURRENT_USER, PCWSTR(path.as_ptr())) };
+    log::info!(
+        "[deep-link] HKCU cleanup rc={:?} (NSIS HKLM is authoritative)",
+        rc.0
+    );
 }
 
 /// 注册 deep link 回调
@@ -97,7 +123,11 @@ fn register_deep_link(app: &tauri::App) {
         show_dashboard(handle.clone());
 
         if let Some(payload) = urls.first().and_then(extract_deep_link_data) {
-            log::info!("Received config data: {} apply={}", payload.data, payload.apply);
+            log::info!(
+                "Received config data: {} apply={}",
+                payload.data,
+                payload.apply
+            );
             // 写入 state（冷/热启动都靠前端主动拉取，保证可靠）
             store_pending_deep_link(&handle.state::<crate::app::state::AppData>(), payload);
             // 发送无 payload 的信号：前端收到后主动 invoke get_pending_deep_link。
@@ -167,8 +197,7 @@ pub(crate) fn spawn_lifecycle_listener(app_handle: &tauri::AppHandle) {
             // Windows 7 / 8 / 8.1：NotifyNetworkConnectivityHintChange 不可用，
             // lifecycle 库不会产生任何 NetworkUp / NetworkDown 事件，
             // 以下逻辑永远不会被触发，行为与未启用 network feature 时完全相同。
-            let network_restart_epoch =
-                std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0));
+            let network_restart_epoch = std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0));
             let mut network_down_at: Option<std::time::SystemTime> = None;
             // 断网时长低于此值视为短暂抖动，不触发重启
             const MIN_OUTAGE: std::time::Duration = std::time::Duration::from_secs(2);
@@ -230,15 +259,12 @@ pub(crate) fn spawn_lifecycle_listener(app_handle: &tauri::AppHandle) {
                             DEBOUNCE_SECS
                         );
                         let epoch_arc = std::sync::Arc::clone(&network_restart_epoch);
-                        let current_epoch =
-                            epoch_arc.load(std::sync::atomic::Ordering::Relaxed);
+                        let current_epoch = epoch_arc.load(std::sync::atomic::Ordering::Relaxed);
                         let h = handle.clone();
                         tauri::async_runtime::spawn(async move {
-                            tokio::time::sleep(std::time::Duration::from_secs(DEBOUNCE_SECS))
-                                .await;
+                            tokio::time::sleep(std::time::Duration::from_secs(DEBOUNCE_SECS)).await;
                             // 若期间又断网，epoch 已自增，放弃本次重启
-                            if epoch_arc.load(std::sync::atomic::Ordering::Relaxed)
-                                != current_epoch
+                            if epoch_arc.load(std::sync::atomic::Ordering::Relaxed) != current_epoch
                             {
                                 log::info!("[network] epoch changed, aborting engine restart");
                                 return;
@@ -282,4 +308,3 @@ fn handle_will_power_off() {
     cleanup_on_shutdown();
     log::info!("System proxy unset on power off");
 }
-
