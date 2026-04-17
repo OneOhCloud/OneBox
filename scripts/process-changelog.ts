@@ -1,5 +1,5 @@
-import { readFileSync, writeFileSync } from "fs";
-import { join } from "path";
+import { readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 
 // 获取 Tauri 版本号
 function getAppVersion(): string {

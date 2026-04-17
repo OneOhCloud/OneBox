@@ -1,9 +1,9 @@
-import fs, { createWriteStream } from 'fs';
-import path from 'path';
-import { pipeline } from 'stream';
+import fs, { createWriteStream } from 'node:fs';
+import path from 'node:path';
+import { pipeline } from 'node:stream';
+import { promisify } from 'node:util';
 import { x } from 'tar';
 import unzipper from 'unzipper';
-import { promisify } from 'util';
 import { SING_BOX_VERSION } from '../src/types/definition';
 
 const BINARY_NAME = 'sing-box';
