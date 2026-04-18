@@ -61,7 +61,10 @@ export default function SelectNode(props: SelectNodeProps) {
             <AppleSelectPlaceholder tone="loading">
                 <span className="inline-flex items-center gap-2">
                     <span className="inline-block size-3 rounded-full bg-blue-500/20 animate-pulse" />
-                    <span className="h-3 w-24 rounded-full bg-gray-200 animate-pulse" />
+                    <span
+                        className="h-3 w-24 rounded-full animate-pulse"
+                        style={{ background: 'var(--onebox-fill)' }}
+                    />
                 </span>
             </AppleSelectPlaceholder>
         );
@@ -150,10 +153,9 @@ function NodeMenu(props: NodeMenuProps) {
             )}
             renderOption={({ option, isSelected }) => (
                 <div
-                    className={
-                        isSelected
-                            ? "font-semibold text-blue-600"
-                            : "text-gray-900"
+                    className={isSelected ? "font-semibold text-blue-600" : ""}
+                    style={
+                        isSelected ? undefined : { color: 'var(--onebox-label)' }
                     }
                 >
                     <NodeOption

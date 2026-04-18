@@ -93,7 +93,7 @@ export default function UASettingsItem() {
     return (
         <>
             <SettingItem
-                icon={<Tools className="w-5 h-5 text-gray-500" />}
+                icon={<Tools className="w-5 h-5" style={{ color: 'var(--onebox-label-secondary)' }} />}
                 title={t("user_agent_settings", "User Agent Settings")}
                 subTitle={t("open_user_agent", "Open user agent settings")}
                 onPress={() => setIsOpen(true)}

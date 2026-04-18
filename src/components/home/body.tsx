@@ -13,7 +13,10 @@ function SectionLabel({
 }) {
     return (
         <div className="flex items-center justify-between px-1 mb-1.5">
-            <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-gray-500 capitalize">
+            <span
+                className="text-[11px] font-semibold uppercase tracking-[0.08em] capitalize"
+                style={{ color: 'var(--onebox-label-secondary)' }}
+            >
                 {children}
             </span>
             {trailing && (

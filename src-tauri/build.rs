@@ -47,6 +47,16 @@ fn main() {
             println!("cargo:rustc-link-lib=framework=ServiceManagement");
             println!("cargo:rustc-link-lib=framework=Security");
             println!("cargo:rerun-if-changed=src/engine/macos/helper.m");
+
+            // NSWindow.appearance override — workaround for Tauri 2.10 +
+            // macOS 26 where setTheme() no-ops on the title bar.
+            cc::Build::new()
+                .file("src/macos_theme.m")
+                .flag("-fobjc-arc")
+                .flag("-fmodules")
+                .compile("onebox_macos_theme");
+            println!("cargo:rustc-link-lib=framework=Cocoa");
+            println!("cargo:rerun-if-changed=src/macos_theme.m");
         }
     }
 

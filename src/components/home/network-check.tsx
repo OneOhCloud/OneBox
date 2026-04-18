@@ -14,20 +14,21 @@ type NetworkCheckProps = {
 };
 
 const LoadingStatus = ({ icon: Icon = Globe }) => (
-    <motion.div
-        className="tooltip tooltip-left"
-        data-tip={t("loading")}
-    >
-        <Icon className="size-4 text-gray-300 " />
+    <motion.div title={t("loading")}>
+        <Icon className="size-4" style={{ color: 'var(--onebox-label-tertiary)' }} />
     </motion.div>
 );
 
+// Normal/detected state uses the primary label color (white in dark, near-black in
+// light) so a healthy link reads clearly. Fault state uses systemRed. Not-detected
+// / not-running lives in the LoadingStatus / GoogleNetworkStatus off-branch, where
+// label-tertiary (dim) is the correct "absent" signal per Apple HIG.
 const NetworkStatus = ({ isOk, icon: Icon, tip }: NetworkStatusProps) => (
-    <div
-        className="tooltip tooltip-left"
-        data-tip={`${tip}:${isOk ? t("network_normal") : t("network_abnormal")}`}
-    >
-        <Icon className={`size-4 ${isOk ? 'text-gray-500' : 'text-red-500'} transition-colors duration-300`} />
+    <div title={`${tip}:${isOk ? t("network_normal") : t("network_abnormal")}`}>
+        <Icon
+            className="size-4 transition-colors duration-300"
+            style={{ color: isOk ? 'var(--onebox-label)' : 'var(--onebox-red)' }}
+        />
     </div>
 );
 
@@ -55,7 +56,7 @@ export function AppleNetworkStatus() {
 export function GoogleNetworkStatus({ isRunning }: NetworkCheckProps) {
     const { data, isLoading, error } = useGoogleNetworkCheck();
 
-    if (!isRunning) return <Globe className="size-4 text-gray-100 " />;
+    if (!isRunning) return <Globe className="size-4" style={{ color: 'var(--onebox-label-tertiary)' }} />;
     if (isLoading || !data) return <LoadingStatus />;
     if (error) {
         return <NetworkStatus isOk={false} icon={Globe} tip={t("vpn_network")} />;

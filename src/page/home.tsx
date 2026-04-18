@@ -1,6 +1,5 @@
 import { useEffect, useMemo } from "react";
 import Body from "../components/home/body";
-import { DeepLinkApplyProgressModal } from "../components/home/deep-link-apply-progress-modal";
 import {
     ProxyMode,
     useModeIndicator,
@@ -27,9 +26,6 @@ export default function HomePage() {
         operationStatus,
         toggleService,
         restartService,
-        applyPhase,
-        applyErrorMessage,
-        closeApplyModal,
     } = useVPNOperations();
     const { indicatorStyle, modeButtonsRef } = useModeIndicator(selectedMode);
 
@@ -105,13 +101,6 @@ export default function HomePage() {
                     />
                 </div>
             </div>
-
-            <DeepLinkApplyProgressModal
-                visible={applyPhase !== null}
-                phase={applyPhase ?? "init"}
-                errorMessage={applyErrorMessage}
-                onClose={closeApplyModal}
-            />
         </div>
     );
 }

@@ -14,6 +14,8 @@ import { UpdateProvider } from './components/settings/update-context';
 import { deduplicateSubscriptionsByUrl } from "./action/db";
 import { primeAllConfigTemplateCaches, purgeLegacyTemplateCache } from "./hooks/useSwr";
 import { EngineStateContext, useEngineStateRoot } from "./hooks/useEngineState";
+import { useApplyPipelineRoot } from "./components/home/hooks";
+import { DeepLinkApplyProgressModal } from "./components/home/deep-link-apply-progress-modal";
 import HomePage from "./page/home";
 import { ActiveScreenType, NavContext } from './single/context';
 import { getStoreValue } from "./single/store";
@@ -37,8 +39,7 @@ type BodyProps = {
 // 加载中的组件
 const LoadingFallback = () => (
   <div className="flex flex-col items-center justify-center h-full space-y-4">
-    <span className="loading loading-infinity loading-xl"></span>
-
+    <span className="onebox-spinner onebox-spinner-ring onebox-spinner-lg" />
   </div>
 );
 
@@ -98,6 +99,9 @@ function Body({ lang, activeScreen }: BodyProps) {
 
 function App() {
   const engineState = useEngineStateRoot();
+  // Theme hook is mounted one level up in WindowManger so the log window
+  // (which renders LogPage, not App) also boots with the persisted theme
+  // and reacts to cross-window toggle events. Do not re-mount here.
   const [activeScreen, setActiveScreen] = useState<ActiveScreenType>('home');
   const [isSettingsHovered, setIsSettingsHovered] = useState(false);
   const [dockLang, setDockLang] = useState({
@@ -126,6 +130,9 @@ function App() {
   const [language, setLanguage] = useState('unknown');
   const [deepLinkUrl, setDeepLinkUrl] = useState<string>('');
   const [deepLinkApplyUrl, setDeepLinkApplyUrl] = useState<string>('');
+  // Default true — deep-link apply=1 uses the auto-start contract.
+  // Manual add flips this to false before firing `setDeepLinkApplyUrl`.
+  const [deepLinkApplyAutoStart, setDeepLinkApplyAutoStart] = useState<boolean>(true);
 
   useEffect(() => {
     // 统一入口：从 Rust 拉取并消费 pending deep link（take() 保证幂等）
@@ -230,58 +237,98 @@ function App() {
 
 
   return (
-    <NavContext.Provider value={{ activeScreen, setActiveScreen, handleLanguageChange, deepLinkUrl, setDeepLinkUrl, deepLinkApplyUrl, setDeepLinkApplyUrl }}>
+    <NavContext.Provider value={{ activeScreen, setActiveScreen, handleLanguageChange, deepLinkUrl, setDeepLinkUrl, deepLinkApplyUrl, setDeepLinkApplyUrl, deepLinkApplyAutoStart, setDeepLinkApplyAutoStart }}>
       <EngineStateContext.Provider value={engineState}>
       <UpdateProvider>
         <Toaster position="top-center" toastOptions={{ duration: 2000 }} />
-
-        <main className="onebox-surface relative flex flex-col h-screen">
-          {activeScreen === 'home' &&
-            <div className='absolute inset-0  z-2   max-h-max flex justify-end p-1'>
-              <Suspense >
-                <UpdaterButton />
-              </Suspense>
-            </div>
-          }
-          <Body activeScreen={activeScreen} lang={language} />
-
-          <div className="dock dock-sm border-0">
-            <button
-              onClick={() => setActiveScreen('home')}
-              className={` ${activeScreen === 'home' ? 'text-blue-500' : ''}`}
-            >
-              <House />
-              <span className='text-xs capitalize'>{dockLang.home}</span>
-            </button>
-
-            <button
-              onClick={() => setActiveScreen('configuration')}
-              className={`${activeScreen === 'configuration' ? 'text-blue-500' : ''}`}
-            >
-              <Layers />
-              <span className='text-xs capitalize'>{dockLang.configuration}</span>
-            </button>
-
-            <button
-              onClick={() => setActiveScreen('settings')}
-              className={`${activeScreen === 'settings' ? 'text-blue-500' : ''}`}
-              onMouseEnter={() => setIsSettingsHovered(true)}
-              onMouseLeave={() => setIsSettingsHovered(false)}
-            >
-              <motion.div
-                animate={{ rotate: isSettingsHovered ? 180 : 0 }}
-                transition={{ duration: 0.3 }}
-              >
-                <GearWideConnected />
-              </motion.div>
-              <span className='text-xs capitalize'>{dockLang.settings}</span>
-            </button>
-          </div>
-
-        </main>
+        <AppShell
+          activeScreen={activeScreen}
+          setActiveScreen={setActiveScreen}
+          language={language}
+          dockLang={dockLang}
+          isSettingsHovered={isSettingsHovered}
+          setIsSettingsHovered={setIsSettingsHovered}
+        />
       </UpdateProvider>
       </EngineStateContext.Provider>
     </NavContext.Provider>
+  );
+}
+
+// Inner shell: must live inside NavContext.Provider so `useApplyPipelineRoot`
+// can read the deep-link signals. Also renders the apply progress modal at
+// app root so it overlays any page — manual add no longer needs to switch
+// to Home for the modal to be visible.
+function AppShell({
+  activeScreen,
+  setActiveScreen,
+  language,
+  dockLang,
+  isSettingsHovered,
+  setIsSettingsHovered,
+}: {
+  activeScreen: ActiveScreenType;
+  setActiveScreen: (s: ActiveScreenType) => void;
+  language: string;
+  dockLang: { home: string; configuration: string; settings: string };
+  isSettingsHovered: boolean;
+  setIsSettingsHovered: (v: boolean) => void;
+}) {
+  const { applyPhase, applyErrorMessage, closeApplyModal } = useApplyPipelineRoot();
+
+  return (
+    <>
+      <main className="onebox-surface relative flex flex-col h-screen">
+        {activeScreen === 'home' &&
+          <div className='absolute inset-0  z-2   max-h-max flex justify-end p-1'>
+            <Suspense >
+              <UpdaterButton />
+            </Suspense>
+          </div>
+        }
+        <Body activeScreen={activeScreen} lang={language} />
+
+        <div className="onebox-dock">
+          <button
+            onClick={() => setActiveScreen('home')}
+            data-active={activeScreen === 'home'}
+          >
+            <House size={18} />
+            <span className='text-[11px] capitalize'>{dockLang.home}</span>
+          </button>
+
+          <button
+            onClick={() => setActiveScreen('configuration')}
+            data-active={activeScreen === 'configuration'}
+          >
+            <Layers size={18} />
+            <span className='text-[11px] capitalize'>{dockLang.configuration}</span>
+          </button>
+
+          <button
+            onClick={() => setActiveScreen('settings')}
+            data-active={activeScreen === 'settings'}
+            onMouseEnter={() => setIsSettingsHovered(true)}
+            onMouseLeave={() => setIsSettingsHovered(false)}
+          >
+            <motion.div
+              animate={{ rotate: isSettingsHovered ? 180 : 0 }}
+              transition={{ duration: 0.3 }}
+            >
+              <GearWideConnected size={18} />
+            </motion.div>
+            <span className='text-[11px] capitalize'>{dockLang.settings}</span>
+          </button>
+        </div>
+      </main>
+
+      <DeepLinkApplyProgressModal
+        visible={applyPhase !== null}
+        phase={applyPhase ?? "init"}
+        errorMessage={applyErrorMessage}
+        onClose={closeApplyModal}
+      />
+    </>
   );
 }
 

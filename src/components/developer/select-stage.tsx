@@ -70,7 +70,7 @@ export default function StageSetting() {
     return (
         <>
             <SettingItem
-                icon={<Git className="w-5 h-5 text-gray-500" />}
+                icon={<Git className="w-5 h-5" style={{ color: 'var(--onebox-label-secondary)' }} />}
                 title={t("update_stage")}
                 badge={<span>{t(`${stageVersion}_version`)}</span>}
                 subTitle={t("update_stage_desc")}

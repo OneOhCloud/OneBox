@@ -23,6 +23,8 @@
     "bypass_router_mode": "BRT",
     "cancel": "Cancel",
     "cannot_open_lan_connection": "Cannot open lan connection",
+    "dark_mode": "Dark mode",
+    "dark_mode_desc": "Off to follow system appearance",
     "clear_filter": "Clear filter",
     "clear_log": "Clear log",
     "close": "Close",

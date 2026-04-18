@@ -23,6 +23,8 @@
     "bypass_router_mode": "BRT",
     "cancel": "取消",
     "cannot_open_lan_connection": "无法开启局域网连接",
+    "dark_mode": "深色模式",
+    "dark_mode_desc": "关闭后跟随系统外观",
     "clear_filter": "清除过滤",
     "clear_log": "清除日志",
     "close": "关闭",

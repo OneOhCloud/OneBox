@@ -71,9 +71,10 @@ export function SettingsModal({
                             onClick={onClose}
                         />
                         <motion.div
-                            className="relative w-full bg-white rounded-[14px] overflow-hidden"
+                            className="relative w-full rounded-[14px] overflow-hidden"
                             style={{
                                 maxWidth,
+                                background: 'var(--onebox-card)',
                                 boxShadow:
                                     "0 22px 48px -12px rgba(15, 23, 42, 0.3), 0 4px 14px rgba(15, 23, 42, 0.08)",
                             }}

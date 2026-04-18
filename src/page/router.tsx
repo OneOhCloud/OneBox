@@ -364,13 +364,11 @@ function Segmented<T extends string>({
                             compact ? "h-6 text-[12px]" : "h-7 text-[13px]"
                         } ${active ? "font-medium" : ""}`}
                         style={{
-                            background: active ? "#FFFFFF" : "transparent",
+                            background: active ? "var(--onebox-card)" : "transparent",
                             color: active
                                 ? "var(--onebox-label)"
                                 : "var(--onebox-label-secondary)",
-                            boxShadow: active
-                                ? "0 1px 2.5px rgba(15,23,42,0.08), 0 1px 1.5px rgba(15,23,42,0.04)"
-                                : "none",
+                            boxShadow: active ? "var(--onebox-shadow-card)" : "none",
                         }}
                     >
                         {label}

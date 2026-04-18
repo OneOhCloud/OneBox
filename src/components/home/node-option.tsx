@@ -32,8 +32,7 @@ const STYLES = {
     nodeName: 'truncate font-medium flex-1 min-w-0',
     delayContainer: 'ml-2 text-sm font-medium transition-all duration-300 ease flex items-center gap-1.5',
     delayDot: 'inline-block w-2 h-2 rounded-full transition-all duration-300 ease',
-    loading: 'loading loading-dots loading-xs',
-    startingContainer: 'select select-sm select-ghost border-[0.8px] border-gray-200'
+    startingContainer: 'onebox-select'
 } as const;
 
 // 自定义 Hook：管理代理延迟数据
@@ -96,7 +95,13 @@ const DelayIndicator = ({ delay, showDelay, delayText }: DelayIndicatorProps) =>
     const displayText = delay === '-' ? delayText : `${delay}ms`;
 
     if (!showDelay) {
-        return <span className={STYLES.loading} />;
+        return (
+            <span className="onebox-spinner onebox-spinner-dots onebox-spinner-sm">
+                <span />
+                <span />
+                <span />
+            </span>
+        );
     }
 
     return (

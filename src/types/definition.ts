@@ -32,6 +32,10 @@ export const LAST_SIGNATURE_FAILURE_TIME_KEY = 'last_signature_failure_time_key'
 // 清除失败，TTL 保证最多 5 分钟后自动失效，避免死锁深链功能。
 export const UPDATE_SUPPRESS_ARGV_DEEPLINK_AT_KEY = 'update_suppress_argv_deeplink_at'
 
+// Theme preference: 'light' | 'dark' | 'system' (default when unset).
+// 'system' follows prefers-color-scheme; explicit values override it.
+export const THEME_PREF_STORE_KEY = 'theme_pref_key'
+
 // 允许局域网连接
 export const ALLOWLAN_STORE_KEY = 'allow_lan_key'
 // 是否启用 tun 模式

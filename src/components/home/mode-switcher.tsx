@@ -41,41 +41,36 @@ export function ModeSwitcher(props: ModeSwitcherProps) {
             {MODES.map(({ key, icon: Icon }) => {
                 const isActive = selectedMode === key;
                 return (
-                    <div key={key} className="tooltip tooltip-delayed text-xs">
-                        <div className="tooltip-content">
-                            <div className="text-xs max-w-55 whitespace-normal">
-                                {t(`${key}_tip`)}
-                            </div>
-                        </div>
-                        <button
-                            type="button"
-                            data-mode={key}
-                            onClick={() => onModeChange(key)}
-                            className={clsx(
-                                "relative z-[1] inline-flex items-center gap-1.5",
-                                "px-3.5 py-1 rounded-full",
-                                "text-[13px] leading-none tracking-[-0.005em]",
-                                "transition-colors duration-200",
-                                isActive ? "font-medium" : "",
-                            )}
+                    <button
+                        key={key}
+                        type="button"
+                        data-mode={key}
+                        title={t(`${key}_tip`)}
+                        onClick={() => onModeChange(key)}
+                        className={clsx(
+                            "relative z-[1] inline-flex items-center gap-1.5",
+                            "px-3.5 py-1 rounded-full",
+                            "text-[13px] leading-none tracking-[-0.005em]",
+                            "transition-colors duration-200",
+                            isActive ? "font-medium" : "",
+                        )}
+                        style={{
+                            color: isActive
+                                ? "var(--onebox-label)"
+                                : "var(--onebox-label-secondary)",
+                        }}
+                    >
+                        <Icon
+                            size={11}
+                            className="transition-colors duration-200"
                             style={{
                                 color: isActive
-                                    ? "var(--onebox-label)"
-                                    : "var(--onebox-label-secondary)",
+                                    ? "var(--onebox-blue)"
+                                    : "var(--onebox-label-tertiary)",
                             }}
-                        >
-                            <Icon
-                                size={11}
-                                className="transition-colors duration-200"
-                                style={{
-                                    color: isActive
-                                        ? "var(--onebox-blue)"
-                                        : "var(--onebox-label-tertiary)",
-                                }}
-                            />
-                            <span className="capitalize">{t(key)}</span>
-                        </button>
-                    </div>
+                        />
+                        <span className="capitalize">{t(key)}</span>
+                    </button>
                 );
             })}
         </div>

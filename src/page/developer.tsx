@@ -9,6 +9,7 @@ import DNSSettingsItem from "../components/developer/dns-settings";
 import HelperPing from "../components/developer/helper-ping";
 import ToggleLocalConfig from "../components/developer/local-config-toggle";
 import StageSetting from "../components/developer/select-stage";
+import ThemeToggle from "../components/developer/theme-toggle";
 import TunStackSetting from "../components/developer/tun-stack";
 import UASettingsItem from "../components/developer/ua-settings";
 import { t } from "../utils/helper";
@@ -24,6 +25,7 @@ export default function Page() {
                     <ToggleDHCP />
                     <ToggleBypassRouter />
                     <ToggleLocalConfig />
+                    <ThemeToggle />
                 </div>
 
                 <div className="onebox-grouped-card">
@@ -33,7 +35,7 @@ export default function Page() {
                     <UASettingsItem />
                     <HelperPing />
                     <SettingItem
-                        icon={<Binoculars className="w-5 h-5 text-gray-500" />}
+                        icon={<Binoculars className="w-5 h-5" style={{ color: 'var(--onebox-label-secondary)' }} />}
                         title={t("open_advanced_settings")}
                         subTitle={t("open_log_desc")}
                         disabled={false}

@@ -14,6 +14,15 @@ interface NavContextType {
     setDeepLinkUrl: (url: string) => void;
     deepLinkApplyUrl: string;
     setDeepLinkApplyUrl: (url: string) => void;
+    // Whether the apply pipeline should auto-start the VPN engine after
+    // import. True = deep-link apply=1 behaviour (the default). Set to
+    // false right before firing `setDeepLinkApplyUrl` to request a
+    // manual-add flow: import only, no engine restart, no SSI auto-select.
+    // The consumer (useVPNOperations) resets this back to true after
+    // consuming each URL, so every fresh fire defaults to the apply=1
+    // contract unless explicitly overridden.
+    deepLinkApplyAutoStart: boolean;
+    setDeepLinkApplyAutoStart: (autoStart: boolean) => void;
 }
 
 export const NavContext = createContext<NavContextType>({
@@ -24,4 +33,6 @@ export const NavContext = createContext<NavContextType>({
     setDeepLinkUrl: () => { },
     deepLinkApplyUrl: '',
     setDeepLinkApplyUrl: () => { },
+    deepLinkApplyAutoStart: true,
+    setDeepLinkApplyAutoStart: () => { },
 });

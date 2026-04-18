@@ -1,12 +1,14 @@
 
 
 
+
+
 /*  Window Customization CSS start
-https://v2.tauri.app/learn/window-customization/ 
+https://v2.tauri.app/learn/window-customization/
 */
 .titlebar {
   height: 30px;
-  background: #f8f8f8;
+  background: var(--onebox-titlebar);
   user-select: none;
   display: flex;
   justify-content: flex-start;
@@ -42,7 +44,7 @@ https://v2.tauri.app/learn/window-customization/
   color: #e3e3e3;
   background: #e3e3e3;
   background-color: #e3e3e3;
-  
+
 }
 
 
@@ -105,56 +107,20 @@ https://v2.tauri.app/learn/window-customization/
   }
 }
 
-/* 自定义滚动条样式 */
-.scrollbar-light::-webkit-scrollbar {
-  width: 6px;
-}
-
-.scrollbar-light::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.scrollbar-light::-webkit-scrollbar-thumb {
-  background-color: rgba(156, 163, 175, 0.3);
-  border-radius: 20px;
-}
-
-.scrollbar-light::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(156, 163, 175, 0.5);
-}
-
-.scrollbar-dark::-webkit-scrollbar {
-  width: 6px;
-}
-
-.scrollbar-dark::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.scrollbar-dark::-webkit-scrollbar-thumb {
-  background-color: rgba(75, 85, 99, 0.3);
-  border-radius: 20px;
-}
-
-.scrollbar-dark::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(75, 85, 99, 0.5);
-}
-
-
-/* 
+/*
 ZH: 禁止全局选中
-EN: Disable global text selection 
+EN: Disable global text selection
 */
 :root {
   /*
-  ZH: 针对 Tauri 使用的 WebKit/WebView2 内核 
+  ZH: 针对 Tauri 使用的 WebKit/WebView2 内核
   EN: For Tauri's WebKit/WebView2 engine
   */
-  -webkit-user-select: none; 
+  -webkit-user-select: none;
   user-select: none;
 }
 
-/* 
+/*
 ZH: 允许输入框和可编辑内容被选中
 EN: Allow text selection in input fields and contenteditable elements
 */
@@ -163,40 +129,165 @@ input, textarea, [contenteditable="true"] {
   user-select: text;
 }
 
+/*
+ZH: <pre> 默认可选中 —— 用于配置/日志/模版内容展示，方便复制调试。
+EN: <pre> is selectable by default — used for log / config / template
+content, users need to copy to a clipboard for debugging.
+
+显式标注 `.onebox-selectable` 的容器及其子元素也可选中；日志列表这类
+非 <pre> 的文本块用它。
+*/
+pre,
+.onebox-selectable,
+.onebox-selectable * {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
 @import "tailwindcss";
-@plugin "daisyui" {
-   themes: light --default, light --prefersdark;
- }
+
+/* Enable class-based `dark:` variant driven by the [data-theme="dark"]
+   attribute we set on <html>. Without this, Tailwind v4 would default
+   to the `prefers-color-scheme: dark` media query and ignore the manual
+   toggle users flip on the Developer page. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* ==========================================================================
+ * Theme tokens.
+ *
+ * Source: Apple HIG light / dark system colors. Tailwind defaults skew
+ * cooler/greener and read "off" next to native chrome.
+ *
+ * Three states:
+ *   - [data-theme="light"] (or default)  → light
+ *   - [data-theme="dark"]                 → dark
+ *   - [data-theme="system"]               → follows @media (prefers-color-scheme)
+ *
+ * The system branch duplicates the dark token set — there is no CSS-level
+ * way to alias one selector to another without wrapping every token in
+ * another layer of indirection, and the dark payload is ~15 declarations.
+ * ========================================================================== */
 
 :root {
   text-autospace: normal;
+  /* Signals the user-agent (WebKit in our case) which colour schemes the
+     page supports. Without this, WebKit renders form controls / scrollbars
+     in light-only mode AND — observed on macOS 26 — can pin the hosting
+     NSWindow.appearance to Aqua regardless of OS preference. Set per
+     theme below; keep the default here matching light. */
+  color-scheme: light;
 
-  /* Apple system tokens.
-     Values taken from Apple HIG — not Tailwind defaults, which skew
-     cooler/greener. Using Tailwind's blue-500 (#3B82F6) for an Apple
-     app reads noticeably "off" next to system chrome. */
+  /* Light (default) */
   --onebox-bg: #F2F2F7;                 /* systemGroupedBackground (light) */
+  --onebox-card: #FFFFFF;               /* secondarySystemGroupedBackground (light) */
+  --onebox-card-muted: rgba(118, 118, 128, 0.08);   /* tertiarySystemFill-ish */
+  --onebox-titlebar: #F8F8F8;
   --onebox-label: #1C1C1E;              /* label (primary) */
   --onebox-label-secondary: rgba(60, 60, 67, 0.6);
   --onebox-label-tertiary: rgba(60, 60, 67, 0.3);
   --onebox-separator: rgba(60, 60, 67, 0.18);
+  --onebox-fill: rgba(118, 118, 128, 0.12);          /* tertiary fill — inputs, chips */
+  --onebox-fill-strong: rgba(118, 118, 128, 0.2);
   --onebox-blue: #007AFF;               /* systemBlue (light) */
   --onebox-blue-hover: #409CFF;
   --onebox-blue-deep: #0062CC;
+  --onebox-red: #FF3B30;
+  --onebox-green: #34C759;
+  --onebox-orange: #FF9500;
+  --onebox-row-hover: rgba(60, 60, 67, 0.025);
+  --onebox-row-active: rgba(60, 60, 67, 0.06);
+  --onebox-shadow-card: 0 1px 2.5px rgba(15, 23, 42, 0.04);
+  /* Translucent popover surface for AppleSelectMenu; sits over a blurred
+     backdrop so a soft-white fill reads as glass. */
+  --onebox-menu-bg: rgba(255, 255, 255, 0.85);
+  /* macOS unified toolbar: translucent over window bg + vibrancy blur. */
+  --onebox-toolbar-bg: rgba(242, 242, 247, 0.72);
+  /* NSSegmentedControl active pill — lifted card with hairline shadow. */
+  --onebox-segctl-active-bg: #FFFFFF;
+  --onebox-segctl-active-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(15, 23, 42, 0.1);
 }
 
-/* Unify whole-app chrome so the dock doesn't look like a different surface
-   from the content. daisyUI's .dock sets its own bg — override here. */
-main.onebox-surface,
-main.onebox-surface .dock {
+/* Explicit dark override. Also applied when the user flips the toggle. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --onebox-bg: #000000;                 /* systemGroupedBackground (dark) */
+  --onebox-card: #1C1C1E;               /* secondarySystemGroupedBackground (dark) */
+  --onebox-card-muted: rgba(118, 118, 128, 0.24);
+  --onebox-titlebar: #1C1C1E;
+  --onebox-label: #FFFFFF;
+  --onebox-label-secondary: rgba(235, 235, 245, 0.6);
+  --onebox-label-tertiary: rgba(235, 235, 245, 0.3);
+  --onebox-separator: rgba(84, 84, 88, 0.5);
+  --onebox-fill: rgba(118, 118, 128, 0.24);
+  --onebox-fill-strong: rgba(118, 118, 128, 0.36);
+  --onebox-blue: #0A84FF;               /* systemBlue (dark) */
+  --onebox-blue-hover: #409CFF;
+  --onebox-blue-deep: #0051D5;
+  --onebox-red: #FF453A;
+  --onebox-green: #30D158;
+  --onebox-orange: #FF9F0A;
+  --onebox-row-hover: rgba(255, 255, 255, 0.04);
+  --onebox-row-active: rgba(255, 255, 255, 0.08);
+  --onebox-shadow-card: 0 1px 2.5px rgba(0, 0, 0, 0.45);
+  --onebox-menu-bg: rgba(44, 44, 46, 0.9);
+  --onebox-toolbar-bg: rgba(28, 28, 30, 0.72);
+  --onebox-segctl-active-bg: rgba(118, 118, 128, 0.45);
+  --onebox-segctl-active-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+
+/* Follow-the-OS branch: active only when user hasn't chosen an explicit
+   light/dark override. Payload mirrors [data-theme="dark"] above. */
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="system"] {
+    color-scheme: dark;
+    --onebox-bg: #000000;
+    --onebox-card: #1C1C1E;
+    --onebox-card-muted: rgba(118, 118, 128, 0.24);
+    --onebox-titlebar: #1C1C1E;
+    --onebox-label: #FFFFFF;
+    --onebox-label-secondary: rgba(235, 235, 245, 0.6);
+    --onebox-label-tertiary: rgba(235, 235, 245, 0.3);
+    --onebox-separator: rgba(84, 84, 88, 0.5);
+    --onebox-fill: rgba(118, 118, 128, 0.24);
+    --onebox-fill-strong: rgba(118, 118, 128, 0.36);
+    --onebox-blue: #0A84FF;
+    --onebox-blue-hover: #409CFF;
+    --onebox-blue-deep: #0051D5;
+    --onebox-red: #FF453A;
+    --onebox-green: #30D158;
+    --onebox-orange: #FF9F0A;
+    --onebox-row-hover: rgba(255, 255, 255, 0.04);
+    --onebox-row-active: rgba(255, 255, 255, 0.08);
+    --onebox-shadow-card: 0 1px 2.5px rgba(0, 0, 0, 0.45);
+    --onebox-menu-bg: rgba(44, 44, 46, 0.9);
+    --onebox-toolbar-bg: rgba(28, 28, 30, 0.72);
+    --onebox-segctl-active-bg: rgba(118, 118, 128, 0.45);
+    --onebox-segctl-active-shadow: 0 0 0 0.5px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.35);
+  }
+}
+
+/* AppleSelectMenu option hover. The hover/active tints follow the theme's
+   row-hover variable so dark mode reads as white-on-dim instead of
+   dark-on-darker. Applied only to non-selected options; selected uses
+   its own systemBlue/10 tint. */
+.onebox-menu-option:not(.bg-blue-500\/10):hover {
+  background: var(--onebox-row-hover);
+}
+.onebox-menu-option:not(.bg-blue-500\/10):active {
+  background: var(--onebox-row-active);
+}
+
+/* Whole-app chrome. Provides the page colour under every route. */
+main.onebox-surface {
   background: var(--onebox-bg);
+  color: var(--onebox-label);
 }
 
 /* ==========================================================================
  * Apple iOS 26 grouped-list primitives.
  *
  * Use these across Settings / Configuration / Developer / Router pages so
- * every scrolling list page reads as one app, not one-off daisyUI defaults.
+ * every scrolling list page reads as one app, not one-off defaults.
  * ========================================================================== */
 
 /* A full-height scrolling page. Drop into any page root — no width caps,
@@ -209,13 +300,13 @@ main.onebox-surface .dock {
 }
 
 /* A card that holds one group of rows. Shadow is at Apple "ambient" level
-   (barely visible on #F2F2F7) — elevation is suggested by the colour
-   contrast between the white cell fill and grey bg, not by a heavy drop. */
+   — elevation is suggested by the colour contrast between the card fill
+   and grouped background, not by a heavy drop. */
 .onebox-grouped-card {
-  background: #FFFFFF;
+  background: var(--onebox-card);
   border-radius: 14px;
   overflow: hidden;
-  box-shadow: 0 1px 2.5px rgba(15, 23, 42, 0.04);
+  box-shadow: var(--onebox-shadow-card);
 }
 
 /* Same surface as a grouped card but WITHOUT the automatic inset separator
@@ -224,21 +315,27 @@ main.onebox-surface .dock {
    hairline wherever you have multiple children — that's a bug, not a
    "iOS" feature. Apple does not draw lines between free-form blocks. */
 .onebox-plain-card {
-  background: #FFFFFF;
+  background: var(--onebox-card);
   border-radius: 14px;
   overflow: hidden;
-  box-shadow: 0 1px 2.5px rgba(15, 23, 42, 0.04);
+  box-shadow: var(--onebox-shadow-card);
 }
 
 /* Separator between rows inside a grouped card. Apple uses 0.5px hairlines
    at very low alpha — invisible on dark mode, a whisper on light. Applied
    as a ::before on each child except the first so we can rely on child
-   composition rather than fiddling with divide-y utilities. */
-.onebox-grouped-card > * + * {
+   composition rather than fiddling with divide-y utilities.
+   Shared with `.onebox-grouped-list`, which keeps the same row-divider
+   treatment without the outer card chrome — used inside modals / other
+   already-elevated surfaces where a nested card reads as two layers of
+   visual elevation. */
+.onebox-grouped-card > * + *,
+.onebox-grouped-list > * + * {
   position: relative;
 }
 
-.onebox-grouped-card > * + *::before {
+.onebox-grouped-card > * + *::before,
+.onebox-grouped-list > * + *::before {
   content: "";
   position: absolute;
   top: 0;
@@ -250,7 +347,7 @@ main.onebox-surface .dock {
 }
 
 /* Uppercase section label above a grouped card. Matches UITableView
-   section headers in light mode Settings. */
+   section headers. */
 .onebox-section-label {
   font-size: 11px;
   font-weight: 500;
@@ -260,30 +357,487 @@ main.onebox-surface .dock {
   padding: 0 16px 6px 16px;
 }
 
-/* Page-wide content width cap. Keeps long settings pages readable on wide
-   windows, but does nothing on the fixed 371px OneBox window. */
+/* Page-wide content width cap. */
 .onebox-page-inner {
   max-width: 28rem; /* 448px */
   margin: 0 auto;
   padding: 16px;
 }
 
-/* iOS-style toggle. Overrides daisyUI defaults to match Apple systemGreen
-   on (#34C759) and a neutral tinted grey track off. Specified via
-   !important only because daisyUI's own `.toggle:checked` utility has
-   equivalent specificity. */
+/* ==========================================================================
+ * iOS-style switch.
+ *
+ * Standalone — the previous version layered our tokens on top of daisyUI's
+ * .toggle utility, which is now gone. Based on native UISwitch: 51×31 pt
+ * (scaled for `sm` to 36×22 px), systemGreen track when on, neutral fill
+ * track when off. Knob is white with a light shadow to fake depth.
+ * ========================================================================== */
 .onebox-toggle {
-  --tglbg: rgba(120, 120, 128, 0.18) !important;
-  background-color: rgba(120, 120, 128, 0.18) !important;
-  border-color: transparent !important;
-  color: #FFFFFF !important;
+  appearance: none;
+  -webkit-appearance: none;
+  width: 36px;
+  height: 22px;
+  border-radius: 999px;
+  background: var(--onebox-fill-strong);
+  position: relative;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  flex-shrink: 0;
+}
+
+.onebox-toggle::before {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #FFFFFF;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15), 0 1px 3px rgba(0, 0, 0, 0.08);
+  transition: transform 0.2s ease;
 }
 
 .onebox-toggle:checked {
-  --tglbg: #34C759 !important;
-  background-color: #34C759 !important;
-  border-color: transparent !important;
+  background: var(--onebox-green);
 }
 
+.onebox-toggle:checked::before {
+  transform: translateX(14px);
+}
 
+.onebox-toggle:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 
+/* ==========================================================================
+ * iOS-style bottom dock. Replaces daisyUI's .dock, which we used to set
+ * a base colour on and fight its default shadow.
+ *
+ * Three equal-weight tab buttons; 56px tall (matches the calc in
+ * .onebox-scrollpage). Active tab uses --onebox-blue, others
+ * --onebox-label-tertiary so they fade into the dock chrome.
+ * ========================================================================== */
+.onebox-dock {
+  height: 56px;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  align-items: stretch;
+  background: var(--onebox-bg);
+  border-top: 0.5px solid var(--onebox-separator);
+}
+
+.onebox-dock button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 4px 0 6px;
+  color: var(--onebox-label-tertiary);
+  transition: color 0.15s ease;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+.onebox-dock button[data-active="true"] {
+  color: var(--onebox-blue);
+}
+
+/* ==========================================================================
+ * iOS-style spinner.
+ *
+ * Replaces daisyUI's .loading utilities. Three-dot variant (`dots`) and
+ * circular variant (`ring`). Sizes: sm (14px), md (22px), lg (32px).
+ * ========================================================================== */
+.onebox-spinner {
+  display: inline-block;
+  vertical-align: middle;
+  color: var(--onebox-label-secondary);
+}
+
+.onebox-spinner-ring {
+  width: 22px;
+  height: 22px;
+  border: 2.5px solid var(--onebox-fill-strong);
+  border-top-color: var(--onebox-blue);
+  border-radius: 50%;
+  animation: onebox-spin 0.8s linear infinite;
+}
+
+.onebox-spinner-ring.onebox-spinner-sm { width: 14px; height: 14px; border-width: 2px; }
+.onebox-spinner-ring.onebox-spinner-lg { width: 32px; height: 32px; border-width: 3px; }
+
+.onebox-spinner-dots {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.onebox-spinner-dots > span {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: onebox-dot 1.2s ease-in-out infinite;
+}
+
+.onebox-spinner-dots > span:nth-child(2) { animation-delay: 0.15s; }
+.onebox-spinner-dots > span:nth-child(3) { animation-delay: 0.3s; }
+
+.onebox-spinner-dots.onebox-spinner-sm > span { width: 3px; height: 3px; }
+.onebox-spinner-dots.onebox-spinner-lg > span { width: 7px; height: 7px; }
+
+@keyframes onebox-spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes onebox-dot {
+  0%, 80%, 100% { opacity: 0.3; transform: scale(0.7); }
+  40% { opacity: 1; transform: scale(1); }
+}
+
+/* ==========================================================================
+ * iOS-style buttons (inline, small). Replaces daisyUI .btn variants.
+ *
+ * .onebox-btn   — base: flex row, rounded-8, small padding, medium weight.
+ * .onebox-btn-primary / -danger / -info / -ghost — colour variants.
+ * ========================================================================== */
+.onebox-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  border: 0;
+  cursor: pointer;
+  transition: background-color 0.15s ease, opacity 0.15s ease;
+  white-space: nowrap;
+}
+
+.onebox-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.onebox-btn-primary {
+  background: var(--onebox-blue);
+  color: #FFFFFF;
+}
+.onebox-btn-primary:hover:not(:disabled) { background: var(--onebox-blue-hover); }
+.onebox-btn-primary:active:not(:disabled) { background: var(--onebox-blue-deep); }
+
+.onebox-btn-danger {
+  background: var(--onebox-red);
+  color: #FFFFFF;
+}
+.onebox-btn-danger:hover:not(:disabled) { opacity: 0.9; }
+
+.onebox-btn-info {
+  background: var(--onebox-blue);
+  color: #FFFFFF;
+  opacity: 0.85;
+}
+.onebox-btn-info:hover:not(:disabled) { opacity: 1; }
+
+.onebox-btn-ghost {
+  background: var(--onebox-card);
+  color: var(--onebox-blue);
+  border: 0.5px solid var(--onebox-separator);
+}
+.onebox-btn-ghost:hover:not(:disabled) {
+  background: var(--onebox-fill);
+}
+
+/* ==========================================================================
+ * Inputs + selects. Pure utilities; callers compose with Tailwind for layout.
+ * ========================================================================== */
+.onebox-input {
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 0.5px solid var(--onebox-separator);
+  background: var(--onebox-card);
+  color: var(--onebox-label);
+  font-size: 12px;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.onebox-input:focus {
+  border-color: var(--onebox-blue);
+  box-shadow: 0 0 0 3px rgba(10, 132, 255, 0.15);
+}
+
+.onebox-input::placeholder { color: var(--onebox-label-tertiary); }
+
+.onebox-select {
+  height: 26px;
+  padding: 0 22px 0 8px;
+  border-radius: 8px;
+  border: 0.5px solid var(--onebox-separator);
+  background-color: var(--onebox-card);
+  color: var(--onebox-label);
+  font-size: 12px;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='%23888'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 6px center;
+  background-size: 12px;
+  cursor: pointer;
+  outline: none;
+}
+
+.onebox-select:focus { border-color: var(--onebox-blue); }
+
+/* ==========================================================================
+ * Tab bar. iOS-style rounded pills — not an underline strip. Active tab
+ * gets a systemBlue-tinted fill; inactive tabs are transparent with a
+ * hover fill. Container is a flat flex row (no bottom border) so it
+ * reads as a button cluster rather than a document tab strip.
+ * ========================================================================== */
+.onebox-tabs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 0;
+}
+
+.onebox-tab {
+  padding: 0 12px;
+  height: 28px;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1;
+  color: var(--onebox-label-secondary);
+  cursor: pointer;
+  border-radius: 8px;
+  transition: background-color 0.15s ease, color 0.15s ease;
+  background: transparent;
+  border: 0;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+}
+
+.onebox-tab:hover:not([data-active="true"]) {
+  color: var(--onebox-label);
+  background: var(--onebox-row-hover);
+}
+
+.onebox-tab[data-active="true"] {
+  color: var(--onebox-blue);
+  background: rgba(10, 132, 255, 0.12);
+  font-weight: 600;
+}
+
+/* ==========================================================================
+ * macOS window shell — for the advanced-settings (log) window.
+ *
+ * Aesthetic commitment: Console.app / Xcode debug-console hybrid.
+ * Unified translucent toolbar, dense SF Mono log rows, minimal chrome.
+ * This language is distinct from the iOS-flavoured `.onebox-tabs` /
+ * `.onebox-segmented` pills used on the main 371×600 window.
+ * ========================================================================== */
+
+.onebox-mac-window {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: var(--onebox-card);
+  color: var(--onebox-label);
+  font-family: ui-sans-serif, -apple-system, "SF Pro Text", system-ui, sans-serif;
+}
+
+.onebox-mac-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 44px;
+  padding: 0 12px;
+  background: var(--onebox-toolbar-bg);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border-bottom: 0.5px solid var(--onebox-separator);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.onebox-mac-content {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.onebox-mac-statusbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 16px;
+  height: 24px;
+  padding: 0 12px;
+  background: var(--onebox-toolbar-bg);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border-top: 0.5px solid var(--onebox-separator);
+  font-size: 11px;
+  color: var(--onebox-label-secondary);
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+/* NSSegmentedControl look — track + lifted active pill. */
+.onebox-segctl {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px;
+  border-radius: 7px;
+  background: var(--onebox-fill);
+  height: 26px;
+}
+
+.onebox-segctl-item {
+  height: 22px;
+  padding: 0 12px;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  color: var(--onebox-label-secondary);
+  background: transparent;
+  border: 0;
+  border-radius: 5px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  transition: background-color 0.12s ease, color 0.12s ease, box-shadow 0.12s ease;
+}
+
+.onebox-segctl-item:hover:not([data-active="true"]) {
+  color: var(--onebox-label);
+}
+
+.onebox-segctl-item[data-active="true"] {
+  color: var(--onebox-label);
+  background: var(--onebox-segctl-active-bg);
+  box-shadow: var(--onebox-segctl-active-shadow);
+  font-weight: 600;
+}
+
+/* Compact toolbar search field. Default width 200px; callers that want
+   the field to fill available space (config-template URL row) add Tailwind
+   `flex-1` which overrides the width because `flex: 1 1 0%` sets basis to
+   0 and takes over sizing. */
+.onebox-search {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 6px;
+  background: var(--onebox-fill);
+  width: 200px;
+  min-width: 0;
+  transition: box-shadow 0.15s ease;
+}
+
+.onebox-search:focus-within {
+  box-shadow: 0 0 0 3px rgba(10, 132, 255, 0.18);
+}
+
+.onebox-search > svg {
+  width: 11px;
+  height: 11px;
+  color: var(--onebox-label-tertiary);
+  flex-shrink: 0;
+}
+
+.onebox-search > input {
+  flex: 1;
+  background: transparent;
+  border: 0;
+  outline: none;
+  font-size: 12px;
+  color: var(--onebox-label);
+  min-width: 0;
+}
+
+.onebox-search > input::placeholder { color: var(--onebox-label-tertiary); }
+
+/* Toolbar icon+label button. Inactive is muted; data-active paints it
+   systemBlue with a matching tint. Used for the logs-tab auto-scroll
+   toggle. */
+.onebox-toolbar-btn {
+  height: 24px;
+  min-width: 24px;
+  padding: 0 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--onebox-label-secondary);
+  background: transparent;
+  border: 0;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+
+.onebox-toolbar-btn:hover:not([data-active="true"]) {
+  background: var(--onebox-row-hover);
+  color: var(--onebox-label);
+}
+
+.onebox-toolbar-btn[data-active="true"] {
+  color: var(--onebox-blue);
+  background: rgba(10, 132, 255, 0.12);
+}
+
+/* SF Mono log row. Dense by default (3px vertical padding, 1.55
+   line-height); hover tint surfaces the row under the cursor without
+   competing with the selection highlight. */
+.onebox-logrow {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 3px 16px;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.55;
+  color: var(--onebox-label);
+  transition: background-color 0.08s ease;
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+
+.onebox-logrow:hover {
+  background: var(--onebox-row-hover);
+}
+
+.onebox-logrow-time {
+  flex-shrink: 0;
+  min-width: 72px;
+  color: var(--onebox-label-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Search-term highlight mark. systemYellow tint, a touch of padding.
+   Works on both themes because the tint is transparent over --label. */
+.onebox-highlight {
+  background: rgba(255, 204, 0, 0.32);
+  color: inherit;
+  padding: 0 2px;
+  border-radius: 3px;
+}

@@ -1,33 +1,3 @@
-.tooltip-delayed {
-  --show-delay: 800ms;
-  --hide-delay: 0ms;
-  --show-duration: 200ms;
-  --hide-duration: 100ms;
-}
-
-.tooltip-delayed > .tooltip-content,
-.tooltip-delayed[data-tip]:before,
-.tooltip-delayed:after {
-  transition:
-    opacity var(--hide-duration) cubic-bezier(0.4, 0, 0.2, 1) var(--hide-delay),
-    transform var(--hide-duration) cubic-bezier(0.4, 0, 0.2, 1) var(--hide-delay);
-}
-
-.tooltip-delayed.tooltip-open > .tooltip-content,
-.tooltip-delayed.tooltip-open:before,
-.tooltip-delayed.tooltip-open:after,
-.tooltip-delayed[data-tip]:not([data-tip=""]):hover:before,
-.tooltip-delayed[data-tip]:not([data-tip=""]):hover:after,
-.tooltip-delayed:not(:has(.tooltip-content:empty)):has(.tooltip-content):hover > .tooltip-content,
-.tooltip-delayed:not(:has(.tooltip-content:empty)):has(.tooltip-content):hover:after,
-.tooltip-delayed:has(:focus-visible) > .tooltip-content,
-.tooltip-delayed:has(:focus-visible):before,
-.tooltip-delayed:has(:focus-visible):after {
-  transition:
-    opacity var(--show-duration) cubic-bezier(0.4, 0, 0.2, 1) var(--show-delay),
-    transform var(--show-duration) cubic-bezier(0.4, 0, 0.2, 1) var(--show-delay);
-}
-
 /* ==========================================================================
  * Apple system aesthetic.
  *
@@ -102,6 +72,41 @@
     0 2px 6px rgba(15, 23, 42, 0.04);
 }
 
+/* Dark-mode idle tile: dim glass card, darker gradient, pulled-back highlights. */
+:root[data-theme="dark"] .onebox-tile--idle,
+:root[data-theme="dark"] .onebox-tile--connecting {
+  background: linear-gradient(
+    140deg,
+    #2C2C2E 0%,
+    #232325 52%,
+    #1C1C1E 100%
+  );
+  box-shadow:
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.06),
+    inset 1.5px 0 0 rgba(255, 255, 255, 0.04),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.4),
+    0 12px 28px -10px rgba(0, 0, 0, 0.5),
+    0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="system"] .onebox-tile--idle,
+  :root[data-theme="system"] .onebox-tile--connecting {
+    background: linear-gradient(
+      140deg,
+      #2C2C2E 0%,
+      #232325 52%,
+      #1C1C1E 100%
+    );
+    box-shadow:
+      inset 0 1.5px 0 rgba(255, 255, 255, 0.06),
+      inset 1.5px 0 0 rgba(255, 255, 255, 0.04),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.4),
+      0 12px 28px -10px rgba(0, 0, 0, 0.5),
+      0 2px 6px rgba(0, 0, 0, 0.3);
+  }
+}
+
 .onebox-tile--on {
   background: linear-gradient(
     140deg,
@@ -148,6 +153,36 @@
   /* Slightly snappier than 300ms — matches the brisk feel. */
   transition: left 240ms cubic-bezier(0.32, 0.72, 0, 1),
               width 240ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+/* Dark-mode segmented control: lighter trough, slightly-elevated pill on
+   the dark card fill. Same shape-of-the-payload pattern as onebox-tile. */
+:root[data-theme="dark"] .onebox-segmented {
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 0.5px 0.5px rgba(0, 0, 0, 0.2);
+}
+
+:root[data-theme="dark"] .onebox-segmented-pill {
+  background: rgba(120, 120, 128, 0.55);
+  box-shadow:
+    inset 0 0.5px 0 rgba(255, 255, 255, 0.12),
+    0 2px 5px rgba(0, 0, 0, 0.45),
+    0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="system"] .onebox-segmented {
+    background: rgba(255, 255, 255, 0.08);
+    box-shadow: inset 0 0.5px 0.5px rgba(0, 0, 0, 0.2);
+  }
+
+  :root[data-theme="system"] .onebox-segmented-pill {
+    background: rgba(120, 120, 128, 0.55);
+    box-shadow:
+      inset 0 0.5px 0 rgba(255, 255, 255, 0.12),
+      0 2px 5px rgba(0, 0, 0, 0.45),
+      0 1px 2px rgba(0, 0, 0, 0.3);
+  }
 }
 
 /* ---- Status row dot pulse (connecting only) ----------------------------- */

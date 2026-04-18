@@ -31,9 +31,10 @@ export function HelpModal({ isOpen, onClose }: HelpModalProps) {
                         onClick={onClose}
                     />
                     <motion.div
-                        className="relative w-full max-w-[320px] bg-white rounded-[14px] overflow-hidden flex flex-col"
+                        className="relative w-full max-w-[320px] rounded-[14px] overflow-hidden flex flex-col"
                         style={{
                             maxHeight: "calc(100dvh - 80px)",
+                            background: 'var(--onebox-card)',
                             boxShadow:
                                 "0 22px 48px -12px rgba(15, 23, 42, 0.3), 0 4px 14px rgba(15, 23, 42, 0.08)",
                         }}

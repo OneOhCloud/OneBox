@@ -68,6 +68,7 @@ pub fn run() {
             commands::shell::open_directory,
             commands::shell::get_app_version,
             commands::shell::get_pending_deep_link,
+            commands::theme::set_native_window_theme,
             engine::engine_probe,
             engine::engine_ensure_installed,
         ])

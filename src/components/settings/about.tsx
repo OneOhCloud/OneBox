@@ -130,9 +130,10 @@ function AboutSheet({ onClose }: { onClose: () => void }) {
                         onClick={onClose}
                     />
                     <motion.div
-                        className="relative w-full max-w-[340px] bg-[#F2F2F7] rounded-[18px] overflow-hidden flex flex-col"
+                        className="relative w-full max-w-[340px] rounded-[18px] overflow-hidden flex flex-col"
                         style={{
                             maxHeight: "calc(100dvh - 80px)",
+                            background: 'var(--onebox-bg)',
                             boxShadow:
                                 "0 22px 48px -12px rgba(15, 23, 42, 0.32), 0 4px 14px rgba(15, 23, 42, 0.08)",
                         }}
@@ -145,7 +146,10 @@ function AboutSheet({ onClose }: { onClose: () => void }) {
                         }}
                     >
                         {/* Title bar */}
-                        <div className="relative flex items-center justify-center h-11 shrink-0 bg-white">
+                        <div
+                            className="relative flex items-center justify-center h-11 shrink-0"
+                            style={{ background: 'var(--onebox-card)' }}
+                        >
                             <h3
                                 className="text-[15px] font-semibold tracking-[-0.01em] capitalize"
                                 style={{ color: "var(--onebox-label)" }}
@@ -169,7 +173,10 @@ function AboutSheet({ onClose }: { onClose: () => void }) {
 
                         <div className="flex-1 overflow-y-auto">
                             {/* Hero */}
-                            <div className="flex flex-col items-center pt-6 pb-7 bg-white">
+                            <div
+                                className="flex flex-col items-center pt-6 pb-7"
+                                style={{ background: 'var(--onebox-card)' }}
+                            >
                                 <img
                                     src={oneboxLogoUrl}
                                     alt="OneBox"
@@ -270,10 +277,9 @@ function AboutSheet({ onClose }: { onClose: () => void }) {
                                     }}
                                     className="w-full h-10 rounded-[12px] text-[13px] font-medium transition-colors active:bg-[rgba(60,60,67,0.06)]"
                                     style={{
-                                        background: "#FFFFFF",
+                                        background: "var(--onebox-card)",
                                         color: "var(--onebox-label)",
-                                        boxShadow:
-                                            "0 1px 2.5px rgba(15, 23, 42, 0.04)",
+                                        boxShadow: "var(--onebox-shadow-card)",
                                     }}
                                 >
                                     {t("developer_options")}
@@ -436,9 +442,10 @@ function CoreInfoSheet({
                     onClick={onClose}
                 />
                 <motion.div
-                    className="relative w-full max-w-[320px] bg-white rounded-[14px] overflow-hidden flex flex-col"
+                    className="relative w-full max-w-[320px] rounded-[14px] overflow-hidden flex flex-col"
                     style={{
                         maxHeight: "calc(100dvh - 100px)",
+                        background: 'var(--onebox-card)',
                         boxShadow:
                             "0 22px 48px -12px rgba(15, 23, 42, 0.3), 0 4px 14px rgba(15, 23, 42, 0.08)",
                     }}

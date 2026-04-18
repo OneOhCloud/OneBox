@@ -103,19 +103,15 @@ export function AppleSelectMenu<T>(props: AppleSelectMenuProps<T>) {
                 type="button"
                 disabled={disabled}
                 onClick={toggle}
+                style={{ background: 'var(--onebox-card)', boxShadow: 'var(--onebox-shadow-card)' }}
                 className={`
                     group w-full text-left rounded-2xl
-                    bg-white
                     px-3.5 py-2.5
-                    shadow-[0_1px_2px_rgba(15,23,42,0.04),0_1px_3px_rgba(15,23,42,0.06)]
                     transition-all duration-150 ease-out
-                    hover:shadow-[0_2px_6px_rgba(15,23,42,0.06),0_2px_12px_rgba(15,23,42,0.06)]
                     active:scale-[0.995]
                     focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/30
                     disabled:opacity-60 disabled:cursor-not-allowed
-                    disabled:hover:shadow-[0_1px_2px_rgba(15,23,42,0.04),0_1px_3px_rgba(15,23,42,0.06)]
                     disabled:active:scale-100
-                    ${isOpen ? "shadow-[0_4px_18px_rgba(15,23,42,0.08),0_2px_6px_rgba(15,23,42,0.06)]" : ""}
                 `}
             >
                 <div className="flex items-center gap-2">
@@ -123,11 +119,12 @@ export function AppleSelectMenu<T>(props: AppleSelectMenuProps<T>) {
                         {renderTrigger({ selected, isOpen })}
                     </div>
                     <ChevronExpand
-                        className={`
-                            size-3 shrink-0 text-gray-400
-                            transition-transform duration-200
-                            ${isOpen ? "text-blue-500" : ""}
-                        `}
+                        className="size-3 shrink-0 transition-transform duration-200"
+                        style={{
+                            color: isOpen
+                                ? 'var(--onebox-blue)'
+                                : 'var(--onebox-label-tertiary)',
+                        }}
                     />
                 </div>
             </button>
@@ -161,18 +158,22 @@ export function AppleSelectMenu<T>(props: AppleSelectMenuProps<T>) {
                         `}
                     >
                         <div
-                            className="
-                                overflow-hidden rounded-2xl
-                                bg-white/85 backdrop-blur-2xl backdrop-saturate-150
-                                shadow-[0_16px_48px_rgba(15,23,42,0.16),0_4px_12px_rgba(15,23,42,0.08)]
-                            "
+                            className="overflow-hidden rounded-2xl backdrop-blur-2xl backdrop-saturate-150"
+                            style={{
+                                background: 'var(--onebox-menu-bg)',
+                                boxShadow:
+                                    '0 16px 48px rgba(15, 23, 42, 0.16), 0 4px 12px rgba(15, 23, 42, 0.08)',
+                            }}
                         >
                             <div
                                 className="overflow-y-auto p-1.5"
                                 style={{ maxHeight: menuMaxHeight }}
                             >
                                 {options.length === 0 ? (
-                                    <div className="px-3 py-3 text-sm text-gray-400 text-center">
+                                    <div
+                                        className="px-3 py-3 text-sm text-center"
+                                        style={{ color: 'var(--onebox-label-tertiary)' }}
+                                    >
                                         {emptyLabel ?? "—"}
                                     </div>
                                 ) : (
@@ -199,16 +200,13 @@ export function AppleSelectMenu<T>(props: AppleSelectMenuProps<T>) {
                                                     setIsOpen(false);
                                                 }}
                                                 className={`
+                                                    onebox-menu-option
                                                     w-full text-left
                                                     px-3 py-2 rounded-xl
                                                     flex items-center gap-2
                                                     transition-colors duration-100
                                                     focus:outline-none
-                                                    ${
-                                                        isSelected
-                                                            ? "bg-blue-500/10"
-                                                            : "hover:bg-gray-900/5 active:bg-gray-900/10"
-                                                    }
+                                                    ${isSelected ? "bg-blue-500/10" : ""}
                                                     ${option.disabled ? "opacity-40 cursor-not-allowed" : ""}
                                                 `}
                                             >
@@ -251,13 +249,19 @@ export function AppleSelectPlaceholder({
     return (
         <div
             className={`
-                w-full rounded-2xl bg-white/60 px-3.5 py-2.5
-                shadow-[0_1px_2px_rgba(15,23,42,0.03)]
+                w-full rounded-2xl px-3.5 py-2.5
                 flex items-center gap-2
                 ${tone === "loading" ? "" : "opacity-70"}
             `}
+            style={{
+                background: 'var(--onebox-card)',
+                boxShadow: 'var(--onebox-shadow-card)',
+            }}
         >
-            <div className="flex-1 min-w-0 text-sm text-gray-400">
+            <div
+                className="flex-1 min-w-0 text-sm"
+                style={{ color: 'var(--onebox-label-tertiary)' }}
+            >
                 {children}
             </div>
         </div>

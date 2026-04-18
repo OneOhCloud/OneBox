@@ -222,11 +222,23 @@ export default function ConfigTemplate() {
     const showUnsavedIndicator = hasUnsavedContent && configContent;
 
     return (
-        <div className="h-full flex flex-col  ">
+        <div className="h-full flex flex-col">
             <Toaster position="top-center" />
-            <div className="pt-1 flex gap-2 items-center px-1">
+            {/* Secondary toolbar row: mode picker + remote-URL path + actions.
+                Sits below the main macOS toolbar; same material (hairline),
+                smaller height so the two strips read as stacked chrome. */}
+            <div
+                className="flex gap-2 items-center px-3"
+                style={{
+                    height: 36,
+                    borderBottom: '0.5px solid var(--onebox-separator)',
+                    background: 'var(--onebox-toolbar-bg)',
+                    backdropFilter: 'blur(24px) saturate(180%)',
+                    WebkitBackdropFilter: 'blur(24px) saturate(180%)',
+                }}
+            >
                 <select
-                    className="select select-bordered w-auto select-xs bg-blue-50/50 border-blue-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all duration-200 hover:bg-blue-50"
+                    className="onebox-select"
                     value={selectedMode}
                     onChange={(e) => setSelectedMode(e.target.value as configType)}
                 >
@@ -236,34 +248,35 @@ export default function ConfigTemplate() {
                 </select>
 
                 {templatePath.startsWith('local file') ? (
-                    <div className="flex-1 bg-red-50  rounded-md pl-2">
-                        <div className="flex  items-center gap-2">
-                            <ExclamationCircle className="text-red-600 shrink-0" />
-                            <div className="text-xs text-red-700">
-                                {/* 本地文件只会在拖动进来的时候读取一次,sing-box 主要版本更新时会清空本地文件配置。 */}
-                                {t('local_file_warning') || ''}
-                            </div>
-                            <button
-                                className="btn btn-ghost btn-xs btn-error ml-auto "
-                                onClick={handleRestoreDefault}
-                                title="恢复默认"
-                            >
-                                <ArrowCounterclockwise size={16} />
-                            </button>
+                    <div
+                        className="flex-1 flex items-center gap-2 px-2 rounded-md"
+                        style={{
+                            background: 'rgba(255, 59, 48, 0.12)',
+                            border: '0.5px solid rgba(255, 59, 48, 0.25)',
+                            height: 24,
+                        }}
+                    >
+                        <ExclamationCircle size={12} style={{ color: 'var(--onebox-red)' }} />
+                        <div className="text-[11px]" style={{ color: 'var(--onebox-red)' }}>
+                            {t('local_file_warning') || ''}
                         </div>
+                        <button
+                            className="onebox-toolbar-btn ml-auto"
+                            onClick={handleRestoreDefault}
+                            title="恢复默认"
+                        >
+                            <ArrowCounterclockwise size={12} />
+                        </button>
                     </div>
                 ) : (
-                    <div className="join flex-1">
-                        <label className="input input-xs input-bordered join-item bg-white border-gray-200 focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100 transition-all duration-200 hover:border-gray-300 flex items-center gap-2 flex-1">
-                            <svg className="h-[1em] opacity-50 shrink-0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-                                <g strokeLinejoin="round" strokeLinecap="round" strokeWidth="2.5" fill="none" stroke="currentColor">
-                                    <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"></path>
-                                    <path d="M14 2v4a2 2 0 0 0 2 2h4"></path>
-                                </g>
+                    <div className="flex-1 flex items-center gap-1">
+                        <label className="onebox-search flex-1">
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" />
+                                <path d="M14 2v4a2 2 0 0 0 2 2h4" />
                             </svg>
                             <input
                                 type="text"
-                                className="grow text-sm bg-transparent border-0 outline-none focus:outline-none p-0 min-w-0"
                                 placeholder="https://... or drag & drop JSON/JSONC file"
                                 value={templatePath}
                                 onChange={(e) => setTemplatePath(e.target.value)}
@@ -272,63 +285,79 @@ export default function ConfigTemplate() {
 
                         {hasPathChanged && (
                             <button
-                                className="btn btn-xs btn-error join-item text-white hover:shadow-md transition-all duration-200"
+                                className="onebox-toolbar-btn"
                                 onClick={handleSave}
                                 title={t('save') || 'Save'}
+                                style={{ color: 'var(--onebox-red)' }}
                             >
-                                <Check size={16} />
+                                <Check size={12} />
                             </button>
                         )}
 
                         {!isDefaultPath && (
                             <button
-                                className="btn btn-xs btn-info join-item text-white hover:shadow-md transition-all duration-200"
+                                className="onebox-toolbar-btn"
                                 onClick={handleRestoreDefault}
                                 title="Restore default"
                             >
-                                <ArrowCounterclockwise size={16} />
+                                <ArrowCounterclockwise size={12} />
                             </button>
                         )}
 
                         <button
-                            className="btn btn-xs btn-primary join-item text-white hover:shadow-md transition-all duration-200 disabled:bg-gray-300 disabled:text-gray-500"
+                            className="onebox-toolbar-btn"
                             onClick={handleSync}
                             disabled={loading}
+                            title={t('update') || 'Update'}
+                            style={{ color: 'var(--onebox-blue)' }}
                         >
-                            <ArrowClockwise className={loading ? 'animate-spin' : ''} size={16} />
-                            {t('update') || '更新'}
+                            <ArrowClockwise className={loading ? 'animate-spin' : ''} size={12} />
                         </button>
                     </div>
                 )}
             </div>
 
             <pre
-                className="mt-2 relative bg-gray-50 px-4 pb-4 pt-2 rounded-xl border border-gray-200 overflow-auto flex-1 text-xs shadow-inner cursor-pointer hover:border-blue-300 transition-all duration-200"
+                className="relative px-4 pt-3 pb-4 overflow-auto flex-1 text-[11px] leading-relaxed onebox-selectable"
+                style={{
+                    fontFamily: 'ui-monospace, "SF Mono", Menlo, Consolas, monospace',
+                    color: 'var(--onebox-label)',
+                    margin: 0,
+                    whiteSpace: 'pre',
+                }}
             >
-                <div className="absolute top-2 right-2 z-10 flex gap-2">
+                <div className="absolute top-2 right-3 z-10 flex gap-1.5">
                     {showUnsavedIndicator && (
-                        <div className="tooltip tooltip-left" data-tip="Unsaved content from dropped file">
-                            <div className="flex items-center gap-1 px-2 py-1 bg-orange-100 border border-orange-300 rounded text-orange-700">
-                                <ExclamationCircle size={14} />
-                                <span className="text-xs">Unsaved</span>
-                            </div>
+                        <div
+                            className="flex items-center gap-1 px-2 py-0.5 rounded text-[11px]"
+                            title="Unsaved content from dropped file"
+                            style={{
+                                background: 'rgba(255, 149, 0, 0.15)',
+                                color: 'var(--onebox-orange)',
+                            }}
+                        >
+                            <ExclamationCircle size={11} />
+                            <span>Unsaved</span>
                         </div>
                     )}
                     <button
-                        className="btn btn-xs btn-ghost bg-white/90 backdrop-blur-sm hover:bg-blue-50 border border-gray-200 hover:border-blue-300 transition-all duration-200 hover:shadow-sm disabled:opacity-40"
+                        className="onebox-toolbar-btn disabled:opacity-40"
                         onClick={handleCopy}
                         disabled={!configContent}
+                        title={t('config_copied_to_clipboard') || 'Copy'}
+                        style={{ color: 'var(--onebox-blue)' }}
                     >
-                        <Copy className="text-blue-600" />
+                        <Copy size={12} />
                     </button>
                 </div>
-                <div className="text-gray-700">
-                    {configContent || (
-                        <div className="text-center text-gray-400 py-8">
-                            {"No content loaded. Click Sync to load from URL or drag & drop a JSON/JSONC file here."}
-                        </div>
-                    )}
-                </div>
+                {configContent || (
+                    <div
+                        className="text-center py-12 text-[12px]"
+                        style={{ color: 'var(--onebox-label-tertiary)' }}
+                    >
+                        {"No content loaded. Click Sync to load from URL or drag & drop a JSON/JSONC file here."}
+                    </div>
+                )}
             </pre>
         </div>
     );

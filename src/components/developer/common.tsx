@@ -104,7 +104,7 @@ export function ToggleSetting({
             </div>
             <input
                 type="checkbox"
-                className="toggle toggle-sm onebox-toggle shrink-0"
+                className="onebox-toggle"
                 checked={isEnabled}
                 onChange={onToggle}
             />

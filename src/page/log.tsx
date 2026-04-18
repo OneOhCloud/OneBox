@@ -1,161 +1,247 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowDownCircle, ArrowUpCircle } from 'react-bootstrap-icons';
+import { ArrowDown, ArrowDownCircle, ArrowUpCircle, Copy, Search, Trash } from 'react-bootstrap-icons';
+import { toast, Toaster } from 'sonner';
+import ConfigTemplate from '../components/config-template/config-template';
 import ConfigViewer from '../components/config-viewer/config-viewer';
 import EmptyLogMessage from '../components/log/empty-log-message';
 import LogTable from '../components/log/log-table';
-import LogTabs, { TabKeys } from '../components/log/log-tabs';
-
-import ConfigTemplate from '../components/config-template/config-template';
 import { formatNetworkSpeed, useLogSource, useNetworkSpeed } from '../utils/clash-api';
-import { initLanguage } from "../utils/helper";
+import { initLanguage, t } from '../utils/helper';
+
+type TabKey = 'logs' | 'config' | 'config-template';
+
+const TABS: { key: TabKey; labelKey: string; fallback: string }[] = [
+    { key: 'logs', labelKey: 'log_viewer', fallback: 'Logs' },
+    { key: 'config', labelKey: 'config_viewer', fallback: 'Config' },
+    { key: 'config-template', labelKey: 'config_template', fallback: 'Template' },
+];
+
+// Segmented control (NSSegmentedControl) — track + lifted active pill.
+// Keyed off data-active so CSS can style without React-only class lists.
+function Segments({
+    value,
+    onChange,
+}: {
+    value: TabKey;
+    onChange: (v: TabKey) => void;
+}) {
+    return (
+        <div className="onebox-segctl" role="tablist">
+            {TABS.map(({ key, labelKey, fallback }) => (
+                <button
+                    key={key}
+                    type="button"
+                    role="tab"
+                    aria-selected={value === key}
+                    data-active={value === key}
+                    onClick={() => onChange(key)}
+                    className="onebox-segctl-item"
+                >
+                    {t(labelKey) || fallback}
+                </button>
+            ))}
+        </div>
+    );
+}
+
+// Logs-tab toolbar tools: search field, auto-scroll toggle, clear.
+function LogsTools({
+    filter,
+    setFilter,
+    autoScroll,
+    setAutoScroll,
+    clearLogs,
+}: {
+    filter: string;
+    setFilter: (s: string) => void;
+    autoScroll: boolean;
+    setAutoScroll: (v: boolean) => void;
+    clearLogs: () => void;
+}) {
+    return (
+        <>
+            <label className="onebox-search" aria-label={t('filter_placeholder') || 'Filter'}>
+                <Search size={11} />
+                <input
+                    type="text"
+                    value={filter}
+                    onChange={(e) => setFilter(e.target.value)}
+                    placeholder={t('filter_placeholder') || '过滤关键词…'}
+                />
+            </label>
+            <button
+                type="button"
+                className="onebox-toolbar-btn"
+                data-active={autoScroll}
+                onClick={() => setAutoScroll(!autoScroll)}
+                title={t('auto_scroll')}
+                aria-pressed={autoScroll}
+            >
+                <ArrowDown size={12} />
+            </button>
+            <button
+                type="button"
+                className="onebox-toolbar-btn"
+                onClick={clearLogs}
+                title={t('clear_log')}
+            >
+                <Trash size={12} />
+            </button>
+        </>
+    );
+}
+
+// Config-tab toolbar tool: copy current JSON to clipboard.
+function ConfigTools({ getContent }: { getContent: () => string | undefined }) {
+    const handleCopy = () => {
+        const c = getContent();
+        if (!c) return;
+        toast.promise(navigator.clipboard.writeText(c), {
+            loading: t('loading') || 'Copying…',
+            success: () => t('config_copied_to_clipboard') || 'Copied',
+            error: (e) => (e instanceof Error ? e.message : String(e)),
+        });
+    };
+    return (
+        <button
+            type="button"
+            className="onebox-toolbar-btn"
+            onClick={handleCopy}
+            title={t('config_copied_to_clipboard') || 'Copy'}
+        >
+            <Copy size={12} />
+        </button>
+    );
+}
 
 export default function LogPage() {
     const [filter, setFilter] = useState('');
     const [autoScroll, setAutoScroll] = useState(true);
-    const logContainerRef = useRef<HTMLDivElement>(null);
     const [isLanguageLoading, setIsLanguageLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState<TabKeys>('logs');
+    const [activeTab, setActiveTab] = useState<TabKey>('logs');
+    const [configContent, setConfigContent] = useState<string | undefined>();
+    const logContainerRef = useRef<HTMLDivElement>(null);
     const { logs, clearLogs } = useLogSource();
     const speed = useNetworkSpeed();
 
-    // 过滤后的日志
     const filteredLogs = filter
-        ? logs.filter(log => log.message.toLowerCase().includes(filter.toLowerCase()))
+        ? logs.filter((log) =>
+              log.message.toLowerCase().includes(filter.toLowerCase()),
+          )
         : logs;
 
-    // 高亮关键词的函数
     const highlightText = (text: string, highlight: string) => {
         if (!highlight) return text;
-
         const parts = text.split(new RegExp(`(${highlight})`, 'gi'));
         return parts.map((part, index) =>
             part.toLowerCase() === highlight.toLowerCase() ? (
-                <span key={index} className="bg-yellow-200 dark:bg-yellow-600 px-1 rounded">
+                <mark key={index} className="onebox-highlight">
                     {part}
-                </span>
-            ) : part
+                </mark>
+            ) : (
+                part
+            ),
         );
     };
 
-    // await initLanguage();
-
     useEffect(() => {
-        const fn = async () => {
-            try {
-                await initLanguage();
-            } finally {
-                setIsLanguageLoading(false);
-            }
-        }
-        fn();
+        initLanguage().finally(() => setIsLanguageLoading(false));
     }, []);
 
-    // 日志源的逻辑已移至 useLogSource hook
-
-    // 监听滚动事件，判断是否要启用自动滚动
+    // Wire scroll to the right container based on activeTab. We only watch
+    // the logs container because config/template have their own scroll and
+    // don't need the auto-scroll-to-bottom contract.
     useEffect(() => {
+        if (activeTab !== 'logs') return;
         const container = logContainerRef.current;
         if (!container) return;
-
         const handleScroll = () => {
             const { scrollTop, scrollHeight, clientHeight } = container;
-            const isAtBottom = scrollHeight - scrollTop - clientHeight < 5;
-            setAutoScroll(isAtBottom);
+            setAutoScroll(scrollHeight - scrollTop - clientHeight < 5);
         };
-
         container.addEventListener('scroll', handleScroll);
         return () => container.removeEventListener('scroll', handleScroll);
-    }, []);
+    }, [activeTab]);
 
-    // 自动滚动到底部
     useEffect(() => {
-        if (autoScroll && logContainerRef.current) {
-            logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
+        if (autoScroll && activeTab === 'logs' && logContainerRef.current) {
+            logContainerRef.current.scrollTop =
+                logContainerRef.current.scrollHeight;
         }
-    }, [filteredLogs, autoScroll]);
+    }, [filteredLogs, autoScroll, activeTab]);
 
-    // 如果语言还在初始化中，显示loading
     if (isLanguageLoading) {
         return (
-            <div className="flex items-center justify-center h-screen">
-                <div className="text-center">
-                    <span className="loading loading-spinner loading-lg"></span>
-                    <div className="mt-4 text-base-content/70">Loading...</div>
-                </div>
+            <div className="onebox-mac-window flex items-center justify-center">
+                <span className="onebox-spinner onebox-spinner-ring onebox-spinner-lg" />
             </div>
         );
     }
 
     return (
-        <div className="flex flex-col  px-4 py-2 bg-white  h-screen">
-            <LogTabs
-                activeTab={activeTab}
-                setActiveTab={setActiveTab}
-                filter={filter}
-                setFilter={setFilter}
+        <div className="onebox-mac-window">
+            <Toaster position="top-center" toastOptions={{ duration: 2000 }} />
 
-                autoScroll={autoScroll}
-                setAutoScroll={setAutoScroll}
-                clearLogs={clearLogs}
-            />
-
-            {/* 日志标签页内容 */}
-            <div className={`max-h-[calc(100dvh-100px)]  flex-1 flex flex-col ${activeTab === 'logs' ? '' : 'hidden'}`} role="tabpanel">
-
-
-                <div
-                    ref={logContainerRef}
-                    className="mt-2 flex-1 rounded-xl border border-gray-200 bg-gray-50 font-mono overflow-y-auto h-[calc(100dvh-100px)] shadow-inner"
-                >
-                    <div className="p-4 h-full">
-                        {filteredLogs.length === 0 ? (
-                            <EmptyLogMessage filter={filter} />
-                        ) : (
-                            <LogTable
-                                logs={filteredLogs}
-                                filter={filter}
-                                highlightText={highlightText}
-                            />
-                        )}
-                    </div>
-                </div>
+            <div className="onebox-mac-toolbar">
+                <Segments value={activeTab} onChange={setActiveTab} />
+                <div className="flex-1" />
+                {activeTab === 'logs' && (
+                    <LogsTools
+                        filter={filter}
+                        setFilter={setFilter}
+                        autoScroll={autoScroll}
+                        setAutoScroll={setAutoScroll}
+                        clearLogs={clearLogs}
+                    />
+                )}
+                {activeTab === 'config' && (
+                    <ConfigTools getContent={() => configContent} />
+                )}
             </div>
 
-            {/* 配置标签页内容 */}
-            <div className={`flex-1 ${activeTab === 'config' ? '' : 'hidden'}`} role="tabpanel">
-                <div className="h-[calc(100dvh-100px)] overflow-y-auto overflow-x-hidden">
-                    <ConfigViewer />
-                </div>
+            {/* Logs: scrollable log stream, own ref for auto-scroll. */}
+            <div
+                ref={logContainerRef}
+                className="onebox-mac-content"
+                style={{ display: activeTab === 'logs' ? 'block' : 'none' }}
+                role="tabpanel"
+            >
+                {filteredLogs.length === 0 ? (
+                    <EmptyLogMessage filter={filter} />
+                ) : (
+                    <LogTable
+                        logs={filteredLogs}
+                        filter={filter}
+                        highlightText={highlightText}
+                    />
+                )}
             </div>
 
-
-            {/* 模板标签页内容 */}
-            <div className={`flex-1 ${activeTab === 'config-template' ? '' : 'hidden'}`} role="tabpanel">
-                <div className="h-[calc(100dvh-100px)] overflow-y-auto overflow-x-hidden">
-                    <ConfigTemplate />
-                </div>
+            {/* Config & template: their own inner scrollers. */}
+            <div
+                className="onebox-mac-content"
+                style={{ display: activeTab === 'config' ? 'block' : 'none' }}
+                role="tabpanel"
+            >
+                <ConfigViewer onContent={setConfigContent} />
+            </div>
+            <div
+                className="onebox-mac-content"
+                style={{ display: activeTab === 'config-template' ? 'block' : 'none' }}
+                role="tabpanel"
+            >
+                <ConfigTemplate />
             </div>
 
-
-
-            <div className="flex   justify-end  items-center text-sm  p-2">
-                <div className="flex items-center gap-1  ">
-                    <ArrowUpCircle size={12} className="text-blue-600" />
-
-                    <div className="font-mono font-medium tracking-tight min-w-20 ">
-                        <span className="text-blue-600">{formatNetworkSpeed(speed.upload)}</span>
-                    </div>
-
-                </div>
-
-                <div className="flex items-center gap-1 text-right justify-end">
-                    <div className="font-mono font-medium tracking-tight min-w-20">
-                        <span className="text-blue-600">{formatNetworkSpeed(speed.download)}</span>
-                    </div>
-                    <ArrowDownCircle size={12} className="text-blue-600" />
-
-                </div>
-
+            <div className="onebox-mac-statusbar">
+                <span className="inline-flex items-center gap-1.5">
+                    <ArrowUpCircle size={11} style={{ color: 'var(--onebox-blue)' }} />
+                    <span>{formatNetworkSpeed(speed.upload)}</span>
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                    <ArrowDownCircle size={11} style={{ color: 'var(--onebox-blue)' }} />
+                    <span>{formatNetworkSpeed(speed.download)}</span>
+                </span>
             </div>
         </div>
     );

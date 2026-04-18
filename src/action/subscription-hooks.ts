@@ -2,7 +2,7 @@ import { useCallback, useState } from "react";
 import { getDataBaseInstance } from "../single/db";
 import { Subscription } from "../types/definition";
 import { t } from "../utils/helper";
-import { fetchConfigContent, FileError, getRemoteInfoBySubscriptionUserinfo, insertSubscription } from "./db";
+import { fetchConfigContent, FileError, getRemoteInfoBySubscriptionUserinfo } from "./db";
 
 
 type MessageType = 'success' | 'error' | 'warning' | undefined;
@@ -66,43 +66,4 @@ export function useUpdateSubscription() {
     }, []);
 
     return { update, resetMessage, loading, message, messageType };
-}
-
-
-
-export function useAddSubscription() {
-    const [loading, setLoading] = useState(false);
-    const [message, setMessage] = useState<string>('');
-    const [messageType, setMessageType] = useState<MessageType>();
-
-    const resetMessage = () => {
-        setMessage('');
-        setMessageType(undefined);
-    };
-
-    const add = useCallback(async (url: string, name?: string): Promise<string | undefined> => {
-        setLoading(true);
-        setMessage('');
-        setMessageType(undefined);
-        try {
-            const identifier = await insertSubscription(url, name);
-            if (!identifier) {
-                setMessage(t('add_subscription_failed'));
-                setMessageType('error');
-                return undefined;
-            }
-            setMessage(t('add_subscription_success'));
-            setMessageType('success');
-            return identifier;
-        } catch (error) {
-            console.error(error);
-            setMessage(t('add_subscription_failed'));
-            setMessageType('error');
-            return undefined;
-        } finally {
-            setLoading(false);
-        }
-    }, []);
-
-    return { add, resetMessage, loading, message, messageType };
 }

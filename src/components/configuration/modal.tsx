@@ -7,10 +7,6 @@ import {
 } from "../../action/modal-state-hook";
 import { t } from "../../utils/helper";
 import { IOSTextField } from "../common/ios-text-field";
-import {
-    DeepLinkApplyPhase,
-    DeepLinkApplyProgressModal,
-} from "../home/deep-link-apply-progress-modal";
 
 // ---- Form step ---------------------------------------------------------
 
@@ -83,20 +79,18 @@ const FormStep: React.FC<FormStepProps> = ({
 
 /**
  * Hook that returns an `openModal` callback and a ready-to-render
- * `ModalElement`. Configuration page mounts the ModalElement at its root
- * so the modal persists across the EmptyState → list transition that
- * happens when submit succeeds (previously the modal was unmounted
- * mid-flow and the user never saw the success result step).
+ * `ModalElement`. Submit hands the URL off to the apply=1 pipeline
+ * (NavContext.setDeepLinkApplyUrl + setActiveScreen('home')) — Home's
+ * DeepLinkApplyProgressModal then drives the full init → import →
+ * start → done flow, so manual add and deep-link apply=1 share the
+ * same modal UI *and* behaviour.
  */
 export function useSubscriptionModalController() {
     const {
         open,
-        step,
         name,
         url,
         errors,
-        message,
-        messageType,
         openModal,
         closeModal,
         onNameChange,
@@ -104,80 +98,53 @@ export function useSubscriptionModalController() {
         submit,
     } = useModalState();
 
-    const showForm = open && step === "form";
-    const showProgress = open && step !== "form";
-    const progressPhase: DeepLinkApplyPhase =
-        step === "loading"
-            ? "import"
-            : messageType === "success"
-                ? "done"
-                : "error";
-
     const ModalElement = (
-        <>
-            <AnimatePresence>
-                {showForm && (
+        <AnimatePresence>
+            {open && (
+                <motion.div
+                    className="fixed inset-0 z-50 flex items-center justify-center px-4"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.18 }}
+                >
+                    <div
+                        className="absolute inset-0"
+                        style={{
+                            background: "rgba(15, 23, 42, 0.38)",
+                            backdropFilter: "blur(6px)",
+                            WebkitBackdropFilter: "blur(6px)",
+                        }}
+                        onClick={closeModal}
+                    />
                     <motion.div
-                        className="fixed inset-0 z-50 flex items-center justify-center px-4"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        transition={{ duration: 0.18 }}
+                        className="relative w-full max-w-[290px] rounded-[14px] overflow-hidden"
+                        style={{
+                            background: 'var(--onebox-card)',
+                            boxShadow:
+                                "0 22px 48px -12px rgba(15, 23, 42, 0.3), 0 4px 14px rgba(15, 23, 42, 0.08)",
+                        }}
+                        initial={{ scale: 0.92, y: 8 }}
+                        animate={{ scale: 1, y: 0 }}
+                        exit={{ scale: 0.94, y: 4 }}
+                        transition={{
+                            duration: 0.22,
+                            ease: [0.32, 0.72, 0, 1],
+                        }}
                     >
-                        <div
-                            className="absolute inset-0"
-                            style={{
-                                background: "rgba(15, 23, 42, 0.38)",
-                                backdropFilter: "blur(6px)",
-                                WebkitBackdropFilter: "blur(6px)",
-                            }}
-                            onClick={closeModal}
+                        <FormStep
+                            name={name}
+                            url={url}
+                            errors={errors}
+                            onNameChange={onNameChange}
+                            onUrlChange={onUrlChange}
+                            onClose={closeModal}
+                            onAdd={submit}
                         />
-                        <motion.div
-                            className="relative w-full max-w-[290px] bg-white rounded-[14px] overflow-hidden"
-                            style={{
-                                boxShadow:
-                                    "0 22px 48px -12px rgba(15, 23, 42, 0.3), 0 4px 14px rgba(15, 23, 42, 0.08)",
-                            }}
-                            initial={{ scale: 0.92, y: 8 }}
-                            animate={{ scale: 1, y: 0 }}
-                            exit={{ scale: 0.94, y: 4 }}
-                            transition={{
-                                duration: 0.22,
-                                ease: [0.32, 0.72, 0, 1],
-                            }}
-                        >
-                            <FormStep
-                                name={name}
-                                url={url}
-                                errors={errors}
-                                onNameChange={onNameChange}
-                                onUrlChange={onUrlChange}
-                                onClose={closeModal}
-                                onAdd={submit}
-                            />
-                        </motion.div>
                     </motion.div>
-                )}
-            </AnimatePresence>
-            <DeepLinkApplyProgressModal
-                visible={showProgress}
-                phase={progressPhase}
-                errorMessage={
-                    progressPhase === "error" && message ? message : undefined
-                }
-                onClose={closeModal}
-                steps={["import"]}
-                titleLabels={{
-                    running: t("adding_subscription"),
-                    error: t("add_subscription_failed"),
-                }}
-                stepLabels={{
-                    import: t("dl_phase_import"),
-                    done: t("add_subscription_success"),
-                }}
-            />
-        </>
+                </motion.div>
+            )}
+        </AnimatePresence>
     );
 
     return { openModal: () => openModal(), ModalElement };

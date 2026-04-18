@@ -90,7 +90,10 @@ export default function SelectSub({ data, isLoading, onUpdate }: SubscriptionPro
             onChange={updateSubscription}
             menuMaxHeight={256}
             renderTrigger={() => (
-                <span className="block truncate text-[14px] font-medium text-gray-900">
+                <span
+                    className="block truncate text-[14px] font-medium"
+                    style={{ color: 'var(--onebox-label)' }}
+                >
                     {selectedItem?.name ?? t("no_subscription")}
                 </span>
             )}
@@ -104,13 +107,21 @@ export default function SelectSub({ data, isLoading, onUpdate }: SubscriptionPro
                             className={`truncate text-[14px] ${
                                 isSelected
                                     ? "text-blue-600 font-semibold"
-                                    : "text-gray-900 font-medium"
+                                    : "font-medium"
                             }`}
+                            style={
+                                isSelected
+                                    ? undefined
+                                    : { color: 'var(--onebox-label)' }
+                            }
                         >
                             {sub.name}
                         </span>
                         {hint && (
-                            <span className="truncate text-[11px] text-gray-400 mt-0.5">
+                            <span
+                                className="truncate text-[11px] mt-0.5"
+                                style={{ color: 'var(--onebox-label-tertiary)' }}
+                            >
                                 {hint}
                             </span>
                         )}

@@ -15,10 +15,15 @@ interface RadioOptionListProps<T extends string> {
 }
 
 /**
- * iOS-style radio list inside a grouped card. Tap anywhere on a row to
- * select it (the `<label>` wraps the hidden input so the whole row is
- * the hit target). Custom radio glyph: systemBlue fill with a white
- * centre dot when selected, hollow ring when not.
+ * iOS-style radio list. Tap anywhere on a row to select it (the `<label>`
+ * wraps the hidden input so the whole row is the hit target). Custom radio
+ * glyph: systemBlue fill with a white centre dot when selected, hollow
+ * ring when not.
+ *
+ * Uses `.onebox-grouped-list` (flush — keeps inset row separators but no
+ * card chrome) because every caller is already inside a SettingsModal.
+ * Wrapping with `.onebox-grouped-card` here would nest a card inside the
+ * modal's card and produce a double-elevation look.
  */
 export function RadioOptionList<T extends string>({
     value,
@@ -26,7 +31,7 @@ export function RadioOptionList<T extends string>({
     options,
 }: RadioOptionListProps<T>) {
     return (
-        <div className="onebox-grouped-card">
+        <div className="onebox-grouped-list">
             {options.map((opt) => {
                 const checked = value === opt.key;
                 return (
