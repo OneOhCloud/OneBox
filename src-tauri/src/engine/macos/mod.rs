@@ -187,7 +187,7 @@ fn detect_active_network_service() -> Result<String, String> {
         .lines()
         .find_map(|l| l.trim().strip_prefix("interface:").map(|s| s.trim().to_string()))
         .ok_or_else(|| "no default interface".to_string())?;
-    log::info!("[dns] default interface: {}", iface);
+    log::debug!("[dns] default interface: {}", iface);
 
     let out = Command::new("networksetup")
         .arg("-listallhardwareports")
@@ -203,7 +203,7 @@ fn detect_active_network_service() -> Result<String, String> {
         } else if let Some(rest) = line.strip_prefix("Device:") {
             if rest.trim() == iface {
                 if let Some(svc) = current_port.take() {
-                    log::info!("[dns] active service: {}", svc);
+                    log::debug!("[dns] active service: {}", svc);
                     return Ok(svc);
                 }
             }
