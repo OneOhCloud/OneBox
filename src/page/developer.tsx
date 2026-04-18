@@ -35,7 +35,7 @@ export default function Page() {
                     <UASettingsItem />
                     <HelperPing />
                     <SettingItem
-                        icon={<Binoculars className="w-5 h-5" style={{ color: 'var(--onebox-label-secondary)' }} />}
+                        icon={<Binoculars className="text-[#5856D6]" size={22} />}
                         title={t("open_advanced_settings")}
                         subTitle={t("open_log_desc")}
                         disabled={false}

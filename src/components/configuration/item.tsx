@@ -3,13 +3,14 @@ import bytes from "bytes";
 import clsx from "clsx";
 import { AnimatePresence, motion } from "framer-motion";
 import React, { useEffect, useState } from "react";
-import { ArrowClockwise, ChevronDown, Trash3 } from "react-bootstrap-icons";
+import { ArrowClockwise, ChevronDown, InfoCircle, Trash3 } from "react-bootstrap-icons";
 import { mutate } from "swr";
 import { deleteSubscription } from "../../action/db";
 import { useUpdateSubscription } from "../../action/subscription-hooks";
 import { GET_SUBSCRIPTIONS_LIST_SWR_KEY, Subscription } from "../../types/definition";
 import { t } from "../../utils/helper";
 import Avatar from "./avatar";
+import { SubscriptionDetailModal } from "./detail-modal";
 
 interface SubscriptionItemProps {
     item: Subscription;
@@ -48,6 +49,7 @@ export const SubscriptionItem: React.FC<SubscriptionItemProps> = ({
     const { update, resetMessage, loading, message, messageType } =
         useUpdateSubscription();
     const [isDeleting, setIsDeleting] = useState(false);
+    const [detailOpen, setDetailOpen] = useState(false);
 
     useEffect(() => {
         if (!loading) {
@@ -208,30 +210,37 @@ export const SubscriptionItem: React.FC<SubscriptionItemProps> = ({
                         className="overflow-hidden"
                     >
                         <div
-                            className="flex relative"
+                            className="grid grid-cols-3 relative"
                             style={{
                                 borderTop: "0.5px solid var(--onebox-separator)",
                             }}
                         >
                             <button
                                 type="button"
-                                onClick={handleUpdate}
-                                className="flex-1 py-2.5 flex items-center justify-center gap-1.5 text-[13px] font-medium transition-colors active:bg-[rgba(0,122,255,0.06)]"
+                                onClick={() => setDetailOpen(true)}
+                                className="py-2.5 flex items-center justify-center gap-1.5 text-[13px] font-medium transition-colors active:bg-[rgba(0,122,255,0.06)]"
                                 style={{ color: "var(--onebox-blue)" }}
+                            >
+                                <InfoCircle size={13} />
+                                <span>{t("details")}</span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={handleUpdate}
+                                className="py-2.5 flex items-center justify-center gap-1.5 text-[13px] font-medium transition-colors active:bg-[rgba(0,122,255,0.06)]"
+                                style={{
+                                    color: "var(--onebox-blue)",
+                                    borderLeft: "0.5px solid var(--onebox-separator)",
+                                    borderRight: "0.5px solid var(--onebox-separator)",
+                                }}
                             >
                                 <ArrowClockwise size={13} />
                                 <span>{t("update")}</span>
                             </button>
-                            <div
-                                className="w-px my-1.5"
-                                style={{
-                                    background: "var(--onebox-separator)",
-                                }}
-                            />
                             <button
                                 type="button"
                                 onClick={handleDelete}
-                                className="flex-1 py-2.5 flex items-center justify-center gap-1.5 text-[13px] font-medium transition-colors active:bg-[rgba(255,59,48,0.06)]"
+                                className="py-2.5 flex items-center justify-center gap-1.5 text-[13px] font-medium transition-colors active:bg-[rgba(255,59,48,0.06)]"
                                 style={{ color: "#FF3B30" }}
                             >
                                 <Trash3 size={13} />
@@ -241,6 +250,12 @@ export const SubscriptionItem: React.FC<SubscriptionItemProps> = ({
                     </motion.div>
                 )}
             </AnimatePresence>
+
+            <SubscriptionDetailModal
+                item={item}
+                isOpen={detailOpen}
+                onClose={() => setDetailOpen(false)}
+            />
         </li>
     );
 };

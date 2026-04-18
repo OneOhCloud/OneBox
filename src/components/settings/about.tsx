@@ -177,15 +177,32 @@ function AboutSheet({ onClose }: { onClose: () => void }) {
                                 className="flex flex-col items-center pt-6 pb-7"
                                 style={{ background: 'var(--onebox-card)' }}
                             >
-                                <img
-                                    src={oneboxLogoUrl}
-                                    alt="OneBox"
-                                    className="size-[72px] rounded-[20px] mb-3.5"
+                                {/* 72px squircle tile. The source PNG has ~22 px
+                                    of transparent padding on every side (content
+                                    bbox 212×212 / 256×256), which reads as a
+                                    visible ring of window background around the
+                                    blue icon. Wrap in an overflow-hidden container
+                                    and scale the <img> past the container bounds
+                                    so the transparent ring is clipped out — the
+                                    visible outline is the container's rounded
+                                    mask, filled edge-to-edge with icon blue.
+                                    Shadow is a low-alpha systemBlue glow (two
+                                    layers: broad halo + tight seat) to avoid
+                                    competing with the hero's centre of mass. */}
+                                <div
+                                    className="size-[72px] rounded-[20px] overflow-hidden mb-3.5"
                                     style={{
                                         boxShadow:
-                                            "0 12px 28px -8px rgba(15, 23, 42, 0.18), 0 2px 4px rgba(15, 23, 42, 0.06)",
+                                            '0 14px 34px -10px rgba(10, 132, 255, 0.35), 0 3px 8px rgba(10, 132, 255, 0.14)',
                                     }}
-                                />
+                                >
+                                    <img
+                                        src={oneboxLogoUrl}
+                                        alt="OneBox"
+                                        className="size-full"
+                                        style={{ transform: 'scale(1.25)' }}
+                                    />
+                                </div>
                                 <h2
                                     className="text-[22px] font-semibold tracking-[-0.02em]"
                                     style={{ color: "var(--onebox-label)" }}

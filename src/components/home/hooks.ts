@@ -143,6 +143,12 @@ export const useApplyPipelineRoot = () => {
 
     const [applyPhase, setApplyPhase] = useState<DeepLinkApplyPhase | null>(null);
     const [applyErrorMessage, setApplyErrorMessage] = useState<string>('');
+    // Tracks which caller kind is driving the *current* modal run, so the
+    // step-3 label in the manual-add path can read "请手动启动服务" instead
+    // of the apply=1 default "启动服务". Snapshotted when the URL is consumed
+    // below, not derived live from NavContext (which resets to true after
+    // consumption).
+    const [manualMode, setManualMode] = useState<boolean>(false);
     // Epoch at the moment we enter the 'start' phase. Only engine transitions
     // past this epoch can close the modal — avoids a stale `running` snapshot
     // (e.g. the previous subscription) flipping us to 'done' prematurely.
@@ -187,6 +193,21 @@ export const useApplyPipelineRoot = () => {
         return () => clearTimeout(timer);
     }, [applyPhase]);
 
+    // apply=1 auto-dismiss: the engine is already running and the user
+    // landed on Home via the deep-link handler, so once they've registered
+    // the success state (~1 s) take them to the connected Home view.
+    // Manual-add intentionally skips this — the modal carries the
+    // "请手动启动服务" hint and should stay open for the user to act on.
+    useEffect(() => {
+        if (applyPhase !== 'done') return;
+        if (manualMode) return;
+        const timer = setTimeout(() => {
+            setApplyPhase(null);
+            setApplyErrorMessage('');
+        }, 1000);
+        return () => clearTimeout(timer);
+    }, [applyPhase, manualMode]);
+
     // Apply pipeline. Shared between two callers:
     //   1. Deep-link apply=1 (App.tsx on_open_url handler): autoStart=true
     //      (the default) — import, select, stop-then-start the engine.
@@ -201,6 +222,7 @@ export const useApplyPipelineRoot = () => {
         // Reset the flag so the next fire — whatever origin — defaults
         // back to the apply=1 contract unless the caller opts out again.
         setDeepLinkApplyAutoStart(true);
+        setManualMode(!autoStart);
 
         setApplyErrorMessage('');
         setApplyPhase('init');
@@ -269,7 +291,14 @@ export const useApplyPipelineRoot = () => {
         setApplyErrorMessage('');
     };
 
-    return { applyPhase, applyErrorMessage, closeApplyModal };
+    // Manual-add renders the same 3-step modal but never kicks the engine;
+    // tell the user step 3 is their responsibility. Leave other steps and
+    // the "done" label as-is so the modal shell stays identical.
+    const stepLabels = manualMode
+        ? { start: t('dl_phase_start_manual') }
+        : undefined;
+
+    return { applyPhase, applyErrorMessage, closeApplyModal, stepLabels };
 };
 
 /**

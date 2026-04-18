@@ -301,6 +301,16 @@ export async function addSubscription(url: string, name: string | undefined) {
 
 // delete subscription by  identifier
 
+export async function renameSubscription(identifier: string, name: string): Promise<void> {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    const db = await getDataBaseInstance();
+    await db.execute(
+        'UPDATE subscriptions SET name = ? WHERE identifier = ?',
+        [trimmed, identifier]
+    );
+}
+
 export async function deleteSubscription(identifier: string) {
     try {
         const db = await getDataBaseInstance();

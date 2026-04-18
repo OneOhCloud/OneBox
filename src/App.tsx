@@ -274,7 +274,7 @@ function AppShell({
   isSettingsHovered: boolean;
   setIsSettingsHovered: (v: boolean) => void;
 }) {
-  const { applyPhase, applyErrorMessage, closeApplyModal } = useApplyPipelineRoot();
+  const { applyPhase, applyErrorMessage, closeApplyModal, stepLabels } = useApplyPipelineRoot();
 
   return (
     <>
@@ -327,6 +327,7 @@ function AppShell({
         phase={applyPhase ?? "init"}
         errorMessage={applyErrorMessage}
         onClose={closeApplyModal}
+        stepLabels={stepLabels}
       />
     </>
   );

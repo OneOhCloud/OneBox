@@ -113,12 +113,23 @@ export function useTheme() {
         };
     }, []);
 
-    // When pref is 'system', re-resolve on OS theme change so the UI tracks
-    // it without a restart.
+    // When pref is 'system', re-resolve on OS theme change AND poke the
+    // native chrome. CSS media queries are live (so --onebox-* tokens
+    // flip automatically), but:
+    //   - `resolved` in React state needs updating for consumers that
+    //     render based on it (e.g. the developer-page icon).
+    //   - `applyNativeChrome('system')` re-sends `null` to NSWindow.
+    //     Empirically, once an explicit appearance has been set on a
+    //     macOS window, switching back to nil + relying on the parent
+    //     NSApp doesn't always repaint the title bar on the next OS
+    //     toggle. Re-sending `nil` on each OS flip nudges it.
     useEffect(() => {
         if (pref !== 'system') return;
         const mq = window.matchMedia('(prefers-color-scheme: dark)');
-        const handler = () => setResolved(mq.matches ? 'dark' : 'light');
+        const handler = () => {
+            setResolved(mq.matches ? 'dark' : 'light');
+            applyNativeChrome('system');
+        };
         mq.addEventListener('change', handler);
         return () => mq.removeEventListener('change', handler);
     }, [pref]);

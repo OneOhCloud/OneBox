@@ -46,7 +46,7 @@ export default function DNSSettingsItem() {
     return (
         <>
             <SettingItem
-                icon={<HddRack className="w-5 h-5" style={{ color: 'var(--onebox-label-secondary)' }} />}
+                icon={<HddRack className="text-[#30B0C7]" size={22} />}
                 title={t("direct_dns_settings", "Direct DNS Settings")}
                 subTitle={t("open_direct_dns", "Open direct DNS settings")}
                 onPress={() => setIsOpen(true)}

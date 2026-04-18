@@ -45,6 +45,7 @@ export function SettingItem({
                 <div
                     className="text-[15px] tracking-[-0.005em] truncate capitalize"
                     style={{ color: 'var(--onebox-label)' }}
+                    title={title}
                 >
                     {title}
                 </div>
@@ -52,6 +53,7 @@ export function SettingItem({
                     <div
                         className="text-[12px] truncate mt-0.5"
                         style={{ color: 'var(--onebox-label-secondary)' }}
+                        title={subTitle}
                     >
                         {subTitle}
                     </div>
@@ -90,6 +92,7 @@ export function ToggleSetting({
                 <div
                     className="text-[15px] tracking-[-0.005em] truncate capitalize"
                     style={{ color: 'var(--onebox-label)' }}
+                    title={title}
                 >
                     {title}
                 </div>
@@ -97,6 +100,7 @@ export function ToggleSetting({
                     <div
                         className="text-[12px] truncate mt-0.5"
                         style={{ color: 'var(--onebox-label-secondary)' }}
+                        title={subTitle}
                     >
                         {subTitle}
                     </div>
