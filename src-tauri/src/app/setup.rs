@@ -19,7 +19,9 @@ const UPDATE_SUPPRESS_KEY: &str = "update_suppress_argv_deeplink_at";
 // Max age of the suppression marker. Set to 5 min: NSIS install + relaunch
 // finishes in seconds even on slow hardware, so anything older is a stale
 // residue from a failed update and must NOT keep suppressing deep links.
-#[cfg(any(windows, target_os = "linux"))]
+// Only consumed by the Windows/Linux cold-start path; silence dead_code on
+// macOS where the caller is cfg'd out entirely (still exercised by tests).
+#[cfg_attr(not(any(windows, target_os = "linux")), allow(dead_code))]
 const UPDATE_SUPPRESS_TTL_MS: u128 = 5 * 60 * 1000;
 
 /// App 初始化逻辑，对应 Builder::setup 闭包
@@ -118,10 +120,24 @@ pub fn app_setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>>
 /// - Only `markPendingUpdateRelaunch` (JS) ever WRITES this key.
 /// - This function ONLY reads + deletes — never rewrites.
 /// - Delete failure is non-fatal: TTL expiry will eventually free the flag.
+///
+/// Store-load note: `app.get_store()` only returns a handle if the store is
+/// already loaded. On post-update cold-start the webview hasn't initialised
+/// yet, so no JS code has touched the store in this process — `get_store`
+/// would return `None` and the suppression would silently no-op. `app.store()`
+/// loads from disk if needed (or returns the existing handle), which is the
+/// only API that makes this decision actually visible to Rust on cold-start.
 #[cfg(any(windows, target_os = "linux"))]
 fn should_suppress_argv_deeplink(app: &tauri::AppHandle) -> bool {
-    let Some(store) = app.get_store("settings.json") else {
-        return false;
+    let store = match app.store("settings.json") {
+        Ok(s) => s,
+        Err(e) => {
+            log::warn!(
+                "[update-suppress] failed to load settings.json, not suppressing: {}",
+                e
+            );
+            return false;
+        }
     };
     let raw = store.get(UPDATE_SUPPRESS_KEY);
     // Always try to clear — even if we decide NOT to suppress (stale marker),
@@ -129,19 +145,72 @@ fn should_suppress_argv_deeplink(app: &tauri::AppHandle) -> bool {
     let _ = store.delete(UPDATE_SUPPRESS_KEY);
     let _ = store.save();
 
-    let Some(value) = raw else {
-        return false;
-    };
-    let Some(at_ms) = value.get("at").and_then(|v| v.as_u64()) else {
-        return false;
-    };
     let now_ms = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_millis())
         .unwrap_or(0);
-    // Saturating subtraction handles wall-clock going backwards (NTP step).
-    let age = now_ms.saturating_sub(at_ms as u128);
-    age < UPDATE_SUPPRESS_TTL_MS
+    let decision = decide_suppress_argv_deeplink(raw.as_ref(), now_ms);
+    match &decision {
+        SuppressDecision::Missing => {
+            log::info!("[update-suppress] no marker present → not suppressing");
+        }
+        SuppressDecision::Malformed => {
+            log::warn!("[update-suppress] marker malformed (no u64 `at`) → not suppressing");
+        }
+        SuppressDecision::Expired { age_ms } => {
+            log::info!(
+                "[update-suppress] marker age={}ms ≥ ttl={}ms → not suppressing (stale residue)",
+                age_ms,
+                UPDATE_SUPPRESS_TTL_MS
+            );
+        }
+        SuppressDecision::Fresh { age_ms } => {
+            log::info!(
+                "[update-suppress] marker age={}ms < ttl={}ms → suppressing argv deep link",
+                age_ms,
+                UPDATE_SUPPRESS_TTL_MS
+            );
+        }
+    }
+    matches!(decision, SuppressDecision::Fresh { .. })
+}
+
+// Only consumed by the Windows/Linux cold-start path; silence dead_code on
+// macOS where the caller is cfg'd out entirely (still exercised by tests).
+#[cfg_attr(not(any(windows, target_os = "linux")), allow(dead_code))]
+#[derive(Debug, PartialEq, Eq)]
+enum SuppressDecision {
+    Missing,
+    Malformed,
+    Expired { age_ms: u128 },
+    Fresh { age_ms: u128 },
+}
+
+/// Pure decision helper extracted so it can be unit-tested without a
+/// `tauri::App` runtime. `raw` is the deserialised value at
+/// `UPDATE_SUPPRESS_KEY` (or `None` if absent); `now_ms` is the current
+/// UNIX-epoch millisecond count.
+// Only consumed by the Windows/Linux cold-start path; silence dead_code on
+// macOS where the caller is cfg'd out entirely (still exercised by tests).
+#[cfg_attr(not(any(windows, target_os = "linux")), allow(dead_code))]
+fn decide_suppress_argv_deeplink(
+    raw: Option<&serde_json::Value>,
+    now_ms: u128,
+) -> SuppressDecision {
+    let Some(value) = raw else {
+        return SuppressDecision::Missing;
+    };
+    let Some(at_ms) = value.get("at").and_then(|v| v.as_u64()) else {
+        return SuppressDecision::Malformed;
+    };
+    // Saturating subtraction handles wall-clock going backwards (NTP step)
+    // and the rare case where the marker timestamp is slightly in the future.
+    let age_ms = now_ms.saturating_sub(at_ms as u128);
+    if age_ms < UPDATE_SUPPRESS_TTL_MS {
+        SuppressDecision::Fresh { age_ms }
+    } else {
+        SuppressDecision::Expired { age_ms }
+    }
 }
 
 // ── Deep Link ──────────────────────────────────────────────────────
@@ -374,4 +443,91 @@ fn handle_will_power_off() {
     log::info!("[lifecycle] received WillPowerOff event");
     cleanup_on_shutdown();
     log::info!("System proxy unset on power off");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn decide_suppress_missing_marker() {
+        assert_eq!(
+            decide_suppress_argv_deeplink(None, 1_700_000_000_000),
+            SuppressDecision::Missing
+        );
+    }
+
+    #[test]
+    fn decide_suppress_malformed_marker_no_at_field() {
+        let v = json!({ "foo": 1 });
+        assert_eq!(
+            decide_suppress_argv_deeplink(Some(&v), 1_700_000_000_000),
+            SuppressDecision::Malformed
+        );
+    }
+
+    #[test]
+    fn decide_suppress_malformed_marker_wrong_type() {
+        let v = json!({ "at": "not-a-number" });
+        assert_eq!(
+            decide_suppress_argv_deeplink(Some(&v), 1_700_000_000_000),
+            SuppressDecision::Malformed
+        );
+    }
+
+    #[test]
+    fn decide_suppress_fresh_marker_within_ttl() {
+        // 30s old — well within the 5-minute TTL.
+        let at_ms: u64 = 1_700_000_000_000;
+        let now_ms: u128 = at_ms as u128 + 30_000;
+        let v = json!({ "at": at_ms });
+        assert_eq!(
+            decide_suppress_argv_deeplink(Some(&v), now_ms),
+            SuppressDecision::Fresh { age_ms: 30_000 }
+        );
+    }
+
+    #[test]
+    fn decide_suppress_expired_marker_beyond_ttl() {
+        // 10 minutes old — twice the TTL; must NOT suppress.
+        let at_ms: u64 = 1_700_000_000_000;
+        let now_ms: u128 = at_ms as u128 + 10 * 60 * 1000;
+        let v = json!({ "at": at_ms });
+        assert_eq!(
+            decide_suppress_argv_deeplink(Some(&v), now_ms),
+            SuppressDecision::Expired {
+                age_ms: 10 * 60 * 1000
+            }
+        );
+    }
+
+    #[test]
+    fn decide_suppress_ttl_boundary_is_exclusive() {
+        // age == TTL → already expired (the `<` in the decision is intentional).
+        let at_ms: u64 = 1_700_000_000_000;
+        let now_ms: u128 = at_ms as u128 + UPDATE_SUPPRESS_TTL_MS;
+        let v = json!({ "at": at_ms });
+        assert_eq!(
+            decide_suppress_argv_deeplink(Some(&v), now_ms),
+            SuppressDecision::Expired {
+                age_ms: UPDATE_SUPPRESS_TTL_MS
+            }
+        );
+    }
+
+    #[test]
+    fn decide_suppress_clock_went_backwards() {
+        // Marker timestamp sits in the "future" vs. now (NTP step after write).
+        // Saturating subtraction clamps the age to 0, so the marker is treated
+        // as fresh — preferring a false positive (one suppressed deep link)
+        // over a false negative (re-import after update).
+        let at_ms: u64 = 1_700_000_000_000;
+        let now_ms: u128 = at_ms as u128 - 1_000;
+        let v = json!({ "at": at_ms });
+        assert_eq!(
+            decide_suppress_argv_deeplink(Some(&v), now_ms),
+            SuppressDecision::Fresh { age_ms: 0 }
+        );
+    }
 }

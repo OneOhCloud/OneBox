@@ -10,6 +10,29 @@
 - Rust side, in the cold-start Windows/Linux argv branch of `app/setup.rs`, reads + `delete`s the key (both best-effort). If the read returned a timestamp within `UPDATE_SUPPRESS_TTL_MS` of now, the argv-carried deep link is discarded. Otherwise it's processed normally.
 - TTL is 5 minutes. NSIS install → relaunch finishes in seconds in practice, so the TTL is a safety net for the "install crashed after writing the marker but before relaunching" scenario.
 
+### Store-load pitfall (historical)
+
+`tauri-plugin-store` exposes two readers: `app.get_store(path)` returns `Some` **only if the store is already loaded** into the in-process collection; `app.store(path)` loads from disk on first call. On a post-update cold-start the webview hasn't initialised yet, so no JS has touched the store — `get_store` returns `None` and the suppression silently no-ops. The marker on disk is ignored and the NSIS-replayed argv URL re-imports. The reader MUST be `app.store("settings.json")`. Loading the file is still a pure read with respect to `UPDATE_SUPPRESS_KEY` — the closed-write-path invariant is about *writing the key*, not about whether the backing file materialises.
+
+### Triage markers
+
+Every cold-start decision emits one `[update-suppress]` info line with the branch taken, so failures are greppable without re-reading source:
+
+- `[update-suppress] no marker present → not suppressing` — JS never wrote the marker (user launched via a genuine deep-link click, or the update path didn't call `markPendingUpdateRelaunch`).
+- `[update-suppress] marker age={N}ms < ttl=300000ms → suppressing argv deep link` — normal successful suppression.
+- `[update-suppress] marker age={N}ms ≥ ttl=300000ms → not suppressing (stale residue)` — marker is older than the TTL; treated as residue from a failed install and cleared. Deep link processed normally.
+- `[update-suppress] marker malformed (no u64 \`at\`) → not suppressing` — write path wrote a shape we don't recognise; investigate `markPendingUpdateRelaunch`.
+- `[update-suppress] failed to load settings.json, not suppressing: …` — disk/permissions issue; after this line the re-import will fire.
+
+Triage recipe for "deep link re-imports after update":
+
+| Symptom | grep | Meaning |
+|---|---|---|
+| No `[update-suppress]` at all on cold-start | `grep '\[update-suppress\]' OneBox.log` | The cold-start `get_current` branch didn't fire — argv URL wasn't captured. Check `Cold-start deep link config data` / the plugin-init argv path. |
+| `no marker present` | — | JS never wrote the marker. Check the update call path in `updater.tsx` / `updater-button.tsx` did call `markPendingUpdateRelaunch` (must be awaited before `install()`). |
+| `marker age ≥ ttl` | — | Install took > 5 min, or the marker survived across an unrelated restart. Investigate the delta between marker write and cold-start timestamp. |
+| `failed to load settings.json` | — | Store file path resolution / permissions. Check `resolve_store_path` behaviour in the plugin. |
+
 ## Critical invariants
 
 Breaking either one makes the suppression mechanism silently wrong:
@@ -26,4 +49,4 @@ macOS deep links don't go through argv — they're delivered via the Cocoa `appl
 - `src/types/definition.ts` — `UPDATE_SUPPRESS_ARGV_DEEPLINK_AT_KEY` constant.
 - `src/utils/update.ts` — `markPendingUpdateRelaunch`.
 - `src/components/settings/updater.tsx`, `src/components/settings/updater-button.tsx` — call sites (always immediately before `updateInfo.install()`).
-- `src-tauri/src/app/setup.rs` — `should_suppress_argv_deeplink`, `UPDATE_SUPPRESS_KEY`, `UPDATE_SUPPRESS_TTL_MS`, call site inside the cold-start `get_current` branch.
+- `src-tauri/src/app/setup.rs` — `should_suppress_argv_deeplink` (impure, touches the store), `decide_suppress_argv_deeplink` (pure helper, unit-tested), `SuppressDecision`, `UPDATE_SUPPRESS_KEY`, `UPDATE_SUPPRESS_TTL_MS`, call site inside the cold-start `get_current` branch.
