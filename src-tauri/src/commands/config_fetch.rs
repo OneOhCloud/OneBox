@@ -10,6 +10,7 @@
 
 use std::collections::HashMap;
 use std::net::{IpAddr, SocketAddr};
+use std::time::Instant;
 
 use tauri::{AppHandle, Manager};
 use tauri_plugin_http::reqwest;
@@ -142,12 +143,23 @@ pub async fn fetch_config_with_optimal_dns(
 ) -> Result<FetchConfigResponse, String> {
     use crate::app::state::AppData;
 
+    // Total wall-clock timer spans the entire command; intermediate timers
+    // bracket each phase so the log reveals which step dominates.
+    let t_total = Instant::now();
+
     let parsed_url = Url::parse(&url).map_err(|e| e.to_string())?;
     let hostname = parsed_url
         .host_str()
         .ok_or("missing host in URL")?
         .to_string();
     let port = parsed_url.port_or_known_default().unwrap_or(443);
+
+    log::info!(
+        "[CONFIG_LOAD] 开始请求 URL={} host={} port={}",
+        url,
+        hostname,
+        port
+    );
 
     // Verification failure only disables the accelerator fallback; the
     // primary request is always attempted regardless of the outcome.
@@ -163,35 +175,52 @@ pub async fn fetch_config_with_optimal_dns(
 
     // Build primary client with optimal DNS — use the cached value while
     // sing-box is running (probing through the proxy would misrank).
+    let t_dns_probe = Instant::now();
     let app_data = app.state::<AppData>();
-    let dns_server = {
+    let (dns_server, dns_source) = {
         let running = crate::core::is_running(app.clone(), app_data.get_clash_secret().unwrap()).await;
         if running {
-            app_data.get_cached_dns()
+            match app_data.get_cached_dns() {
+                Some(d) => (d, "cached"),
+                None => {
+                    let best = get_best_dns_server()
+                        .await
+                        .unwrap_or_else(|| "223.5.5.5".to_string());
+                    app_data.set_cached_dns(Some(best.clone()));
+                    (best, "probed")
+                }
+            }
         } else {
-            None
-        }
-    };
-    let dns_server = match dns_server {
-        Some(d) => d,
-        None => {
             let best = get_best_dns_server()
                 .await
                 .unwrap_or_else(|| "223.5.5.5".to_string());
             app_data.set_cached_dns(Some(best.clone()));
-            best
+            (best, "probed")
         }
     };
+    log::info!(
+        "[CONFIG_LOAD] DNS服务器选择 source={} server={} elapsed={}ms",
+        dns_source,
+        dns_server,
+        t_dns_probe.elapsed().as_millis()
+    );
 
     let client_builder = reqwest::ClientBuilder::new()
         .timeout(std::time::Duration::from_secs(30))
         .no_proxy();
 
+    let t_resolve = Instant::now();
     let primary_client = if !is_ip_address(&hostname) {
         match resolve_a_record(&hostname, &dns_server).await {
             Some(ip) => {
                 let addr = SocketAddr::new(IpAddr::V4(ip), port);
-                log::info!("Resolved {} -> {} via DNS {}", hostname, ip, dns_server);
+                log::info!(
+                    "[CONFIG_LOAD] A记录解析成功 {} -> {} via DNS {} elapsed={}ms",
+                    hostname,
+                    ip,
+                    dns_server,
+                    t_resolve.elapsed().as_millis()
+                );
                 client_builder
                     .resolve(&hostname, addr)
                     .build()
@@ -199,9 +228,10 @@ pub async fn fetch_config_with_optimal_dns(
             }
             None => {
                 log::warn!(
-                    "DNS resolution failed for {} via {}, falling back to system DNS",
+                    "[CONFIG_LOAD] A记录解析失败 {} via {} elapsed={}ms, 回退系统DNS",
                     hostname,
-                    dns_server
+                    dns_server,
+                    t_resolve.elapsed().as_millis()
                 );
                 client_builder.build().map_err(|e| e.to_string())?
             }
@@ -210,6 +240,7 @@ pub async fn fetch_config_with_optimal_dns(
         client_builder.build().map_err(|e| e.to_string())?
     };
 
+    let t_primary = Instant::now();
     match primary_client
         .get(&url)
         .header("User-Agent", &user_agent)
@@ -217,8 +248,10 @@ pub async fn fetch_config_with_optimal_dns(
         .await
     {
         Ok(response) => {
+            let t_headers = t_primary.elapsed();
             let status = response.status().as_u16();
             let headers = collect_headers(response.headers());
+            let t_body = Instant::now();
             let data = if status == 200 {
                 response
                     .bytes()
@@ -228,7 +261,14 @@ pub async fn fetch_config_with_optimal_dns(
             } else {
                 None
             };
-            log::info!("[CONFIG_LOAD] 方式=PRIMARY, URL={}", url);
+            log::info!(
+                "[CONFIG_LOAD] 方式=PRIMARY status={} headers_elapsed={}ms body_elapsed={}ms total_elapsed={}ms URL={}",
+                status,
+                t_headers.as_millis(),
+                t_body.elapsed().as_millis(),
+                t_total.elapsed().as_millis(),
+                url
+            );
             Ok(FetchConfigResponse {
                 data,
                 headers,
@@ -236,12 +276,18 @@ pub async fn fetch_config_with_optimal_dns(
             })
         }
         Err(primary_err) if primary_err.is_connect() || primary_err.is_timeout() => {
+            let primary_elapsed = t_primary.elapsed().as_millis();
             let primary_reason = if primary_err.is_timeout() {
                 "TIMEOUT".to_string()
             } else {
                 format!("CONNECT_ERROR({})", primary_err)
             };
-            log::warn!("[CONFIG_LOAD] 主地址失败: {}, URL={}", primary_reason, url);
+            log::warn!(
+                "[CONFIG_LOAD] 主地址失败 reason={} primary_elapsed={}ms URL={}",
+                primary_reason,
+                primary_elapsed,
+                url
+            );
 
             // Three conditions must all hold for the fallback:
             // accelerator URL compiled in, domain verification passed,
@@ -287,6 +333,7 @@ pub async fn fetch_config_with_optimal_dns(
                 .build()
                 .map_err(|e| e.to_string())?;
 
+            let t_fallback = Instant::now();
             match fallback_client
                 .get(&accelerated_url)
                 .header("User-Agent", &user_agent)
@@ -294,8 +341,10 @@ pub async fn fetch_config_with_optimal_dns(
                 .await
             {
                 Ok(response) => {
+                    let t_headers = t_fallback.elapsed();
                     let status = response.status().as_u16();
                     let headers = collect_headers(response.headers());
+                    let t_body = Instant::now();
                     if status == 200 {
                         let data = response
                             .bytes()
@@ -303,8 +352,12 @@ pub async fn fetch_config_with_optimal_dns(
                             .ok()
                             .and_then(|b| serde_json::from_slice(&b).ok());
                         log::info!(
-                            "[CONFIG_LOAD] 方式=FALLBACK_ACCELERATOR, 原因={}, 加速URL={}",
+                            "[CONFIG_LOAD] 方式=FALLBACK_ACCELERATOR status={} primary_reason={} headers_elapsed={}ms body_elapsed={}ms total_elapsed={}ms 加速URL={}",
+                            status,
                             primary_reason,
+                            t_headers.as_millis(),
+                            t_body.elapsed().as_millis(),
+                            t_total.elapsed().as_millis(),
                             accelerated_url
                         );
                         Ok(FetchConfigResponse {
@@ -314,9 +367,11 @@ pub async fn fetch_config_with_optimal_dns(
                         })
                     } else {
                         log::warn!(
-                            "[CONFIG_LOAD] 方式=BOTH_FAILED, 主地址原因={}, 加速地址原因=HTTP_{}",
+                            "[CONFIG_LOAD] 方式=BOTH_FAILED 主地址原因={} 加速地址原因=HTTP_{} fallback_elapsed={}ms total_elapsed={}ms",
                             primary_reason,
-                            status
+                            status,
+                            t_headers.as_millis(),
+                            t_total.elapsed().as_millis()
                         );
                         Ok(FetchConfigResponse {
                             data: None,
@@ -332,9 +387,11 @@ pub async fn fetch_config_with_optimal_dns(
                         format!("CONNECT_ERROR({})", acc_err)
                     };
                     log::error!(
-                        "[CONFIG_LOAD] 方式=BOTH_FAILED, 主地址原因={}, 加速地址原因={}",
+                        "[CONFIG_LOAD] 方式=BOTH_FAILED 主地址原因={} 加速地址原因={} fallback_elapsed={}ms total_elapsed={}ms",
                         primary_reason,
-                        acc_reason
+                        acc_reason,
+                        t_fallback.elapsed().as_millis(),
+                        t_total.elapsed().as_millis()
                     );
                     Err(format!(
                         "[CONFIG_LOAD] BOTH_FAILED: primary={}, accelerator={}",

@@ -193,10 +193,21 @@ export function insertSubscription(url: string, name?: string): Promise<string |
 }
 
 async function _insertSubscription(url: string, name?: string): Promise<string | undefined> {
+    // Timings bracket each phase so the renderer log reveals whether the
+    // dominant cost is the network fetch (Rust reqwest, see
+    // `fetch_config_with_optimal_dns`), the DB upsert, or JSON parsing.
+    const tTotal = performance.now();
     try {
+        const tFetch = performance.now();
         const response = await fetchConfigContent(url);
-        if (response.status !== 200) return undefined;
+        const fetchMs = Math.round(performance.now() - tFetch);
+        console.info(`[import] fetch done status=${response.status} elapsed=${fetchMs}ms url=${url}`);
+        if (response.status !== 200) {
+            console.warn(`[import] abort non-200 status=${response.status} url=${url}`);
+            return undefined;
+        }
 
+        const tDb = performance.now();
         const db = await getDataBaseInstance();
         const resolvedName = (!name || name === '默认配置')
             ? getRemoteNameByContentDisposition(response.headers['content-disposition'] || '') || '配置'
@@ -223,6 +234,8 @@ async function _insertSubscription(url: string, name?: string): Promise<string |
                 'UPDATE subscription_configs SET config_content = ? WHERE identifier = ?',
                 [JSON.stringify(response.data), identifier]
             );
+            const dbMs = Math.round(performance.now() - tDb);
+            console.info(`[import] db update elapsed=${dbMs}ms total=${Math.round(performance.now() - tTotal)}ms identifier=${identifier}`);
             return identifier;
         }
 
@@ -239,8 +252,11 @@ async function _insertSubscription(url: string, name?: string): Promise<string |
             'INSERT INTO subscription_configs (identifier, config_content) VALUES (?, ?)',
             [identifier, JSON.stringify(response.data)]
         );
+        const dbMs = Math.round(performance.now() - tDb);
+        console.info(`[import] db insert elapsed=${dbMs}ms total=${Math.round(performance.now() - tTotal)}ms identifier=${identifier}`);
         return identifier;
-    } catch {
+    } catch (err) {
+        console.error(`[import] error total=${Math.round(performance.now() - tTotal)}ms err=${err instanceof Error ? err.message : String(err)} url=${url}`);
         return undefined;
     }
 }

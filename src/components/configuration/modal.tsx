@@ -1,20 +1,16 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { useState } from "react";
+import { Plus } from "react-bootstrap-icons";
 import {
-    CheckCircleFill,
-    CloudArrowDownFill,
-    ExclamationTriangleFill,
-    InfoCircleFill,
-    Plus,
-    XCircleFill,
-} from "react-bootstrap-icons";
-import {
-    MessageType,
     ValidationErrors,
     useModalState,
 } from "../../action/modal-state-hook";
 import { t } from "../../utils/helper";
 import { IOSTextField } from "../common/ios-text-field";
+import {
+    DeepLinkApplyPhase,
+    DeepLinkApplyProgressModal,
+} from "../home/deep-link-apply-progress-modal";
 
 // ---- Form step ---------------------------------------------------------
 
@@ -83,101 +79,6 @@ const FormStep: React.FC<FormStepProps> = ({
     </>
 );
 
-// ---- Loading step ------------------------------------------------------
-
-const LoadingStep: React.FC = () => (
-    <div className="flex flex-col items-center justify-center py-8 px-5">
-        <div
-            className="size-11 rounded-[12px] flex items-center justify-center mb-3"
-            style={{ background: "rgba(0, 122, 255, 0.1)" }}
-        >
-            <CloudArrowDownFill
-                size={22}
-                style={{ color: "var(--onebox-blue)" }}
-            />
-        </div>
-        <div
-            className="text-[14px] font-medium tracking-[-0.005em]"
-            style={{ color: "var(--onebox-label)" }}
-        >
-            {t("adding_subscription")}
-        </div>
-    </div>
-);
-
-// ---- Result step -------------------------------------------------------
-
-interface ResultStepProps {
-    message: string;
-    messageType: MessageType;
-    onClose: () => void;
-}
-
-const ResultStep: React.FC<ResultStepProps> = ({
-    message,
-    messageType,
-    onClose,
-}) => {
-    const config = (() => {
-        switch (messageType) {
-            case "success":
-                return {
-                    Icon: CheckCircleFill,
-                    color: "#34C759",
-                    bg: "rgba(52, 199, 89, 0.12)",
-                };
-            case "error":
-                return {
-                    Icon: XCircleFill,
-                    color: "#FF3B30",
-                    bg: "rgba(255, 59, 48, 0.1)",
-                };
-            case "warning":
-                return {
-                    Icon: ExclamationTriangleFill,
-                    color: "#FF9500",
-                    bg: "rgba(255, 149, 0, 0.1)",
-                };
-            default:
-                return {
-                    Icon: InfoCircleFill,
-                    color: "var(--onebox-blue)",
-                    bg: "rgba(0, 122, 255, 0.1)",
-                };
-        }
-    })();
-    const { Icon, color, bg } = config;
-
-    return (
-        <>
-            <div className="flex flex-col items-center py-6 px-5">
-                <div
-                    className="size-11 rounded-[12px] flex items-center justify-center mb-3"
-                    style={{ background: bg }}
-                >
-                    <Icon size={22} style={{ color }} />
-                </div>
-                <p
-                    className="text-[14px] font-medium text-center leading-snug tracking-[-0.005em]"
-                    style={{ color: "var(--onebox-label)" }}
-                >
-                    {message}
-                </p>
-            </div>
-            <button
-                className="w-full h-11 text-[14px] font-semibold transition-colors active:bg-[rgba(0,122,255,0.08)]"
-                style={{
-                    color: "var(--onebox-blue)",
-                    borderTop: "0.5px solid var(--onebox-separator)",
-                }}
-                onClick={onClose}
-            >
-                {t("close")}
-            </button>
-        </>
-    );
-};
-
 // ---- Trigger + dialog --------------------------------------------------
 
 /**
@@ -203,40 +104,49 @@ export function useSubscriptionModalController() {
         submit,
     } = useModalState();
 
+    const showForm = open && step === "form";
+    const showProgress = open && step !== "form";
+    const progressPhase: DeepLinkApplyPhase =
+        step === "loading"
+            ? "import"
+            : messageType === "success"
+                ? "done"
+                : "error";
+
     const ModalElement = (
-        <AnimatePresence>
-            {open && (
-                <motion.div
-                    className="fixed inset-0 z-50 flex items-center justify-center px-4"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.18 }}
-                >
-                    <div
-                        className="absolute inset-0"
-                        style={{
-                            background: "rgba(15, 23, 42, 0.38)",
-                            backdropFilter: "blur(6px)",
-                            WebkitBackdropFilter: "blur(6px)",
-                        }}
-                        onClick={closeModal}
-                    />
+        <>
+            <AnimatePresence>
+                {showForm && (
                     <motion.div
-                        className="relative w-full max-w-[290px] bg-white rounded-[14px] overflow-hidden"
-                        style={{
-                            boxShadow:
-                                "0 22px 48px -12px rgba(15, 23, 42, 0.3), 0 4px 14px rgba(15, 23, 42, 0.08)",
-                        }}
-                        initial={{ scale: 0.92, y: 8 }}
-                        animate={{ scale: 1, y: 0 }}
-                        exit={{ scale: 0.94, y: 4 }}
-                        transition={{
-                            duration: 0.22,
-                            ease: [0.32, 0.72, 0, 1],
-                        }}
+                        className="fixed inset-0 z-50 flex items-center justify-center px-4"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.18 }}
                     >
-                        {step === "form" && (
+                        <div
+                            className="absolute inset-0"
+                            style={{
+                                background: "rgba(15, 23, 42, 0.38)",
+                                backdropFilter: "blur(6px)",
+                                WebkitBackdropFilter: "blur(6px)",
+                            }}
+                            onClick={closeModal}
+                        />
+                        <motion.div
+                            className="relative w-full max-w-[290px] bg-white rounded-[14px] overflow-hidden"
+                            style={{
+                                boxShadow:
+                                    "0 22px 48px -12px rgba(15, 23, 42, 0.3), 0 4px 14px rgba(15, 23, 42, 0.08)",
+                            }}
+                            initial={{ scale: 0.92, y: 8 }}
+                            animate={{ scale: 1, y: 0 }}
+                            exit={{ scale: 0.94, y: 4 }}
+                            transition={{
+                                duration: 0.22,
+                                ease: [0.32, 0.72, 0, 1],
+                            }}
+                        >
                             <FormStep
                                 name={name}
                                 url={url}
@@ -246,19 +156,28 @@ export function useSubscriptionModalController() {
                                 onClose={closeModal}
                                 onAdd={submit}
                             />
-                        )}
-                        {step === "loading" && <LoadingStep />}
-                        {step === "result" && (
-                            <ResultStep
-                                message={message}
-                                messageType={messageType}
-                                onClose={closeModal}
-                            />
-                        )}
+                        </motion.div>
                     </motion.div>
-                </motion.div>
-            )}
-        </AnimatePresence>
+                )}
+            </AnimatePresence>
+            <DeepLinkApplyProgressModal
+                visible={showProgress}
+                phase={progressPhase}
+                errorMessage={
+                    progressPhase === "error" && message ? message : undefined
+                }
+                onClose={closeModal}
+                steps={["import"]}
+                titleLabels={{
+                    running: t("adding_subscription"),
+                    error: t("add_subscription_failed"),
+                }}
+                stepLabels={{
+                    import: t("dl_phase_import"),
+                    done: t("add_subscription_success"),
+                }}
+            />
+        </>
     );
 
     return { openModal: () => openModal(), ModalElement };

@@ -5,18 +5,24 @@ import { t } from '../../utils/helper';
 
 export type DeepLinkApplyPhase = 'init' | 'import' | 'start' | 'done' | 'error';
 
+type StepKey = 'init' | 'import' | 'start';
+
 export interface DeepLinkApplyProgressModalProps {
     visible: boolean;
     phase: DeepLinkApplyPhase;
     errorMessage?: string;
     onClose?: () => void;
-    stepLabels?: Partial<Record<'init' | 'import' | 'start' | 'done', string>>;
+    stepLabels?: Partial<Record<StepKey | 'done', string>>;
+    // Which steps to render. Default = full apply=1 3-step flow.
+    // Manual-add passes `['import']` so only one step (no rail) renders.
+    steps?: readonly StepKey[];
+    // Title overrides. `done` still uses stepLabels.done.
+    titleLabels?: { running?: string; error?: string };
 }
 
-type StepKey = 'init' | 'import' | 'start';
 type StepState = 'idle' | 'active' | 'done' | 'error';
 
-const STEP_KEYS: readonly StepKey[] = ['init', 'import', 'start'];
+const DEFAULT_STEPS: readonly StepKey[] = ['init', 'import', 'start'];
 
 // Vertical distance between step-circle centres. With h-[38px] rows, the
 // rail segment between two circles is 38 - circle_size = 38 - 20 = 18.
@@ -24,14 +30,10 @@ const STEP_ROW_HEIGHT_PX = 38;
 const CIRCLE_SIZE_PX = 20;
 const RAIL_SEGMENT_PX = STEP_ROW_HEIGHT_PX - CIRCLE_SIZE_PX;
 
-function phaseToIndex(phase: DeepLinkApplyPhase): number {
-    switch (phase) {
-        case 'init': return 0;
-        case 'import': return 1;
-        case 'start': return 2;
-        case 'done': return STEP_KEYS.length;
-        default: return -1;
-    }
+function phaseToIndex(phase: DeepLinkApplyPhase, stepKeys: readonly StepKey[]): number {
+    if (phase === 'done') return stepKeys.length;
+    const idx = stepKeys.indexOf(phase as StepKey);
+    return idx; // -1 for 'error' is fine — lastRunningIdxRef preserves the last valid step
 }
 
 function resolveStepState(
@@ -208,16 +210,20 @@ export function DeepLinkApplyProgressModal({
     errorMessage,
     onClose,
     stepLabels,
+    steps,
+    titleLabels,
 }: DeepLinkApplyProgressModalProps) {
+    const stepKeys = steps ?? DEFAULT_STEPS;
+
     // Remember the last running step so 'error' paints the correct step red.
     const lastRunningIdxRef = useRef(0);
     useEffect(() => {
-        const idx = phaseToIndex(phase);
-        if (idx >= 0 && idx < STEP_KEYS.length) lastRunningIdxRef.current = idx;
-    }, [phase]);
+        const idx = phaseToIndex(phase, stepKeys);
+        if (idx >= 0 && idx < stepKeys.length) lastRunningIdxRef.current = idx;
+    }, [phase, stepKeys]);
 
     const activeIdx =
-        phase === 'error' ? lastRunningIdxRef.current : phaseToIndex(phase);
+        phase === 'error' ? lastRunningIdxRef.current : phaseToIndex(phase, stepKeys);
     const isError = phase === 'error';
     const isDone = phase === 'done';
     const isRunning = !isError && !isDone;
@@ -226,10 +232,10 @@ export function DeepLinkApplyProgressModal({
         stepLabels?.[k] ?? t(`dl_phase_${k}`);
 
     const titleText = isError
-        ? t('connect_failed', 'Connection failed')
+        ? (titleLabels?.error ?? t('connect_failed', 'Connection failed'))
         : isDone
             ? labelFor('done')
-            : t('dl_phase_title', 'Applying configuration');
+            : (titleLabels?.running ?? t('dl_phase_title', 'Applying configuration'));
 
     return (
         <AnimatePresence>
@@ -251,7 +257,7 @@ export function DeepLinkApplyProgressModal({
                         }}
                     />
                     <motion.div
-                        className="relative w-full max-w-[290px] bg-white rounded-[14px] overflow-hidden"
+                        className="relative w-full max-w-72.5 bg-white rounded-[14px] overflow-hidden"
                         style={{
                             boxShadow:
                                 '0 22px 48px -12px rgba(15, 23, 42, 0.3), 0 4px 14px rgba(15, 23, 42, 0.08)',
@@ -265,7 +271,7 @@ export function DeepLinkApplyProgressModal({
                             {/* State chip — only when terminal */}
                             {(isError || isDone) && (
                                 <div
-                                    className="size-11 rounded-[12px] flex items-center justify-center mx-auto mb-3"
+                                    className="size-11 rounded-xl flex items-center justify-center mx-auto mb-3"
                                     style={{
                                         background: isError
                                             ? 'rgba(255, 59, 48, 0.1)'
@@ -294,7 +300,7 @@ export function DeepLinkApplyProgressModal({
                             </h3>
 
                             <ol className="relative m-0 p-0 pl-1">
-                                {STEP_KEYS.map((key, i) => {
+                                {stepKeys.map((key, i) => {
                                     const state = resolveStepState(
                                         i,
                                         activeIdx,
@@ -315,7 +321,7 @@ export function DeepLinkApplyProgressModal({
                                             key={key}
                                             label={labelFor(key)}
                                             state={state}
-                                            isLast={i === STEP_KEYS.length - 1}
+                                            isLast={i === stepKeys.length - 1}
                                             railFillPercent={railFill}
                                         />
                                     );
