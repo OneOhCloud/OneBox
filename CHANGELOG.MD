@@ -26,6 +26,7 @@ All significant changes in this version are documented here.
 ### 🐛 Bug Fixes
 
 - Fixed an issue where installing an app update could trigger a duplicate import of a previously applied configuration on next launch
+- Fixed an issue where network authentication pages could fail to load after switching Wi-Fi networks
 
 
 
@@ -49,6 +50,12 @@ All significant changes in this version are documented here.
 - 手动添加配置的加载界面与链接导入保持一致，完成后停留在当前页面，且不再自动启动服务
 - 配置页的按钮文案长度对齐，详情页的复制操作文案也同步精简
 - 通过链接自动应用配置前，会先校验来源是否可信
+
+
+### 🐛 Bug 修复
+
+- 修复安装应用更新后可能在下次启动时触发重复导入此前已应用配置的问题
+- 修复切换 Wi-Fi 后可能无法打开网络认证页面的问题
 
 
 
