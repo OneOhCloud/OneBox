@@ -1,6 +1,6 @@
 # Update-driven relaunch: deep-link argv suppression
 
-> OneBox subsystem deep-dive. Extracted from the project `CLAUDE.md`. Read when touching `src-tauri/src/app/setup.rs` deep-link handling, `src/components/settings/updater*.tsx`, or `src/utils/update.ts`. Paths are repo-relative; if anything here disagrees with the code, trust the code and update this file.
+> **Claude-facing, not human-facing.** Optimised for Claude execution; see [`README.md`](README.md) for directory-wide conventions (preamble shape, `Do not X` framing, file:line style). Read when touching `src-tauri/src/app/setup.rs` deep-link handling, `src/components/settings/updater*.tsx`, or `src/utils/update.ts`. Paths are repo-relative; if anything here disagrees with the code, trust the code and update this file.
 
 `tauri-plugin-updater` on Windows (NSIS) and on macOS/Linux (via `tauri::process::restart`) forwards the current process's `argv` to the freshly-installed binary when it relaunches. Concretely, the NSIS installer is invoked with `/ARGS <original-argv>` so the new exe boots with the same command line as the one being replaced. `tauri-plugin-deep-link::handle_cli_arguments` runs at plugin-init time on Windows/Linux and populates its `current` URL slot from argv — so an app originally launched via `onebox-networktools://config?...&apply=1` will see the URL back in argv on every update-relaunch. Without a guard, the post-update cold-start path in `app/setup.rs` re-imports + re-applies the original payload.
 

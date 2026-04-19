@@ -1,6 +1,6 @@
 # Config Template Loading Flow
 
-> OneBox subsystem deep-dive. Extracted from the project `CLAUDE.md`. Read when editing template JSONC, bumping sing-box versions, changing the cache shape, or debugging "remote has it but built-in doesn't" (or vice versa). Touches `scripts/sync-templates.ts`, `src/config/**`, `src/hooks/useSwr.ts`, `src/single/store.ts`. Paths are repo-relative; if anything here disagrees with the code, trust the code and update this file.
+> **Claude-facing, not human-facing.** Optimised for Claude execution; see [`README.md`](README.md) for directory-wide conventions (preamble shape, `Do not X` framing, file:line style). Read when editing template JSONC, bumping sing-box versions, changing the cache shape, or debugging "remote has it but built-in doesn't" (or vice versa). Touches `scripts/sync-templates.ts`, `src/config/**`, `src/hooks/useSwr.ts`, `src/single/store.ts`. Paths are repo-relative; if anything here disagrees with the code, trust the code and update this file.
 
 Core principle: **there is one source of truth — the `conf-template` repo — and every template OneBox ever uses traces back to it**. Both the built-in fallback (baked at build time) and the live-fetched runtime cache (refreshed by SWR) are snapshots of the same upstream files. They can never disagree in shape, only in freshness.
 
@@ -109,6 +109,17 @@ src/config/templates/generated.ts   tauri-plugin-store v2 cache
 - Any `-template-path` override whose value points at a stale URL (e.g. `conf/1.13/zh-cn/` post-1.13.8) → delete the override **and** the sibling v2 content cache (which was poisoned by the stale URL). `getDefaultConfigTemplateURL` will then resolve to the migrated path.
 
 Purge + prime run in parallel at mount. Order doesn't matter: if purge wipes a poisoned v2 cache, prime repopulates it from the new default URL; if prime lands first, purge detects the stale-override signature and still wipes it, and the next prime cycle re-seeds.
+
+## What we deliberately DON'T do
+
+- **Do not hand-edit `src/config/templates/generated.ts`.** It is `.gitignore`d and regenerated from `conf-template` by `scripts/sync-templates.ts` on every `predev` / `prebuild` hook and in the CI "Sync config templates" step. Any hand edit will be overwritten on the next dev/build and will silently diverge from upstream in the meantime.
+- **Do not bake built-in templates as JSON-string literals embedded in TS.** Prior design did this and introduced double-escaping bugs on any unusual character. The generator now emits real TypeScript object literals (`export const X = { ... } as const`) so `tsc` catches malformed JSON at build time. If you find yourself reaching for `JSON.stringify` inside `sync-templates.ts`, you are re-introducing the bug class — the stringification must happen only on the cache-write path in `templates/index.ts::getBuiltInTemplate`.
+- **Do not add network I/O to `getConfigTemplate` or any `set*Config` merger.** The read path is pure cache access by design so TUN toggle latency never depends on network. If a caller appears to "need fresh data", it should trigger a `primeConfigTemplateCache` via SWR and keep reading the cache, not synchronously fetch.
+- **Do not gate `primeConfigTemplateCache` on "only write if stale".** Every prime overwrites the cache unconditionally so the write path reflects the latest attempt. A stale-check would re-introduce the "built-in fallback drifted from remote" class of bug (the `www.qq.com → overseas IP` regression was this).
+- **Do not replace the scorched-earth `purgeLegacyTemplateCache` with an allowlist.** It enumerates `store.keys()` and deletes anything matching the legacy-shape signature — this is how it catches historical key shapes we no longer remember. An allowlist requires updating a hardcoded list every time the cache key shape changes and will silently fail to purge shapes added between releases.
+- **Do not change the cache value type from JSON string to object.** Every reader and writer expects `string` at the `tauri-plugin-store` boundary — changing it breaks the `set*Config` mergers that `JSON.parse` it and the SWR primer that `JSON.stringify`s before writing.
+- **Do not "correct" the typo `miexdGlobalConfig` in historical references.** See the preserved-typo note on the `TunRulesConfig` / `miexdGlobalConfig` line in the runtime-read-path section — `git log -S miexdGlobalConfig` and blame searches rely on the typo staying visible in tracked text.
+- **Do not enhance the built-in snapshot with rules not present in the remote `conf-template` commit.** The single-source-of-truth invariant (both paths trace to the same upstream commit) is how "works in built-in fallback but not in live" is made structurally impossible. Any built-in-only rule re-opens that failure mode.
 
 ## Why this shape
 

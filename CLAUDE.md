@@ -385,6 +385,8 @@ Project-scoped restatement of the global `Step-by-step Semantic Analysis` rule i
 
 Three subsystems have their own design documents in [`docs/claude/`](docs/claude/). They are **not** loaded into the default CLAUDE.md context — you must fetch them explicitly.
 
+**Everything in `docs/claude/` is Claude-facing, not human-facing.** Style, mandatory structure, and "Do not X" conventions are specified in [`docs/claude/README.md`](docs/claude/README.md). Read that file before creating or editing any doc in that directory — especially do not add human-flavoured prose (scenic examples, motivational framing, tutorial narration) to docs there.
+
 **Trigger to fetch a deep-dive**: (a) you are about to edit a file in that section's *Read before editing* list, or (b) the user's report describes behaviour that subsystem covers (DNS leaks / stale DNS after stop, template-cache drift between built-in and remote, deep-link re-imports after an update). When either triggers, Read the linked file *before* proposing a fix.
 
 Each deep-dive is self-contained and linkable from PR descriptions.

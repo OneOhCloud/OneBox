@@ -54,6 +54,14 @@ pub trait EngineManager {
     /// override on the active interface; others are no-ops.
     fn on_network_up(_app: &AppHandle) {}
 
+    /// Notify the engine of a system NetworkDown event. Engines that
+    /// override DNS may release the Setup layer here so that OS-native
+    /// captive detection on the next NetworkUp has a clean State to probe
+    /// against. Only macOS implements this today — Windows needs a new
+    /// SCM service control verb and Linux has no lifecycle listener. See
+    /// docs/claude/dns-override.md "What we deliberately DON'T do".
+    fn on_network_down(_app: &AppHandle) {}
+
     /// Restore system DNS after the sing-box process has terminated.
     /// Called from the process monitor; implementations read any per-
     /// platform teardown state from their own module. `was_user_stop`

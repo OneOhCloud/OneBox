@@ -46,6 +46,13 @@ pub(crate) struct ActiveOverride {
     pub service: String,
     pub captured: String,
     pub gateway: String,
+    /// True between `release_dns_on_network_down` writing `"empty"` and the
+    /// next `apply_system_dns_override` that re-applies the gateway. While
+    /// true, `reapply_on_active_primary` short-circuits so the
+    /// SCDynamicStore watcher's echo of our own `"empty"` write isn't
+    /// misclassified as an "external write" (which would revert Setup back
+    /// to the gateway and defeat the release).
+    pub released: bool,
 }
 
 static ACTIVE_OVERRIDE: Mutex<Option<ActiveOverride>> = Mutex::new(None);
@@ -254,13 +261,48 @@ fn read_service_dns(service: &str) -> String {
 pub fn apply_system_dns_override(config_path: &str) -> Result<(), String> {
     let gateway = extract_tun_gateway_from_config(config_path)
         .ok_or_else(|| format!("could not extract TUN gateway from {}", config_path))?;
+    // Clear any release flag left by a preceding NetworkDown. This is the
+    // only entry point that should clear it — the SCDynamicStore watcher
+    // calls `reapply_on_active_primary` directly and must keep skipping
+    // while the flag is set (see invariant #5 in docs/claude/dns-override.md).
+    {
+        let mut slot = ACTIVE_OVERRIDE.lock().unwrap_or_else(|e| e.into_inner());
+        if let Some(active) = slot.as_mut() {
+            if active.released {
+                log::info!(
+                    "[dns] apply: clearing released flag on [{}] before re-apply",
+                    active.service
+                );
+                active.released = false;
+            }
+        }
+    }
     reapply_on_active_primary(&gateway)
 }
 
 /// Same logic as `apply_system_dns_override` but with the gateway IP already
 /// known. Called from dns_watcher when a change event fires; the gateway
 /// lives in the slot so the watcher doesn't need the sing-box config path.
+///
+/// Short-circuits when the slot's `released` flag is set — see the
+/// "ACTIVE_OVERRIDE invariants" section of docs/claude/dns-override.md for
+/// why this prevents the NetworkDown release from being reverted by the
+/// SCDynamicStore watcher.
 pub(crate) fn reapply_on_active_primary(gateway: &str) -> Result<(), String> {
+    // Check released under the lock first so watcher callbacks during a
+    // NetworkDown release window return immediately without touching Setup.
+    {
+        let slot = ACTIVE_OVERRIDE.lock().unwrap_or_else(|e| e.into_inner());
+        if let Some(active) = slot.as_ref() {
+            if active.released {
+                log::debug!(
+                    "[dns] reapply: released flag set on [{}], skipping",
+                    active.service
+                );
+                return Ok(());
+            }
+        }
+    }
     let new_service = detect_active_network_service()?;
     let current = read_service_dns(&new_service);
     // Per-call preamble is debug: it fires on every watcher callback, most of
@@ -347,6 +389,7 @@ pub(crate) fn reapply_on_active_primary(gateway: &str) -> Result<(), String> {
                 service: new_service.clone(),
                 captured: current,
                 gateway: gateway.to_string(),
+                released: false,
             });
             log::info!("[dns] apply: override [{}] → {}", new_service, gateway);
             Ok(())
@@ -364,6 +407,7 @@ pub(crate) fn reapply_on_active_primary(gateway: &str) -> Result<(), String> {
                 service: new_service.clone(),
                 captured: current,
                 gateway: gateway.to_string(),
+                released: false,
             });
             log::info!("[dns] apply: override [{}] → {}", new_service, gateway);
             Ok(())
@@ -402,11 +446,17 @@ fn apply_captured_originals_sync(taken: Option<&ActiveOverride>) -> Option<(Stri
 }
 
 /// Probe each restored DNS server on UDP/53. If **none** of a service's
-/// captured servers respond, swap it for `get_best_dns_server` so the user
-/// isn't stranded on a stale IP (e.g. a Wi-Fi router that has since
-/// disappeared). Must only run AFTER sing-box has exited and TUN has been
-/// removed — otherwise every probe is routed through TUN → proxy and all
-/// servers look reachable, producing bogus "everything's fine" results.
+/// captured servers respond, release the service to DHCP (write `"empty"`
+/// to Setup) so the DHCP-pushed DNS — including a captive portal's internal
+/// hijacker — can take over. Must only run AFTER sing-box has exited and
+/// TUN has been removed — otherwise every probe is routed through
+/// TUN → proxy and all servers look reachable, producing bogus
+/// "everything's fine" results.
+///
+/// Previously this path called `get_best_dns_server` to pick a public
+/// fallback, but any hardcoded IP gets read back by the next
+/// `reapply_on_active_primary` and fixated as "user intent", polluting
+/// all future restores. Writing `"empty"` breaks that cycle.
 async fn verify_and_fallback(applied: Option<&(String, String)>) {
     let Some((service, original)) = applied else {
         log::info!("[dns] phase 2 (post-kill verify): nothing to verify, skipping");
@@ -442,33 +492,70 @@ async fn verify_and_fallback(applied: Option<&(String, String)>) {
         return;
     }
     log::warn!(
-        "[dns] phase 2 [{}] all of '{}' unreachable — racing public resolvers",
+        "[dns] phase 2 [{}] all of '{}' unreachable — releasing to DHCP (writing empty)",
         service,
         original
     );
-    match crate::commands::dns::get_best_dns_server().await {
-        Some(best) => {
-            log::info!("[dns] phase 2 [{}] best public DNS = {}", service, best);
-            if let Err(e) = macos_helper::api::set_dns_servers(service, &best) {
-                log::warn!(
-                    "[dns] phase 2 fallback write [{}] → {} failed: {}",
-                    service,
-                    best,
-                    e
-                );
-            } else {
-                log::info!("[dns] phase 2 [{}] fell back to {}", service, best);
-            }
-        }
-        None => {
-            log::warn!(
-                "[dns] phase 2 [{}] get_best_dns_server returned None; leaving as-is",
-                service
-            );
-        }
+    // Write "empty" instead of a hardcoded public DNS. Any hardcoded IP
+    // (previously `223.5.5.5` via `get_best_dns_server`) is itself blocked in
+    // strict captive networks *and* self-propagates: the next
+    // `reapply_on_active_primary` reads it back as the new "user intent" and
+    // commits it to `ACTIVE_OVERRIDE.captured`, polluting every future restore.
+    // See docs/claude/dns-override.md "What we deliberately DON'T do".
+    if let Err(e) = macos_helper::api::set_dns_servers(service, "empty") {
+        log::warn!(
+            "[dns] phase 2 fallback write [{}] → empty failed: {}",
+            service,
+            e
+        );
+    } else {
+        log::info!("[dns] phase 2 [{}] fell back to empty (DHCP)", service);
     }
     macos_helper::api::flush_dns_cache().ok();
     log::info!("[dns] phase 2 done, cache flushed");
+}
+
+/// NetworkDown release: overwrite the active service's Setup DNS with
+/// `"empty"` so that, when the device reconnects to a different network on
+/// NetworkUp, the OS-native captive-portal detection (Windows NCSI /
+/// macOS's own probes) has a clean State layer populated by the new
+/// network's DHCP — including a captive hijacker's internal resolver,
+/// which is the only resolver that answers pre-auth.
+///
+/// Sets the slot's `released` flag to `true` before writing so the
+/// SCDynamicStore watcher's echo of this write doesn't trigger
+/// `reapply_on_active_primary` to "correct" Setup back to the gateway.
+/// The flag is cleared by the next `apply_system_dns_override` (the
+/// NetworkUp re-apply path).
+///
+/// Does **not** drain the slot — NetworkUp needs the `service` + `gateway`
+/// to re-apply. If the process exits while `released == true`, the slot
+/// dies with the process; no on-disk recovery needed.
+pub fn release_dns_on_network_down() -> Result<(), String> {
+    let (service, prev_gateway) = {
+        let mut slot = ACTIVE_OVERRIDE.lock().unwrap_or_else(|e| e.into_inner());
+        let Some(active) = slot.as_mut() else {
+            log::info!("[dns] NetworkDown: slot empty, nothing to release");
+            return Ok(());
+        };
+        if active.released {
+            log::info!(
+                "[dns] NetworkDown: [{}] already released, skipping",
+                active.service
+            );
+            return Ok(());
+        }
+        active.released = true;
+        (active.service.clone(), active.gateway.clone())
+    };
+    log::info!(
+        "[dns] NetworkDown: releasing [{}] to empty (was gateway={})",
+        service,
+        prev_gateway
+    );
+    macos_helper::api::set_dns_servers(&service, "empty")?;
+    macos_helper::api::flush_dns_cache().ok();
+    Ok(())
 }
 
 /// Crash-path restore (called from `on_process_terminated`). sing-box has
@@ -653,6 +740,15 @@ impl EngineManager for MacOSEngine {
         };
         if let Err(e) = apply_system_dns_override(&config_path) {
             log::warn!("[dns] NetworkUp re-apply failed: {}", e);
+        }
+    }
+
+    fn on_network_down(_app: &AppHandle) {
+        // Release Setup DNS so the next network's OS-native captive
+        // detection has a clean State layer to probe against. Slot is
+        // preserved — NetworkUp will re-apply via `on_network_up`.
+        if let Err(e) = release_dns_on_network_down() {
+            log::warn!("[dns] NetworkDown release failed: {}", e);
         }
     }
 

@@ -359,6 +359,12 @@ pub(crate) fn spawn_lifecycle_listener(app_handle: &tauri::AppHandle) {
                         log::info!("[network] NetworkDown — cancelling any pending engine restart");
                         network_restart_epoch.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                         network_down_at = Some(std::time::SystemTime::now());
+                        // Release Setup DNS so OS-native captive detection on
+                        // the next NetworkUp has a clean State layer to probe.
+                        // macOS-only; Windows/Linux use trait default no-op.
+                        // See docs/claude/dns-override.md.
+                        use crate::engine::{EngineManager, PlatformEngine};
+                        PlatformEngine::on_network_down(&handle);
                     }
                     SystemEvent::NetworkUp => {
                         log::info!("[network] NetworkUp");
