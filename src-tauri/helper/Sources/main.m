@@ -378,10 +378,32 @@ static NSString *runTool(NSString *tool, NSArray<NSString *> *args) {
     __block int resultPid = 0;
     __block NSString *resultErr = nil;
     dispatch_sync(_stateQueue, ^{
+        // Idempotent: if a prior session is still tracked (e.g. the GUI that
+        // started it crashed before the kqueue exit source could fire — sing-box
+        // is the helper's child, not the GUI's, so it outlives a GUI crash),
+        // SIGKILL it and reap the zombie before spawning the new one. SIGKILL
+        // rather than SIGTERM because utun devices are fd-owned by the dying
+        // process — the kernel tears down the interface and its routes the
+        // instant sing-box dies, so no in-process cleanup is needed. DNS
+        // restore lives entirely in the Rust client; the client driving the
+        // old session is already gone, and there are no captured originals to
+        // write back (they died with that GUI's RAM).
         if (self->_activePid != 0) {
-            resultErr = [NSString stringWithFormat:
-                @"sing-box already running as pid %d", self->_activePid];
-            return;
+            pid_t old = self->_activePid;
+            NSLog(@"[helper] reaping prior sing-box pid=%d before new spawn", old);
+            if (self->_exitSource) {
+                dispatch_source_cancel(self->_exitSource);
+                self->_exitSource = nil;
+            }
+            kill(old, SIGKILL);
+            int status = 0;
+            for (int i = 0; i < 50; i++) {              // 500 ms upper bound
+                pid_t w = waitpid(old, &status, WNOHANG);
+                if (w == old || w == -1) break;
+                usleep(10000);
+            }
+            self->_activePid = 0;
+            self->_activeConnection = nil;
         }
 
         posix_spawn_file_actions_t actions;
@@ -463,11 +485,16 @@ static NSString *runTool(NSString *tool, NSArray<NSString *> *args) {
             }
 
             dispatch_sync(strongSelf->_stateQueue, ^{
-                strongSelf->_activePid = 0;
-                strongSelf->_activeConnection = nil;
-                if (strongSelf->_exitSource) {
-                    dispatch_source_cancel(strongSelf->_exitSource);
-                    strongSelf->_exitSource = nil;
+                // Guard against a stale fire: the start path may have
+                // SIGKILL'd + reaped the old pid and already spawned a new
+                // session. Only clear state if we're still the tracked pid.
+                if (strongSelf->_activePid == pid) {
+                    strongSelf->_activePid = 0;
+                    strongSelf->_activeConnection = nil;
+                    if (strongSelf->_exitSource) {
+                        dispatch_source_cancel(strongSelf->_exitSource);
+                        strongSelf->_exitSource = nil;
+                    }
                 }
             });
         });
