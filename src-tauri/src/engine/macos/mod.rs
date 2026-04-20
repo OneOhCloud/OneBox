@@ -86,13 +86,129 @@ fn take_active_override() -> Option<ActiveOverride> {
 /// Ensure the privileged helper is installed (auto-install if needed).
 /// Blocks the calling thread while the SMJobBless authorization prompt is
 /// shown; callers must invoke from `spawn_blocking` / background.
+///
+/// Upgrade gate: compares the manually-maintained `CFBundleVersion`
+/// strings embedded in the bundled vs. installed helper binaries'
+/// `__TEXT,__info_plist` section. Mismatch triggers install(); match
+/// short-circuits to the ping check. The `CFBundleVersion` value is the
+/// ONLY upgrade signal — developers bump it by hand in
+/// `src-tauri/helper/Info.plist` whenever helper source changes
+/// (`Sources/main.m`, either plist). See the "Privileged helper version
+/// bump (macOS)" section in CLAUDE.md for the invariant and rationale.
 pub fn ensure_helper_installed() -> Result<(), String> {
-    match macos_helper::api::ping() {
-        Ok(_) => Ok(()),
-        Err(_) => {
-            log::info!("[helper] not responding, triggering SMJobBless install...");
+    let ping_result = macos_helper::api::ping();
+    if ping_result.is_err() {
+        log::info!("[helper] not responding, triggering SMJobBless install...");
+        return macos_helper::api::install();
+    }
+
+    let bundled = bundled_helper_path().and_then(|p| read_helper_cfbundle_version(&p));
+    let installed = read_helper_cfbundle_version(std::path::Path::new(
+        "/Library/PrivilegedHelperTools/cloud.oneoh.onebox.helper",
+    ));
+
+    match (bundled, installed) {
+        (Some(b), Some(i)) if b != i => {
+            log::info!(
+                "[helper] CFBundleVersion bundled={} installed={}; upgrading via SMJobBless",
+                b,
+                i
+            );
             macos_helper::api::install()
         }
+        _ => Ok(()),
+    }
+}
+
+/// Resolve the helper shipped inside this running app's bundle.
+/// /Applications/OneBox.app/Contents/MacOS/one-box
+///   → /Applications/OneBox.app/Contents/Library/LaunchServices/<label>
+/// Returns None in dev/unbundled layouts so the caller falls back to
+/// the ping branch rather than spuriously prompting for SMJobBless.
+fn bundled_helper_path() -> Option<std::path::PathBuf> {
+    let exe = std::env::current_exe().ok()?;
+    let contents = exe.parent()?.parent()?;
+    let p = contents
+        .join("Library")
+        .join("LaunchServices")
+        .join("cloud.oneoh.onebox.helper");
+    if p.exists() {
+        Some(p)
+    } else {
+        None
+    }
+}
+
+/// Extract the `CFBundleVersion` string from a Mach-O binary's
+/// `__TEXT,__info_plist` section. The plist is embedded as ASCII XML,
+/// so a byte scan for the exact `<key>CFBundleVersion</key>` marker
+/// followed by the next `<string>…</string>` is sufficient — no Mach-O
+/// header parsing needed. Returns None if the file is unreadable, the
+/// marker is absent, or the value isn't valid UTF-8. Using the fully
+/// tagged marker avoids any accidental substring match with other
+/// plist keys (e.g. `CFBundleShortVersionString`).
+fn read_helper_cfbundle_version(path: &std::path::Path) -> Option<String> {
+    let data = std::fs::read(path).ok()?;
+    let key = b"<key>CFBundleVersion</key>";
+    let key_pos = data.windows(key.len()).position(|w| w == key)?;
+    let after_key = &data[key_pos + key.len()..];
+    let open = b"<string>";
+    let open_pos = after_key.windows(open.len()).position(|w| w == open)?;
+    let value_start = open_pos + open.len();
+    let close = b"</string>";
+    let close_rel = after_key[value_start..]
+        .windows(close.len())
+        .position(|w| w == close)?;
+    let bytes = &after_key[value_start..value_start + close_rel];
+    std::str::from_utf8(bytes).ok().map(|s| s.to_string())
+}
+
+#[cfg(test)]
+mod version_extract_tests {
+    use super::read_helper_cfbundle_version;
+    use std::io::Write;
+
+    fn write_tmp(bytes: &[u8]) -> tempfile::NamedTempFile {
+        let mut f = tempfile::NamedTempFile::new().unwrap();
+        f.write_all(bytes).unwrap();
+        f.flush().unwrap();
+        f
+    }
+
+    #[test]
+    fn extracts_version_from_minimal_plist_bytes() {
+        let body = b"<key>CFBundleVersion</key>\n<string>1.4.11</string>";
+        let f = write_tmp(body);
+        assert_eq!(
+            read_helper_cfbundle_version(f.path()),
+            Some("1.4.11".to_string())
+        );
+    }
+
+    #[test]
+    fn ignores_cfbundleshortversionstring_substring() {
+        // ShortVersionString appears *before* CFBundleVersion; the
+        // extractor must not latch onto its `<string>` block.
+        let body = b"<key>CFBundleShortVersionString</key>\n<string>9.9.9</string>\n\
+                    <key>CFBundleVersion</key>\n<string>42</string>";
+        let f = write_tmp(body);
+        assert_eq!(
+            read_helper_cfbundle_version(f.path()),
+            Some("42".to_string())
+        );
+    }
+
+    #[test]
+    fn returns_none_when_marker_absent() {
+        let body = b"<plist><key>Something</key><string>else</string></plist>";
+        let f = write_tmp(body);
+        assert_eq!(read_helper_cfbundle_version(f.path()), None);
+    }
+
+    #[test]
+    fn returns_none_when_file_missing() {
+        let p = std::path::Path::new("/tmp/__onebox_does_not_exist__");
+        assert_eq!(read_helper_cfbundle_version(p), None);
     }
 }
 

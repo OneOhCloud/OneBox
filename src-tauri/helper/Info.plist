@@ -8,10 +8,17 @@
     <string>6.0</string>
     <key>CFBundleName</key>
     <string>OneBoxHelper</string>
+    <!-- CFBundleVersion drives SMJobBless's "replace the installed helper?"
+         decision. MUST be manually bumped whenever anything under
+         src-tauri/helper/ changes (main.m, this Info.plist, Launchd.plist),
+         otherwise the new helper silently never reaches end-user machines —
+         the old daemon keeps answering XPC pings and ensure_helper_installed
+         treats it as up-to-date. There is no automatic sync; see the
+         "Privileged helper version bump" section in CLAUDE.md. -->
     <key>CFBundleShortVersionString</key>
-    <string>1.0.0</string>
+    <string>1.0.1</string>
     <key>CFBundleVersion</key>
-    <string>1</string>
+    <string>2</string>
     <key>SMAuthorizedClients</key>
     <array>
         <string>identifier "cloud.oneoh.onebox" and anchor apple generic and certificate 1[field.1.2.840.113635.100.6.2.6] /* exists */ and certificate leaf[field.1.2.840.113635.100.6.1.13] /* exists */ and certificate leaf[subject.OU] = "GN2W3N34TM"</string>

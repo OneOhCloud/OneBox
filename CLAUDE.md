@@ -10,14 +10,15 @@
 4. **Deep link bug triage** — log-first checklist (Rust saw it? hot/cold? parsed? timing?)
 5. **Logging discipline** — write logs anticipating triage (companion to §4)
 6. **Release workflow triggers** — one workflow, four channels, `make bump` only
-7. **GitHub CLI access** — `gh` is the preferred interface for this repo
-8. **Test-first cadence** — write fn → write test → run local → pass → next; CI runs both layers
-9. **Verifying Linux from a macOS host** — `make linux-check`; commits are not transport
-10. **Workflows that need my hands** — `scripts/tmp-*.sh` with manual gates + sanity checks
-11. **Design Philosophy** — principles driving DNS / template subsystems
-12. **Windows Platform Implementation Philosophy** — native Win32 over PowerShell
-13. **Step-by-step semantic analysis** — expand every verb in a sequence before inserting adjacent to it
-14. **Subsystem deep-dives** — DNS override, config templates, update argv suppression (in `docs/claude/`)
+7. **Privileged helper version bump (macOS)** — editing `src-tauri/helper/` requires a manual `CFBundleVersion` bump; no auto-sync
+8. **GitHub CLI access** — `gh` is the preferred interface for this repo
+9. **Test-first cadence** — write fn → write test → run local → pass → next; CI runs both layers
+10. **Verifying Linux from a macOS host** — `make linux-check`; commits are not transport
+11. **Workflows that need my hands** — `scripts/tmp-*.sh` with manual gates + sanity checks
+12. **Design Philosophy** — principles driving DNS / template subsystems
+13. **Windows Platform Implementation Philosophy** — native Win32 over PowerShell
+14. **Step-by-step semantic analysis** — expand every verb in a sequence before inserting adjacent to it
+15. **Subsystem deep-dives** — DNS override, config templates, update argv suppression (in `docs/claude/`)
 
 ### Meta-rule: when rules tension against each other
 
@@ -202,6 +203,41 @@ The workflow's `resolve` job maps the trigger to a channel, then derives all cha
 Do **not** split this back into per-channel workflow files. The earlier multi-file design wasted GitHub Actions cache (each workflow had its own Rust cache namespace) and required every build-step change to be replicated four times. Do **not** chain releases with `workflow_run` triggers — an earlier design caused an automatic dev→beta→stable cascade on every dev push. If you see a reason to re-introduce either pattern, treat it as a design change that needs explicit discussion, not a "missing feature" to patch back in.
 
 The canonical way to cut a release on any channel is `make bump` on that channel's branch, then push. Nothing else.
+
+## Privileged helper version bump (macOS)
+
+**Whenever you touch anything under `src-tauri/helper/` (`Sources/main.m`, `Info.plist`, `Launchd.plist`), manually bump `CFBundleVersion` in `src-tauri/helper/Info.plist` in the same commit.** `CFBundleShortVersionString` is user-visible; keep it loosely in sync but it's not the upgrade trigger. Forgetting the `CFBundleVersion` bump means the new helper silently never reaches end-user machines.
+
+### Why: the whole upgrade path hinges on this one integer
+
+`ensure_helper_installed` in `src-tauri/src/engine/macos/mod.rs` reads the `CFBundleVersion` string from **both** the bundled helper (`/Applications/OneBox.app/Contents/Library/LaunchServices/cloud.oneoh.onebox.helper`) and the installed helper (`/Library/PrivilegedHelperTools/cloud.oneoh.onebox.helper`) by scanning each binary's `__TEXT,__info_plist` section for the `<key>CFBundleVersion</key>` marker. Mismatch → `SMJobBless` → authorization prompt → new helper replaces old. Match → skip.
+
+That string is the **only** signal. The privileged helper is a launchd-managed root daemon that keeps running across app updates — it answers XPC pings from the old code even after the user installs a new OneBox.app. Without a deliberate bump, the new helper bytes inside `Contents/Library/LaunchServices/` just sit there; `ensure_helper_installed` sees matching versions and moves on.
+
+### What we deliberately DON'T do
+
+- **No auto-sync from `tauri.conf.json` / the app version.** Every app release would flip the helper binary (the embedded `__info_plist` bytes change) and re-authorize SMJobBless on every update, including releases where helper code didn't move. Users would see the admin-password prompt on every bump — poor UX and desensitizes them to the prompt.
+- **No SHA256 hash comparison.** Same failure mode: any embedded-plist edit (version, comments, anything) flips the hash even when the helper source is semantically identical. The version string is the narrower, intent-carrying signal.
+- **No second source of truth (no helper-side constant, no app-side const).** `Info.plist` is the only place `CFBundleVersion` lives. The Rust runtime reads it from the on-disk binaries; the developer reads it from the plist when editing. One file to update, zero risk of drift.
+
+The bump is the declaration "I changed helper source; existing users should pick it up on their next launch." Reserve it for real changes.
+
+### Format
+
+Apple spec: both fields are **period-separated non-negative integers**, no suffixes, no letters.
+- `CFBundleShortVersionString` — exactly three components (`1.0.1`, never `1.0`, never `1.0.1-beta`).
+- `CFBundleVersion` — one to three components (`2`, `1.5`, `1.0.1` all valid; `1` is equivalent to `1.0.0`). `make bump` does NOT touch either field — they are helper-local, not project-version-linked.
+
+String comparison in `ensure_helper_installed` is literal byte equality on the extracted plist value, not numeric ordering. `"2"` ≠ `"1.0.0"` even though Apple treats them as equivalent — don't rely on Apple's equivalence rule when bumping; pick a monotonically increasing string that's textually different from the prior value.
+
+### On release, what users see
+
+- Helper source unchanged across a release → same `CFBundleVersion` on disk as already installed → no prompt, silent launch.
+- Helper source bumped → versions differ → single SMJobBless authorization prompt ("OneBox wants to install a helper tool") on the first app launch after upgrade → new helper active from that point on.
+
+### Covered by
+
+`src-tauri/src/engine/macos/mod.rs::version_extract_tests` — four unit tests covering: minimal plist extraction, `CFBundleShortVersionString` substring safety, missing marker, missing file. These exercise `read_helper_cfbundle_version` directly; the `ensure_helper_installed` glue is not unit-tested (depends on SMJobBless + filesystem state in `/Library/PrivilegedHelperTools/`) and is exercised via manual install verification after a bump.
 
 ## GitHub CLI access: use `gh` freely for history and CI diagnostics
 
