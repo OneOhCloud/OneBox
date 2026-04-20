@@ -135,3 +135,99 @@ pub(super) fn write_singbox_log(writer: &mut Option<std::fs::File>, line: &str) 
         let _ = writeln!(file, "{}", line);
     }
 }
+
+/// Delete rotated OneBox app logs older than 7 days.
+///
+/// Companion to the `tauri-plugin-log` configuration in `app::plugins`
+/// (`RotationStrategy::KeepAll`). The plugin rotates by size only, so
+/// without this sweep rotated files accumulate forever. Files are left
+/// uncompressed intentionally — `OneBox.log` is grep-driven triage
+/// material and the triage script must be able to read it directly.
+///
+/// Only rotated archives (`OneBox_<timestamp>.log`) are subject to
+/// deletion; the live `OneBox.log` is always preserved regardless of
+/// mtime — the plugin holds it open and deleting it would corrupt the
+/// writer. Oneshot: call once at `app_setup`; not re-entered per log
+/// write.
+pub fn cleanup_old_onebox_logs(app: &AppHandle) {
+    let Ok(log_dir) = app.path().app_log_dir() else {
+        return;
+    };
+    if !log_dir.exists() {
+        return;
+    }
+    let cutoff = std::time::SystemTime::now() - std::time::Duration::from_secs(7 * 86400);
+    sweep_onebox_logs(&log_dir, cutoff);
+}
+
+/// Pure filesystem sweep — split from `cleanup_old_onebox_logs` so unit
+/// tests can exercise it without a real `AppHandle`.
+fn sweep_onebox_logs(log_dir: &Path, cutoff: std::time::SystemTime) {
+    let entries = match std::fs::read_dir(log_dir) {
+        Ok(e) => e,
+        Err(_) => return,
+    };
+
+    for entry in entries.flatten() {
+        let name = entry.file_name();
+        let name_str = name.to_string_lossy();
+
+        // Rotated archive only: "OneBox_<timestamp>.log". Active file
+        // "OneBox.log" is never touched — see fn doc.
+        if !(name_str.starts_with("OneBox_") && name_str.ends_with(".log")) {
+            continue;
+        }
+
+        if let Ok(meta) = entry.metadata() {
+            let modified = meta.modified().unwrap_or(std::time::SystemTime::now());
+            if modified < cutoff {
+                if let Err(e) = std::fs::remove_file(entry.path()) {
+                    log::warn!("Failed to remove old OneBox log {}: {}", name_str, e);
+                } else {
+                    log::info!("Removed old OneBox log: {}", name_str);
+                }
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod onebox_log_sweep_tests {
+    use super::sweep_onebox_logs;
+    use std::fs::File;
+    use std::time::{Duration, SystemTime};
+
+    fn touch(path: &std::path::Path, age_days: u64) {
+        File::create(path).expect("create test log");
+        let mtime = SystemTime::now() - Duration::from_secs(age_days * 86400);
+        filetime::set_file_mtime(path, filetime::FileTime::from_system_time(mtime))
+            .expect("set mtime");
+    }
+
+    #[test]
+    fn removes_rotated_logs_older_than_cutoff() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let dir = tmp.path();
+
+        let active = dir.join("OneBox.log");
+        let recent = dir.join("OneBox_2026-04-20_00-00-00.log");
+        let stale = dir.join("OneBox_2026-04-01_00-00-00.log");
+        let singbox = dir.join("sing-box-2026-04-01.log");
+        let unrelated = dir.join("other.log");
+
+        touch(&active, 30);
+        touch(&recent, 1);
+        touch(&stale, 30);
+        touch(&singbox, 30);
+        touch(&unrelated, 30);
+
+        let cutoff = SystemTime::now() - Duration::from_secs(7 * 86400);
+        sweep_onebox_logs(dir, cutoff);
+
+        assert!(active.exists(), "active OneBox.log must never be deleted");
+        assert!(recent.exists(), "recent rotated log must survive");
+        assert!(!stale.exists(), "stale rotated log must be removed");
+        assert!(singbox.exists(), "sing-box logs are owned by a different sweep");
+        assert!(unrelated.exists(), "unrelated files must not be touched");
+    }
+}

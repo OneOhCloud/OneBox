@@ -38,6 +38,10 @@ pub fn app_setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>>
     // Purge must run before copy_database_files so the resource-bundled v2 defaults
     // are not clobbered by a later v1 cleanup pass.
     crate::utils::purge_legacy_cache_files(app.handle());
+
+    // One-shot sweep of rotated OneBox.log archives older than 7 days.
+    // Paired with tauri-plugin-log's KeepAll rotation in `plugins.rs`.
+    crate::core::cleanup_old_onebox_logs(app.handle());
     if let Err(e) = crate::utils::copy_database_files(app.handle()) {
         log::error!("Failed to copy database files: {}", e);
     }
@@ -306,6 +310,49 @@ fn report_captive(app: &tauri::App) {
 
 // ── Lifecycle ──────────────────────────────────────────────────────
 
+// 断网时长低于此值视为短暂抖动，不触发重启
+#[cfg(any(target_os = "windows", target_os = "macos"))]
+const MIN_OUTAGE: std::time::Duration = std::time::Duration::from_secs(2);
+// NetworkUp / DidWake 后等待此时长确认系统稳定，再执行重启
+#[cfg(any(target_os = "windows", target_os = "macos"))]
+const DEBOUNCE_SECS: u64 = 3;
+// 睡眠时长 >= 此值才触发 wake 重启。30s 足以过滤"临时锁屏-解锁"
+// 但会覆盖"开会合盖几分钟"这种真实场景。
+#[cfg(any(target_os = "windows", target_os = "macos"))]
+const WAKE_RESTART_THRESHOLD: std::time::Duration = std::time::Duration::from_secs(30);
+
+/// 调度引擎重启：DEBOUNCE_SECS 秒后若 epoch 未变则 stop + start。
+/// NetworkUp / DidWake 共用此路径，`ctx` 仅用于日志前缀区分触发源。
+///
+/// 调用方负责在调度前 `fetch_add(1)` 自增 epoch（幂等取消：后来的调度
+/// 让之前已排队的任务读到不同 epoch，自动放弃）。
+#[cfg(any(target_os = "windows", target_os = "macos"))]
+fn schedule_engine_restart(
+    handle: tauri::AppHandle,
+    epoch_arc: std::sync::Arc<std::sync::atomic::AtomicU64>,
+    ctx: &'static str,
+) {
+    let current_epoch = epoch_arc.load(std::sync::atomic::Ordering::Relaxed);
+    tauri::async_runtime::spawn(async move {
+        tokio::time::sleep(std::time::Duration::from_secs(DEBOUNCE_SECS)).await;
+        if epoch_arc.load(std::sync::atomic::Ordering::Relaxed) != current_epoch {
+            log::info!("[{ctx}] epoch changed, aborting engine restart");
+            return;
+        }
+        let Some((mode, path)) = crate::core::get_running_config() else {
+            return;
+        };
+        log::info!("[{ctx}] restarting engine (mode: {:?})", mode);
+        if let Err(e) = crate::core::stop(handle.clone()).await {
+            log::error!("[{ctx}] stop engine failed: {}", e);
+        } else if let Err(e) = crate::core::start(handle, path, mode).await {
+            log::error!("[{ctx}] restart engine failed: {}", e);
+        } else {
+            log::info!("[{ctx}] engine restarted");
+        }
+    });
+}
+
 /// 生命周期事件监听：仅 Windows / macOS 支持。
 ///
 /// **macOS**：必须在 `RunEvent::Ready` 时调用，确保 delegate 安装在 Tauri/WRY 之后，
@@ -335,10 +382,11 @@ pub(crate) fn spawn_lifecycle_listener(app_handle: &tauri::AppHandle) {
             // 以下逻辑永远不会被触发，行为与未启用 network feature 时完全相同。
             let network_restart_epoch = std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0));
             let mut network_down_at: Option<std::time::SystemTime> = None;
-            // 断网时长低于此值视为短暂抖动，不触发重启
-            const MIN_OUTAGE: std::time::Duration = std::time::Duration::from_secs(2);
-            // NetworkUp 后等待此时长确认网络稳定，再执行重启
-            const DEBOUNCE_SECS: u64 = 3;
+            // WillSleep 墙钟时间。DidWake 时与此值对比判断是否需要重启引擎。
+            // NWPathMonitor 在睡眠期间挂起且带 satisfied 去重，Wi-Fi
+            // 不 drop 的场景（Power Nap / 电源常连）唤醒后不会补发任何事件，
+            // 恢复链路完全断在这里——所以不能只依赖 NetworkUp。
+            let mut will_sleep_at: Option<std::time::SystemTime> = None;
 
             while let Some(event) = rx.recv() {
                 use onebox_lifecycle::SystemEvent;
@@ -350,10 +398,47 @@ pub(crate) fn spawn_lifecycle_listener(app_handle: &tauri::AppHandle) {
                         handle_will_power_off();
                     }
                     SystemEvent::WillSleep => {
-                        log::info!("System will sleep");
+                        log::info!("[wake] WillSleep");
+                        will_sleep_at = Some(std::time::SystemTime::now());
                     }
                     SystemEvent::DidWake => {
-                        log::info!("System did wake");
+                        let sleep_dur = will_sleep_at
+                            .take()
+                            .and_then(|t| t.elapsed().ok())
+                            .unwrap_or_default();
+                        log::info!(
+                            "[wake] DidWake — slept {:.1}s",
+                            sleep_dur.as_secs_f32()
+                        );
+
+                        // 幂等地刷一次 TUN DNS。睡眠期间 mDNSResponder 可能已被
+                        // 系统回写为 DHCP 下发的服务器；这一次调用在非 TUN 模式
+                        // 下是 no-op（见 on_network_up 里的 mode gate）。
+                        use crate::engine::{EngineManager, PlatformEngine};
+                        PlatformEngine::on_network_up(&handle);
+
+                        if sleep_dur < WAKE_RESTART_THRESHOLD {
+                            log::info!(
+                                "[wake] sleep {:.1}s < threshold, skipping restart",
+                                sleep_dur.as_secs_f32()
+                            );
+                            continue;
+                        }
+
+                        // 走和 NetworkUp 同一套 epoch + debounce：若期间又发
+                        // NetworkDown/NetworkUp，epoch 自增会让本任务自动放弃。
+                        network_restart_epoch
+                            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                        log::info!(
+                            "[wake] sleep {:.1}s — scheduling engine restart in {}s",
+                            sleep_dur.as_secs_f32(),
+                            DEBOUNCE_SECS
+                        );
+                        schedule_engine_restart(
+                            handle.clone(),
+                            std::sync::Arc::clone(&network_restart_epoch),
+                            "wake",
+                        );
                     }
                     SystemEvent::NetworkDown => {
                         log::info!("[network] NetworkDown — cancelling any pending engine restart");
@@ -400,32 +485,15 @@ pub(crate) fn spawn_lifecycle_listener(app_handle: &tauri::AppHandle) {
                             outage.as_secs_f32(),
                             DEBOUNCE_SECS
                         );
-                        let epoch_arc = std::sync::Arc::clone(&network_restart_epoch);
-                        let current_epoch = epoch_arc.load(std::sync::atomic::Ordering::Relaxed);
-                        let h = handle.clone();
-                        tauri::async_runtime::spawn(async move {
-                            tokio::time::sleep(std::time::Duration::from_secs(DEBOUNCE_SECS)).await;
-                            // 若期间又断网，epoch 已自增，放弃本次重启
-                            if epoch_arc.load(std::sync::atomic::Ordering::Relaxed) != current_epoch
-                            {
-                                log::info!("[network] epoch changed, aborting engine restart");
-                                return;
-                            }
-                            let Some((mode, path)) = crate::core::get_running_config() else {
-                                return;
-                            };
-                            log::info!(
-                                "[network] network stable, restarting engine (mode: {:?})",
-                                mode
-                            );
-                            if let Err(e) = crate::core::stop(h.clone()).await {
-                                log::error!("[network] stop engine failed: {}", e);
-                            } else if let Err(e) = crate::core::start(h, path, mode).await {
-                                log::error!("[network] restart engine failed: {}", e);
-                            } else {
-                                log::info!("[network] engine restarted after network recovery");
-                            }
-                        });
+                        // 取消可能被 DidWake 预先排的 wake 重启——epoch 自增一次
+                        // 后新旧两个已排队任务中只有我们刚刚捕获的那个能通过检查。
+                        network_restart_epoch
+                            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                        schedule_engine_restart(
+                            handle.clone(),
+                            std::sync::Arc::clone(&network_restart_epoch),
+                            "network",
+                        );
                     }
                     _ => {}
                 }

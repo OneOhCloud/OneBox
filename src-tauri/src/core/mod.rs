@@ -1,6 +1,8 @@
 mod log;
 pub(crate) mod monitor;
 
+pub use self::log::cleanup_old_onebox_logs;
+
 use lazy_static::lazy_static;
 use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Manager};

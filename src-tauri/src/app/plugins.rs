@@ -1,7 +1,14 @@
 use log::LevelFilter;
 use tauri::{AppHandle, Builder, Manager, Wry};
 use tauri_plugin_autostart::MacosLauncher;
+use tauri_plugin_log::{RotationStrategy, Target, TargetKind};
 use tauri_plugin_sql::Migration;
+
+// OneBox.log rotation policy — rotate when the active file exceeds 50 MB,
+// keep all rotated files (renamed to OneBox_YYYY-MM-DD_HH-MM-SS.log). A
+// startup sweep in `core::log::cleanup_old_onebox_logs` deletes rotated
+// files older than 7 days. Uncompressed — triage speed trumps disk cost.
+const ONEBOX_LOG_MAX_FILE_SIZE: u128 = 50 * 1024 * 1024;
 
 #[allow(unused_variables)]
 pub fn register_plugins(builder: Builder<Wry>, migrations: Vec<Migration>) -> Builder<Wry> {
@@ -31,6 +38,12 @@ pub fn register_plugins(builder: Builder<Wry>, migrations: Vec<Migration>) -> Bu
                         .any(|&target| metadata.target().starts_with(target))
                 })
                 .level(LevelFilter::Info)
+                .max_file_size(ONEBOX_LOG_MAX_FILE_SIZE)
+                .rotation_strategy(RotationStrategy::KeepAll)
+                .targets([
+                    Target::new(TargetKind::Stdout),
+                    Target::new(TargetKind::LogDir { file_name: None }),
+                ])
                 .build()
         })
         .plugin(tauri_plugin_clipboard_manager::init())
