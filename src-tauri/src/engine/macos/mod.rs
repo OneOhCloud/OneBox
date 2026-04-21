@@ -719,10 +719,13 @@ impl EngineManager for MacOSEngine {
                     .map_err(|e| format!("sidecar lookup failed: {}", e))?
                     .args(["run", "-c", &config_path, "--disable-color"]);
                 let (rx, child) = cmd.spawn().map_err(|e| format!("spawn failed: {}", e))?;
+                let child_pid = child.pid();
+                log::info!("[sing-box] spawned pid={} mode=SystemProxy", child_pid);
                 crate::core::monitor::spawn_process_monitor(
                     app.clone(),
                     rx,
                     Arc::new(mode.clone()),
+                    child_pid,
                 );
                 {
                     let mut mgr = crate::core::ProcessManager::acquire();
@@ -932,17 +935,56 @@ impl EngineManager for MacOSEngine {
                 Err(e) => log::warn!("[reload] flush_dns_cache join error: {}", e),
             }
         } else {
+            // Snapshot which sing-box processes are currently alive BEFORE
+            // the SIGHUP. `pkill -HUP sing-box` matches by process name,
+            // so if there are multiple sing-box processes (e.g. a leaked
+            // one from a previous crash/force-quit), they'll ALL receive
+            // the signal — captured here for post-mortem analysis.
+            match Command::new("pgrep").args(["-lf", "sing-box"]).output() {
+                Ok(out) => {
+                    let stdout = String::from_utf8_lossy(&out.stdout);
+                    let lines: Vec<&str> = stdout.lines().collect();
+                    log::info!(
+                        "[reload] pgrep pre-pkill: {} sing-box process(es) {:?}",
+                        lines.len(),
+                        lines
+                    );
+                }
+                Err(e) => log::warn!("[reload] pgrep pre-pkill failed: {}", e),
+            }
+            let pm_pid = {
+                let m = crate::core::ProcessManager::acquire();
+                m.child.as_ref().map(|c| c.pid())
+            };
+            log::info!("[reload] pm_child_pid={:?} (expected sole SIGHUP target)", pm_pid);
+
             let output = Command::new("pkill")
                 .args(["-HUP", "sing-box"])
                 .output()
                 .map_err(|e| format!("Failed to send SIGHUP: {}", e))?;
+            // pkill exit codes: 0 = matched + signaled, 1 = none matched.
+            // Treat "none matched" as a warn so it doesn't silently fail.
+            let code = output.status.code();
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            let stdout = String::from_utf8_lossy(&output.stdout);
             if !output.status.success() {
+                if code == Some(1) {
+                    log::warn!(
+                        "[reload] pkill -HUP matched 0 processes (code=1) — sing-box may already be dead"
+                    );
+                    return Err(format!("pkill -HUP matched nothing: {}", stderr));
+                }
                 return Err(format!(
-                    "pkill -HUP non-zero: {}",
-                    String::from_utf8_lossy(&output.stderr)
+                    "pkill -HUP non-zero (code={:?}): {}",
+                    code, stderr
                 ));
             }
-            log::info!("[reload] SIGHUP sent via pkill");
+            log::info!(
+                "[reload] SIGHUP sent via pkill code={:?} stdout={:?} stderr={:?}",
+                code,
+                stdout.trim(),
+                stderr.trim()
+            );
         }
         Ok(())
     }

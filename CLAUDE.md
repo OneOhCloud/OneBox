@@ -174,7 +174,24 @@ Every log line carries a short, stable prefix so triage reduces to a pipeline of
 - `[helper]` / `[helper-bridge]` — macOS privileged XPC helper install / ping / exit bridging.
 - `[network]` — lifecycle NetworkUp / NetworkDown + debounced engine restart.
 - `[reload]` — config reload (SIGHUP + DNS cache flush).
+- `[start]` / `[stop]` — `core::start` / `core::stop` entry with `action=N`, a `ProcessManager` snapshot (child pid + liveness + mode), and a `:6789_listener=bool` probe. Each top-level lifecycle call issues a fresh `action=N` token (monotonic), so overlapping calls from independent triggers (user click + Wi-Fi switch + reload) can be disentangled by grepping on the token.
+- `[sing-box]` — process-level events about the sing-box sidecar: `spawned pid=N`, `monitor attached`, `BIND FAILED: ...` (EADDRINUSE echo from stderr), and `terminated runtime=Xs code=C signal=S`.
 - `[dns] phase 1` / `[dns] phase 2` — the two restore phases straddling `stop_sing_box` (see `docs/claude/dns-override.md`).
+
+**Port-6789 occupation triage recipe** (for "reload / Wi-Fi switch leaves :6789 bound" reports):
+
+```bash
+# Which action tokens overlapped at the failure moment?
+grep -E '\[(start|stop|reload)\] action=' OneBox.log
+# Was :6789 already listening when a [start] entered, or unbound after [reload] sent SIGHUP?
+grep -E ':6789(_listener|_NOT_LISTENING)' OneBox.log
+# Did sing-box emit EADDRINUSE on stderr?
+grep -E '\[sing-box\] pid=[0-9]+ BIND FAILED' OneBox.log
+# All sing-box PIDs in this session, and how long each lived:
+grep -E '\[sing-box\] (spawned|terminated)' OneBox.log
+# How many sing-box processes were alive when reload fired?
+grep -E '\[reload\] pgrep pre-pkill' OneBox.log
+```
 
 New subsystems pick one short, stable prefix and stick with it. Renaming silently invalidates every playbook / deep-dive / triage checklist that greps for it, including this file and `docs/claude/*.md`.
 

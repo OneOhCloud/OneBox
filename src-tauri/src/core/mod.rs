@@ -4,7 +4,9 @@ pub(crate) mod monitor;
 pub use self::log::cleanup_old_onebox_logs;
 
 use lazy_static::lazy_static;
-use std::sync::{Arc, Mutex};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, Mutex, OnceLock};
+use std::time::{Duration, Instant};
 use tauri::{AppHandle, Manager};
 
 use crate::app::state::AppData;
@@ -13,6 +15,74 @@ use crate::engine::{readiness, EVENT_STATUS_CHANGED};
 use crate::engine::{PlatformEngine, EngineManager};
 use tauri::Emitter;
 use tauri_plugin_shell::process::CommandChild;
+
+// ── Diagnostics ──────────────────────────────────────────────────────
+//
+// Lifecycle calls (`start` / `stop` / `reload_config` and the lifecycle-
+// driven restart path in `app/setup.rs`) can fire concurrently from
+// multiple triggers — user clicks, Wi-Fi switch debounce, watchdog,
+// tray toggles. When one of them ends in "port 6789 is occupied", the
+// only way to tell *which* path collided is if every entry records an
+// `action=N` token, plus a snapshot of `ProcessManager` (child PID,
+// liveness) and the port listener state. These helpers are the raw
+// inputs for that snapshot — cheap, no behaviour change.
+
+/// Monotonic per-process action counter. Prefix lifecycle log lines
+/// with `action=N` so overlapping calls from independent triggers can
+/// be untangled purely from the log stream.
+pub(crate) fn next_action_token() -> u64 {
+    static COUNTER: AtomicU64 = AtomicU64::new(0);
+    COUNTER.fetch_add(1, Ordering::Relaxed)
+}
+
+/// Wall-clock of the previous `reload_config` entry. The frontend
+/// (`vpnServiceManager.reload`) does NOT serialize calls, so two
+/// quickly-successive config edits dispatch two `pkill -HUP` without
+/// any interlock. A short delta here flags that situation.
+fn note_reload_entry() -> Option<Duration> {
+    static LAST: OnceLock<Mutex<Option<Instant>>> = OnceLock::new();
+    let slot = LAST.get_or_init(|| Mutex::new(None));
+    let mut guard = slot.lock().unwrap_or_else(|e| e.into_inner());
+    let elapsed = guard.map(|t| t.elapsed());
+    *guard = Some(Instant::now());
+    elapsed
+}
+
+/// Best-effort check: is *something* already listening on
+/// 127.0.0.1:6789 (Mixed inbound) right now? A successful connect
+/// means the port is bound — used as a pre-flight before spawning a
+/// fresh sing-box and as a post-flight after `pkill -HUP` to detect
+/// a failed rebind.
+pub(crate) fn probe_mixed_port_listening() -> bool {
+    use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpStream};
+    let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 6789);
+    TcpStream::connect_timeout(&addr, Duration::from_millis(100)).is_ok()
+}
+
+/// `kill(pid, 0)` probe — returns true if the PID still refers to a
+/// live process we have permission to signal. Useful to distinguish
+/// "ProcessManager still holds a handle but the process is already
+/// dead" from "the process is genuinely alive and we're about to
+/// spawn on top of it".
+#[cfg(unix)]
+pub(crate) fn pid_is_alive(pid: u32) -> bool {
+    unsafe { libc::kill(pid as i32, 0) == 0 }
+}
+
+#[cfg(not(unix))]
+pub(crate) fn pid_is_alive(_pid: u32) -> bool {
+    true
+}
+
+/// Snapshot of `ProcessManager` for a single log line. `(child_pid,
+/// child_pid_alive, mode)`.
+fn pm_snapshot() -> (Option<u32>, Option<bool>, Option<ProxyMode>) {
+    let mgr = ProcessManager::acquire();
+    let pid = mgr.child.as_ref().map(|c| c.pid());
+    let alive = pid.map(pid_is_alive);
+    let mode = mgr.mode.as_ref().map(|m| (**m).clone());
+    (pid, alive, mode)
+}
 
 
 // ── ProcessManager ────────────────────────────────────────────────────
@@ -61,13 +131,33 @@ lazy_static! {
 
 #[tauri::command]
 pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Result<(), String> {
-    ::log::info!("Starting proxy process in mode: {:?}", mode);
+    let action = next_action_token();
+    let (pm_pid, pm_alive, pm_mode) = pm_snapshot();
+    let port_listening = probe_mixed_port_listening();
+    let cur_state_kind = app.state::<EngineStateCell>().snapshot().kind();
+    ::log::info!(
+        "[start] action={action} mode={:?} state={} pm_child_pid={:?} pm_child_alive={:?} pm_mode={:?} :6789_listener={}",
+        mode, cur_state_kind, pm_pid, pm_alive, pm_mode, port_listening
+    );
+    // Loud flag for the two "about to collide" preconditions. Either alone
+    // is enough to explain a subsequent EADDRINUSE in sing-box stderr.
+    if port_listening {
+        ::log::warn!(
+            "[start] action={action} :6789 already has a listener on entry — previous sing-box still bound?"
+        );
+    }
+    if matches!(pm_alive, Some(true)) {
+        ::log::warn!(
+            "[start] action={action} pm_child_pid={:?} still alive on entry — spawning on top of a live process",
+            pm_pid
+        );
+    }
 
     {
         let cur = app.state::<EngineStateCell>().snapshot();
         if !matches!(cur, EngineState::Idle { .. } | EngineState::Failed { .. }) {
             ::log::warn!(
-                "[start] engine in {} state, forcing MarkIdle before restart",
+                "[start] action={action} engine in {} state, forcing MarkIdle before restart",
                 cur.kind()
             );
             let _ = transition(&app, Intent::MarkIdle);
@@ -87,7 +177,7 @@ pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Resu
     // core just drives state-machine transitions and hands off to the
     // readiness prober once the spawn call returns.
     if let Err(e) = PlatformEngine::start(&app, mode.clone(), path).await {
-        ::log::error!("Failed to start engine: {}", e);
+        ::log::error!("[start] action={action} PlatformEngine::start failed: {}", e);
         // Start can fail partway through (e.g. proxy set fails after the
         // child has already spawned). Ask the platform to tear down whatever
         // it did set up so we don't leak a half-started engine.
@@ -101,14 +191,24 @@ pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Resu
     // round-trips through the privileged companion, SystemProxy just
     // spawns a user-mode sidecar.
     tokio::time::sleep(PlatformEngine::start_settle_delay(&mode)).await;
-    ::log::info!("Proxy process spawn returned; handing off to readiness prober");
+    let (post_pid, post_alive, _) = pm_snapshot();
+    ::log::info!(
+        "[start] action={action} spawn returned, handing off to readiness prober (pm_child_pid={:?} alive={:?})",
+        post_pid, post_alive
+    );
     readiness::spawn(app.clone(), start_epoch);
     Ok(())
 }
 
 #[tauri::command]
 pub async fn stop(app: tauri::AppHandle) -> Result<(), String> {
-    ::log::info!("Stopping proxy process");
+    let action = next_action_token();
+    let (pm_pid, pm_alive, pm_mode) = pm_snapshot();
+    let cur_state_kind = app.state::<EngineStateCell>().snapshot().kind();
+    ::log::info!(
+        "[stop] action={action} state={} pm_child_pid={:?} pm_child_alive={:?} pm_mode={:?}",
+        cur_state_kind, pm_pid, pm_alive, pm_mode
+    );
 
     {
         let cur = app.state::<EngineStateCell>().snapshot();
@@ -128,7 +228,7 @@ pub async fn stop(app: tauri::AppHandle) -> Result<(), String> {
     // process exit is observed asynchronously by the process monitor which
     // then calls PlatformEngine::on_process_terminated for DNS restore.
     if let Err(e) = PlatformEngine::stop(&app).await {
-        ::log::error!("Engine stop returned error: {}", e);
+        ::log::error!("[stop] action={action} PlatformEngine::stop returned error: {}", e);
     }
 
     // Linux and Windows don't go through readiness tick on stop, so drop
@@ -141,7 +241,19 @@ pub async fn stop(app: tauri::AppHandle) -> Result<(), String> {
 
     ProcessManager::acquire().reset();
 
-    ::log::info!("Proxy process stopped");
+    // Post-stop port probe: `PlatformEngine::stop` only SIGTERMs + sleeps
+    // 500ms, it does NOT wait for the process to actually exit. If this
+    // line reports `:6789_listener=true`, the next `start` call is about
+    // to collide with a still-alive sing-box.
+    let port_listening = probe_mixed_port_listening();
+    if port_listening {
+        ::log::warn!(
+            "[stop] action={action} returning with :6789 STILL LISTENING — pm_child_pid={:?} may have survived SIGTERM",
+            pm_pid
+        );
+    } else {
+        ::log::info!("[stop] action={action} returned, :6789 released");
+    }
     app.emit(EVENT_STATUS_CHANGED, ()).ok();
     Ok(())
 }
@@ -178,34 +290,73 @@ pub fn get_running_config() -> Option<(ProxyMode, String)> {
 
 #[tauri::command]
 pub async fn reload_config(app: tauri::AppHandle) -> Result<String, String> {
+    let action = next_action_token();
+    let since_last = note_reload_entry();
+    let since_last_str = since_last
+        .map(|d| format!("{}ms", d.as_millis()))
+        .unwrap_or_else(|| "first".into());
+    let (pm_pid, pm_alive, pm_mode) = pm_snapshot();
+    let port_listening = probe_mixed_port_listening();
+    ::log::info!(
+        "[reload] action={action} entry since_last={} pm_child_pid={:?} pm_child_alive={:?} pm_mode={:?} :6789_listener={}",
+        since_last_str, pm_pid, pm_alive, pm_mode, port_listening
+    );
+    if let Some(delta) = since_last {
+        if delta.as_millis() < 2000 {
+            ::log::warn!(
+                "[reload] action={action} back-to-back: only {}ms since last reload — frontend is not serializing",
+                delta.as_millis()
+            );
+        }
+    }
+    if !port_listening {
+        ::log::warn!(
+            "[reload] action={action} :6789 NOT listening on entry — sing-box may already be down; SIGHUP will no-op"
+        );
+    }
+
     #[cfg(any(unix, target_os = "windows"))]
     {
-        // Read the currently-running mode directly from ProcessManager —
-        // callers no longer need to pass it in (the previous `is_tun`
-        // parameter was only used as a consistency check against this
-        // same piece of state).
         let needs_proxy_reset = {
             let manager = ProcessManager::acquire();
             match manager.mode.as_ref().map(|m| m.as_ref()) {
                 Some(ProxyMode::TunProxy) => false,
                 Some(ProxyMode::SystemProxy) => true,
-                None => return Err("No running process found".to_string()),
+                None => {
+                    ::log::warn!("[reload] action={action} rejected: no running process");
+                    return Err("No running process found".to_string());
+                }
             }
         };
 
-        ::log::info!("Reloading config");
+        ::log::info!("[reload] action={action} dispatching PlatformEngine::restart");
         PlatformEngine::restart(&app).await?;
 
         if needs_proxy_reset {
-            ::log::info!("SystemProxy mode detected, waiting for reload and resetting proxy");
+            ::log::info!(
+                "[reload] action={action} SystemProxy — sleeping 500ms for sing-box rebind, then re-apply proxy"
+            );
             tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+            let still_listening = probe_mixed_port_listening();
+            if !still_listening {
+                // Decisive signal: SIGHUP was sent, 500ms later the port
+                // has no listener. Either (a) sing-box's Close()+create()
+                // cycle hasn't rebound yet (bind failed, Close took too
+                // long, log.Fatal exit), or (b) sing-box died outright.
+                ::log::warn!(
+                    "[reload] action={action} :6789 NOT listening 500ms after SIGHUP — sing-box rebind FAILED or process died"
+                );
+            } else {
+                ::log::info!("[reload] action={action} :6789 listener up 500ms after SIGHUP");
+            }
             if let Err(e) = crate::engine::apply_system_proxy(&app).await {
-                ::log::error!("Failed to reset system proxy after reload: {}", e);
+                ::log::error!("[reload] action={action} re-apply system proxy failed: {}", e);
                 return Err(format!("Config reloaded but failed to reset proxy: {}", e));
             }
-            ::log::info!("System proxy reset successfully after reload");
+            ::log::info!("[reload] action={action} system proxy re-applied");
         }
 
+        ::log::info!("[reload] action={action} done");
         Ok("Configuration reloaded successfully".to_string())
     }
 

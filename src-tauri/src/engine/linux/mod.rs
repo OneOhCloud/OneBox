@@ -246,10 +246,13 @@ impl EngineManager for LinuxEngine {
                     .map_err(|e| format!("sidecar lookup failed: {}", e))?
                     .args(["run", "-c", &config_path, "--disable-color"]);
                 let (rx, child) = cmd.spawn().map_err(|e| format!("spawn failed: {}", e))?;
+                let child_pid = child.pid();
+                log::info!("[sing-box] spawned pid={} mode=SystemProxy", child_pid);
                 crate::core::monitor::spawn_process_monitor(
                     app.clone(),
                     rx,
                     Arc::new(mode.clone()),
+                    child_pid,
                 );
                 {
                     let mut mgr = crate::core::ProcessManager::acquire();
@@ -289,10 +292,15 @@ impl EngineManager for LinuxEngine {
                 )
                 .ok_or_else(|| "pkexec command not available".to_string())?;
                 let (rx, child) = cmd.spawn().map_err(|e| format!("spawn failed: {}", e))?;
+                let child_pid = child.pid();
+                // On Linux TUN this pid is pkexec; sing-box is its child.
+                // Kept in the log as "child_pid" so the reader isn't misled.
+                log::info!("[sing-box] spawned pid={} (pkexec) mode=TunProxy", child_pid);
                 crate::core::monitor::spawn_process_monitor(
                     app.clone(),
                     rx,
                     Arc::new(mode.clone()),
+                    child_pid,
                 );
                 {
                     let mut mgr = crate::core::ProcessManager::acquire();

@@ -11,12 +11,24 @@ use super::{ProcessManager, ProxyMode};
 
 /// Spawn the sing-box stdout/stderr monitor as a tokio task.
 /// Routes output to log file + frontend events, and handles termination.
+///
+/// `child_pid` is the OS pid of the process Tauri spawned — on macOS
+/// / Windows SystemProxy and Linux SystemProxy it's sing-box itself,
+/// on Linux TUN it's `pkexec` (sing-box runs as its child). It's only
+/// used as a stable identifier in log lines so Terminated / stderr
+/// bind-error / spawn entries can be correlated across the full log.
 pub(crate) fn spawn_process_monitor(
     app: tauri::AppHandle,
     mut rx: tauri::async_runtime::Receiver<tauri_plugin_shell::process::CommandEvent>,
     mode: Arc<ProxyMode>,
+    child_pid: u32,
 ) {
     let mut singbox_log = create_singbox_log_writer(&app);
+    let spawn_at = std::time::Instant::now();
+    log::info!(
+        "[sing-box] monitor attached pid={} mode={:?}",
+        child_pid, mode
+    );
     tokio::spawn(async move {
         let mut terminated = false;
         let app_status_data = app.state::<AppData>();
@@ -39,18 +51,23 @@ pub(crate) fn spawn_process_monitor(
                 tauri_plugin_shell::process::CommandEvent::Stderr(line) => {
                     let line_str = String::from_utf8_lossy(&line);
                     write_singbox_log(&mut singbox_log, &line_str);
+                    scan_stderr_for_bind_error(child_pid, &line_str);
                     app_status_data.write(line_str.to_string(), LogType::Info);
                 }
                 tauri_plugin_shell::process::CommandEvent::Error(err) => {
-                    log::error!("sing-box process error: {}", err);
+                    log::error!("[sing-box] pid={} process error: {}", child_pid, err);
                     write_singbox_log(&mut singbox_log, &format!("[ERROR] {}", err));
                     app_status_data.write(err.to_string(), LogType::Error);
                 }
                 tauri_plugin_shell::process::CommandEvent::Terminated(payload) => {
                     terminated = true;
+                    let runtime = spawn_at.elapsed();
                     log::info!(
-                        "sing-box process terminated with exit code: {:?}",
-                        payload.code
+                        "[sing-box] pid={} terminated runtime={:.2}s code={:?} signal={:?}",
+                        child_pid,
+                        runtime.as_secs_f64(),
+                        payload.code,
+                        payload.signal
                     );
                     #[allow(unused_variables)]
                     let adjusted_payload = {
@@ -78,6 +95,29 @@ pub(crate) fn spawn_process_monitor(
             }
         }
     });
+}
+
+/// Sing-box emits `listen tcp 127.0.0.1:6789: bind: address already in
+/// use` (or the platform's localized equivalent) on stderr when its
+/// Mixed inbound's `listenConfig.Listen()` returns EADDRINUSE. The raw
+/// line goes to sing-box.log regardless; we additionally echo a
+/// prominent warn to the main OneBox.log so triage doesn't need to
+/// cross-reference two files.
+fn scan_stderr_for_bind_error(pid: u32, line: &str) {
+    let lc = line.to_ascii_lowercase();
+    if lc.contains("address already in use") || lc.contains("eaddrinuse") {
+        log::warn!(
+            "[sing-box] pid={} BIND FAILED: {}",
+            pid,
+            line.trim_end()
+        );
+    } else if lc.contains("listen tcp") && lc.contains("bind:") {
+        log::warn!(
+            "[sing-box] pid={} listener error: {}",
+            pid,
+            line.trim_end()
+        );
+    }
 }
 
 /// Handle sing-box process termination (intentional stop or crash).

@@ -182,10 +182,13 @@ impl EngineManager for WindowsEngine {
                     .map_err(|e| format!("sidecar lookup failed: {}", e))?
                     .args(["run", "-c", &config_path, "--disable-color"]);
                 let (rx, child) = cmd.spawn().map_err(|e| format!("spawn failed: {}", e))?;
+                let child_pid = child.pid();
+                log::info!("[sing-box] spawned pid={} mode=SystemProxy", child_pid);
                 crate::core::monitor::spawn_process_monitor(
                     app.clone(),
                     rx,
                     Arc::new(mode.clone()),
+                    child_pid,
                 );
                 {
                     let mut mgr = crate::core::ProcessManager::acquire();
