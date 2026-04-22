@@ -497,6 +497,15 @@ int onebox_helper_install(char **error_out) {
             return 3;
         }
 
+        // SMJobBless just replaced the helper process; the old mach port is
+        // destroyed. The OS invalidationHandler fires asynchronously on an XPC
+        // private queue, so a post-bless caller may race it and return the
+        // stale _connection pointing at the dead port (first XPC call then
+        // errors with "Couldn't communicate..."). Drop the cache synchronously
+        // so the next -[OneBoxHelperClient connection] lazily rebuilds against
+        // the new helper's fresh mach port.
+        [[OneBoxHelperClient sharedClient] invalidate];
+
         return 0;
     }
 }
