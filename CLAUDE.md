@@ -1,5 +1,11 @@
 # OneBox — Project Notes for Claude
 
+## Dispatch protocol (hard rule)
+
+Dispatch protocol is mandatory. Main Claude does NOT edit production code directly — dispatch `implementer` (forward work) or `investigator` (root-cause) first. Inline work is allowed ONLY for the exhaustive exceptions listed in `~/.claude/orchestrator.md § orchestrator rules § rule 5 (exhaustive)` (meta-docs, read-only Q&A, standard-gate runs, ≤ 3-LOC typo/comment fixes, git inspection, user-facing summaries). No size-based escape hatch.
+
+---
+
 ## Reading guide
 
 **Table of contents**:
@@ -239,6 +245,10 @@ That string is the **only** signal. The privileged helper is a launchd-managed r
 
 The bump is the declaration "I changed helper source; existing users should pick it up on their next launch." Reserve it for real changes.
 
+### Checklist when extending the helper XPC protocol
+
+Every new parameter on a helper method touches 6 files in strict order — drift here is silent until a user hits the new path: (1) `src-tauri/helper/Sources/protocol.m` (interface) → (2) `helper.m` validator + method impl → (3) `helper/Info.plist` `CFBundleVersion` bump (see below) → (4) Rust FFI decl in `src-tauri/src/engine/macos/helper.rs` → (5) Obj-C shim in same file → (6) call site in `mod.rs`. Verify with `scripts/build-helper.sh` + `otool -s __TEXT __info_plist <helper-bin>`. Skipping any step = new code silently runs against old helper after install.
+
 ### Format
 
 Apple spec: both fields are **period-separated non-negative integers**, no suffixes, no letters.
@@ -322,6 +332,8 @@ script:
 
 A second invocation re-runs cleanly because step 2 starts with
 `git reset --hard HEAD` to unwind the previous patch.
+
+**CWD reminder**: every `Bash` call starts from the project root; shell state does NOT persist between calls (per global CLAUDE.md). Use absolute paths (`cargo check --manifest-path src-tauri/Cargo.toml`, `bash /abs/path/to/scripts/build-helper.sh`) instead of `cd src-tauri && …` — chaining `cd` breaks the next tool call's assumptions and wastes rounds re-locating files.
 
 If you discover a real bug during a linux-check round, fold the fix into
 the **same** working-tree diff and rerun `make linux-check` until it's
