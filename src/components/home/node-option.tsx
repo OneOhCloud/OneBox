@@ -29,7 +29,7 @@ interface NodeOptionProps {
 // 样式常量
 const STYLES = {
     container: 'flex justify-between items-center w-full',
-    nodeName: 'truncate font-medium flex-1 min-w-0',
+    nodeName: 'truncate font-medium flex-1 min-w-0 text-sm',
     delayContainer: 'ml-2 text-sm font-medium transition-all duration-300 ease flex items-center gap-1.5',
     delayDot: 'inline-block w-2 h-2 rounded-full transition-all duration-300 ease',
     startingContainer: 'onebox-select'
@@ -94,19 +94,19 @@ interface DelayIndicatorProps {
 const DelayIndicator = ({ delay, showDelay, delayText }: DelayIndicatorProps) => {
     const displayText = delay === '-' ? delayText : `${delay}ms`;
 
-    if (!showDelay) {
-        return (
-            <span className="onebox-spinner onebox-spinner-dots onebox-spinner-sm">
-                <span />
-                <span />
-                <span />
-            </span>
-        );
-    }
-
     return (
-        <div className="ml-2 text-sm font-medium transition-all duration-300 ease">
-            {displayText}
+        <div className="h-5 flex items-center justify-end">
+            {showDelay ? (
+                <div className="ml-2 text-sm font-medium transition-all duration-300 ease">
+                    {displayText}
+                </div>
+            ) : (
+                <span className="onebox-spinner onebox-spinner-dots onebox-spinner-sm">
+                    <span />
+                    <span />
+                    <span />
+                </span>
+            )}
         </div>
     );
 };

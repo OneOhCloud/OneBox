@@ -1,6 +1,7 @@
 import { useSubscriptions } from "../../hooks/useDB";
 import { t, vpnServiceManager } from "../../utils/helper";
 import { AppleNetworkStatus, GoogleNetworkStatus } from "./network-check";
+import NetworkSpeed from "./network-speed";
 import SelectSub from "./select-config";
 import SelectNode from "./select-node";
 
@@ -70,6 +71,8 @@ export default function Body({
                 <SectionLabel>{t("node_selection")}</SectionLabel>
                 <SelectNode isRunning={isRunning} />
             </section>
+
+            <NetworkSpeed isRunning={isRunning} />
         </div>
     );
 }

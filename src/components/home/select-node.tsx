@@ -59,7 +59,7 @@ export default function SelectNode(props: SelectNodeProps) {
     if (isLoading || !data) {
         return (
             <AppleSelectPlaceholder tone="loading">
-                <span className="inline-flex items-center gap-2">
+                <span className="min-h-5 inline-flex items-center gap-2">
                     <span className="inline-block size-3 rounded-full bg-blue-500/20 animate-pulse" />
                     <span
                         className="h-3 w-24 rounded-full animate-pulse"
