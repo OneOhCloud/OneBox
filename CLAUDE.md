@@ -2,7 +2,7 @@
 
 ## Dispatch protocol (hard rule)
 
-Dispatch protocol is mandatory. Main Claude does NOT edit production code directly — dispatch `implementer` (forward work) or `investigator` (root-cause) first. Inline work is allowed ONLY for the exhaustive exceptions listed in `~/.claude/orchestrator.md § orchestrator rules § rule 5 (exhaustive)` (meta-docs, read-only Q&A, standard-gate runs, ≤ 3-LOC typo/comment fixes, git inspection, user-facing summaries). No size-based escape hatch.
+Dispatch protocol is mandatory. Main Claude does NOT edit production code directly — dispatch `implementer` (forward work) or `investigator` (root-cause) first. **The dispatch barrier covers Reads, greps, and Bash searches against production code too, whenever the next planned step is a dispatch.** Pre-dispatch anchor-finding, brief preparation, and "let me just peek at the file first" all belong inside the worker's first round, not the orchestrator's preamble — bundle the file path into the brief and let the worker read. Inline work is allowed ONLY for the exhaustive exceptions listed in `~/.claude/orchestrator.md § orchestrator rules § rule 5 (exhaustive)` (meta-docs, read-only Q&A whose answer is returned as-is, standard-gate runs, ≤ 3-LOC typo/comment fixes, git inspection, user-facing summaries) — and "read-only" in rule 5 means **the read IS the final deliverable**, not a preamble to dispatch. No size-based escape hatch; no pre-dispatch-read escape hatch.
 
 ---
 
