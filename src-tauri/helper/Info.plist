@@ -16,9 +16,9 @@
          treats it as up-to-date. There is no automatic sync; see the
          "Privileged helper version bump" section in CLAUDE.md. -->
     <key>CFBundleShortVersionString</key>
-    <string>1.0.1</string>
+    <string>1.0.2</string>
     <key>CFBundleVersion</key>
-    <string>2</string>
+    <string>3</string>
     <key>SMAuthorizedClients</key>
     <array>
         <string>identifier "cloud.oneoh.onebox" and anchor apple generic and certificate 1[field.1.2.840.113635.100.6.2.6] /* exists */ and certificate leaf[field.1.2.840.113635.100.6.1.13] /* exists */ and certificate leaf[subject.OU] = "GN2W3N34TM"</string>

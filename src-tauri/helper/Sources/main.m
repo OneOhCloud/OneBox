@@ -22,8 +22,10 @@
 // bypassed:
 //
 //   - startSingBox: config path must live under the caller's Application
-//     Support directory; the sing-box binary path is derived from the
-//     caller's SecCode bundle, never passed by the caller.
+//     Support directory; log path must live under the caller's
+//     ~/Library/Logs/cloud.oneoh.onebox/ directory; the sing-box binary
+//     path is derived from the caller's SecCode bundle, never passed by
+//     the caller.
 //   - stopSingBox / reloadSingBox: operate only on the pid the helper
 //     itself spawned, never an arbitrary pid.
 //   - setDnsServers: service name restricted to [A-Za-z0-9 _-], dns spec
@@ -63,6 +65,7 @@
 - (void)pingWithReply:(void (^)(NSString *reply))reply;
 
 - (void)startSingBoxWithConfigPath:(NSString *)configPath
+                            logPath:(NSString *)logPath
                               reply:(void (^)(int pid, NSString *error))reply;
 
 - (void)stopSingBoxWithReply:(void (^)(NSString *error))reply;
@@ -221,6 +224,29 @@ static NSString *validateConfigPath(NSString *path) {
     return nil;
 }
 
+// Log path must be absolute, end with .log, not traverse outside the
+// caller's per-user logs dir, and sit inside
+// ~/Library/Logs/cloud.oneoh.onebox/. We don't require the file to pre-
+// exist — the helper will create it (mode 0644, root-owned, user-readable
+// because the user owns the parent dir and can unlink via Rust-side
+// rotation). The dir itself must already exist; the Rust caller runs
+// `create_dir_all` before the XPC call.
+static NSString *validateLogPath(NSString *path) {
+    if (path.length == 0) return @"log path is empty";
+    if (![path isAbsolutePath]) return @"log path must be absolute";
+    if (![path.pathExtension isEqualToString:@"log"]) return @"log path must end with .log";
+    if ([path rangeOfString:@"/../"].location != NSNotFound) return @"log path must not contain /../";
+    if ([path rangeOfString:@"/Library/Logs/cloud.oneoh.onebox/"].location == NSNotFound) {
+        return @"log path must be under ~/Library/Logs/cloud.oneoh.onebox/";
+    }
+    NSString *parent = [path stringByDeletingLastPathComponent];
+    BOOL isDir = NO;
+    if (![[NSFileManager defaultManager] fileExistsAtPath:parent isDirectory:&isDir] || !isDir) {
+        return @"log path parent directory does not exist";
+    }
+    return nil;
+}
+
 static NSString *validateServiceName(NSString *name) {
     if (name.length == 0 || name.length > 64) return @"service name length out of range";
     static NSCharacterSet *allowed = nil;
@@ -357,8 +383,14 @@ static NSString *runTool(NSString *tool, NSArray<NSString *> *args) {
 // startSingBox
 // ------------------------------------------------------------------
 - (void)startSingBoxWithConfigPath:(NSString *)configPath
+                            logPath:(NSString *)logPath
                               reply:(void (^)(int pid, NSString *error))reply {
     NSString *validationError = validateConfigPath(configPath);
+    if (validationError) {
+        reply(0, validationError);
+        return;
+    }
+    validationError = validateLogPath(logPath);
     if (validationError) {
         reply(0, validationError);
         return;
@@ -408,10 +440,22 @@ static NSString *runTool(NSString *tool, NSArray<NSString *> *args) {
 
         posix_spawn_file_actions_t actions;
         posix_spawn_file_actions_init(&actions);
-        // Don't let sing-box inherit our stdin (launchd daemon's is already
-        // /dev/null, but be explicit). Stdout/stderr are inherited so
-        // sing-box output lands in the helper's unified log stream.
+        // stdin → /dev/null. launchd already gives us /dev/null on fd 0, but
+        // be explicit so sing-box cannot block on a stray read.
         posix_spawn_file_actions_addopen(&actions, STDIN_FILENO, "/dev/null", O_RDONLY, 0);
+        // stdout + stderr → the user-owned sing-box-<date>.log file. Before
+        // this change they inherited the helper's fds (both /dev/null by
+        // launchd default), so sing-box's kernel output was silently
+        // dropped in TUN mode. Opening with O_WRONLY|O_CREAT|O_APPEND +
+        // mode 0644 makes the file root-owned but user-readable; Rust-side
+        // rotation (compress_singbox_log / prune sweep) works because the
+        // user owns the parent directory, so unlink() is permitted even
+        // though the log files themselves are owned by root.
+        const char *logC = logPath.UTF8String;
+        posix_spawn_file_actions_addopen(&actions, STDOUT_FILENO, logC,
+            O_WRONLY | O_CREAT | O_APPEND, 0644);
+        posix_spawn_file_actions_addopen(&actions, STDERR_FILENO, logC,
+            O_WRONLY | O_CREAT | O_APPEND, 0644);
 
         posix_spawnattr_t attrs;
         posix_spawnattr_init(&attrs);

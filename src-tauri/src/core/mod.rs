@@ -2,6 +2,8 @@ mod log;
 pub(crate) mod monitor;
 
 pub use self::log::cleanup_old_onebox_logs;
+#[cfg(target_os = "macos")]
+pub(crate) use self::log::resolve_singbox_log_path;
 
 use lazy_static::lazy_static;
 use std::sync::atomic::{AtomicU64, Ordering};

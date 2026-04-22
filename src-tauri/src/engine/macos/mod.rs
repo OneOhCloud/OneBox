@@ -244,8 +244,20 @@ pub fn start_tun_via_helper(app: &AppHandle, config_path: &str) -> Result<i32, S
     // stops. See `dns_watcher` for the callback contract.
     dns_watcher::ensure_started();
 
-    let pid = macos_helper::api::start_sing_box(config_path)?;
-    log::info!("[helper] sing-box started, pid={}", pid);
+    // Resolve today's sing-box log path (runs 7-day prune + previous-day
+    // compression as a side effect) and hand it to the helper so sing-box's
+    // stdout/stderr land in the same sing-box-<date>.log file that
+    // SystemProxy mode writes to. We intentionally hard-fail TUN start if
+    // the path can't be resolved — this path is essentially infallible on
+    // macOS (app_log_dir() + create_dir_all on a user-owned dir), and a
+    // silent fallback to /dev/null would re-introduce exactly the "no
+    // sing-box kernel log" bug this change is fixing.
+    let log_path = crate::core::resolve_singbox_log_path(app)
+        .ok_or_else(|| "failed to resolve sing-box log path".to_string())?;
+    let log_path_str = log_path.to_string_lossy();
+
+    let pid = macos_helper::api::start_sing_box(config_path, &log_path_str)?;
+    log::info!("[helper] sing-box started, pid={} log={}", pid, log_path_str);
     Ok(pid)
 }
 

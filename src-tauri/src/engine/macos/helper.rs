@@ -19,6 +19,7 @@ mod ffi {
 
         pub fn onebox_helper_start_sing_box(
             config_path: *const c_char,
+            log_path: *const c_char,
             pid_out: *mut c_int,
             error_out: *mut *mut c_char,
         ) -> c_int;
@@ -173,12 +174,18 @@ pub mod api {
         call_error_only(|err_out| unsafe { ffi::onebox_helper_install(err_out) })
     }
 
-    pub fn start_sing_box(config_path: &str) -> Result<i32, String> {
+    pub fn start_sing_box(config_path: &str, log_path: &str) -> Result<i32, String> {
         let c_path = to_cstring(config_path, "config_path")?;
+        let c_log = to_cstring(log_path, "log_path")?;
         let mut pid: std::os::raw::c_int = 0;
         let mut err: *mut std::os::raw::c_char = ptr::null_mut();
         let rc = unsafe {
-            ffi::onebox_helper_start_sing_box(c_path.as_ptr(), &mut pid, &mut err)
+            ffi::onebox_helper_start_sing_box(
+                c_path.as_ptr(),
+                c_log.as_ptr(),
+                &mut pid,
+                &mut err,
+            )
         };
         let message = consume_cstring(err);
         if rc == 0 && pid > 0 {
@@ -234,7 +241,9 @@ pub mod api {
 
     pub fn ping() -> Result<String, String> { Err(MSG.to_string()) }
     pub fn install() -> Result<(), String> { Err(MSG.to_string()) }
-    pub fn start_sing_box(_config_path: &str) -> Result<i32, String> { Err(MSG.to_string()) }
+    pub fn start_sing_box(_config_path: &str, _log_path: &str) -> Result<i32, String> {
+        Err(MSG.to_string())
+    }
     pub fn stop_sing_box() -> Result<(), String> { Err(MSG.to_string()) }
     pub fn reload_sing_box() -> Result<(), String> { Err(MSG.to_string()) }
     pub fn set_ip_forwarding(_enable: bool) -> Result<(), String> { Err(MSG.to_string()) }

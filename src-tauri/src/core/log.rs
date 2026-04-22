@@ -79,18 +79,24 @@ pub(super) fn cleanup_old_singbox_logs(log_dir: &Path, keep_days: u64) {
     }
 }
 
-/// Create a daily-rotated log file writer for sing-box output.
-/// In a single directory scan: removes logs older than 7 days, compresses
-/// previous days' logs that are still uncompressed.
-pub(super) fn create_singbox_log_writer(app: &AppHandle) -> Option<std::fs::File> {
-    let log_dir = app.path().app_log_dir().ok()?;
-    std::fs::create_dir_all(&log_dir).ok()?;
+/// Run the daily housekeeping on `log_dir` and return today's sing-box
+/// log path. Pure-ish filesystem helper split out of
+/// `create_singbox_log_writer` so the TUN path can reuse the rotation /
+/// compression / 7-day-prune logic before handing the path over to the
+/// privileged helper (which will open the file itself as root).
+///
+/// In a single directory scan: prunes entries older than 7 days
+/// (both `.log` and `.log.gz`), compresses previous days' still-plain
+/// logs. Does NOT create or open the returned path — callers do that
+/// step (or delegate it to the helper).
+pub(crate) fn prepare_singbox_log_dir(log_dir: &Path) -> std::io::Result<std::path::PathBuf> {
+    std::fs::create_dir_all(log_dir)?;
 
     let date = today_date_string();
     let log_path = log_dir.join(format!("sing-box-{}.log", date));
     let cutoff = std::time::SystemTime::now() - std::time::Duration::from_secs(7 * 86400);
 
-    if let Ok(entries) = std::fs::read_dir(&log_dir) {
+    if let Ok(entries) = std::fs::read_dir(log_dir) {
         for entry in entries.flatten() {
             let name = entry.file_name();
             let name_str = name.to_string_lossy();
@@ -121,6 +127,26 @@ pub(super) fn create_singbox_log_writer(app: &AppHandle) -> Option<std::fs::File
         }
     }
 
+    Ok(log_path)
+}
+
+/// Resolve the per-platform app-log dir and hand it to
+/// `prepare_singbox_log_dir`. Used by macOS TUN (helper opens the file
+/// as root) and by `create_singbox_log_writer` below.
+pub(crate) fn resolve_singbox_log_path(app: &AppHandle) -> Option<std::path::PathBuf> {
+    let log_dir = app.path().app_log_dir().ok()?;
+    prepare_singbox_log_dir(&log_dir)
+        .map_err(|e| log::warn!("[sing-box] prepare log dir failed: {}", e))
+        .ok()
+}
+
+/// Create a daily-rotated log file writer for sing-box output. Used by
+/// `spawn_process_monitor` — i.e. every mode where Tauri itself owns
+/// the sing-box process (macOS/Windows SystemProxy, Linux TUN+SystemProxy).
+/// macOS TUN doesn't go through here: the helper opens the file as root
+/// directly, see `engine::macos::start_tun_via_helper`.
+pub(super) fn create_singbox_log_writer(app: &AppHandle) -> Option<std::fs::File> {
+    let log_path = resolve_singbox_log_path(app)?;
     std::fs::OpenOptions::new()
         .create(true)
         .append(true)
@@ -188,6 +214,61 @@ fn sweep_onebox_logs(log_dir: &Path, cutoff: std::time::SystemTime) {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod singbox_log_dir_tests {
+    use super::{prepare_singbox_log_dir, today_date_string};
+    use std::fs::File;
+    use std::time::{Duration, SystemTime};
+
+    fn touch(path: &std::path::Path, age_days: u64) {
+        File::create(path).expect("create test log");
+        let mtime = SystemTime::now() - Duration::from_secs(age_days * 86400);
+        filetime::set_file_mtime(path, filetime::FileTime::from_system_time(mtime))
+            .expect("set mtime");
+    }
+
+    #[test]
+    fn returns_todays_log_path_and_runs_housekeeping() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let dir = tmp.path();
+
+        let today = today_date_string();
+        let today_log = dir.join(format!("sing-box-{}.log", today));
+        let yesterday_log = dir.join("sing-box-1970-01-01.log"); // old uncompressed
+        let stale_gz = dir.join("sing-box-1970-01-01.log.gz"); // old compressed
+        let recent_gz = dir.join("sing-box-2026-04-20.log.gz"); // 1 day old — keep
+        let unrelated = dir.join("other.log");
+
+        touch(&today_log, 0);
+        touch(&yesterday_log, 30);
+        touch(&stale_gz, 30);
+        touch(&recent_gz, 1);
+        touch(&unrelated, 30);
+
+        let returned = prepare_singbox_log_dir(dir).expect("resolve");
+
+        assert_eq!(returned, today_log, "must resolve today's path");
+        assert!(today_log.exists(), "today's log must be preserved");
+        assert!(!stale_gz.exists(), "stale .gz beyond 7d must be pruned");
+        assert!(recent_gz.exists(), "recent .gz within 7d must survive");
+        assert!(unrelated.exists(), "unrelated files are not touched");
+        // The old uncompressed yesterday log is either pruned (age > 7d) OR
+        // compressed in place; both outcomes are acceptable and neither leaves
+        // the original .log file behind.
+        assert!(!yesterday_log.exists(), "old uncompressed log must not remain");
+    }
+
+    #[test]
+    fn creates_missing_log_dir() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let nested = tmp.path().join("a").join("b");
+        assert!(!nested.exists());
+        let returned = prepare_singbox_log_dir(&nested).expect("resolve");
+        assert!(nested.is_dir(), "parent dir must be created");
+        assert_eq!(returned.parent(), Some(nested.as_path()));
     }
 }
 

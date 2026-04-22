@@ -34,6 +34,7 @@ static const int64_t kOneBoxHelperStartTimeoutSeconds = 30;
 @protocol OneBoxHelperProtocol
 - (void)pingWithReply:(void (^)(NSString *reply))reply;
 - (void)startSingBoxWithConfigPath:(NSString *)configPath
+                            logPath:(NSString *)logPath
                               reply:(void (^)(int pid, NSString *error))reply;
 - (void)stopSingBoxWithReply:(void (^)(NSString *error))reply;
 - (void)reloadSingBoxWithReply:(void (^)(NSString *error))reply;
@@ -289,6 +290,7 @@ int onebox_helper_ping(char **reply_out) {
 }
 
 int onebox_helper_start_sing_box(const char *config_path,
+                                  const char *log_path,
                                   int *pid_out,
                                   char **error_out) {
     if (pid_out != NULL) *pid_out = 0;
@@ -300,9 +302,16 @@ int onebox_helper_start_sing_box(const char *config_path,
         }
         return 1;
     }
+    if (log_path == NULL) {
+        if (error_out != NULL) {
+            *error_out = onebox_copy_cstring(@"log_path is null");
+        }
+        return 1;
+    }
 
     @autoreleasepool {
         NSString *configPath = [NSString stringWithUTF8String:config_path];
+        NSString *logPath = [NSString stringWithUTF8String:log_path];
         NSXPCConnection *conn = [[OneBoxHelperClient sharedClient] connection];
 
         __block int resultPid = 0;
@@ -320,6 +329,7 @@ int onebox_helper_start_sing_box(const char *config_path,
         }];
 
         [proxy startSingBoxWithConfigPath:configPath
+                                  logPath:logPath
                                     reply:^(int pid, NSString *error) {
             if (!completed) {
                 resultPid = pid;
