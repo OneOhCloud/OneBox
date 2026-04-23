@@ -718,6 +718,7 @@ impl EngineManager for MacOSEngine {
         app: &AppHandle,
         mode: crate::engine::ProxyMode,
         config_path: String,
+        start_epoch: u64,
     ) -> Result<(), String> {
         use std::sync::Arc;
         use tauri_plugin_shell::ShellExt;
@@ -738,6 +739,7 @@ impl EngineManager for MacOSEngine {
                     rx,
                     Arc::new(mode.clone()),
                     child_pid,
+                    start_epoch,
                 );
                 {
                     let mut mgr = crate::core::ProcessManager::acquire();
@@ -767,6 +769,7 @@ impl EngineManager for MacOSEngine {
                 let exit_app = app.clone();
                 let mode_arc = Arc::new(crate::engine::ProxyMode::TunProxy);
                 let exit_mode = Arc::clone(&mode_arc);
+                let exit_spawn_epoch = start_epoch;
                 tokio::spawn(async move {
                     if let Some(exit) = exit_rx.recv().await {
                         log::info!(
@@ -782,6 +785,7 @@ impl EngineManager for MacOSEngine {
                             &exit_app,
                             &exit_mode,
                             payload,
+                            exit_spawn_epoch,
                         )
                         .await;
                     }

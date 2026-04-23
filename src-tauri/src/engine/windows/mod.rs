@@ -170,6 +170,7 @@ impl EngineManager for WindowsEngine {
         app: &AppHandle,
         mode: crate::engine::ProxyMode,
         config_path: String,
+        start_epoch: u64,
     ) -> Result<(), String> {
         use std::sync::Arc;
         use tauri_plugin_shell::ShellExt;
@@ -189,6 +190,7 @@ impl EngineManager for WindowsEngine {
                     rx,
                     Arc::new(mode.clone()),
                     child_pid,
+                    start_epoch,
                 );
                 {
                     let mut mgr = crate::core::ProcessManager::acquire();
@@ -219,7 +221,7 @@ impl EngineManager for WindowsEngine {
                 // sing-box runs inside the service — no child rx to monitor.
                 // The watchdog polls SCM state and synthesizes
                 // handle_process_termination on external kills / crashes.
-                watchdog::spawn(app.clone(), mode_arc);
+                watchdog::spawn(app.clone(), mode_arc, start_epoch);
                 // SystemProxy setting may linger across mode switches on
                 // Windows; best-effort unset so browsers stop pointing at
                 // the mixed port.

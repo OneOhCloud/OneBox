@@ -34,6 +34,7 @@ pub trait EngineManager {
         app: &AppHandle,
         mode: ProxyMode,
         config_path: String,
+        start_epoch: u64,
     ) -> Result<(), String>;
 
     /// Initiate an orderly stop of the engine: signal sing-box to exit,

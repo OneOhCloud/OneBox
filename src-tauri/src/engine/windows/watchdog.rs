@@ -17,7 +17,7 @@ use crate::core::{ProcessManager, ProxyMode};
 /// observed (and only after we've seen at least one Running tick, so we
 /// don't fire on the initial "not yet started" window), synthesize a
 /// `handle_process_termination` call.
-pub(crate) fn spawn(app: AppHandle, process_mode: Arc<ProxyMode>) {
+pub(crate) fn spawn(app: AppHandle, process_mode: Arc<ProxyMode>, spawn_epoch: u64) {
     tokio::spawn(async move {
         use tun_service::scm::{query_state, QueriedState};
         let mut observed_running = false;
@@ -43,7 +43,7 @@ pub(crate) fn spawn(app: AppHandle, process_mode: Arc<ProxyMode>) {
                         code: Some(0),
                         signal: None,
                     };
-                    handle_process_termination(&app, &process_mode, payload).await;
+                    handle_process_termination(&app, &process_mode, payload, spawn_epoch).await;
                     return;
                 }
                 _ => {}

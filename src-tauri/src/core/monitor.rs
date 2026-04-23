@@ -22,6 +22,7 @@ pub(crate) fn spawn_process_monitor(
     mut rx: tauri::async_runtime::Receiver<tauri_plugin_shell::process::CommandEvent>,
     mode: Arc<ProxyMode>,
     child_pid: u32,
+    spawn_epoch: u64,
 ) {
     let mut singbox_log = create_singbox_log_writer(&app);
     let spawn_at = std::time::Instant::now();
@@ -100,7 +101,7 @@ pub(crate) fn spawn_process_monitor(
                         #[cfg(not(target_os = "windows"))]
                         payload
                     };
-                    handle_process_termination(&app, &mode, adjusted_payload).await;
+                    handle_process_termination(&app, &mode, adjusted_payload, spawn_epoch).await;
                 }
                 _ => {
                     log::debug!("[sing-box-event] pid={} other event received", child_pid);
@@ -133,13 +134,36 @@ fn scan_stderr_for_bind_error(pid: u32, line: &str) {
     }
 }
 
+/// Returns `true` when the termination handler was spawned for an older engine
+/// session and should be skipped. Mirrors the sibling check in
+/// `engine/common/readiness.rs:45`.
+///
+/// Three cases:
+///   `spawn == current` → same session, handle normally → `false`
+///   `spawn < current`  → superseded session, skip         → `true`
+///   `spawn > current`  → should never happen in prod; prefer drop over corrupt → `true`
+#[inline]
+pub(crate) fn epoch_guard_stale(spawn_epoch: u64, current_epoch: u64) -> bool {
+    spawn_epoch != current_epoch
+}
+
 /// Handle sing-box process termination (intentional stop or crash).
 /// Cleans up DNS, proxy, and transitions the state machine.
 pub(crate) async fn handle_process_termination(
     app_handle: &tauri::AppHandle,
     process_mode: &Arc<ProxyMode>,
     payload: tauri_plugin_shell::process::TerminatedPayload,
+    spawn_epoch: u64,
 ) {
+    let current_epoch = app_handle.state::<EngineStateCell>().snapshot().epoch();
+    if epoch_guard_stale(spawn_epoch, current_epoch) {
+        log::info!(
+            "[monitor] guard: stale epoch captured={} current={} mode={:?} code={:?} — skipping cleanup",
+            spawn_epoch, current_epoch, process_mode, payload.code
+        );
+        return;
+    }
+
     #[cfg(target_os = "macos")]
     if crate::engine::macos::watchdog::is_restart_in_progress() {
         log::info!(
@@ -246,5 +270,68 @@ pub(crate) async fn handle_process_termination(
                 cur.kind(), payload.code
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod epoch_guard_tests {
+    use super::epoch_guard_stale;
+
+    #[test]
+    fn same_epoch_is_not_stale() {
+        assert!(!epoch_guard_stale(5, 5));
+    }
+
+    #[test]
+    fn older_spawn_epoch_is_stale() {
+        assert!(epoch_guard_stale(1, 3));
+    }
+
+    #[test]
+    fn spawn_epoch_ahead_of_current_is_stale() {
+        // Should never happen in prod; prefer drop over corrupt state.
+        assert!(epoch_guard_stale(3, 1));
+    }
+}
+
+#[cfg(test)]
+mod engine_state_cell_integration_tests {
+    use crate::engine::state_machine::EngineStateCell;
+    use super::epoch_guard_stale;
+
+    /// Drive EngineStateCell through two start cycles using the real atomic
+    /// (via the public bump_epoch_for_test helper), simulating:
+    ///   Idle{ep=0} → Starting{ep=1} → Idle{ep=2} → Starting{ep=3}
+    ///
+    /// A stale handler carrying spawn_epoch=1 must trip the guard when the
+    /// cell has advanced to ep=3. A handler from the current session (ep=3)
+    /// must pass.
+    ///
+    /// Smoke-check: if epoch_guard_stale is changed to return false
+    /// unconditionally, the first assert below fails.
+    #[test]
+    fn stale_handler_from_first_session_trips_guard_at_third_epoch() {
+        let cell = EngineStateCell::new();
+        assert_eq!(cell.current_epoch(), 0); // Idle{ep=0}
+
+        // First start: Idle → Starting{ep=1}
+        let ep1 = cell.bump_epoch_for_test();
+        assert_eq!(ep1, 1);
+        assert_eq!(cell.current_epoch(), 1);
+
+        // Stop: Starting → Idle{ep=2}
+        let _ep2 = cell.bump_epoch_for_test();
+        assert_eq!(cell.current_epoch(), 2);
+
+        // Second start: Idle → Starting{ep=3}
+        let ep3 = cell.bump_epoch_for_test();
+        assert_eq!(ep3, 3);
+        assert_eq!(cell.current_epoch(), 3);
+
+        // Stale handler from first session must be dropped.
+        assert!(epoch_guard_stale(ep1, cell.current_epoch()));
+
+        // Handler from current session must pass.
+        assert!(!epoch_guard_stale(ep3, cell.current_epoch()));
     }
 }

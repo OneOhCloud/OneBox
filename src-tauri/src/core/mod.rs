@@ -178,7 +178,7 @@ pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Resu
     // watchdogs, and ProcessManager seeding live inside the platform engine.
     // core just drives state-machine transitions and hands off to the
     // readiness prober once the spawn call returns.
-    if let Err(e) = PlatformEngine::start(&app, mode.clone(), path).await {
+    if let Err(e) = PlatformEngine::start(&app, mode.clone(), path, start_epoch).await {
         ::log::error!("[start] action={action} PlatformEngine::start failed: {}", e);
         // Start can fail partway through (e.g. proxy set fails after the
         // child has already spawned). Ask the platform to tear down whatever

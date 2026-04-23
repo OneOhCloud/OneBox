@@ -105,6 +105,18 @@ impl Default for EngineStateCell {
     }
 }
 
+#[cfg(test)]
+impl EngineStateCell {
+    /// Increment the epoch counter and return the new value. Exists only to
+    /// let tests in sibling modules drive the cell without needing an AppHandle
+    /// or going through `transition()`. Mirrors the SeqCst bump inside
+    /// `transition()` so accidental Ordering::Relaxed regressions in the
+    /// production path would still be visible here.
+    pub(crate) fn bump_epoch_for_test(&self) -> u64 {
+        self.counter.fetch_add(1, Ordering::SeqCst) + 1
+    }
+}
+
 /// Intents the caller can hand to `transition()`. Each intent is validated
 /// against the current state; illegal combinations return `Err` and do not
 /// mutate the cell.

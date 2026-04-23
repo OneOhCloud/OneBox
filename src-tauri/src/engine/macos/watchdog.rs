@@ -111,24 +111,6 @@ async fn restart_tun_send_safe(app: AppHandle, path: Arc<String>) -> Result<(), 
         .map_err(|e| format!("restart join error: {}", e))?
         .map_err(|e| format!("restart start_tun_via_helper failed: {}", e))?;
 
-    let mut exit_rx = macos_helper::subscribe_sing_box_exits();
-    let exit_app = app.clone();
-    let exit_mode = Arc::new(ProxyMode::TunProxy);
-    tokio::spawn(async move {
-        if let Some(exit) = exit_rx.recv().await {
-            log::info!(
-                "[helper-bridge] sing-box exit (watchdog restart) pid={} code={}",
-                exit.pid,
-                exit.exit_code
-            );
-            let payload = tauri_plugin_shell::process::TerminatedPayload {
-                code: Some(exit.exit_code),
-                signal: None,
-            };
-            handle_process_termination(&exit_app, &exit_mode, payload).await;
-        }
-    });
-
     {
         let mut manager = ProcessManager::acquire();
         manager.mode = Some(Arc::new(ProxyMode::TunProxy));
@@ -143,6 +125,27 @@ async fn restart_tun_send_safe(app: AppHandle, path: Arc<String>) -> Result<(), 
     let _ = transition(&app, Intent::Start { mode: "tun".into() });
     let epoch_snap = app.state::<EngineStateCell>().snapshot().epoch();
     readiness::spawn(app.clone(), epoch_snap);
+
+    // Subscribe to the restarted sing-box's exit event. The epoch is snapped
+    // after the Starting transition above so the guard correctly identifies
+    // stale handlers from prior sessions.
+    let mut exit_rx = macos_helper::subscribe_sing_box_exits();
+    let exit_app = app.clone();
+    let exit_mode = Arc::new(ProxyMode::TunProxy);
+    tokio::spawn(async move {
+        if let Some(exit) = exit_rx.recv().await {
+            log::info!(
+                "[helper-bridge] sing-box exit (watchdog restart) pid={} code={}",
+                exit.pid,
+                exit.exit_code
+            );
+            let payload = tauri_plugin_shell::process::TerminatedPayload {
+                code: Some(exit.exit_code),
+                signal: None,
+            };
+            handle_process_termination(&exit_app, &exit_mode, payload, epoch_snap).await;
+        }
+    });
 
     Ok(())
 }

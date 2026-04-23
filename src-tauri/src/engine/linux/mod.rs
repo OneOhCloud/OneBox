@@ -234,6 +234,7 @@ impl EngineManager for LinuxEngine {
         app: &AppHandle,
         mode: crate::engine::ProxyMode,
         config_path: String,
+        start_epoch: u64,
     ) -> Result<(), String> {
         use std::sync::Arc;
         use tauri_plugin_shell::ShellExt;
@@ -253,6 +254,7 @@ impl EngineManager for LinuxEngine {
                     rx,
                     Arc::new(mode.clone()),
                     child_pid,
+                    start_epoch,
                 );
                 {
                     let mut mgr = crate::core::ProcessManager::acquire();
@@ -301,6 +303,7 @@ impl EngineManager for LinuxEngine {
                     rx,
                     Arc::new(mode.clone()),
                     child_pid,
+                    start_epoch,
                 );
                 {
                     let mut mgr = crate::core::ProcessManager::acquire();
@@ -371,7 +374,7 @@ impl EngineManager for LinuxEngine {
         }
     }
 
-    fn on_process_terminated(_app: &AppHandle, _was_user_stop: bool) {
+    fn on_process_terminated(_app: &AppHandle, was_user_stop: bool) {
         // Drain the teardown state captured at start. If stop already
         // consumed it (user-initiated path), this is a no-op — exactly
         // what we want, since restoring twice would clobber whatever the
@@ -386,10 +389,12 @@ impl EngineManager for LinuxEngine {
             if let Err(e) = restore_system_dns(&iface, &original_dns) {
                 log::warn!("[dns] fallback restore_system_dns failed: {}", e);
             }
-        } else {
+        } else if !was_user_stop {
             log::warn!(
                 "[dns] TUN terminated but no dns_override captured; DNS may need manual restore"
             );
+        } else {
+            log::debug!("[dns] TUN user-stop: dns_override already consumed by stop path");
         }
     }
 
