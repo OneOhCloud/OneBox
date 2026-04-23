@@ -16,17 +16,21 @@ All significant changes in this version are documented here.
 
 ### ⚠ Changes
 
-- Redesigned the advanced settings window in a native macOS layout
+- Updated dependency versions
+- Upgraded the kernel to 1.13.11
 - Refreshed the main app appearance
-- Manual configuration add now shows the same progress sheet as link-triggered imports, stays on the current page when done, and no longer automatically starts the service
-- Balanced the action labels on the Configuration page and tightened the wording of the copy actions in the detail view
+- Redesigned the advanced settings window in a native macOS layout
 - Configuration imports from links now verify the source before being applied automatically
+- Balanced the action labels on the Configuration page and tightened the wording of the copy actions in the detail view
+- Manual configuration add now shows the same progress sheet as link-triggered imports, stays on the current page when done, and no longer automatically starts the service
+
 
 
 ### 🐛 Bug Fixes
 
-- Fixed an issue where installing an app update could trigger a duplicate import of a previously applied configuration on next launch
+- Fixed an issue where logs were being truncated too short
 - Fixed an issue where network authentication pages could fail to load after switching Wi-Fi networks
+- Fixed an issue where installing an app update could trigger a duplicate import of a previously applied configuration on next launch
 
 
 
@@ -45,17 +49,21 @@ All significant changes in this version are documented here.
 
 ### ⚠ 变更
 
-- 高级设置窗口改为原生 macOS 风格
+- 更新了依赖版本
+- 升级内核至 1.13.11
 - 全局界面外观整体刷新
-- 手动添加配置的加载界面与链接导入保持一致，完成后停留在当前页面，且不再自动启动服务
-- 配置页的按钮文案长度对齐，详情页的复制操作文案也同步精简
+- 高级设置窗口改为原生 macOS 风格
 - 通过链接自动应用配置前，会先校验来源是否可信
+- 配置页的按钮文案长度对齐，详情页的复制操作文案也同步精简
+- 手动添加配置的加载界面与链接导入保持一致，完成后停留在当前页面，且不再自动启动服务
+
 
 
 ### 🐛 Bug 修复
 
-- 修复安装应用更新后可能在下次启动时触发重复导入此前已应用配置的问题
+- 修复日志记录过短的问题
 - 修复切换 Wi-Fi 后可能无法打开网络认证页面的问题
+- 修复安装应用更新后可能在下次启动时触发重复导入此前已应用配置的问题
 
 
 
