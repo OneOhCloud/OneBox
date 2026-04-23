@@ -165,11 +165,14 @@ pub(crate) async fn handle_process_termination(
     }
 
     #[cfg(target_os = "macos")]
-    if crate::engine::macos::watchdog::is_restart_in_progress() {
+    let is_watchdog_restart = crate::engine::macos::watchdog::is_restart_in_progress();
+    #[cfg(not(target_os = "macos"))]
+    let is_watchdog_restart = false;
+
+    if is_watchdog_restart {
         log::info!(
-            "[handle_process_termination] bypass_router_watchdog restart in progress, skipping cleanup"
+            "[handle_process_termination] bypass_router_watchdog restart in progress, skipping cleanup but preserving state transition"
         );
-        return;
     }
 
     // Phase 1: confirm the exiting process belongs to the mode we think is
@@ -210,8 +213,9 @@ pub(crate) async fn handle_process_termination(
         (false, false)
     };
 
-    // Only run cleanup if: (1) mode matches, (2) not stale epoch, and (3) not in a macOS watchdog restart
-    if should_cleanup && !is_stale {
+    // Only run cleanup if: (1) mode matches, (2) not stale epoch, and (3) not in a macOS watchdog restart.
+    // Watchdog restart skips cleanup because stop_tun_process has already run; state transition still executes.
+    if should_cleanup && !is_stale && !is_watchdog_restart {
         if matches!(**process_mode, ProxyMode::SystemProxy) {
             if let Err(e) = crate::engine::clear_system_proxy(app_handle).await {
                 log::error!("Failed to unset proxy after process termination: {}", e);
