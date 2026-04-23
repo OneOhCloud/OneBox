@@ -39,6 +39,10 @@ export async function updateDHCPSettings2Config(newConfig: any) {
  */
 export async function updateVPNServerConfigFromDB(fileName: string, dbConfigData: any, newConfig: any) {
 
+    if (!dbConfigData?.outbounds) {
+        throw new Error('subscription_config_missing');
+    }
+
     const outboundsSelectorIndex = 1;
     const outboundsUrltestIndex = 2;
 

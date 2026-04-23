@@ -199,6 +199,7 @@
     "subscription_invalid_expired": "The config link is invalid or expired",
     "subscription_management": "My config",
     "subscription_not_exist": "Config not exist",
+    "subscription_config_missing": "Config data missing, please re-import this config",
     "switching": "Switching...",
     "sync": "Sync",
     "system_info": "System",

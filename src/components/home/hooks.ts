@@ -352,6 +352,9 @@ export const useVPNOperations = () => {
         }
         performSyncAndStart(async (error) => {
             console.error('同步配置失败:', error);
+            if (error?.message === 'subscription_config_missing') {
+                await message(t('subscription_config_missing'), { title: t('error'), kind: 'error' });
+            }
             await stopService();
         });
     };

@@ -199,6 +199,7 @@
     "subscription_invalid_expired": "该配置链接无效或者过期",
     "subscription_management": "配置管理",
     "subscription_not_exist": "配置不存在",
+    "subscription_config_missing": "配置数据丢失，请重新导入",
     "switching": "正在切换...",
     "sync": "同步",
     "system_info": "系统信息",
