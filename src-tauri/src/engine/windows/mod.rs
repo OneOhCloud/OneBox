@@ -244,6 +244,11 @@ impl EngineManager for WindowsEngine {
         let Some(mode) = mode else {
             return Ok(());
         };
+        let child_pid_for_log = child.as_ref().map(|c| c.pid());
+        log::info!(
+            "[win-stop] entry mode={:?} pm_child_pid={:?}",
+            mode, child_pid_for_log
+        );
         match mode.as_ref() {
             crate::engine::ProxyMode::SystemProxy => {
                 if let Err(e) = clear_system_proxy(app).await {
@@ -254,9 +259,23 @@ impl EngineManager for WindowsEngine {
                     );
                 }
                 if let Some(child) = child {
-                    child.kill().map_err(|e| e.to_string())?;
+                    let pid = child.pid();
+                    let kill_result = child.kill();
+                    match &kill_result {
+                        Ok(()) => log::info!("[win-stop] child_kill_result=Ok pid={}", pid),
+                        Err(e) => log::info!("[win-stop] child_kill_result=Err({}) pid={}", e, pid),
+                    }
+                    kill_result.map_err(|e| e.to_string())?;
+                    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+                    let (alive, exit_code) = win32_pid_alive_check(pid);
+                    log::info!(
+                        "[win-stop] post_kill_alive_check pid={} alive={} exit_code={}",
+                        pid, alive, exit_code
+                    );
+                } else {
+                    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+                    log::info!("[win-stop] post_kill_alive_check skipped reason=no_child_pid");
                 }
-                tokio::time::sleep(std::time::Duration::from_millis(500)).await;
             }
             crate::engine::ProxyMode::TunProxy => {
                 stop_tun_process().map_err(|e| {
@@ -332,4 +351,40 @@ impl EngineManager for WindowsEngine {
         };
         restart_privileged_command(sidecar_path, config_path)
     }
+}
+
+/// Probe whether a Windows PID is still alive by opening the process handle
+/// and calling GetExitCodeProcess. Returns (alive, exit_code) where
+/// alive=true means exit_code == STILL_ACTIVE (259). If the handle cannot
+/// be opened the process is assumed dead (alive=false, exit_code=0).
+#[cfg(target_os = "windows")]
+fn win32_pid_alive_check(pid: u32) -> (bool, u32) {
+    use windows::Win32::Foundation::CloseHandle;
+    use windows::Win32::System::Threading::{
+        GetExitCodeProcess, OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION,
+    };
+    const STILL_ACTIVE: u32 = 259;
+    unsafe {
+        let handle =
+            match OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid) {
+                Ok(h) => h,
+                Err(_) => return (false, 0),
+            };
+        let mut exit_code: u32 = 0;
+        let ok = GetExitCodeProcess(handle, &mut exit_code).is_ok();
+        let _ = CloseHandle(handle);
+        if ok {
+            (exit_code == STILL_ACTIVE, exit_code)
+        } else {
+            (false, 0)
+        }
+    }
+}
+
+/// Non-Windows stub so the call site compiles on all platforms even though
+/// the function is only called inside a SystemProxy arm that is itself only
+/// reachable on Windows at runtime.
+#[cfg(not(target_os = "windows"))]
+fn win32_pid_alive_check(_pid: u32) -> (bool, u32) {
+    (false, 0)
 }

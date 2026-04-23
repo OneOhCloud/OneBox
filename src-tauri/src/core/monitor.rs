@@ -45,16 +45,19 @@ pub(crate) fn spawn_process_monitor(
             }
             match event {
                 tauri_plugin_shell::process::CommandEvent::Stdout(line) => {
+                    log::debug!("[sing-box-event] pid={} Stdout", child_pid);
                     let line_str = String::from_utf8_lossy(&line);
                     write_singbox_log(&mut singbox_log, &line_str);
                 }
                 tauri_plugin_shell::process::CommandEvent::Stderr(line) => {
+                    log::debug!("[sing-box-event] pid={} Stderr", child_pid);
                     let line_str = String::from_utf8_lossy(&line);
                     write_singbox_log(&mut singbox_log, &line_str);
                     scan_stderr_for_bind_error(child_pid, &line_str);
                     app_status_data.write(line_str.to_string(), LogType::Info);
                 }
                 tauri_plugin_shell::process::CommandEvent::Error(err) => {
+                    log::debug!("[sing-box-event] pid={} Error", child_pid);
                     log::error!("[sing-box] pid={} process error: {}", child_pid, err);
                     write_singbox_log(&mut singbox_log, &format!("[ERROR] {}", err));
                     app_status_data.write(err.to_string(), LogType::Error);
@@ -78,11 +81,19 @@ pub(crate) fn spawn_process_monitor(
                                 manager.is_stopping
                             };
                             if is_stopping && payload.code == Some(1) {
+                                log::info!(
+                                    "[monitor] windows code remap applied orig_code=1 new_code=0 is_stopping=true pid={}",
+                                    child_pid
+                                );
                                 tauri_plugin_shell::process::TerminatedPayload {
                                     code: Some(0),
                                     signal: payload.signal,
                                 }
                             } else {
+                                log::debug!(
+                                    "[monitor] windows code remap not applied pid={} is_stopping={} code={:?}",
+                                    child_pid, is_stopping, payload.code
+                                );
                                 payload
                             }
                         }
@@ -91,7 +102,9 @@ pub(crate) fn spawn_process_monitor(
                     };
                     handle_process_termination(&app, &mode, adjusted_payload).await;
                 }
-                _ => {}
+                _ => {
+                    log::debug!("[sing-box-event] pid={} other event received", child_pid);
+                }
             }
         }
     });
@@ -140,19 +153,37 @@ pub(crate) async fn handle_process_termination(
     // reset ProcessManager yet — the platform's on_process_terminated hook
     // below may need to read teardown state (e.g. Linux dns_override) that
     // lives there.
-    let (should_cleanup, was_user_initiated_stop) = {
+    let (pm_pid, manager_mode, matches, is_stopping) = {
         let manager = ProcessManager::acquire();
+        let pm_pid = manager.child.as_ref().map(|c| c.pid());
+        let manager_mode = manager.mode.as_ref().map(|m| (**m).clone());
         let matches = manager
             .mode
             .as_ref()
             .map(|m| **m == **process_mode)
             .unwrap_or(false);
-        if matches {
-            log::info!("Cleaning up resources after process termination");
-            (true, manager.is_stopping)
-        } else {
-            (false, false)
-        }
+        let is_stopping = manager.is_stopping;
+        (pm_pid, manager_mode, matches, is_stopping)
+    };
+    let engine_state = app_handle.state::<crate::engine::state_machine::EngineStateCell>().snapshot();
+    log::info!(
+        "[monitor] handle_process_termination entry pid={:?} code={:?} signal={:?} is_stopping={} process_mode={:?} manager_mode={:?} engine_state={}",
+        pm_pid, payload.code, payload.signal, is_stopping,
+        process_mode, manager_mode, engine_state.kind()
+    );
+    let (should_cleanup, was_user_initiated_stop) = if matches {
+        log::info!("Cleaning up resources after process termination");
+        log::info!(
+            "[monitor] should_cleanup=true is_stopping={} mode={:?}",
+            is_stopping, process_mode
+        );
+        (true, is_stopping)
+    } else {
+        log::info!(
+            "[monitor] should_cleanup=false reason=mode_mismatch process_mode={:?} manager_mode={:?}",
+            process_mode, manager_mode
+        );
+        (false, false)
     };
 
     if !should_cleanup {
@@ -182,13 +213,25 @@ pub(crate) async fn handle_process_termination(
     let cur = app_handle.state::<EngineStateCell>().snapshot();
     match cur {
         EngineState::Stopping { .. } => {
+            log::info!(
+                "[monitor] intent=MarkIdle reason=user_stop engine_state={} code={:?}",
+                cur.kind(), payload.code
+            );
             let _ = transition(app_handle, Intent::MarkIdle);
         }
         EngineState::Running { .. } | EngineState::Starting { .. } => {
             let code = payload.code.unwrap_or(-1);
             if code == 0 {
+                log::info!(
+                    "[monitor] intent=MarkIdle reason=clean_exit engine_state={} code=0",
+                    cur.kind()
+                );
                 let _ = transition(app_handle, Intent::MarkIdle);
             } else {
+                log::info!(
+                    "[monitor] intent=Fail reason=unexpected_exit engine_state={} code={}",
+                    cur.kind(), code
+                );
                 let _ = transition(
                     app_handle,
                     Intent::Fail {
@@ -197,6 +240,11 @@ pub(crate) async fn handle_process_termination(
                 );
             }
         }
-        _ => {}
+        _ => {
+            log::info!(
+                "[monitor] intent=none engine_state={} code={:?} no transition taken",
+                cur.kind(), payload.code
+            );
+        }
     }
 }

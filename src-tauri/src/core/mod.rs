@@ -206,10 +206,11 @@ pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Resu
 pub async fn stop(app: tauri::AppHandle) -> Result<(), String> {
     let action = next_action_token();
     let (pm_pid, pm_alive, pm_mode) = pm_snapshot();
+    let is_stopping_before = ProcessManager::acquire().is_stopping;
     let cur_state_kind = app.state::<EngineStateCell>().snapshot().kind();
     ::log::info!(
-        "[stop] action={action} state={} pm_child_pid={:?} pm_child_alive={:?} pm_mode={:?}",
-        cur_state_kind, pm_pid, pm_alive, pm_mode
+        "[stop] action={action} state={} pm_child_pid={:?} pm_child_alive={:?} pm_mode={:?} is_stopping_before={}",
+        cur_state_kind, pm_pid, pm_alive, pm_mode, is_stopping_before
     );
 
     {
