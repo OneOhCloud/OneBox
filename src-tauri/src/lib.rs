@@ -71,6 +71,8 @@ pub fn run() {
             commands::theme::set_native_window_theme,
             engine::engine_probe,
             engine::engine_ensure_installed,
+            commands::prestart::prestart_check,
+            commands::prestart::kill_orphans,
         ])
         .setup(app::setup::app_setup)
         .on_menu_event(app::events::on_menu_event)

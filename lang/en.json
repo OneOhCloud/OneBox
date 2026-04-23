@@ -239,5 +239,12 @@
     "user_agent_settings": "User Agent",
     "version": "Version",
     "vpn_network": "VPN",
-    "zzzzzeof": "Zzzzzeof"
+    "zzzzzeof": "Zzzzzeof",
+    "prestart_repair_title": "Clean Up Orphan Processes",
+    "prestart_detecting": "Orphan processes detected",
+    "prestart_killing": "Cleaning up...",
+    "prestart_verifying": "Verifying...",
+    "prestart_success": "Repaired, starting service",
+    "prestart_failed": "Repair failed, please restart your computer",
+    "prestart_pid_label": "Orphan process"
 }

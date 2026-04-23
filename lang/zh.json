@@ -239,5 +239,12 @@
     "user_agent_settings": "User Agent",
     "version": "版本",
     "vpn_network": "VPN",
-    "zzzzzeof": "zzzzzeof"
+    "zzzzzeof": "zzzzzeof",
+    "prestart_repair_title": "清理残留进程",
+    "prestart_detecting": "检测到残留进程",
+    "prestart_killing": "正在清理...",
+    "prestart_verifying": "正在验证...",
+    "prestart_success": "修复成功，正在启动",
+    "prestart_failed": "修复失败，请重启电脑",
+    "prestart_pid_label": "残留进程"
 }
