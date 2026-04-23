@@ -8,6 +8,7 @@ import {
 } from "../components/home/hooks";
 import { ModeSwitcher } from "../components/home/mode-switcher";
 import { PowerToggle } from "../components/home/power-toggle";
+import { PrestartRepairModal } from "../components/home/prestart-repair-modal";
 import { StatusDisplay } from "../components/home/status-display";
 import { useSubscriptions } from "../hooks/useDB";
 import { t } from "../utils/helper";
@@ -26,6 +27,8 @@ export default function HomePage() {
         operationStatus,
         toggleService,
         restartService,
+        repairState,
+        onRepairSuccess,
     } = useVPNOperations();
     const { indicatorStyle, modeButtonsRef } = useModeIndicator(selectedMode);
 
@@ -68,6 +71,12 @@ export default function HomePage() {
             className="onebox-home relative w-full h-[calc(100dvh-56px)] overflow-hidden"
             data-phase={phase}
         >
+            <PrestartRepairModal
+                visible={repairState.visible}
+                orphanPids={repairState.orphanPids}
+                onSuccess={onRepairSuccess}
+                onClose={() => {/* dismissed on failure — user must restart */}}
+            />
             {/* systemBlue aura — only rendered when the tile is active or
                 connecting. Same design vocabulary as the warm glow under
                 an active HomeKit accessory. Idle shows no decoration. */}

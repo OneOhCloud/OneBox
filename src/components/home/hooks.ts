@@ -322,6 +322,15 @@ export const useVPNOperations = () => {
                 ? 'stopping'
                 : 'idle';
 
+    // Repair modal state: visible + orphan pids found by prestart_check
+    const [repairState, setRepairState] = useState<{ visible: boolean; orphanPids: number[] }>({
+        visible: false,
+        orphanPids: [],
+    });
+
+    // Pending start callback: called by onRepairSuccess to resume the start sequence
+    const pendingStartRef = useRef<(() => void) | null>(null);
+
     const stopService = async () => {
         try {
             await vpnServiceManager.stop();
@@ -350,6 +359,24 @@ export const useVPNOperations = () => {
             setActiveScreen('configuration');
             return message(t('please_add_subscription'), { title: t('tips'), kind: 'error' });
         }
+
+        // Pre-start check: if port is occupied by orphan processes, show repair modal
+        const check = await invoke<{ port_occupied: boolean; orphan_pids: number[] }>('prestart_check');
+        if (check.port_occupied && check.orphan_pids.length > 0) {
+            // Store what we would do after repair, then show the modal
+            pendingStartRef.current = () => {
+                performSyncAndStart(async (error) => {
+                    console.error('同步配置失败:', error);
+                    if (error?.message === 'subscription_config_missing') {
+                        await message(t('subscription_config_missing'), { title: t('error'), kind: 'error' });
+                    }
+                    await stopService();
+                });
+            };
+            setRepairState({ visible: true, orphanPids: check.orphan_pids });
+            return;
+        }
+
         performSyncAndStart(async (error) => {
             console.error('同步配置失败:', error);
             if (error?.message === 'subscription_config_missing') {
@@ -357,6 +384,13 @@ export const useVPNOperations = () => {
             }
             await stopService();
         });
+    };
+
+    const onRepairSuccess = () => {
+        setRepairState({ visible: false, orphanPids: [] });
+        const pending = pendingStartRef.current;
+        pendingStartRef.current = null;
+        pending?.();
     };
 
     const restartService = async (isEmpty: boolean) => {
@@ -398,6 +432,8 @@ export const useVPNOperations = () => {
         startService,
         restartService,
         toggleService,
+        repairState,
+        onRepairSuccess,
     };
 };
 
