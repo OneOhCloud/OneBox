@@ -34,6 +34,7 @@ src-tauri/resources/*.dll
 # conf-template repo. Never commit: every fresh checkout regenerates via
 # the predev/prebuild hooks.
 src/config/templates/generated.ts
+scripts/tmp-*.sh
 
 
 src-tauri/*.db
