@@ -156,12 +156,12 @@ pub(crate) async fn handle_process_termination(
     spawn_epoch: u64,
 ) {
     let current_epoch = app_handle.state::<EngineStateCell>().snapshot().epoch();
-    if epoch_guard_stale(spawn_epoch, current_epoch) {
+    let is_stale = epoch_guard_stale(spawn_epoch, current_epoch);
+    if is_stale {
         log::info!(
             "[monitor] guard: stale epoch captured={} current={} mode={:?} code={:?} — skipping cleanup",
             spawn_epoch, current_epoch, process_mode, payload.code
         );
-        return;
     }
 
     #[cfg(target_os = "macos")]
@@ -210,25 +210,23 @@ pub(crate) async fn handle_process_termination(
         (false, false)
     };
 
-    if !should_cleanup {
-        log::info!("Process mode has changed, skipping cleanup");
-        return;
-    }
-
-    if matches!(**process_mode, ProxyMode::SystemProxy) {
-        if let Err(e) = crate::engine::clear_system_proxy(app_handle).await {
-            log::error!("Failed to unset proxy after process termination: {}", e);
+    // Only run cleanup if: (1) mode matches, (2) not stale epoch, and (3) not in a macOS watchdog restart
+    if should_cleanup && !is_stale {
+        if matches!(**process_mode, ProxyMode::SystemProxy) {
+            if let Err(e) = crate::engine::clear_system_proxy(app_handle).await {
+                log::error!("Failed to unset proxy after process termination: {}", e);
+            }
         }
-    }
 
-    if matches!(**process_mode, ProxyMode::TunProxy) {
-        PlatformEngine::on_process_terminated(app_handle, was_user_initiated_stop);
-    }
+        if matches!(**process_mode, ProxyMode::TunProxy) {
+            PlatformEngine::on_process_terminated(app_handle, was_user_initiated_stop);
+        }
 
-    // Phase 2: now that platform teardown has run and consumed whatever state
-    // it needed, reset ProcessManager. The old `reset()` return value is
-    // ignored — dns_override consumption is a platform concern.
-    ProcessManager::acquire().reset();
+        // Phase 2: now that platform teardown has run and consumed whatever state
+        // it needed, reset ProcessManager. The old `reset()` return value is
+        // ignored — dns_override consumption is a platform concern.
+        ProcessManager::acquire().reset();
+    }
 
     if let Err(e) = app_handle.emit(EVENT_STATUS_CHANGED, payload.clone()) {
         log::error!("Failed to emit status-changed event: {}", e);
