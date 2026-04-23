@@ -234,15 +234,29 @@ pub async fn stop(app: tauri::AppHandle) -> Result<(), String> {
         ::log::error!("[stop] action={action} PlatformEngine::stop returned error: {}", e);
     }
 
-    // Linux and Windows don't go through readiness tick on stop, so drop
-    // to Idle explicitly. macOS rides the state machine via the helper
-    // exit event → handle_process_termination path.
+    // Snapshot state once, after PlatformEngine::stop returns, to guard
+    // the two side-effects below. On all platforms the monitor fires
+    // MarkIdle (Stopping→Idle) well within the 500 ms kill-sleep, so by
+    // the time we reach this point a concurrent start() may have already
+    // advanced the state machine to Starting or Running. Acting on a
+    // superseded state orphans the new sing-box process: it keeps holding
+    // :6789 while the app loses its only handle to kill it.
+    let post_stop_state = app.state::<EngineStateCell>().snapshot();
+
+    // Windows/Linux: MarkIdle is not driven by the monitor path, so we
+    // push it explicitly — but only when still in Stopping.
+    // macOS: monitor handles the Stopping→Idle transition; skip.
     #[cfg(any(target_os = "windows", target_os = "linux"))]
-    {
+    if matches!(post_stop_state, EngineState::Stopping { .. }) {
         let _ = transition(&app, Intent::MarkIdle);
     }
 
-    ProcessManager::acquire().reset();
+    // All platforms: skip reset if a concurrent start() already seeded
+    // ProcessManager with a new pid. Resetting would erase that handle
+    // and leave the child untrackable and unkillable.
+    if !matches!(post_stop_state, EngineState::Starting { .. } | EngineState::Running { .. }) {
+        ProcessManager::acquire().reset();
+    }
 
     // Post-stop port probe: `PlatformEngine::stop` only SIGTERMs + sleeps
     // 500ms, it does NOT wait for the process to actually exit. If this
