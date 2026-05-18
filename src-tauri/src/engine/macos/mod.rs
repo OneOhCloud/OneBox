@@ -800,7 +800,7 @@ impl EngineManager for MacOSEngine {
                     mgr.is_stopping = false;
                 }
 
-                // Optional bypass-router watchdog: restart sing-box every 4h
+                // Optional bypass-router watchdog: restart sing-box every 24h
                 // so macOS's auto_detect_interface can pick up routing table
                 // changes that accumulate without a clean refresh. All
                 // state (abort handle, restart-in-progress flag) lives
@@ -890,7 +890,7 @@ impl EngineManager for MacOSEngine {
     fn on_process_terminated(_app: &AppHandle, _was_user_stop: bool) {
         // Cancel the bypass-router watchdog eagerly — its own in-loop mode
         // check would eventually notice TUN is gone, but only after the
-        // next 4h sleep, which is too slow.
+        // next 24h sleep, which is too slow.
         watchdog::cancel();
         log::info!("[dns] TUN process terminated — restoring captured original");
         // Async restore runs fire-and-forget. take_active_override drains

@@ -1,6 +1,6 @@
 //! Bypass-router restart watchdog (macOS TUN mode only).
 //!
-//! Periodically (every 4 hours) restarts sing-box via the privileged helper
+//! Periodically (every 24 hours) restarts sing-box via the privileged helper
 //! so macOS's `auto_detect_interface` picks up routing changes that would
 //! otherwise accumulate as stale entries — long-lived TUN sessions on
 //! roaming laptops tend to drift as Wi-Fi networks change.
@@ -23,7 +23,7 @@ use crate::engine::{readiness, EVENT_STATUS_CHANGED};
 use super::helper as macos_helper;
 
 pub const BYPASS_ROUTER_RESTART_INTERVAL: std::time::Duration =
-    std::time::Duration::from_secs(4 * 3600);
+    std::time::Duration::from_secs(24 * 3600);
 
 // Flag set while a watchdog restart is mid-flight (between stop and start).
 // `core::monitor::handle_process_termination` reads this to skip the
