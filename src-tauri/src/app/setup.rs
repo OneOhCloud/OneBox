@@ -34,6 +34,7 @@ pub fn app_setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>>
 
     app.manage(crate::app::state::AppData::new());
     app.manage(crate::engine::state_machine::EngineStateCell::new());
+    stop_orphan_tun_service_on_startup();
 
     // Purge must run before copy_database_files so the resource-bundled v2 defaults
     // are not clobbered by a later v1 cleanup pass.
@@ -117,6 +118,26 @@ pub fn app_setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>>
 
     Ok(())
 }
+
+#[cfg(target_os = "windows")]
+fn stop_orphan_tun_service_on_startup() {
+    use tun_service::scm::{self, QueriedState};
+
+    match scm::query_state() {
+        QueriedState::Running | QueriedState::StartPending => {
+            log::warn!(
+                "[service] OneBoxTunService was running before engine-state ownership; stopping orphan"
+            );
+            if let Err(e) = scm::stop_service() {
+                log::warn!("[service] failed to stop orphan OneBoxTunService: {}", e);
+            }
+        }
+        _ => {}
+    }
+}
+
+#[cfg(not(target_os = "windows"))]
+fn stop_orphan_tun_service_on_startup() {}
 
 fn report_main_window_geometry(app: &tauri::App) {
     let Some(window) = app.get_webview_window("main") else {

@@ -11,7 +11,7 @@ use std::path::{Path, PathBuf};
 
 use sha2::{Digest, Sha256};
 use windows::core::PCWSTR;
-use windows::Win32::Foundation::{HLOCAL, LocalFree};
+use windows::Win32::Foundation::{LocalFree, ERROR_SERVICE_ALREADY_RUNNING, HLOCAL, WIN32_ERROR};
 use windows::Win32::Security::Authorization::{
     ConvertStringSecurityDescriptorToSecurityDescriptorW, SDDL_REVISION_1,
 };
@@ -406,7 +406,25 @@ fn wait_not_pending(svc: &ScHandle, timeout_ms: u64) -> Result<QueriedState, Str
 /// with the given arguments; polls until it leaves StartPending or 15s elapses.
 pub fn start_service_with_args(args: &[&str]) -> Result<(), String> {
     let scm = open_scm(SC_MANAGER_CONNECT)?;
-    let svc = open_service(&scm, SERVICE_START | SERVICE_QUERY_STATUS)?;
+    let svc = open_service(&scm, SERVICE_START | SERVICE_QUERY_STATUS | SERVICE_STOP)?;
+
+    match wait_not_pending(&svc, 15_000)? {
+        QueriedState::Running => {
+            log::warn!(
+                "start_service_with_args: stale service already running; stopping before restart"
+            );
+            let mut status = SERVICE_STATUS::default();
+            unsafe {
+                ControlService(svc.0, SERVICE_CONTROL_STOP, &mut status)
+                    .map_err(|e| format!("ControlService(STOP) failed: {}", e))?;
+            }
+            wait_until_stopped(&svc, 10_000)?;
+        }
+        QueriedState::StopPending => {
+            wait_until_stopped(&svc, 10_000)?;
+        }
+        _ => {}
+    }
 
     // Build wide-string storage + PCWSTR pointer array.
     let wides: Vec<Vec<u16>> = args.iter().map(|a| to_wide_z(a)).collect();
@@ -418,7 +436,19 @@ pub fn start_service_with_args(args: &[&str]) -> Result<(), String> {
         Some(ptrs.as_slice())
     };
     unsafe {
-        StartServiceW(svc.0, slice).map_err(|e| format!("StartServiceW failed: {}", e))?;
+        if let Err(e) = StartServiceW(svc.0, slice) {
+            if WIN32_ERROR::from_error(&e) == Some(ERROR_SERVICE_ALREADY_RUNNING) {
+                log::warn!("StartServiceW reported service already running; stopping stale service and retrying");
+                let mut status = SERVICE_STATUS::default();
+                ControlService(svc.0, SERVICE_CONTROL_STOP, &mut status)
+                    .map_err(|e| format!("ControlService(STOP) failed: {}", e))?;
+                wait_until_stopped(&svc, 10_000)?;
+                StartServiceW(svc.0, slice)
+                    .map_err(|e| format!("StartServiceW retry failed: {}", e))?;
+            } else {
+                return Err(format!("StartServiceW failed: {}", e));
+            }
+        }
     }
 
     let final_state = wait_not_pending(&svc, 15_000)?;
