@@ -12,9 +12,9 @@ use std::time::{Duration, Instant};
 use tauri::{AppHandle, Manager};
 
 use crate::app::state::AppData;
-use crate::engine::state_machine::{transition, Intent, EngineState, EngineStateCell};
+use crate::engine::state_machine::{transition, EngineState, EngineStateCell, Intent};
 use crate::engine::{readiness, EVENT_STATUS_CHANGED};
-use crate::engine::{PlatformEngine, EngineManager};
+use crate::engine::{EngineManager, PlatformEngine};
 use tauri::Emitter;
 use tauri_plugin_shell::process::CommandChild;
 
@@ -23,7 +23,7 @@ use tauri_plugin_shell::process::CommandChild;
 // Lifecycle calls (`start` / `stop` / `reload_config` and the lifecycle-
 // driven restart path in `app/setup.rs`) can fire concurrently from
 // multiple triggers — user clicks, Wi-Fi switch debounce, watchdog,
-// tray toggles. When one of them ends in "port 6789 is occupied", the
+// tray toggles. When one of them ends in "mixed port is occupied", the
 // only way to tell *which* path collided is if every entry records an
 // `action=N` token, plus a snapshot of `ProcessManager` (child PID,
 // liveness) and the port listener state. These helpers are the raw
@@ -50,14 +50,45 @@ fn note_reload_entry() -> Option<Duration> {
     elapsed
 }
 
+pub(crate) const DEFAULT_MIXED_PROXY_PORT: u16 = 6789;
+
+pub(crate) fn mixed_proxy_port(app: &AppHandle) -> u16 {
+    let Ok(config_dir) = app.path().app_config_dir() else {
+        return DEFAULT_MIXED_PROXY_PORT;
+    };
+    let config_path = config_dir.join("config.json");
+    let Ok(text) = std::fs::read_to_string(config_path) else {
+        return DEFAULT_MIXED_PROXY_PORT;
+    };
+    let Ok(json) = serde_json::from_str::<serde_json::Value>(&text) else {
+        return DEFAULT_MIXED_PROXY_PORT;
+    };
+    json.get("inbounds")
+        .and_then(|v| v.as_array())
+        .and_then(|inbounds| {
+            inbounds.iter().find_map(|ib| {
+                let is_mixed = ib.get("type").and_then(|v| v.as_str()) == Some("mixed")
+                    && ib.get("tag").and_then(|v| v.as_str()) == Some("mixed");
+                if !is_mixed {
+                    return None;
+                }
+                ib.get("listen_port")
+                    .and_then(|v| v.as_u64())
+                    .and_then(|port| u16::try_from(port).ok())
+                    .filter(|port| *port > 0)
+            })
+        })
+        .unwrap_or(DEFAULT_MIXED_PROXY_PORT)
+}
+
 /// Best-effort check: is *something* already listening on
-/// 127.0.0.1:6789 (Mixed inbound) right now? A successful connect
+/// 127.0.0.1:<mixed port> right now? A successful connect
 /// means the port is bound — used as a pre-flight before spawning a
 /// fresh sing-box and as a post-flight after `pkill -HUP` to detect
 /// a failed rebind.
-pub(crate) fn probe_mixed_port_listening() -> bool {
+pub(crate) fn probe_port_listening(port: u16) -> bool {
     use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpStream};
-    let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 6789);
+    let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), port);
     TcpStream::connect_timeout(&addr, Duration::from_millis(100)).is_ok()
 }
 
@@ -85,7 +116,6 @@ fn pm_snapshot() -> (Option<u32>, Option<bool>, Option<ProxyMode>) {
     let mode = mgr.mode.as_ref().map(|m| (**m).clone());
     (pid, alive, mode)
 }
-
 
 // ── ProcessManager ────────────────────────────────────────────────────
 //
@@ -135,17 +165,18 @@ lazy_static! {
 pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Result<(), String> {
     let action = next_action_token();
     let (pm_pid, pm_alive, pm_mode) = pm_snapshot();
-    let port_listening = probe_mixed_port_listening();
+    let mixed_port = mixed_proxy_port(&app);
+    let port_listening = probe_port_listening(mixed_port);
     let cur_state_kind = app.state::<EngineStateCell>().snapshot().kind();
     ::log::info!(
-        "[start] action={action} mode={:?} state={} pm_child_pid={:?} pm_child_alive={:?} pm_mode={:?} :6789_listener={}",
+        "[start] action={action} mode={:?} state={} pm_child_pid={:?} pm_child_alive={:?} pm_mode={:?} :{mixed_port}_listener={}",
         mode, cur_state_kind, pm_pid, pm_alive, pm_mode, port_listening
     );
     // Loud flag for the two "about to collide" preconditions. Either alone
     // is enough to explain a subsequent EADDRINUSE in sing-box stderr.
     if port_listening {
         ::log::warn!(
-            "[start] action={action} :6789 already has a listener on entry — previous sing-box still bound?"
+            "[start] action={action} :{mixed_port} already has a listener on entry — previous sing-box still bound?"
         );
     }
     if matches!(pm_alive, Some(true)) {
@@ -169,7 +200,12 @@ pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Resu
         ProxyMode::TunProxy => "tun",
         ProxyMode::SystemProxy => "mixed",
     };
-    if let Err(e) = transition(&app, Intent::Start { mode: mode_label.into() }) {
+    if let Err(e) = transition(
+        &app,
+        Intent::Start {
+            mode: mode_label.into(),
+        },
+    ) {
         return Err(format!("state transition rejected: {}", e));
     }
     let start_epoch = app.state::<EngineStateCell>().snapshot().epoch();
@@ -179,7 +215,10 @@ pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Resu
     // core just drives state-machine transitions and hands off to the
     // readiness prober once the spawn call returns.
     if let Err(e) = PlatformEngine::start(&app, mode.clone(), path, start_epoch).await {
-        ::log::error!("[start] action={action} PlatformEngine::start failed: {}", e);
+        ::log::error!(
+            "[start] action={action} PlatformEngine::start failed: {}",
+            e
+        );
         // Start can fail partway through (e.g. proxy set fails after the
         // child has already spawned). Ask the platform to tear down whatever
         // it did set up so we don't leak a half-started engine.
@@ -231,7 +270,10 @@ pub async fn stop(app: tauri::AppHandle) -> Result<(), String> {
     // process exit is observed asynchronously by the process monitor which
     // then calls PlatformEngine::on_process_terminated for DNS restore.
     if let Err(e) = PlatformEngine::stop(&app).await {
-        ::log::error!("[stop] action={action} PlatformEngine::stop returned error: {}", e);
+        ::log::error!(
+            "[stop] action={action} PlatformEngine::stop returned error: {}",
+            e
+        );
     }
 
     // Snapshot state once, after PlatformEngine::stop returns, to guard
@@ -240,7 +282,7 @@ pub async fn stop(app: tauri::AppHandle) -> Result<(), String> {
     // the time we reach this point a concurrent start() may have already
     // advanced the state machine to Starting or Running. Acting on a
     // superseded state orphans the new sing-box process: it keeps holding
-    // :6789 while the app loses its only handle to kill it.
+    // the mixed port while the app loses its only handle to kill it.
     let post_stop_state = app.state::<EngineStateCell>().snapshot();
 
     // Windows/Linux: MarkIdle is not driven by the monitor path, so we
@@ -254,22 +296,26 @@ pub async fn stop(app: tauri::AppHandle) -> Result<(), String> {
     // All platforms: skip reset if a concurrent start() already seeded
     // ProcessManager with a new pid. Resetting would erase that handle
     // and leave the child untrackable and unkillable.
-    if !matches!(post_stop_state, EngineState::Starting { .. } | EngineState::Running { .. }) {
+    if !matches!(
+        post_stop_state,
+        EngineState::Starting { .. } | EngineState::Running { .. }
+    ) {
         ProcessManager::acquire().reset();
     }
 
     // Post-stop port probe: `PlatformEngine::stop` only SIGTERMs + sleeps
     // 500ms, it does NOT wait for the process to actually exit. If this
-    // line reports `:6789_listener=true`, the next `start` call is about
+    // line reports the mixed-port listener as true, the next `start` call is about
     // to collide with a still-alive sing-box.
-    let port_listening = probe_mixed_port_listening();
+    let mixed_port = mixed_proxy_port(&app);
+    let port_listening = probe_port_listening(mixed_port);
     if port_listening {
         ::log::warn!(
-            "[stop] action={action} returning with :6789 STILL LISTENING — pm_child_pid={:?} may have survived SIGTERM",
+            "[stop] action={action} returning with :{mixed_port} STILL LISTENING — pm_child_pid={:?} may have survived SIGTERM",
             pm_pid
         );
     } else {
-        ::log::info!("[stop] action={action} returned, :6789 released");
+        ::log::info!("[stop] action={action} returned, :{mixed_port} released");
     }
     app.emit(EVENT_STATUS_CHANGED, ()).ok();
     Ok(())
@@ -313,9 +359,10 @@ pub async fn reload_config(app: tauri::AppHandle) -> Result<String, String> {
         .map(|d| format!("{}ms", d.as_millis()))
         .unwrap_or_else(|| "first".into());
     let (pm_pid, pm_alive, pm_mode) = pm_snapshot();
-    let port_listening = probe_mixed_port_listening();
+    let mixed_port = mixed_proxy_port(&app);
+    let port_listening = probe_port_listening(mixed_port);
     ::log::info!(
-        "[reload] action={action} entry since_last={} pm_child_pid={:?} pm_child_alive={:?} pm_mode={:?} :6789_listener={}",
+        "[reload] action={action} entry since_last={} pm_child_pid={:?} pm_child_alive={:?} pm_mode={:?} :{mixed_port}_listener={}",
         since_last_str, pm_pid, pm_alive, pm_mode, port_listening
     );
     if let Some(delta) = since_last {
@@ -328,7 +375,7 @@ pub async fn reload_config(app: tauri::AppHandle) -> Result<String, String> {
     }
     if !port_listening {
         ::log::warn!(
-            "[reload] action={action} :6789 NOT listening on entry — sing-box may already be down; SIGHUP will no-op"
+            "[reload] action={action} :{mixed_port} NOT listening on entry — sing-box may already be down; SIGHUP will no-op"
         );
     }
 
@@ -354,20 +401,25 @@ pub async fn reload_config(app: tauri::AppHandle) -> Result<String, String> {
                 "[reload] action={action} SystemProxy — sleeping 500ms for sing-box rebind, then re-apply proxy"
             );
             tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
-            let still_listening = probe_mixed_port_listening();
+            let still_listening = probe_port_listening(mixed_port);
             if !still_listening {
                 // Decisive signal: SIGHUP was sent, 500ms later the port
                 // has no listener. Either (a) sing-box's Close()+create()
                 // cycle hasn't rebound yet (bind failed, Close took too
                 // long, log.Fatal exit), or (b) sing-box died outright.
                 ::log::warn!(
-                    "[reload] action={action} :6789 NOT listening 500ms after SIGHUP — sing-box rebind FAILED or process died"
+                    "[reload] action={action} :{mixed_port} NOT listening 500ms after SIGHUP — sing-box rebind FAILED or process died"
                 );
             } else {
-                ::log::info!("[reload] action={action} :6789 listener up 500ms after SIGHUP");
+                ::log::info!(
+                    "[reload] action={action} :{mixed_port} listener up 500ms after SIGHUP"
+                );
             }
             if let Err(e) = crate::engine::apply_system_proxy(&app).await {
-                ::log::error!("[reload] action={action} re-apply system proxy failed: {}", e);
+                ::log::error!(
+                    "[reload] action={action} re-apply system proxy failed: {}",
+                    e
+                );
                 return Err(format!("Config reloaded but failed to reset proxy: {}", e));
             }
             ::log::info!("[reload] action={action} system proxy re-applied");

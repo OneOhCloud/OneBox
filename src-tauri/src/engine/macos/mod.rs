@@ -257,7 +257,11 @@ pub fn start_tun_via_helper(app: &AppHandle, config_path: &str) -> Result<i32, S
     let log_path_str = log_path.to_string_lossy();
 
     let pid = macos_helper::api::start_sing_box(config_path, &log_path_str)?;
-    log::info!("[helper] sing-box started, pid={} log={}", pid, log_path_str);
+    log::info!(
+        "[helper] sing-box started, pid={} log={}",
+        pid,
+        log_path_str
+    );
     Ok(pid)
 }
 
@@ -290,7 +294,11 @@ pub async fn stop_tun_process() -> Result<(), String> {
     }
 
     if let Err(e) = macos_helper::api::remove_tun_routes(TUN_INTERFACE_NAME) {
-        log::warn!("[helper] remove_tun_routes({}) failed: {}", TUN_INTERFACE_NAME, e);
+        log::warn!(
+            "[helper] remove_tun_routes({}) failed: {}",
+            TUN_INTERFACE_NAME,
+            e
+        );
     } else {
         log::info!("[helper] TUN routes removed on {}", TUN_INTERFACE_NAME);
     }
@@ -320,7 +328,11 @@ fn detect_active_network_service() -> Result<String, String> {
     let stdout = String::from_utf8_lossy(&out.stdout);
     let iface = stdout
         .lines()
-        .find_map(|l| l.trim().strip_prefix("interface:").map(|s| s.trim().to_string()))
+        .find_map(|l| {
+            l.trim()
+                .strip_prefix("interface:")
+                .map(|s| s.trim().to_string())
+        })
         .ok_or_else(|| "no default interface".to_string())?;
     log::debug!("[dns] default interface: {}", iface);
 
@@ -344,7 +356,10 @@ fn detect_active_network_service() -> Result<String, String> {
             }
         }
     }
-    Err(format!("could not map interface {} to a network service", iface))
+    Err(format!(
+        "could not map interface {} to a network service",
+        iface
+    ))
 }
 
 /// Read the DNS servers currently configured on a network service.
@@ -488,7 +503,9 @@ pub(crate) fn reapply_on_active_primary(gateway: &str) -> Result<(), String> {
             );
             let prev_snap = prev.clone();
             drop(slot);
-            if let Err(e) = macos_helper::api::set_dns_servers(&prev_snap.service, &prev_snap.captured) {
+            if let Err(e) =
+                macos_helper::api::set_dns_servers(&prev_snap.service, &prev_snap.captured)
+            {
                 log::warn!(
                     "[dns] apply: restore old [{}] → '{}' failed: {}",
                     prev_snap.service,
@@ -561,11 +578,7 @@ fn apply_captured_originals_sync(taken: Option<&ActiveOverride>) -> Option<(Stri
         active.captured
     );
     if let Err(e) = macos_helper::api::set_dns_servers(&active.service, &active.captured) {
-        log::warn!(
-            "[dns] phase 1 [{}] write failed: {}",
-            active.service,
-            e
-        );
+        log::warn!("[dns] phase 1 [{}] write failed: {}", active.service, e);
         return None;
     }
     macos_helper::api::flush_dns_cache().ok();
@@ -973,7 +986,10 @@ impl EngineManager for MacOSEngine {
                 let m = crate::core::ProcessManager::acquire();
                 m.child.as_ref().map(|c| c.pid())
             };
-            log::info!("[reload] pm_child_pid={:?} (expected sole SIGHUP target)", pm_pid);
+            log::info!(
+                "[reload] pm_child_pid={:?} (expected sole SIGHUP target)",
+                pm_pid
+            );
 
             let output = Command::new("pkill")
                 .args(["-HUP", "sing-box"])
@@ -991,10 +1007,7 @@ impl EngineManager for MacOSEngine {
                     );
                     return Err(format!("pkill -HUP matched nothing: {}", stderr));
                 }
-                return Err(format!(
-                    "pkill -HUP non-zero (code={:?}): {}",
-                    code, stderr
-                ));
+                return Err(format!("pkill -HUP non-zero (code={:?}): {}", code, stderr));
             }
             log::info!(
                 "[reload] SIGHUP sent via pkill code={:?} stdout={:?} stderr={:?}",

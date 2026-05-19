@@ -4,24 +4,9 @@ use std::io::{Read, Write};
 use std::path::Path;
 use tauri::{AppHandle, Manager};
 
-/// Howard Hinnant's algorithm: Unix days → civil date (UTC).
+/// Local civil date used for daily sing-box log filenames.
 pub(super) fn today_date_string() -> String {
-    use std::time::{SystemTime, UNIX_EPOCH};
-    let secs = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs();
-    let z = secs as i64 / 86400 + 719468;
-    let era = (if z >= 0 { z } else { z - 146096 }) / 146097;
-    let doe = z - era * 146097;
-    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
-    let y = yoe + era * 400;
-    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
-    let mp = (5 * doy + 2) / 153;
-    let day = doy - (153 * mp + 2) / 5 + 1;
-    let month = if mp < 10 { mp + 3 } else { mp - 9 };
-    let year = if month <= 2 { y + 1 } else { y };
-    format!("{:04}-{:02}-{:02}", year, month, day)
+    chrono::Local::now().format("%Y-%m-%d").to_string()
 }
 
 fn compress_singbox_log(log_path: &Path) -> std::io::Result<()> {
@@ -258,7 +243,10 @@ mod singbox_log_dir_tests {
         // The old uncompressed yesterday log is either pruned (age > 7d) OR
         // compressed in place; both outcomes are acceptable and neither leaves
         // the original .log file behind.
-        assert!(!yesterday_log.exists(), "old uncompressed log must not remain");
+        assert!(
+            !yesterday_log.exists(),
+            "old uncompressed log must not remain"
+        );
     }
 
     #[test]
@@ -308,7 +296,10 @@ mod onebox_log_sweep_tests {
         assert!(active.exists(), "active OneBox.log must never be deleted");
         assert!(recent.exists(), "recent rotated log must survive");
         assert!(!stale.exists(), "stale rotated log must be removed");
-        assert!(singbox.exists(), "sing-box logs are owned by a different sweep");
+        assert!(
+            singbox.exists(),
+            "sing-box logs are owned by a different sweep"
+        );
         assert!(unrelated.exists(), "unrelated files must not be touched");
     }
 }

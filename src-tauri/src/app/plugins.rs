@@ -1,7 +1,7 @@
 use log::LevelFilter;
 use tauri::{AppHandle, Builder, Manager, Wry};
 use tauri_plugin_autostart::MacosLauncher;
-use tauri_plugin_log::{RotationStrategy, Target, TargetKind};
+use tauri_plugin_log::{RotationStrategy, Target, TargetKind, TimezoneStrategy};
 use tauri_plugin_sql::Migration;
 
 // OneBox.log rotation policy — rotate when the active file exceeds 50 MB,
@@ -38,6 +38,7 @@ pub fn register_plugins(builder: Builder<Wry>, migrations: Vec<Migration>) -> Bu
                         .any(|&target| metadata.target().starts_with(target))
                 })
                 .level(LevelFilter::Info)
+                .timezone_strategy(TimezoneStrategy::UseLocal)
                 .max_file_size(ONEBOX_LOG_MAX_FILE_SIZE)
                 .rotation_strategy(RotationStrategy::KeepAll)
                 .targets([

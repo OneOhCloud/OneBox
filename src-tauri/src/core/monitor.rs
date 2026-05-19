@@ -2,9 +2,9 @@ use std::sync::Arc;
 use tauri::Emitter;
 use tauri::Manager;
 
+use crate::app::state::{AppData, LogType};
 use crate::engine::state_machine::{transition, EngineState, EngineStateCell, Intent};
 use crate::engine::{EngineManager, PlatformEngine, EVENT_STATUS_CHANGED};
-use crate::app::state::{AppData, LogType};
 
 use super::log::{create_singbox_log_writer, write_singbox_log};
 use super::{ProcessManager, ProxyMode};
@@ -28,7 +28,8 @@ pub(crate) fn spawn_process_monitor(
     let spawn_at = std::time::Instant::now();
     log::info!(
         "[sing-box] monitor attached pid={} mode={:?}",
-        child_pid, mode
+        child_pid,
+        mode
     );
     tokio::spawn(async move {
         let mut terminated = false;
@@ -120,17 +121,9 @@ pub(crate) fn spawn_process_monitor(
 fn scan_stderr_for_bind_error(pid: u32, line: &str) {
     let lc = line.to_ascii_lowercase();
     if lc.contains("address already in use") || lc.contains("eaddrinuse") {
-        log::warn!(
-            "[sing-box] pid={} BIND FAILED: {}",
-            pid,
-            line.trim_end()
-        );
+        log::warn!("[sing-box] pid={} BIND FAILED: {}", pid, line.trim_end());
     } else if lc.contains("listen tcp") && lc.contains("bind:") {
-        log::warn!(
-            "[sing-box] pid={} listener error: {}",
-            pid,
-            line.trim_end()
-        );
+        log::warn!("[sing-box] pid={} listener error: {}", pid, line.trim_end());
     }
 }
 
@@ -192,7 +185,9 @@ pub(crate) async fn handle_process_termination(
         let is_stopping = manager.is_stopping;
         (pm_pid, manager_mode, matches, is_stopping)
     };
-    let engine_state = app_handle.state::<crate::engine::state_machine::EngineStateCell>().snapshot();
+    let engine_state = app_handle
+        .state::<crate::engine::state_machine::EngineStateCell>()
+        .snapshot();
     log::info!(
         "[monitor] handle_process_termination entry pid={:?} code={:?} signal={:?} is_stopping={} process_mode={:?} manager_mode={:?} engine_state={}",
         pm_pid, payload.code, payload.signal, is_stopping,
@@ -202,7 +197,8 @@ pub(crate) async fn handle_process_termination(
         log::info!("Cleaning up resources after process termination");
         log::info!(
             "[monitor] should_cleanup=true is_stopping={} mode={:?}",
-            is_stopping, process_mode
+            is_stopping,
+            process_mode
         );
         (true, is_stopping)
     } else {
@@ -241,7 +237,8 @@ pub(crate) async fn handle_process_termination(
         EngineState::Stopping { .. } => {
             log::info!(
                 "[monitor] intent=MarkIdle reason=user_stop engine_state={} code={:?}",
-                cur.kind(), payload.code
+                cur.kind(),
+                payload.code
             );
             let _ = transition(app_handle, Intent::MarkIdle);
         }
@@ -256,7 +253,8 @@ pub(crate) async fn handle_process_termination(
             } else {
                 log::info!(
                     "[monitor] intent=Fail reason=unexpected_exit engine_state={} code={}",
-                    cur.kind(), code
+                    cur.kind(),
+                    code
                 );
                 let _ = transition(
                     app_handle,
@@ -269,7 +267,8 @@ pub(crate) async fn handle_process_termination(
         _ => {
             log::info!(
                 "[monitor] intent=none engine_state={} code={:?} no transition taken",
-                cur.kind(), payload.code
+                cur.kind(),
+                payload.code
             );
         }
     }
@@ -298,8 +297,8 @@ mod epoch_guard_tests {
 
 #[cfg(test)]
 mod engine_state_cell_integration_tests {
-    use crate::engine::state_machine::EngineStateCell;
     use super::epoch_guard_stale;
+    use crate::engine::state_machine::EngineStateCell;
 
     /// Drive EngineStateCell through two start cycles using the real atomic
     /// (via the public bump_epoch_for_test helper), simulating:

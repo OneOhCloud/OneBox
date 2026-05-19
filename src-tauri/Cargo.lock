@@ -3319,6 +3319,7 @@ version = "1.0.0"
 dependencies = [
  "anyhow",
  "cc",
+ "chrono",
  "core-foundation 0.9.4",
  "env_logger",
  "filetime",

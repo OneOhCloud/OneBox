@@ -67,7 +67,9 @@ impl EngineState {
 
     pub fn mode(&self) -> Option<&str> {
         match self {
-            EngineState::Starting { mode, .. } | EngineState::Running { mode, .. } => Some(mode.as_str()),
+            EngineState::Starting { mode, .. } | EngineState::Running { mode, .. } => {
+                Some(mode.as_str())
+            }
             _ => None,
         }
     }
@@ -88,10 +90,7 @@ impl EngineStateCell {
     }
 
     pub fn snapshot(&self) -> EngineState {
-        self.inner
-            .lock()
-            .unwrap_or_else(|e| e.into_inner())
-            .clone()
+        self.inner.lock().unwrap_or_else(|e| e.into_inner()).clone()
     }
 
     pub fn current_epoch(&self) -> u64 {
@@ -181,7 +180,9 @@ pub fn transition(app: &AppHandle, intent: Intent) -> Result<EngineState, String
             }
         }
         (
-            EngineState::Stopping { .. } | EngineState::Starting { .. } | EngineState::Running { .. },
+            EngineState::Stopping { .. }
+            | EngineState::Starting { .. }
+            | EngineState::Running { .. },
             Intent::MarkIdle,
         ) => {
             let epoch = cell.counter.fetch_add(1, Ordering::SeqCst) + 1;

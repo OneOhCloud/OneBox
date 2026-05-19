@@ -102,8 +102,8 @@ pub trait EngineManager {
 }
 
 pub mod common;
-pub use common::{helper, readiness, state_machine};
 pub(crate) use common::sysproxy;
+pub use common::{helper, readiness, state_machine};
 
 #[cfg(target_os = "linux")]
 pub mod linux;
@@ -135,10 +135,10 @@ pub use macos::MacOSEngine as PlatformEngine;
 #[cfg(target_os = "windows")]
 pub use windows::WindowsEngine as PlatformEngine;
 
+pub(crate) use sysproxy::clear_system_proxy;
 /// Re-export the cross-platform system-proxy entry points so existing
 /// `core::*` call sites (`engine::apply_system_proxy`, etc.) keep working.
 pub(crate) use sysproxy::set_system_proxy as apply_system_proxy;
-pub(crate) use sysproxy::clear_system_proxy;
 
 /// Clean up system proxy settings on app shutdown.
 pub fn cleanup_on_shutdown() {

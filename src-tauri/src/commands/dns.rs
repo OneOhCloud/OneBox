@@ -58,7 +58,11 @@ pub(crate) async fn probe_dns_server(
         Ok(addr) => addr,
         Err(_) => return,
     };
-    let bind_addr = if ns_addr.is_ipv4() { "0.0.0.0:0" } else { "[::]:0" };
+    let bind_addr = if ns_addr.is_ipv4() {
+        "0.0.0.0:0"
+    } else {
+        "[::]:0"
+    };
 
     let socket = match UdpSocket::bind(bind_addr).await {
         Ok(s) => s,
@@ -228,7 +232,11 @@ fn parse_dns_a_record(buf: &[u8]) -> Option<Ipv4Addr> {
 /// to a specific resolver instead of trusting the system stub.
 pub(crate) async fn resolve_a_record(hostname: &str, dns_server: &str) -> Option<Ipv4Addr> {
     let ns_addr: SocketAddr = format!("{}:53", dns_server).parse().ok()?;
-    let bind_addr = if ns_addr.is_ipv4() { "0.0.0.0:0" } else { "[::]:0" };
+    let bind_addr = if ns_addr.is_ipv4() {
+        "0.0.0.0:0"
+    } else {
+        "[::]:0"
+    };
 
     let payload = build_dns_a_query(hostname)?;
     let socket = UdpSocket::bind(bind_addr).await.ok()?;
@@ -259,9 +267,8 @@ pub async fn get_optimal_local_dns_server(app: AppHandle) -> Option<String> {
     use crate::app::state::AppData;
 
     let app_data = app.state::<AppData>();
-    let running = {
-        crate::core::is_running(app.clone(), app_data.get_clash_secret().unwrap()).await
-    };
+    let running =
+        { crate::core::is_running(app.clone(), app_data.get_clash_secret().unwrap()).await };
 
     if running {
         if let Some(cached) = app_data.get_cached_dns() {

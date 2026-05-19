@@ -18,11 +18,11 @@ use windows::Win32::Security::Authorization::{
 use windows::Win32::Security::{DACL_SECURITY_INFORMATION, PSECURITY_DESCRIPTOR};
 use windows::Win32::System::Services::{
     CloseServiceHandle, ControlService, CreateServiceW, DeleteService, OpenSCManagerW,
-    OpenServiceW, QueryServiceStatusEx, SC_HANDLE, SC_MANAGER_CONNECT, SC_MANAGER_CREATE_SERVICE,
-    SC_STATUS_PROCESS_INFO, SERVICE_CONTROL_STOP, SERVICE_DEMAND_START, SERVICE_ERROR_NORMAL,
-    SERVICE_QUERY_STATUS, SERVICE_RUNNING, SERVICE_START, SERVICE_START_PENDING,
-    SERVICE_STATUS, SERVICE_STATUS_PROCESS, SERVICE_STOP, SERVICE_STOPPED, SERVICE_STOP_PENDING,
-    SERVICE_WIN32_OWN_PROCESS, SetServiceObjectSecurity, StartServiceW,
+    OpenServiceW, QueryServiceStatusEx, SetServiceObjectSecurity, StartServiceW, SC_HANDLE,
+    SC_MANAGER_CONNECT, SC_MANAGER_CREATE_SERVICE, SC_STATUS_PROCESS_INFO, SERVICE_CONTROL_STOP,
+    SERVICE_DEMAND_START, SERVICE_ERROR_NORMAL, SERVICE_QUERY_STATUS, SERVICE_RUNNING,
+    SERVICE_START, SERVICE_START_PENDING, SERVICE_STATUS, SERVICE_STATUS_PROCESS, SERVICE_STOP,
+    SERVICE_STOPPED, SERVICE_STOP_PENDING, SERVICE_WIN32_OWN_PROCESS,
 };
 
 use crate::{SERVICE_DISPLAY_NAME, SERVICE_NAME};
@@ -281,7 +281,12 @@ fn apply_sddl(svc: &ScHandle) -> Result<(), String> {
             &mut psd,
             None,
         )
-        .map_err(|e| format!("ConvertStringSecurityDescriptorToSecurityDescriptorW: {}", e))?;
+        .map_err(|e| {
+            format!(
+                "ConvertStringSecurityDescriptorToSecurityDescriptorW: {}",
+                e
+            )
+        })?;
     }
     let res = unsafe { SetServiceObjectSecurity(svc.0, DACL_SECURITY_INFORMATION, psd) };
     // Free regardless of success.
@@ -300,11 +305,12 @@ pub fn ensure_installed(bundled_exe: &Path) -> Result<(), String> {
             bundled_exe.display()
         ));
     }
-    let bundled_hash = compute_file_sha256(bundled_exe)
-        .map_err(|e| format!("compute hash failed: {}", e))?;
+    let bundled_hash =
+        compute_file_sha256(bundled_exe).map_err(|e| format!("compute hash failed: {}", e))?;
 
     let dir = program_data_dir();
-    std::fs::create_dir_all(&dir).map_err(|e| format!("mkdir ProgramData\\OneBox\\service: {}", e))?;
+    std::fs::create_dir_all(&dir)
+        .map_err(|e| format!("mkdir ProgramData\\OneBox\\service: {}", e))?;
 
     let scm = open_scm(SC_MANAGER_CONNECT | SC_MANAGER_CREATE_SERVICE)?;
 
@@ -454,7 +460,10 @@ pub fn start_service_with_args(args: &[&str]) -> Result<(), String> {
     let final_state = wait_not_pending(&svc, 15_000)?;
     match final_state {
         QueriedState::Running => Ok(()),
-        other => Err(format!("service did not reach Running (state = {:?})", other)),
+        other => Err(format!(
+            "service did not reach Running (state = {:?})",
+            other
+        )),
     }
 }
 
@@ -495,7 +504,11 @@ mod tests {
     #[test]
     fn program_data_dir_is_absolute_and_ends_with_onebox_service() {
         let p = program_data_dir();
-        assert!(p.is_absolute(), "program_data_dir must be absolute: {:?}", p);
+        assert!(
+            p.is_absolute(),
+            "program_data_dir must be absolute: {:?}",
+            p
+        );
         let s = p.to_string_lossy();
         assert!(
             s.ends_with(r"OneBox\service") || s.ends_with("OneBox/service"),

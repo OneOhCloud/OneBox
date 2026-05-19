@@ -1,5 +1,5 @@
 import { type } from '@tauri-apps/plugin-os';
-import { getDirectDNS, getStoreValue, getUseDHCP } from "../../single/store";
+import { getDirectDNS, getProxyPort, getStoreValue, getUseDHCP } from "../../single/store";
 import { TUN_INTERFACE_NAME, TUN_STACK_STORE_KEY } from "../../types/definition";
 import { writeConfigFile } from "../helper";
 
@@ -92,6 +92,11 @@ export async function updateVPNServerConfigFromDB(fileName: string, dbConfigData
 export async function configureTunInbound(newConfig: any, bypassRouter: boolean = false): Promise<void> {
     const tunInbound = newConfig.inbounds.find((ib: Item) => ib.type === "tun" && ib.tag === "tun");
     if (!tunInbound) return;
+    const proxyPort = await getProxyPort();
+
+    if (tunInbound.platform?.http_proxy) {
+        tunInbound.platform.http_proxy.server_port = proxyPort;
+    }
 
     const osType = type();
     if (osType === "linux") {
@@ -140,9 +145,10 @@ export async function configureTunInbound(newConfig: any, bypassRouter: boolean 
     console.log("当前 TUN Stack:", tunInbound.stack);
 }
 
-export function configureMixedInbound(newConfig: any, allowLan: boolean, bypassRouter: boolean = false): void {
+export async function configureMixedInbound(newConfig: any, allowLan: boolean, bypassRouter: boolean = false): Promise<void> {
     const mixedInbound = newConfig.inbounds.find((ib: Item) => ib.type === "mixed" && ib.tag === "mixed");
-    if (mixedInbound) mixedInbound.listen = (allowLan || bypassRouter) ? "0.0.0.0" : "127.0.0.1";
+    if (mixedInbound) {
+        mixedInbound.listen = (allowLan || bypassRouter) ? "0.0.0.0" : "127.0.0.1";
+        mixedInbound.listen_port = await getProxyPort();
+    }
 }
-
-

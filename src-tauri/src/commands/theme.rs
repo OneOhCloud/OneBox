@@ -18,10 +18,7 @@ unsafe extern "C" {
 }
 
 #[tauri::command]
-pub fn set_native_window_theme(
-    window: tauri::Window,
-    theme: Option<String>,
-) -> Result<(), String> {
+pub fn set_native_window_theme(window: tauri::Window, theme: Option<String>) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
         let ns_window = window.ns_window().map_err(|e| e.to_string())?;

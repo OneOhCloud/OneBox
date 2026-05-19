@@ -196,8 +196,12 @@ pub async fn get_captive_redirect_url() -> String {
 }
 
 #[tauri::command]
-pub async fn ping_google() -> bool {
-    let proxy = format!("http://{}:{}", "127.0.0.1", 6789);
+pub async fn ping_google(app: tauri::AppHandle) -> bool {
+    let proxy = format!(
+        "http://{}:{}",
+        "127.0.0.1",
+        crate::core::mixed_proxy_port(&app)
+    );
     let client = reqwest::ClientBuilder::new()
         .proxy(reqwest::Proxy::all(&proxy).unwrap())
         .timeout(std::time::Duration::from_secs(10))

@@ -26,10 +26,7 @@ mod ffi {
         pub fn onebox_helper_stop_sing_box(error_out: *mut *mut c_char) -> c_int;
         pub fn onebox_helper_reload_sing_box(error_out: *mut *mut c_char) -> c_int;
 
-        pub fn onebox_helper_set_ip_forwarding(
-            enable: bool,
-            error_out: *mut *mut c_char,
-        ) -> c_int;
+        pub fn onebox_helper_set_ip_forwarding(enable: bool, error_out: *mut *mut c_char) -> c_int;
         pub fn onebox_helper_set_dns_servers(
             service_name: *const c_char,
             dns_spec: *const c_char,
@@ -180,12 +177,7 @@ pub mod api {
         let mut pid: std::os::raw::c_int = 0;
         let mut err: *mut std::os::raw::c_char = ptr::null_mut();
         let rc = unsafe {
-            ffi::onebox_helper_start_sing_box(
-                c_path.as_ptr(),
-                c_log.as_ptr(),
-                &mut pid,
-                &mut err,
-            )
+            ffi::onebox_helper_start_sing_box(c_path.as_ptr(), c_log.as_ptr(), &mut pid, &mut err)
         };
         let message = consume_cstring(err);
         if rc == 0 && pid > 0 {
@@ -206,9 +198,7 @@ pub mod api {
     }
 
     pub fn set_ip_forwarding(enable: bool) -> Result<(), String> {
-        call_error_only(|err_out| unsafe {
-            ffi::onebox_helper_set_ip_forwarding(enable, err_out)
-        })
+        call_error_only(|err_out| unsafe { ffi::onebox_helper_set_ip_forwarding(enable, err_out) })
     }
 
     pub fn set_dns_servers(service_name: &str, dns_spec: &str) -> Result<(), String> {
@@ -239,18 +229,30 @@ pub mod api {
 pub mod api {
     const MSG: &str = "privileged helper is only available on macOS";
 
-    pub fn ping() -> Result<String, String> { Err(MSG.to_string()) }
-    pub fn install() -> Result<(), String> { Err(MSG.to_string()) }
+    pub fn ping() -> Result<String, String> {
+        Err(MSG.to_string())
+    }
+    pub fn install() -> Result<(), String> {
+        Err(MSG.to_string())
+    }
     pub fn start_sing_box(_config_path: &str, _log_path: &str) -> Result<i32, String> {
         Err(MSG.to_string())
     }
-    pub fn stop_sing_box() -> Result<(), String> { Err(MSG.to_string()) }
-    pub fn reload_sing_box() -> Result<(), String> { Err(MSG.to_string()) }
-    pub fn set_ip_forwarding(_enable: bool) -> Result<(), String> { Err(MSG.to_string()) }
+    pub fn stop_sing_box() -> Result<(), String> {
+        Err(MSG.to_string())
+    }
+    pub fn reload_sing_box() -> Result<(), String> {
+        Err(MSG.to_string())
+    }
+    pub fn set_ip_forwarding(_enable: bool) -> Result<(), String> {
+        Err(MSG.to_string())
+    }
     pub fn set_dns_servers(_service_name: &str, _dns_spec: &str) -> Result<(), String> {
         Err(MSG.to_string())
     }
-    pub fn flush_dns_cache() -> Result<(), String> { Err(MSG.to_string()) }
+    pub fn flush_dns_cache() -> Result<(), String> {
+        Err(MSG.to_string())
+    }
     pub fn remove_tun_routes(_interface_name: &str) -> Result<(), String> {
         Err(MSG.to_string())
     }
@@ -258,4 +260,3 @@ pub mod api {
 
 // Tauri commands for helper_ping/helper_install are defined in
 // engine/mod.rs as cross-platform wrappers that delegate to api::ping/install.
-

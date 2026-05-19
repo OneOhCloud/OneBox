@@ -27,11 +27,10 @@ const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
 use windows::core::{PCWSTR, PWSTR};
 use windows::Win32::System::Services::{
-    RegisterServiceCtrlHandlerExW, SERVICE_ACCEPT_STOP, SERVICE_CONTROL_INTERROGATE,
-    SERVICE_CONTROL_STOP, SERVICE_RUNNING, SERVICE_START_PENDING, SERVICE_STATUS,
-    SERVICE_STATUS_CURRENT_STATE, SERVICE_STATUS_HANDLE, SERVICE_STOPPED, SERVICE_STOP_PENDING,
-    SERVICE_TABLE_ENTRYW, SERVICE_WIN32_OWN_PROCESS, SetServiceStatus,
-    StartServiceCtrlDispatcherW,
+    RegisterServiceCtrlHandlerExW, SetServiceStatus, StartServiceCtrlDispatcherW,
+    SERVICE_ACCEPT_STOP, SERVICE_CONTROL_INTERROGATE, SERVICE_CONTROL_STOP, SERVICE_RUNNING,
+    SERVICE_START_PENDING, SERVICE_STATUS, SERVICE_STATUS_CURRENT_STATE, SERVICE_STATUS_HANDLE,
+    SERVICE_STOPPED, SERVICE_STOP_PENDING, SERVICE_TABLE_ENTRYW, SERVICE_WIN32_OWN_PROCESS,
 };
 
 use crate::{dns, SERVICE_NAME};
@@ -121,17 +120,14 @@ unsafe extern "system" fn service_main(argc: u32, argv: *mut PWSTR) {
 
     // Register control handler.
     let name_w = to_wide_z(SERVICE_NAME);
-    let handle = match RegisterServiceCtrlHandlerExW(
-        PCWSTR(name_w.as_ptr()),
-        Some(handler_ex),
-        None,
-    ) {
-        Ok(h) => h,
-        Err(e) => {
-            dns::log_line(&format!("RegisterServiceCtrlHandlerExW failed: {}", e));
-            return;
-        }
-    };
+    let handle =
+        match RegisterServiceCtrlHandlerExW(PCWSTR(name_w.as_ptr()), Some(handler_ex), None) {
+            Ok(h) => h,
+            Err(e) => {
+                dns::log_line(&format!("RegisterServiceCtrlHandlerExW failed: {}", e));
+                return;
+            }
+        };
     STATUS_HANDLE_RAW.store(handle.0 as usize, Ordering::SeqCst);
     set_state(SERVICE_START_PENDING, 0, 5000);
 

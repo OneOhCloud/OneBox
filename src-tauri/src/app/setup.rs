@@ -465,10 +465,7 @@ pub(crate) fn spawn_lifecycle_listener(app_handle: &tauri::AppHandle) {
                             .take()
                             .and_then(|t| t.elapsed().ok())
                             .unwrap_or_default();
-                        log::info!(
-                            "[wake] DidWake — slept {:.1}s",
-                            sleep_dur.as_secs_f32()
-                        );
+                        log::info!("[wake] DidWake — slept {:.1}s", sleep_dur.as_secs_f32());
 
                         // 幂等地刷一次 TUN DNS。睡眠期间 mDNSResponder 可能已被
                         // 系统回写为 DHCP 下发的服务器；这一次调用在非 TUN 模式
@@ -486,8 +483,7 @@ pub(crate) fn spawn_lifecycle_listener(app_handle: &tauri::AppHandle) {
 
                         // 走和 NetworkUp 同一套 epoch + debounce：若期间又发
                         // NetworkDown/NetworkUp，epoch 自增会让本任务自动放弃。
-                        network_restart_epoch
-                            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                        network_restart_epoch.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                         log::info!(
                             "[wake] sleep {:.1}s — scheduling engine restart in {}s",
                             sleep_dur.as_secs_f32(),
@@ -546,8 +542,7 @@ pub(crate) fn spawn_lifecycle_listener(app_handle: &tauri::AppHandle) {
                         );
                         // 取消可能被 DidWake 预先排的 wake 重启——epoch 自增一次
                         // 后新旧两个已排队任务中只有我们刚刚捕获的那个能通过检查。
-                        network_restart_epoch
-                            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                        network_restart_epoch.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                         schedule_engine_restart(
                             handle.clone(),
                             std::sync::Arc::clone(&network_restart_epoch),

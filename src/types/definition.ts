@@ -18,6 +18,8 @@ export type BypassRouterWatchdogInterval = '4' | '12' | '24' | 'disabled'
 export const DEFAULT_BYPASS_ROUTER_WATCHDOG_INTERVAL: BypassRouterWatchdogInterval = '24'
 // User Agent 配置键
 export const USER_AGENT_STORE_KEY = 'user_agent_key'
+export const DEFAULT_PROXY_PORT = 6789
+export const PROXY_PORT_STORE_KEY = 'proxy_port_key'
 
 // 上次检查更新的时间戳（ms），跨会话持久化
 export const LAST_UPDATE_CHECK_TIME_KEY = 'last_update_check_time_key'

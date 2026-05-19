@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { Router } from "react-bootstrap-icons";
-import { getAllowLan, setAllowLan } from "../../single/store";
+import { getAllowLan, getProxyPort, setAllowLan } from "../../single/store";
 import { ToggleSetting } from "./common";
 
 import { invoke } from "@tauri-apps/api/core";
 import { message } from "@tauri-apps/plugin-dialog";
+import { DEFAULT_PROXY_PORT } from "../../types/definition";
 import { t, vpnServiceManager } from "../../utils/helper";
 
 
@@ -22,6 +23,7 @@ async function getLanIP(): Promise<string> {
 export default function ToggleLan() {
   const [toggle, setToggle] = useState(false);
   const [lanIP, setLanIP] = useState<string>("127.0.0.1");
+  const [proxyPort, setProxyPort] = useState(DEFAULT_PROXY_PORT);
 
   useEffect(() => {
     const loadTunState = async () => {
@@ -45,6 +47,7 @@ export default function ToggleLan() {
     };
     fetchLanIP();
     loadTunState();
+    getProxyPort().then(setProxyPort).catch(() => setProxyPort(DEFAULT_PROXY_PORT));
   }, []);
 
   const handleToggle = async () => {
@@ -68,7 +71,7 @@ export default function ToggleLan() {
     <ToggleSetting
       icon={<Router className="text-[#5856D6] " size={22} />}
       title={t("allow_lan_connection")}
-      subTitle={`${lanIP}:6789`}
+      subTitle={`${lanIP}:${proxyPort}`}
       isEnabled={toggle}
       onToggle={handleToggle}
     />
