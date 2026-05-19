@@ -49,11 +49,24 @@ export default function ProxyPortSetting() {
 
     setIsLoading(true);
     try {
-      await setProxyPort(parsedPort);
-      setCurrentPort(parsedPort);
-      await vpnServiceManager.syncConfig({});
-      await vpnServiceManager.reload(1000);
-      toast.success(t("proxy_port_saved", "Proxy port saved"));
+      if (await vpnServiceManager.is_running()) {
+        await toast.promise(
+          (async () => {
+            await vpnServiceManager.stop();
+            await setProxyPort(parsedPort);
+            setCurrentPort(parsedPort);
+          })(),
+          {
+            loading: t("please_wait_releasing_resources"),
+            success: t("proxy_port_saved_stop_vpn", "Proxy port saved, VPN stopped"),
+            error: t("proxy_port_save_failed", "Failed to save proxy port"),
+          },
+        );
+      } else {
+        await setProxyPort(parsedPort);
+        setCurrentPort(parsedPort);
+        toast.success(t("proxy_port_saved", "Proxy port saved"));
+      }
       setIsOpen(false);
     } catch {
       toast.error(t("proxy_port_save_failed", "Failed to save proxy port"));

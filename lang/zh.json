@@ -182,6 +182,7 @@
     "proxy_port_desc": "HTTP/SOCKS 混合入站端口",
     "proxy_port_invalid": "端口必须在 1 到 65535 之间",
     "proxy_port_saved": "代理端口已保存",
+    "proxy_port_saved_stop_vpn": "代理端口已保存，VPN服务已停止",
     "proxy_port_save_failed": "保存代理端口失败",
     "proxy_rules": "代理规则",
     "reconnect_failed": "重新连接失败，请检查网络",

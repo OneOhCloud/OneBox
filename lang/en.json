@@ -182,6 +182,7 @@
     "proxy_port_desc": "HTTP/SOCKS mixed inbound",
     "proxy_port_invalid": "Port must be between 1 and 65535",
     "proxy_port_saved": "Proxy port saved",
+    "proxy_port_saved_stop_vpn": "Proxy port saved, VPN stopped",
     "proxy_port_save_failed": "Failed to save proxy port",
     "proxy_rules": "Proxy Rules",
     "reconnect_failed": "Reconnect failed, please check network",
