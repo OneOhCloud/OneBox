@@ -4,6 +4,13 @@
 
 [![sing-box](https://repology.org/badge/version-for-repo/homebrew/sing-box.svg?header=sing-box-latest-version)](https://github.com/SagerNet/sing-box)
 
+Mobile apps:
+
+| Platform | Download |
+|----------|----------|
+| Android | [Google Play](https://play.google.com/store/apps/details?id=cloud.oneoh.networktools) |
+| iOS | [App Store](https://apps.apple.com/us/app/oneboxm/id6759716475) |
+
 **Simplicity, Stability, Security. No complex configuration, ready to use out of the box.**
 
 

@@ -2,6 +2,13 @@
 
 [![sing-box](https://repology.org/badge/version-for-repo/homebrew/sing-box.svg?header=sing-box-latest-version)](https://github.com/SagerNet/sing-box)
 
+移动端应用：
+
+| 平台 | 下载 |
+|------|------|
+| Android | [Google Play](https://play.google.com/store/apps/details?id=cloud.oneoh.networktools) |
+| iOS | [App Store](https://apps.apple.com/us/app/oneboxm/id6759716475) |
+
 **简单、稳定、安全。无需繁琐配置，开箱即用。**
 
 
