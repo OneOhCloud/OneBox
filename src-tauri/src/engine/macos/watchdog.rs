@@ -1,9 +1,9 @@
 //! Bypass-router restart watchdog (macOS TUN mode only).
 //!
-//! Periodically (every 24 hours) restarts sing-box via the privileged helper
-//! so macOS's `auto_detect_interface` picks up routing changes that would
-//! otherwise accumulate as stale entries — long-lived TUN sessions on
-//! roaming laptops tend to drift as Wi-Fi networks change.
+//! Periodically restarts sing-box via the privileged helper so macOS's
+//! `auto_detect_interface` picks up routing changes that would otherwise
+//! accumulate as stale entries — long-lived TUN sessions on roaming laptops
+//! tend to drift as Wi-Fi networks change.
 //!
 //! All state lives in this module; `core` does not see the watchdog.
 //! The only cross-module concession is the `is_restart_in_progress` flag
@@ -12,8 +12,10 @@
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 use tauri::{AppHandle, Emitter, Manager};
+use tauri_plugin_store::StoreExt;
 
 use crate::core::monitor::handle_process_termination;
 use crate::core::{ProcessManager, ProxyMode};
@@ -22,8 +24,39 @@ use crate::engine::{readiness, EVENT_STATUS_CHANGED};
 
 use super::helper as macos_helper;
 
-pub const BYPASS_ROUTER_RESTART_INTERVAL: std::time::Duration =
-    std::time::Duration::from_secs(24 * 3600);
+const SETTINGS_STORE: &str = "settings.json";
+const WATCHDOG_INTERVAL_KEY: &str = "bypass_router_watchdog_interval_key";
+const DEFAULT_RESTART_INTERVAL_HOURS: u64 = 24;
+const WATCHDOG_SETTING_POLL_INTERVAL: Duration = Duration::from_secs(60);
+
+fn configured_restart_interval(app: &AppHandle) -> Option<Duration> {
+    let value = app
+        .get_store(SETTINGS_STORE)
+        .and_then(|store| store.get(WATCHDOG_INTERVAL_KEY));
+
+    let Some(value) = value else {
+        return Some(Duration::from_secs(DEFAULT_RESTART_INTERVAL_HOURS * 3600));
+    };
+
+    if value.as_str() == Some("disabled") {
+        return None;
+    }
+
+    let hours = value
+        .as_str()
+        .and_then(|s| s.parse::<u64>().ok())
+        .or_else(|| value.as_u64())
+        .unwrap_or(DEFAULT_RESTART_INTERVAL_HOURS);
+
+    match hours {
+        4 | 12 | 24 => Some(Duration::from_secs(hours * 3600)),
+        _ => Some(Duration::from_secs(DEFAULT_RESTART_INTERVAL_HOURS * 3600)),
+    }
+}
+
+fn interval_hours(interval: Duration) -> u64 {
+    interval.as_secs() / 3600
+}
 
 // Flag set while a watchdog restart is mid-flight (between stop and start).
 // `core::monitor::handle_process_termination` reads this to skip the
@@ -46,13 +79,17 @@ pub fn is_restart_in_progress() -> bool {
 /// a fresh one with the new config path.
 pub fn spawn(app: AppHandle, config_path: Arc<String>) {
     cancel();
+    let current_interval = configured_restart_interval(&app);
     let task = tokio::spawn(run(app, config_path));
     let mut guard = ABORT_HANDLE.lock().unwrap_or_else(|e| e.into_inner());
     *guard = Some(task.abort_handle());
-    log::info!(
-        "[bypass_router_watchdog] started, next restart in {}h",
-        BYPASS_ROUTER_RESTART_INTERVAL.as_secs() / 3600
-    );
+    match current_interval {
+        Some(interval) => log::info!(
+            "[bypass_router_watchdog] started, next restart in {}h",
+            interval_hours(interval)
+        ),
+        None => log::info!("[bypass_router_watchdog] started disabled by settings"),
+    }
 }
 
 /// Cancel the running watchdog if any. Idempotent.
@@ -64,8 +101,38 @@ pub fn cancel() {
 }
 
 async fn run(app: AppHandle, path: Arc<String>) {
+    let mut elapsed = Duration::ZERO;
+    let mut logged_disabled = false;
+
     loop {
-        tokio::time::sleep(BYPASS_ROUTER_RESTART_INTERVAL).await;
+        let Some(interval) = configured_restart_interval(&app) else {
+            if !logged_disabled {
+                log::info!("[bypass_router_watchdog] disabled by settings");
+                logged_disabled = true;
+            }
+            elapsed = Duration::ZERO;
+            tokio::time::sleep(WATCHDOG_SETTING_POLL_INTERVAL).await;
+            continue;
+        };
+
+        if logged_disabled {
+            log::info!(
+                "[bypass_router_watchdog] enabled, next restart in {}h",
+                interval_hours(interval)
+            );
+            logged_disabled = false;
+        }
+
+        let sleep_for = interval
+            .saturating_sub(elapsed)
+            .min(WATCHDOG_SETTING_POLL_INTERVAL);
+        if sleep_for > Duration::ZERO {
+            tokio::time::sleep(sleep_for).await;
+            elapsed += sleep_for;
+        }
+        if elapsed < interval {
+            continue;
+        }
 
         let still_tun = {
             let manager = ProcessManager::acquire();
@@ -82,7 +149,7 @@ async fn run(app: AppHandle, path: Arc<String>) {
 
         log::info!(
             "[bypass_router_watchdog] scheduled restart after {}h to refresh routing table",
-            BYPASS_ROUTER_RESTART_INTERVAL.as_secs() / 3600
+            interval_hours(interval)
         );
 
         RESTART_IN_PROGRESS.store(true, Ordering::SeqCst);
@@ -90,15 +157,17 @@ async fn run(app: AppHandle, path: Arc<String>) {
         if let Err(e) = super::stop_tun_process().await {
             log::error!("[bypass_router_watchdog] stop_tun_process failed: {}", e);
             RESTART_IN_PROGRESS.store(false, Ordering::SeqCst);
+            elapsed = Duration::ZERO;
             continue;
         }
 
-        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+        tokio::time::sleep(Duration::from_secs(2)).await;
         RESTART_IN_PROGRESS.store(false, Ordering::SeqCst);
 
         if let Err(e) = restart_tun_send_safe(app.clone(), Arc::clone(&path)).await {
             log::error!("[bypass_router_watchdog] restart failed: {}", e);
         }
+        elapsed = Duration::ZERO;
     }
 }
 

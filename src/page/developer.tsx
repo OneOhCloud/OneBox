@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Binoculars } from "react-bootstrap-icons";
 import ToggleBypassRouter from "../components/developer/bypass-router";
+import BypassRouterWatchdogSetting from "../components/developer/bypass-router-watchdog";
 import { SettingItem } from "../components/developer/common";
 import ToggleDev from "../components/developer/dev-toggle";
 import ToggleDHCP from "../components/developer/dhcp-toggle";
@@ -24,6 +25,7 @@ export default function Page() {
                     <ToggleDev />
                     <ToggleDHCP />
                     <ToggleBypassRouter />
+                    <BypassRouterWatchdogSetting />
                     <ToggleLocalConfig />
                     <ThemeToggle />
                 </div>

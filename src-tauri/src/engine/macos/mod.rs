@@ -800,11 +800,12 @@ impl EngineManager for MacOSEngine {
                     mgr.is_stopping = false;
                 }
 
-                // Optional bypass-router watchdog: restart sing-box every 24h
-                // so macOS's auto_detect_interface can pick up routing table
-                // changes that accumulate without a clean refresh. All
-                // state (abort handle, restart-in-progress flag) lives
-                // inside watchdog.rs, not in ProcessManager.
+                // Optional bypass-router watchdog: restart sing-box on the
+                // configured interval so macOS's auto_detect_interface can
+                // pick up routing table changes that accumulate without a
+                // clean refresh. All state (abort handle,
+                // restart-in-progress flag, interval handling) lives inside
+                // watchdog.rs, not in ProcessManager.
                 let bypass_router_enabled = app
                     .get_store("settings.json")
                     .and_then(|store| store.get("enable_bypass_router_key"))

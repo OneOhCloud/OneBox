@@ -12,7 +12,10 @@ export const TUN_STACK_STORE_KEY = 'tun_stack_key'
 export const TUN_INTERFACE_NAME = 'utun233'
 export const USE_DHCP_STORE_KEY = 'use_dhcp_key'
 export const ENABLE_BYPASS_ROUTER_STORE_KEY = 'enable_bypass_router_key'
+export const BYPASS_ROUTER_WATCHDOG_INTERVAL_STORE_KEY = 'bypass_router_watchdog_interval_key'
 export const SUPPORT_LOCAL_FILE_STORE_KEY = 'support_local_file_key'
+export type BypassRouterWatchdogInterval = '4' | '12' | '24' | 'disabled'
+export const DEFAULT_BYPASS_ROUTER_WATCHDOG_INTERVAL: BypassRouterWatchdogInterval = '24'
 // User Agent 配置键
 export const USER_AGENT_STORE_KEY = 'user_agent_key'
 
