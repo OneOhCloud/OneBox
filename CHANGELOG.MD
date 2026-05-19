@@ -9,7 +9,7 @@ All significant changes in this version are documented here.
 
 ### Features
 
-- No new user-facing features in this release.
+- Added a macOS bypass-router Watchdog setting with 4-hour, 12-hour, 24-hour, and disabled options.
 
 
 ### Changes
@@ -17,7 +17,7 @@ All significant changes in this version are documented here.
 - Updated frontend and Tauri dependencies.
 - Upgraded the bundled sing-box kernel from v1.13.11 to v1.13.12.
 - Added startup window geometry diagnostics to help troubleshoot display and sizing issues.
-- Changed the macOS bypass-router scheduled restart interval from every 4 hours to every 24 hours.
+- Changed the default macOS bypass-router scheduled restart interval from every 4 hours to every 24 hours.
 
 
 ### Bug Fixes
@@ -34,7 +34,7 @@ All significant changes in this version are documented here.
 
 ### 新增功能
 
-- 本版本没有新增面向用户的功能。
+- 新增 macOS 旁路由 Watchdog 设置，可选择 4 小时、12 小时、24 小时或禁用。
 
 
 ### 变更
@@ -42,7 +42,7 @@ All significant changes in this version are documented here.
 - 更新了前端与 Tauri 相关依赖。
 - 内置 sing-box 内核从 v1.13.11 升级至 v1.13.12。
 - 新增启动时窗口尺寸诊断日志，便于排查显示和窗口大小问题。
-- macOS 旁路由定时重启间隔从每 4 小时调整为每 24 小时。
+- macOS 旁路由默认定时重启间隔从每 4 小时调整为每 24 小时。
 
 
 
