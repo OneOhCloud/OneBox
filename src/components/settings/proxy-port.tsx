@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Ethernet } from "react-bootstrap-icons";
 import { toast } from "sonner";
-import { DEFAULT_PROXY_PORT } from "../../types/definition";
+import { DEFAULT_PROXY_PORT, PROXY_PORT_CHANGED_EVENT } from "../../types/definition";
 import { getProxyPort, setProxyPort } from "../../single/store";
 import { t, vpnServiceManager } from "../../utils/helper";
 import { IOSTextField } from "../common/ios-text-field";
@@ -49,12 +49,17 @@ export default function ProxyPortSetting() {
 
     setIsLoading(true);
     try {
+      const applySavedPort = () => {
+        setCurrentPort(parsedPort);
+        window.dispatchEvent(new CustomEvent<number>(PROXY_PORT_CHANGED_EVENT, { detail: parsedPort }));
+      };
+
       if (await vpnServiceManager.is_running()) {
         await toast.promise(
           (async () => {
             await vpnServiceManager.stop();
             await setProxyPort(parsedPort);
-            setCurrentPort(parsedPort);
+            applySavedPort();
           })(),
           {
             loading: t("please_wait_releasing_resources"),
@@ -64,7 +69,7 @@ export default function ProxyPortSetting() {
         );
       } else {
         await setProxyPort(parsedPort);
-        setCurrentPort(parsedPort);
+        applySavedPort();
         toast.success(t("proxy_port_saved", "Proxy port saved"));
       }
       setIsOpen(false);

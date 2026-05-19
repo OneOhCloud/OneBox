@@ -5,7 +5,7 @@ import { ToggleSetting } from "./common";
 
 import { invoke } from "@tauri-apps/api/core";
 import { message } from "@tauri-apps/plugin-dialog";
-import { DEFAULT_PROXY_PORT } from "../../types/definition";
+import { DEFAULT_PROXY_PORT, PROXY_PORT_CHANGED_EVENT } from "../../types/definition";
 import { t, vpnServiceManager } from "../../utils/helper";
 
 
@@ -48,6 +48,15 @@ export default function ToggleLan() {
     fetchLanIP();
     loadTunState();
     getProxyPort().then(setProxyPort).catch(() => setProxyPort(DEFAULT_PROXY_PORT));
+
+    const handleProxyPortChanged = (event: Event) => {
+      const nextPort = (event as CustomEvent<number>).detail;
+      if (Number.isInteger(nextPort)) {
+        setProxyPort(nextPort);
+      }
+    };
+    window.addEventListener(PROXY_PORT_CHANGED_EVENT, handleProxyPortChanged);
+    return () => window.removeEventListener(PROXY_PORT_CHANGED_EVENT, handleProxyPortChanged);
   }, []);
 
   const handleToggle = async () => {
