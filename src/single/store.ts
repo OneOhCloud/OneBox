@@ -3,7 +3,7 @@ import { locale, type } from '@tauri-apps/plugin-os';
 import { LazyStore } from '@tauri-apps/plugin-store';
 import { toast } from 'sonner';
 import { configType, StageVersionType } from '../config/common';
-import { ALLOWLAN_STORE_KEY, ENABLE_BYPASS_ROUTER_STORE_KEY, ENABLE_TUN_STORE_KEY, SING_BOX_MAJOR_VERSION, SING_BOX_VERSION, STAGE_VERSION_STORE_KEY, USE_DHCP_STORE_KEY, USER_AGENT_STORE_KEY } from '../types/definition';
+import { ALLOWLAN_STORE_KEY, DEFAULT_PROXY_PORT, ENABLE_BYPASS_ROUTER_STORE_KEY, ENABLE_TUN_STORE_KEY, PROXY_PORT_STORE_KEY, SING_BOX_MAJOR_VERSION, SING_BOX_VERSION, STAGE_VERSION_STORE_KEY, USE_DHCP_STORE_KEY, USER_AGENT_STORE_KEY } from '../types/definition';
 
 const OsType = type();
 export const LANGUAGE_STORE_KEY = 'language';
@@ -202,6 +202,23 @@ export async function setUserAgent(ua: string) {
     await store.save();
 }
 
+export async function getProxyPort(): Promise<number> {
+    const raw = await store.get(PROXY_PORT_STORE_KEY);
+    const port = typeof raw === 'number' ? raw : Number(raw);
+    if (Number.isInteger(port) && port > 0 && port <= 65535) {
+        return port;
+    }
+    return DEFAULT_PROXY_PORT;
+}
+
+export async function setProxyPort(port: number): Promise<void> {
+    if (!Number.isInteger(port) || port <= 0 || port > 65535) {
+        throw new Error('invalid_proxy_port');
+    }
+    await store.set(PROXY_PORT_STORE_KEY, port);
+    await store.save();
+}
+
 export async function getConfigTemplateURLKey(mode: configType): Promise<string> {
     // zh: 返回配置模版 URL 的存储键，格式为 `key-sing-box-{主版本号}-{模式}-template-path`, 如非必要请勿更改此格式。
     // en: Returns the storage key for the config template URL in the format `key-sing-box-{major-version}-{mode}-template-path`. Do not change this format unless necessary.
@@ -253,4 +270,3 @@ export async function getDefaultConfigTemplateURL(mode: configType): Promise<str
             return '';
     }
 }
-

@@ -135,6 +135,31 @@ function App() {
   const [deepLinkApplyAutoStart, setDeepLinkApplyAutoStart] = useState<boolean>(true);
 
   useEffect(() => {
+    const visualViewport = window.visualViewport;
+
+    console.info("[window-geometry:webview]", {
+      innerWidth: window.innerWidth,
+      innerHeight: window.innerHeight,
+      outerWidth: window.outerWidth,
+      outerHeight: window.outerHeight,
+      devicePixelRatio: window.devicePixelRatio,
+      screen: {
+        width: window.screen.width,
+        height: window.screen.height,
+        availWidth: window.screen.availWidth,
+        availHeight: window.screen.availHeight,
+      },
+      visualViewport: visualViewport
+        ? {
+            width: visualViewport.width,
+            height: visualViewport.height,
+            scale: visualViewport.scale,
+          }
+        : null,
+    });
+  }, []);
+
+  useEffect(() => {
     // 统一入口：从 Rust 拉取并消费 pending deep link（take() 保证幂等）
     const processPending = () => {
       invoke<{ data: string; apply: boolean } | null>('get_pending_deep_link').then(async (payload) => {

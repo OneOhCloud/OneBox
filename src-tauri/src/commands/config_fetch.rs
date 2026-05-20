@@ -38,7 +38,10 @@ fn hostname_suffix_candidates(hostname: &str) -> Vec<String> {
         return Vec::new();
     }
     let parts: Vec<&str> = hostname.split('.').collect();
-    (0..parts.len()).rev().map(|i| parts[i..].join(".")).collect()
+    (0..parts.len())
+        .rev()
+        .map(|i| parts[i..].join("."))
+        .collect()
 }
 
 /// True iff any suffix of `hostname` (shortest first) hashes to an entry in
@@ -48,9 +51,7 @@ pub(crate) fn verify_hostname(hostname: &str, app: &AppHandle) -> bool {
     let cached = load_whitelist_hashes(app);
     for candidate in hostname_suffix_candidates(hostname) {
         let h = compute_sha256_hex(&candidate);
-        if KNOWN_HOST_SHA256_LIST.contains(&h.as_str())
-            || cached.iter().any(|c| c == &h)
-        {
+        if KNOWN_HOST_SHA256_LIST.contains(&h.as_str()) || cached.iter().any(|c| c == &h) {
             return true;
         }
     }
@@ -178,7 +179,8 @@ pub async fn fetch_config_with_optimal_dns(
     let t_dns_probe = Instant::now();
     let app_data = app.state::<AppData>();
     let (dns_server, dns_source) = {
-        let running = crate::core::is_running(app.clone(), app_data.get_clash_secret().unwrap()).await;
+        let running =
+            crate::core::is_running(app.clone(), app_data.get_clash_secret().unwrap()).await;
         if running {
             match app_data.get_cached_dns() {
                 Some(d) => (d, "cached"),
@@ -449,9 +451,7 @@ mod tests {
     fn matches_allowlist(hostname: &str, cached: &[&str]) -> bool {
         for candidate in hostname_suffix_candidates(hostname) {
             let h = compute_sha256_hex(&candidate);
-            if KNOWN_HOST_SHA256_LIST.contains(&h.as_str())
-                || cached.iter().any(|c| *c == h)
-            {
+            if KNOWN_HOST_SHA256_LIST.contains(&h.as_str()) || cached.iter().any(|c| *c == h) {
                 return true;
             }
         }
@@ -467,8 +467,10 @@ mod tests {
         for h in KNOWN_HOST_SHA256_LIST {
             assert_eq!(h.len(), 64, "SHA256 hex must be 64 chars: {}", h);
             assert!(
-                h.chars().all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase()),
-                "SHA256 hex must be lowercase: {}", h
+                h.chars()
+                    .all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase()),
+                "SHA256 hex must be lowercase: {}",
+                h
             );
         }
     }

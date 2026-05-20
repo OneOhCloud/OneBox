@@ -2,6 +2,15 @@
 
 [![sing-box](https://repology.org/badge/version-for-repo/homebrew/sing-box.svg?header=sing-box-latest-version)](https://github.com/SagerNet/sing-box)
 
+<p>
+  <a href="https://play.google.com/store/apps/details?id=cloud.oneoh.networktools">
+    <img alt="在 Google Play 上获取" src="https://play.google.com/intl/en_us/badges/static/images/badges/zh-cn_badge_web_generic.png" height="56" align="middle">
+  </a>
+  <a href="https://apps.apple.com/us/app/oneboxm/id6759716475">
+    <img alt="在 App Store 下载" src="https://toolbox.marketingtools.apple.com/api/badges/download-on-the-app-store/black/zh-cn?size=250x83" height="38" align="middle">
+  </a>
+</p>
+
 **简单、稳定、安全。无需繁琐配置，开箱即用。**
 
 

@@ -34,6 +34,7 @@ pub fn app_setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>>
 
     app.manage(crate::app::state::AppData::new());
     app.manage(crate::engine::state_machine::EngineStateCell::new());
+    stop_orphan_tun_service_on_startup();
 
     // Purge must run before copy_database_files so the resource-bundled v2 defaults
     // are not clobbered by a later v1 cleanup pass.
@@ -49,6 +50,7 @@ pub fn app_setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>>
     report_captive(app);
 
     crate::commands::whitelist::spawn_whitelist_refresh_task(app.handle().clone());
+    report_main_window_geometry(app);
 
     // macOS：以无 Dock 图标的附件模式运行，启动时直接显示主窗口
     // 此模式下，访达点击已运行 App 图标时触发 Reopen 事件，需要监听此事件将隐藏的主窗口重新显示
@@ -115,6 +117,63 @@ pub fn app_setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>>
     }
 
     Ok(())
+}
+
+#[cfg(target_os = "windows")]
+fn stop_orphan_tun_service_on_startup() {
+    use tun_service::scm::{self, QueriedState};
+
+    match scm::query_state() {
+        QueriedState::Running | QueriedState::StartPending => {
+            log::warn!(
+                "[service] OneBoxTunService was running before engine-state ownership; stopping orphan"
+            );
+            if let Err(e) = scm::stop_service() {
+                log::warn!("[service] failed to stop orphan OneBoxTunService: {}", e);
+            }
+        }
+        _ => {}
+    }
+}
+
+#[cfg(not(target_os = "windows"))]
+fn stop_orphan_tun_service_on_startup() {}
+
+fn report_main_window_geometry(app: &tauri::App) {
+    let Some(window) = app.get_webview_window("main") else {
+        log::warn!("[window-geometry] main window not found during setup");
+        return;
+    };
+
+    let inner = window.inner_size().ok();
+    let outer = window.outer_size().ok();
+    let scale_factor = window.scale_factor().ok();
+    let monitor = window.current_monitor().ok().flatten();
+
+    let monitor_summary = monitor
+        .as_ref()
+        .map(|m| {
+            let size = m.size();
+            let position = m.position();
+            format!(
+                "name={:?} size={}x{} position={}x{} scale_factor={}",
+                m.name(),
+                size.width,
+                size.height,
+                position.x,
+                position.y,
+                m.scale_factor()
+            )
+        })
+        .unwrap_or_else(|| "none".to_string());
+
+    log::info!(
+        "[window-geometry] inner={:?} outer={:?} scale_factor={:?} monitor={}",
+        inner,
+        outer,
+        scale_factor,
+        monitor_summary
+    );
 }
 
 /// Read, check TTL, best-effort delete the suppression marker. Returns
@@ -406,10 +465,7 @@ pub(crate) fn spawn_lifecycle_listener(app_handle: &tauri::AppHandle) {
                             .take()
                             .and_then(|t| t.elapsed().ok())
                             .unwrap_or_default();
-                        log::info!(
-                            "[wake] DidWake — slept {:.1}s",
-                            sleep_dur.as_secs_f32()
-                        );
+                        log::info!("[wake] DidWake — slept {:.1}s", sleep_dur.as_secs_f32());
 
                         // 幂等地刷一次 TUN DNS。睡眠期间 mDNSResponder 可能已被
                         // 系统回写为 DHCP 下发的服务器；这一次调用在非 TUN 模式
@@ -427,8 +483,7 @@ pub(crate) fn spawn_lifecycle_listener(app_handle: &tauri::AppHandle) {
 
                         // 走和 NetworkUp 同一套 epoch + debounce：若期间又发
                         // NetworkDown/NetworkUp，epoch 自增会让本任务自动放弃。
-                        network_restart_epoch
-                            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                        network_restart_epoch.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                         log::info!(
                             "[wake] sleep {:.1}s — scheduling engine restart in {}s",
                             sleep_dur.as_secs_f32(),
@@ -487,8 +542,7 @@ pub(crate) fn spawn_lifecycle_listener(app_handle: &tauri::AppHandle) {
                         );
                         // 取消可能被 DidWake 预先排的 wake 重启——epoch 自增一次
                         // 后新旧两个已排队任务中只有我们刚刚捕获的那个能通过检查。
-                        network_restart_epoch
-                            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                        network_restart_epoch.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                         schedule_engine_restart(
                             handle.clone(),
                             std::sync::Arc::clone(&network_restart_epoch),

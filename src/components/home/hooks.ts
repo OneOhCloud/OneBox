@@ -6,7 +6,7 @@ import useSWR, { mutate as swrMutate } from "swr";
 import { insertSubscription } from "../../action/db";
 import { clearEngineError, useEngineState } from "../../hooks/useEngineState";
 import { NavContext } from "../../single/context";
-import { getStoreValue, setStoreValue } from "../../single/store";
+import { getProxyPort, getStoreValue, setStoreValue } from "../../single/store";
 import { GET_SUBSCRIPTIONS_LIST_SWR_KEY, RULE_MODE_STORE_KEY, SSI_STORE_KEY } from "../../types/definition";
 import { t, vpnServiceManager } from "../../utils/helper";
 import type { DeepLinkApplyPhase } from "./deep-link-apply-progress-modal";
@@ -361,7 +361,8 @@ export const useVPNOperations = () => {
         }
 
         // Pre-start check: if port is occupied by orphan processes, show repair modal
-        const check = await invoke<{ port_occupied: boolean; orphan_pids: number[] }>('prestart_check');
+        const proxyPort = await getProxyPort();
+        const check = await invoke<{ port_occupied: boolean; orphan_pids: number[] }>('prestart_check', { port: proxyPort });
         if (check.port_occupied && check.orphan_pids.length > 0) {
             // Store what we would do after repair, then show the modal
             pendingStartRef.current = () => {

@@ -2,6 +2,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useEffect, useRef, useState } from 'react';
 import { CheckCircleFill, XCircleFill } from 'react-bootstrap-icons';
+import { getProxyPort } from '../../single/store';
 import { t } from '../../utils/helper';
 
 export interface PrestartRepairModalProps {
@@ -215,7 +216,7 @@ export function PrestartRepairModal({
             setPhase('killing');
 
             try {
-                const result = await invoke<{ success: boolean; port_released: boolean }>('kill_orphans');
+                const result = await invoke<{ success: boolean; port_released: boolean }>('kill_orphans', { port: await getProxyPort() });
                 setPhase('verifying');
                 // Brief verifying dwell
                 await new Promise(r => setTimeout(r, 800));

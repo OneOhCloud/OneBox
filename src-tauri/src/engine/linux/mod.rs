@@ -41,7 +41,12 @@ pub fn create_privileged_command(
     path: String,
     dns_override: Option<&(String, String)>,
 ) -> Option<TauriCommand> {
-    let mut args = vec![HELPER_PATH.to_string(), "start-tun".to_string(), sidecar_path, path.clone()];
+    let mut args = vec![
+        HELPER_PATH.to_string(),
+        "start-tun".to_string(),
+        sidecar_path,
+        path.clone(),
+    ];
 
     if let Some((iface, _original)) = dns_override {
         let gateway = extract_tun_gateway_from_config(&path).unwrap_or_default();
@@ -56,9 +61,7 @@ pub fn create_privileged_command(
 }
 
 /// Stop sing-box and restore DNS in a single pkexec call (one auth prompt).
-pub fn stop_tun_and_restore_dns(
-    dns_override: Option<&(String, String)>,
-) -> Result<(), String> {
+pub fn stop_tun_and_restore_dns(dns_override: Option<&(String, String)>) -> Result<(), String> {
     let mut args = vec![HELPER_PATH, "stop-tun"];
 
     let iface_owned;
@@ -282,10 +285,9 @@ impl EngineManager for LinuxEngine {
                     }
                 };
 
-                let sidecar_path = crate::engine::helper::get_sidecar_path(
-                    std::path::Path::new("sing-box"),
-                )
-                .map_err(|e| format!("Failed to get sidecar path: {}", e))?;
+                let sidecar_path =
+                    crate::engine::helper::get_sidecar_path(std::path::Path::new("sing-box"))
+                        .map_err(|e| format!("Failed to get sidecar path: {}", e))?;
                 let cmd = create_privileged_command(
                     app,
                     sidecar_path,
@@ -297,7 +299,10 @@ impl EngineManager for LinuxEngine {
                 let child_pid = child.pid();
                 // On Linux TUN this pid is pkexec; sing-box is its child.
                 // Kept in the log as "child_pid" so the reader isn't misled.
-                log::info!("[sing-box] spawned pid={} (pkexec) mode=TunProxy", child_pid);
+                log::info!(
+                    "[sing-box] spawned pid={} (pkexec) mode=TunProxy",
+                    child_pid
+                );
                 crate::core::monitor::spawn_process_monitor(
                     app.clone(),
                     rx,
@@ -324,7 +329,9 @@ impl EngineManager for LinuxEngine {
             mgr.is_stopping = true;
             (mgr.mode.clone(), mgr.child.take())
         };
-        let Some(mode) = mode else { return Ok(()); };
+        let Some(mode) = mode else {
+            return Ok(());
+        };
         match mode.as_ref() {
             crate::engine::ProxyMode::SystemProxy => {
                 let _ = clear_system_proxy(app).await;
@@ -406,7 +413,9 @@ impl EngineManager for LinuxEngine {
         if std::path::Path::new(HELPER_PATH).exists() {
             Ok(())
         } else {
-            Err(format!("{HELPER_PATH} not found — is the OneBox package installed?"))
+            Err(format!(
+                "{HELPER_PATH} not found — is the OneBox package installed?"
+            ))
         }
     }
 

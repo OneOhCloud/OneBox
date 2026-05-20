@@ -6,13 +6,12 @@ import { TrayIcon, TrayIconEvent } from '@tauri-apps/api/tray';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { message } from '@tauri-apps/plugin-dialog';
 import { type } from '@tauri-apps/plugin-os';
-import { getClashApiSecret, getStoreValue } from './single/store';
+import { getClashApiSecret, getProxyPort, getStoreValue } from './single/store';
 import { DEVELOPER_TOGGLE_STORE_KEY } from './types/definition';
 import { copyEnvToClipboard, initLanguage, t, vpnServiceManager } from './utils/helper';
 
 // 常量
 const PROXY_HOST = "127.0.0.1";
-const PROXY_PORT = "6789";
 const STATUS_POLL_INTERVAL = 500;
 
 const appWindow = getCurrentWindow();
@@ -52,7 +51,8 @@ async function toggleProxyStatus(status: boolean) {
 }
 
 // 创建基础菜单项
-function createBaseMenuItems(status: boolean): NonNullable<MenuOptions['items']> {
+async function createBaseMenuItems(status: boolean): Promise<NonNullable<MenuOptions['items']>> {
+    const proxyPort = await getProxyPort();
     return [
         {
             id: 'show',
@@ -68,7 +68,7 @@ function createBaseMenuItems(status: boolean): NonNullable<MenuOptions['items']>
         {
             id: 'copy_proxy',
             text: t("menu_copy_env"),
-            action: () => copyEnvToClipboard(PROXY_HOST, PROXY_PORT),
+            action: () => copyEnvToClipboard(PROXY_HOST, proxyPort.toString()),
         },
     ];
 }
@@ -140,7 +140,7 @@ async function createTrayMenu() {
 
     setupWindowControls();
 
-    const baseItems = createBaseMenuItems(status);
+    const baseItems = await createBaseMenuItems(status);
     const developerMenu = await createDeveloperMenuItems();
 
     const menuItems = [

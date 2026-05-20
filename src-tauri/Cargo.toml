@@ -53,6 +53,7 @@ anyhow = "1.0"
 tauri-plugin-log = "2"
 lazy_static = "1.5.0"
 flate2 = "1.0"
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
 onebox-sysproxy-rs = { git = "https://github.com/OneOhCloud/onebox-sysproxy-rs", tag = "v0.0.1" }
 tauri-plugin-clipboard-manager = "2"
 

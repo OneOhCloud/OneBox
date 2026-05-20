@@ -20,8 +20,7 @@ use windows::Win32::System::Registry::{
     HKEY_LOCAL_MACHINE, KEY_READ, KEY_SET_VALUE, REG_SAM_FLAGS, REG_SZ, REG_VALUE_TYPE,
 };
 
-pub const TCPIP_INTERFACES: &str =
-    r"SYSTEM\CurrentControlSet\Services\Tcpip\Parameters\Interfaces";
+pub const TCPIP_INTERFACES: &str = r"SYSTEM\CurrentControlSet\Services\Tcpip\Parameters\Interfaces";
 pub const NET_CLASS_GUID: &str = "{4D36E972-E325-11CE-BFC1-08002BE10318}";
 
 // =========================== pure helpers =============================
@@ -152,8 +151,7 @@ fn set_string_value(key: &RegKey, name: &str, value: &str) -> Result<(), String>
     let wvalue = to_wide_z(value);
     let bytes: &[u8] =
         unsafe { std::slice::from_raw_parts(wvalue.as_ptr() as *const u8, wvalue.len() * 2) };
-    let rc =
-        unsafe { RegSetValueExW(key.0, PCWSTR(wname.as_ptr()), Some(0), REG_SZ, Some(bytes)) };
+    let rc = unsafe { RegSetValueExW(key.0, PCWSTR(wname.as_ptr()), Some(0), REG_SZ, Some(bytes)) };
     if rc != ERROR_SUCCESS {
         return Err(format!("RegSetValueExW({}) failed: {:?}", name, rc.0));
     }
@@ -214,11 +212,10 @@ pub fn enumerate_interfaces() -> Result<Vec<InterfaceInfo>, String> {
         if !guid.starts_with('{') {
             continue;
         }
-        let iface_key =
-            match open_key(HKEY_LOCAL_MACHINE, &interface_reg_path(&guid), KEY_READ) {
-                Ok(k) => k,
-                Err(_) => continue,
-            };
+        let iface_key = match open_key(HKEY_LOCAL_MACHINE, &interface_reg_path(&guid), KEY_READ) {
+            Ok(k) => k,
+            Err(_) => continue,
+        };
         let dns = query_string_value(&iface_key, "NameServer").unwrap_or_default();
         let ip = query_string_value(&iface_key, "IPAddress").unwrap_or_default();
         let dhcp_ip = query_string_value(&iface_key, "DhcpIPAddress").unwrap_or_default();
@@ -297,10 +294,7 @@ pub fn apply_override(gateway: &str) -> (usize, usize) {
         }
         match set_interface_dns(&it.guid, &[g]) {
             Ok(()) => {
-                log_line(&format!(
-                    "dns override {} ({}) -> {}",
-                    it.guid, it.alias, g
-                ));
+                log_line(&format!("dns override {} ({}) -> {}", it.guid, it.alias, g));
                 ok += 1;
             }
             Err(e) => {

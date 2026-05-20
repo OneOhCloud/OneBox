@@ -11,18 +11,18 @@ use std::path::{Path, PathBuf};
 
 use sha2::{Digest, Sha256};
 use windows::core::PCWSTR;
-use windows::Win32::Foundation::{HLOCAL, LocalFree};
+use windows::Win32::Foundation::{LocalFree, ERROR_SERVICE_ALREADY_RUNNING, HLOCAL, WIN32_ERROR};
 use windows::Win32::Security::Authorization::{
     ConvertStringSecurityDescriptorToSecurityDescriptorW, SDDL_REVISION_1,
 };
 use windows::Win32::Security::{DACL_SECURITY_INFORMATION, PSECURITY_DESCRIPTOR};
 use windows::Win32::System::Services::{
     CloseServiceHandle, ControlService, CreateServiceW, DeleteService, OpenSCManagerW,
-    OpenServiceW, QueryServiceStatusEx, SC_HANDLE, SC_MANAGER_CONNECT, SC_MANAGER_CREATE_SERVICE,
-    SC_STATUS_PROCESS_INFO, SERVICE_CONTROL_STOP, SERVICE_DEMAND_START, SERVICE_ERROR_NORMAL,
-    SERVICE_QUERY_STATUS, SERVICE_RUNNING, SERVICE_START, SERVICE_START_PENDING,
-    SERVICE_STATUS, SERVICE_STATUS_PROCESS, SERVICE_STOP, SERVICE_STOPPED, SERVICE_STOP_PENDING,
-    SERVICE_WIN32_OWN_PROCESS, SetServiceObjectSecurity, StartServiceW,
+    OpenServiceW, QueryServiceStatusEx, SetServiceObjectSecurity, StartServiceW, SC_HANDLE,
+    SC_MANAGER_CONNECT, SC_MANAGER_CREATE_SERVICE, SC_STATUS_PROCESS_INFO, SERVICE_CONTROL_STOP,
+    SERVICE_DEMAND_START, SERVICE_ERROR_NORMAL, SERVICE_QUERY_STATUS, SERVICE_RUNNING,
+    SERVICE_START, SERVICE_START_PENDING, SERVICE_STATUS, SERVICE_STATUS_PROCESS, SERVICE_STOP,
+    SERVICE_STOPPED, SERVICE_STOP_PENDING, SERVICE_WIN32_OWN_PROCESS,
 };
 
 use crate::{SERVICE_DISPLAY_NAME, SERVICE_NAME};
@@ -281,7 +281,12 @@ fn apply_sddl(svc: &ScHandle) -> Result<(), String> {
             &mut psd,
             None,
         )
-        .map_err(|e| format!("ConvertStringSecurityDescriptorToSecurityDescriptorW: {}", e))?;
+        .map_err(|e| {
+            format!(
+                "ConvertStringSecurityDescriptorToSecurityDescriptorW: {}",
+                e
+            )
+        })?;
     }
     let res = unsafe { SetServiceObjectSecurity(svc.0, DACL_SECURITY_INFORMATION, psd) };
     // Free regardless of success.
@@ -300,11 +305,12 @@ pub fn ensure_installed(bundled_exe: &Path) -> Result<(), String> {
             bundled_exe.display()
         ));
     }
-    let bundled_hash = compute_file_sha256(bundled_exe)
-        .map_err(|e| format!("compute hash failed: {}", e))?;
+    let bundled_hash =
+        compute_file_sha256(bundled_exe).map_err(|e| format!("compute hash failed: {}", e))?;
 
     let dir = program_data_dir();
-    std::fs::create_dir_all(&dir).map_err(|e| format!("mkdir ProgramData\\OneBox\\service: {}", e))?;
+    std::fs::create_dir_all(&dir)
+        .map_err(|e| format!("mkdir ProgramData\\OneBox\\service: {}", e))?;
 
     let scm = open_scm(SC_MANAGER_CONNECT | SC_MANAGER_CREATE_SERVICE)?;
 
@@ -406,7 +412,25 @@ fn wait_not_pending(svc: &ScHandle, timeout_ms: u64) -> Result<QueriedState, Str
 /// with the given arguments; polls until it leaves StartPending or 15s elapses.
 pub fn start_service_with_args(args: &[&str]) -> Result<(), String> {
     let scm = open_scm(SC_MANAGER_CONNECT)?;
-    let svc = open_service(&scm, SERVICE_START | SERVICE_QUERY_STATUS)?;
+    let svc = open_service(&scm, SERVICE_START | SERVICE_QUERY_STATUS | SERVICE_STOP)?;
+
+    match wait_not_pending(&svc, 15_000)? {
+        QueriedState::Running => {
+            log::warn!(
+                "start_service_with_args: stale service already running; stopping before restart"
+            );
+            let mut status = SERVICE_STATUS::default();
+            unsafe {
+                ControlService(svc.0, SERVICE_CONTROL_STOP, &mut status)
+                    .map_err(|e| format!("ControlService(STOP) failed: {}", e))?;
+            }
+            wait_until_stopped(&svc, 10_000)?;
+        }
+        QueriedState::StopPending => {
+            wait_until_stopped(&svc, 10_000)?;
+        }
+        _ => {}
+    }
 
     // Build wide-string storage + PCWSTR pointer array.
     let wides: Vec<Vec<u16>> = args.iter().map(|a| to_wide_z(a)).collect();
@@ -418,13 +442,28 @@ pub fn start_service_with_args(args: &[&str]) -> Result<(), String> {
         Some(ptrs.as_slice())
     };
     unsafe {
-        StartServiceW(svc.0, slice).map_err(|e| format!("StartServiceW failed: {}", e))?;
+        if let Err(e) = StartServiceW(svc.0, slice) {
+            if WIN32_ERROR::from_error(&e) == Some(ERROR_SERVICE_ALREADY_RUNNING) {
+                log::warn!("StartServiceW reported service already running; stopping stale service and retrying");
+                let mut status = SERVICE_STATUS::default();
+                ControlService(svc.0, SERVICE_CONTROL_STOP, &mut status)
+                    .map_err(|e| format!("ControlService(STOP) failed: {}", e))?;
+                wait_until_stopped(&svc, 10_000)?;
+                StartServiceW(svc.0, slice)
+                    .map_err(|e| format!("StartServiceW retry failed: {}", e))?;
+            } else {
+                return Err(format!("StartServiceW failed: {}", e));
+            }
+        }
     }
 
     let final_state = wait_not_pending(&svc, 15_000)?;
     match final_state {
         QueriedState::Running => Ok(()),
-        other => Err(format!("service did not reach Running (state = {:?})", other)),
+        other => Err(format!(
+            "service did not reach Running (state = {:?})",
+            other
+        )),
     }
 }
 
@@ -465,7 +504,11 @@ mod tests {
     #[test]
     fn program_data_dir_is_absolute_and_ends_with_onebox_service() {
         let p = program_data_dir();
-        assert!(p.is_absolute(), "program_data_dir must be absolute: {:?}", p);
+        assert!(
+            p.is_absolute(),
+            "program_data_dir must be absolute: {:?}",
+            p
+        );
         let s = p.to_string_lossy();
         assert!(
             s.ends_with(r"OneBox\service") || s.ends_with("OneBox/service"),

@@ -1,5 +1,5 @@
 import { type } from '@tauri-apps/plugin-os';
-import { getDirectDNS, getStoreValue, getUseDHCP } from "../../single/store";
+import { getDirectDNS, getProxyPort, getStoreValue, getUseDHCP } from "../../single/store";
 import { TUN_INTERFACE_NAME, TUN_STACK_STORE_KEY } from "../../types/definition";
 import { writeConfigFile } from "../helper";
 
@@ -92,6 +92,11 @@ export async function updateVPNServerConfigFromDB(fileName: string, dbConfigData
 export async function configureTunInbound(newConfig: any, bypassRouter: boolean = false): Promise<void> {
     const tunInbound = newConfig.inbounds.find((ib: Item) => ib.type === "tun" && ib.tag === "tun");
     if (!tunInbound) return;
+    const proxyPort = await getProxyPort();
+
+    if (tunInbound.platform?.http_proxy) {
+        tunInbound.platform.http_proxy.server_port = proxyPort;
+    }
 
     const osType = type();
     if (osType === "linux") {
@@ -114,6 +119,11 @@ export async function configureTunInbound(newConfig: any, bypassRouter: boolean 
         tunInbound.route_exclude_address = tunInbound.route_exclude_address.filter(
             (cidr: string) => !lanRanges.has(cidr),
         );
+        // 华硕路由器的「WAN 中断浏览器导页通知」会在检测到外网异常时，把所有 DNS
+        // 应答劫持成 10.0.0.1 的导页 IP（见 https://github.com/pymumu/smartdns/issues/541）。
+        // 上面剔除 10.0.0.0/8 后，本机访问该 IP 的包会被 auto_route 吸进 TUN，
+        // 形成自路由回环，dial 永远超时；单独把这一个 host 留在排除清单里。
+        tunInbound.route_exclude_address.push("10.0.0.1/32");
     }
 
     // 旁路由模式：LAN 设备把 DNS 指向本机时，sing-box 需要在 UDP:53 上监听
@@ -135,9 +145,10 @@ export async function configureTunInbound(newConfig: any, bypassRouter: boolean 
     console.log("当前 TUN Stack:", tunInbound.stack);
 }
 
-export function configureMixedInbound(newConfig: any, allowLan: boolean, bypassRouter: boolean = false): void {
+export async function configureMixedInbound(newConfig: any, allowLan: boolean, bypassRouter: boolean = false): Promise<void> {
     const mixedInbound = newConfig.inbounds.find((ib: Item) => ib.type === "mixed" && ib.tag === "mixed");
-    if (mixedInbound) mixedInbound.listen = (allowLan || bypassRouter) ? "0.0.0.0" : "127.0.0.1";
+    if (mixedInbound) {
+        mixedInbound.listen = (allowLan || bypassRouter) ? "0.0.0.0" : "127.0.0.1";
+        mixedInbound.listen_port = await getProxyPort();
+    }
 }
-
-

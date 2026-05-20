@@ -2,6 +2,7 @@ import AboutItem from '../components/settings/about';
 import ToggleAutoStart from '../components/settings/auto-start';
 import ToggleLan from '../components/settings/lan';
 import ToggleLanguage from '../components/settings/language';
+import ProxyPortSetting from '../components/settings/proxy-port';
 import RouterSettingsItem from '../components/settings/router-settings';
 import ToggleTun from '../components/settings/tun';
 import UpdaterItem from '../components/settings/updater';
@@ -17,6 +18,7 @@ export default function Settings() {
         <div className="onebox-grouped-card mb-5">
           <ToggleAutoStart />
           <ToggleLan />
+          <ProxyPortSetting />
           <ToggleTun />
           <ToggleLanguage />
         </div>

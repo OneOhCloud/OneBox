@@ -27,7 +27,7 @@ use tauri::{AppHandle, Manager};
 use tokio::net::TcpStream;
 use tokio::time::{sleep, timeout, Instant};
 
-use super::state_machine::{transition, Intent, EngineState, EngineStateCell};
+use super::state_machine::{transition, EngineState, EngineStateCell, Intent};
 
 const POLL_INTERVAL: Duration = Duration::from_millis(200);
 const STARTUP_TIMEOUT: Duration = Duration::from_secs(20);

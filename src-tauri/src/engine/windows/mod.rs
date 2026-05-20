@@ -249,7 +249,8 @@ impl EngineManager for WindowsEngine {
         let child_pid_for_log = child.as_ref().map(|c| c.pid());
         log::info!(
             "[win-stop] entry mode={:?} pm_child_pid={:?}",
-            mode, child_pid_for_log
+            mode,
+            child_pid_for_log
         );
         match mode.as_ref() {
             crate::engine::ProxyMode::SystemProxy => {
@@ -272,7 +273,9 @@ impl EngineManager for WindowsEngine {
                     let (alive, exit_code) = win32_pid_alive_check(pid);
                     log::info!(
                         "[win-stop] post_kill_alive_check pid={} alive={} exit_code={}",
-                        pid, alive, exit_code
+                        pid,
+                        alive,
+                        exit_code
                     );
                 } else {
                     tokio::time::sleep(std::time::Duration::from_millis(500)).await;
@@ -367,11 +370,10 @@ fn win32_pid_alive_check(pid: u32) -> (bool, u32) {
     };
     const STILL_ACTIVE: u32 = 259;
     unsafe {
-        let handle =
-            match OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid) {
-                Ok(h) => h,
-                Err(_) => return (false, 0),
-            };
+        let handle = match OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid) {
+            Ok(h) => h,
+            Err(_) => return (false, 0),
+        };
         let mut exit_code: u32 = 0;
         let ok = GetExitCodeProcess(handle, &mut exit_code).is_ok();
         let _ = CloseHandle(handle);

@@ -1,6 +1,6 @@
 import { Arch, OsType } from "@tauri-apps/plugin-os";
 export const SING_BOX_MAJOR_VERSION = "1.13";
-export const SING_BOX_MINOR_VERSION = "11";
+export const SING_BOX_MINOR_VERSION = "12";
 export const SING_BOX_VERSION = `v${SING_BOX_MAJOR_VERSION}.${SING_BOX_MINOR_VERSION}`;
 
 export const GITHUB_URL = 'https://github.com/OneOhCloud/OneBox'
@@ -12,9 +12,15 @@ export const TUN_STACK_STORE_KEY = 'tun_stack_key'
 export const TUN_INTERFACE_NAME = 'utun233'
 export const USE_DHCP_STORE_KEY = 'use_dhcp_key'
 export const ENABLE_BYPASS_ROUTER_STORE_KEY = 'enable_bypass_router_key'
+export const BYPASS_ROUTER_WATCHDOG_INTERVAL_STORE_KEY = 'bypass_router_watchdog_interval_key'
 export const SUPPORT_LOCAL_FILE_STORE_KEY = 'support_local_file_key'
+export type BypassRouterWatchdogInterval = '4' | '12' | '24' | 'disabled'
+export const DEFAULT_BYPASS_ROUTER_WATCHDOG_INTERVAL: BypassRouterWatchdogInterval = '24'
 // User Agent 配置键
 export const USER_AGENT_STORE_KEY = 'user_agent_key'
+export const DEFAULT_PROXY_PORT = 6789
+export const PROXY_PORT_STORE_KEY = 'proxy_port_key'
+export const PROXY_PORT_CHANGED_EVENT = 'onebox-proxy-port-changed'
 
 // 上次检查更新的时间戳（ms），跨会话持久化
 export const LAST_UPDATE_CHECK_TIME_KEY = 'last_update_check_time_key'

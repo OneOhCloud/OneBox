@@ -2,83 +2,51 @@
 
 {{version-tag-date}}
 
-## Changes since v1.4.0
+## Changes since v1.4.23
 
 All significant changes in this version are documented here.
 
+### Features
 
-### ✨ Features
+- Added a custom proxy port setting for the HTTP/SOCKS mixed inbound.
+- Added a macOS bypass-router Watchdog setting with 4-hour, 12-hour, 24-hour, and disabled options.
 
-- Refreshed the app with an iOS 26-style design across all pages
-- Added dark mode, with a System / Light / Dark picker under Developer options → Appearance
-- Added a configuration detail view: tap Details on any config to edit the name, copy its link, copy the full content, refresh, or delete it from one place
-- Added live DNS override on macOS so DNS keeps working through Wi-Fi switches, VPN toggles, and wired-to-wireless changes instead of stopping until the next reconnect
-- The home screen now shows live upload and download speeds for the active proxy
-- Configuration imports from links now verify the source before being applied automatically
-- Updating the app no longer re-imports a previously applied configuration on the next launch
+### Changes
 
+- Updated frontend and Tauri dependencies.
+- Upgraded the bundled sing-box kernel from v1.13.11 to v1.13.12.
+- Changed OneBox and sing-box log timestamps/file dates to use the local timezone.
+- Added startup window geometry diagnostics to help troubleshoot display and sizing issues.
+- Changed the default macOS bypass-router scheduled restart interval from every 4 hours to every 24 hours.
+- Changing the proxy port now stops the VPN service so the new port is applied cleanly on the next start.
 
-### ⚠ Changes
+### Bug Fixes
 
-- Updated dependency versions
-- Upgraded the kernel
-- Redesigned the advanced settings window in a native macOS layout
-- Manual configuration add now shows the same progress sheet as link-triggered imports, stays on the current page when done, and no longer automatically starts the service
+- Fixed the home page being clipped on shorter windows by allowing the app route area to scroll when needed.
+- Fixed stale Windows TUN service state by stopping orphaned or already-running service instances before startup/restart.
 
-
-### 🐛 Bug Fixes
-
-- Fixed the privileged helper tool not upgrading automatically after an app update
-- Fixed the service failing to recover after the Mac woke from an extended sleep
-- Fixed kernel diagnostics not being captured in TUN mode on macOS
-- Fixed the helper connection becoming unresponsive after the helper tool was upgraded
-- Fixed stale service state causing incorrect behaviour after rapid restarts
-- Fixed a missing configuration file not showing an error message to the user
-- Fixed network authentication pages failing to load after switching Wi-Fi networks
-- Fixed an issue where logs were being truncated too short
-- Fixed DNS state becoming inconsistent after the service stopped on network loss
-
-
-
-
-## 自 v1.4.0 以来的变更
+## 自 v1.4.23 以来的变更
 
 本版本的所有重要变更将记录于此。
 
+### 新增功能
 
-### ✨ 新增功能
+- 新增 HTTP/SOCKS 混合入站的自定义代理端口设置。
+- 新增 macOS 旁路由 Watchdog 设置，可选择 4 小时、12 小时、24 小时或禁用。
 
-- 全面采用 iOS 26 风格，界面视觉全面焕新
-- 新增深色模式，"开发者选项 → 外观" 提供 跟随系统 / 浅色 / 深色 三种选择
-- 新增配置详情页：点任一配置的 详情 可在同一处编辑名称、复制链接、复制完整内容、立即刷新，或删除
-- macOS 下 DNS 生效改为实时跟随网络变化，切换 Wi-Fi、开关 VPN、在有线与无线之间切换时不再失效
-- 主页现在实时显示当前代理的上传和下载速度
-- 通过链接自动应用配置前，会先校验来源是否可信
-- 安装应用更新后，不再在下次启动时重复导入此前已应用的配置
+### 变更
 
+- 更新了前端与 Tauri 相关依赖。
+- 内置 sing-box 内核从 v1.13.11 升级至 v1.13.12。
+- 新增启动时窗口尺寸诊断日志，便于排查显示和窗口大小问题。
+- 修改代理端口时会停止 VPN 服务，下次启动时干净应用新端口。
+- OneBox 与 sing-box 日志时间戳/文件日期改为使用本地时区。
+- macOS 旁路由默认定时重启间隔从每 4 小时调整为每 24 小时。
 
-### ⚠ 变更
+### Bug 修复
 
-- 更新了依赖版本
-- 升级内核
-- 高级设置窗口改为原生 macOS 风格
-- 手动添加配置的加载界面与链接导入保持一致，完成后停留在当前页面，且不再自动启动服务
-
-
-### 🐛 Bug 修复
-
-- 修复应用更新后特权助手工具未能自动升级的问题
-- 修复 Mac 长时间合盖休眠后服务无法自动恢复的问题
-- 修复 macOS TUN 模式下内核日志未被捕获的问题
-- 修复助手工具升级后连接失效、需重启才能恢复的问题
-- 修复服务快速重启后残留旧状态导致行为异常的问题
-- 修复配置文件缺失时未向用户显示任何错误提示的问题
-- 修复切换 Wi-Fi 后可能无法打开网络认证页面的问题
-- 修复日志记录过短的问题
-- 修复网络断开后服务停止时 DNS 状态不一致的问题
-
-
-
+- 修复 Windows TUN 服务残留旧状态的问题，启动或重启前会停止孤立或已运行的旧服务实例。
+- 修复窗口高度较小时主页内容可能被裁切的问题，现在需要时可通过应用路由区域滚动查看。
 
 ---
 

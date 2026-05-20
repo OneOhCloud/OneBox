@@ -5,9 +5,7 @@
 //! semicolon, glob vs CIDR). Collapsing into one module kills three
 //! near-identical copies in the platform mods.
 //!
-//! Proxy always points at the Mixed inbound's fixed listen port
-//! (127.0.0.1:6789). The port is hard-coded in the sing-box config
-//! templates so there's nothing to plumb.
+//! Proxy always points at the Mixed inbound's listen port.
 //!
 //! `set_*` emits a frontend log line (Windows historically did, macOS
 //! and Linux did not — we now do it on all three for symmetry); failure
@@ -17,10 +15,9 @@
 use onebox_sysproxy_rs::Sysproxy;
 use tauri::{AppHandle, Emitter};
 
-use crate::engine::EVENT_TAURI_LOG;
+use crate::{core::mixed_proxy_port, engine::EVENT_TAURI_LOG};
 
 const PROXY_HOST: &str = "127.0.0.1";
-const PROXY_PORT: u16 = 6789;
 
 /// Bypass-list syntax differs per platform — see the `onebox_sysproxy_rs`
 /// source for exactly how it's parsed. The values below were migrated
@@ -41,18 +38,22 @@ const DEFAULT_BYPASS: &str = "localhost,127.0.0.1";
 
 /// Apply the HTTP/SOCKS system proxy pointing at the Mixed inbound.
 pub(crate) async fn set_system_proxy(app: &AppHandle) -> anyhow::Result<()> {
+    let proxy_port = mixed_proxy_port(app);
     let _ = app.emit(
         EVENT_TAURI_LOG,
-        (0, format!("Start set system proxy: {}:{}", PROXY_HOST, PROXY_PORT)),
+        (
+            0,
+            format!("Start set system proxy: {}:{}", PROXY_HOST, proxy_port),
+        ),
     );
     let sys = Sysproxy {
         enable: true,
         host: PROXY_HOST.to_string(),
-        port: PROXY_PORT,
+        port: proxy_port,
         bypass: DEFAULT_BYPASS.to_string(),
     };
     sys.set_system_proxy().map_err(|e| anyhow::anyhow!(e))?;
-    log::info!("Proxy set to {}:{}", PROXY_HOST, PROXY_PORT);
+    log::info!("Proxy set to {}:{}", PROXY_HOST, proxy_port);
     Ok(())
 }
 

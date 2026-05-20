@@ -44,4 +44,3 @@ pub fn extract_tun_gateway_from_config(config_path: &str) -> Option<String> {
     }
     None
 }
-

@@ -87,7 +87,7 @@ export async function setMixedConfig(identifier: string) {
     updateExperimentalConfig(newConfig, dbCacheFilePath);
     const allowLan = await getAllowLan();
     const bypassRouter = await isBypassRouterEnabled();
-    configureMixedInbound(newConfig, allowLan, bypassRouter);
+    await configureMixedInbound(newConfig, allowLan, bypassRouter);
 
     await updateDHCPSettings2Config(newConfig);
     await updateVPNServerConfigFromDB('config.json', dbConfigData, newConfig);
@@ -140,7 +140,7 @@ export async function setTunConfig(identifier: string) {
 
     updateExperimentalConfig(newConfig, dbCacheFilePath);
     const allowLan = await getAllowLan();
-    configureMixedInbound(newConfig, allowLan, bypassRouter);
+    await configureMixedInbound(newConfig, allowLan, bypassRouter);
 
     await updateDHCPSettings2Config(newConfig);
     await updateVPNServerConfigFromDB('config.json', dbConfigData, newConfig);
@@ -163,7 +163,7 @@ export async function setGlobalMixedConfig(identifier: string) {
     updateExperimentalConfig(newConfig, dbCacheFilePath);
     const allowLan = await getAllowLan();
     const bypassRouter = await isBypassRouterEnabled();
-    configureMixedInbound(newConfig, allowLan, bypassRouter);
+    await configureMixedInbound(newConfig, allowLan, bypassRouter);
 
     await updateDHCPSettings2Config(newConfig);
     await updateVPNServerConfigFromDB('config.json', dbConfigData, newConfig);
@@ -189,7 +189,7 @@ export default async function setGlobalTunConfig(identifier: string) {
     updateExperimentalConfig(newConfig, dbCacheFilePath);
 
     const allowLan = await getAllowLan();
-    configureMixedInbound(newConfig, allowLan, bypassRouter);
+    await configureMixedInbound(newConfig, allowLan, bypassRouter);
 
     await updateDHCPSettings2Config(newConfig);
     await updateVPNServerConfigFromDB('config.json', dbConfigData, newConfig);

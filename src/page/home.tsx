@@ -16,8 +16,8 @@ import { t } from "../utils/helper";
 import "./home.css";
 
 // Layout targets the actual available area: 371×514 px
-// (600 window - 30 titlebar - 56 tab bar). Everything is vertically
-// rhythmed against that budget so there's no scrolling.
+// (600 window - 30 titlebar - 56 tab bar). When the window is shorter than
+// that budget, let the app-level route scroller reveal the overflow.
 export default function HomePage() {
     const { data: subscriptions } = useSubscriptions();
     const { selectedMode, initializeMode, changeMode } = useProxyMode();
@@ -68,7 +68,7 @@ export default function HomePage() {
 
     return (
         <div
-            className="onebox-home relative w-full h-[calc(100dvh-56px)] overflow-hidden"
+            className="onebox-home relative w-full min-h-[calc(100dvh-56px)] overflow-x-hidden"
             data-phase={phase}
         >
             <PrestartRepairModal
@@ -83,7 +83,7 @@ export default function HomePage() {
             <div className="onebox-aura" aria-hidden />
 
             {/* Content */}
-            <div className="relative h-full flex flex-col items-center px-5 pt-5 pb-5">
+            <div className="relative min-h-[calc(100dvh-56px)] flex flex-col items-center px-5 pt-5 pb-5">
                 <PowerToggle
                     isRunning={Boolean(isRunning)}
                     isLoading={isLoading}
