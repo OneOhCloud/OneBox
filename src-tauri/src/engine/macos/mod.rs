@@ -389,6 +389,40 @@ fn read_service_dns(service: &str) -> String {
     }
 }
 
+fn dns_entries(spec: &str) -> Vec<&str> {
+    if spec == "empty" {
+        return Vec::new();
+    }
+    spec.split_whitespace().filter(|s| !s.is_empty()).collect()
+}
+
+fn dns_spec_from_entries(entries: Vec<&str>) -> String {
+    if entries.is_empty() {
+        "empty".to_string()
+    } else {
+        entries.join(" ")
+    }
+}
+
+fn dns_without_gateway<'a>(spec: &'a str, gateway: &str) -> String {
+    dns_spec_from_entries(
+        dns_entries(spec)
+            .into_iter()
+            .filter(|s| *s != gateway)
+            .collect(),
+    )
+}
+
+fn dns_with_gateway_first(spec: &str, gateway: &str) -> String {
+    let mut entries = vec![gateway];
+    entries.extend(dns_entries(spec).into_iter().filter(|s| *s != gateway));
+    dns_spec_from_entries(entries)
+}
+
+fn dns_has_gateway_first(spec: &str, gateway: &str) -> bool {
+    dns_entries(spec).first().is_some_and(|s| *s == gateway)
+}
+
 /// Point system DNS at the TUN gateway. The single entry point that drives
 /// the ACTIVE_OVERRIDE state machine; safe to call repeatedly from TUN start,
 /// the NetworkUp lifecycle event, and the dns_watcher callback.
@@ -462,7 +496,7 @@ pub(crate) fn reapply_on_active_primary(gateway: &str) -> Result<(), String> {
     let mut slot = ACTIVE_OVERRIDE.lock().unwrap_or_else(|e| e.into_inner());
     match slot.as_ref() {
         Some(prev) if prev.service == new_service => {
-            if current == gateway {
+            if dns_has_gateway_first(&current, gateway) {
                 // Hot path: our own write just round-tripped through
                 // SCDynamicStore. Debug-only so it doesn't drown the
                 // interesting transitions.
@@ -482,13 +516,14 @@ pub(crate) fn reapply_on_active_primary(gateway: &str) -> Result<(), String> {
                 current
             );
             let mut updated = prev.clone();
-            updated.captured = current;
+            updated.captured = dns_without_gateway(&current, gateway);
+            let target = dns_with_gateway_first(&updated.captured, gateway);
             updated.gateway = gateway.to_string();
             *slot = Some(updated);
             drop(slot); // release lock before syscalls
-            macos_helper::api::set_dns_servers(&new_service, gateway)?;
+            macos_helper::api::set_dns_servers(&new_service, &target)?;
             macos_helper::api::flush_dns_cache().ok();
-            log::info!("[dns] apply: re-override [{}] → {}", new_service, gateway);
+            log::info!("[dns] apply: re-override [{}] → {}", new_service, target);
             Ok(())
         }
         Some(prev) => {
@@ -503,20 +538,20 @@ pub(crate) fn reapply_on_active_primary(gateway: &str) -> Result<(), String> {
             );
             let prev_snap = prev.clone();
             drop(slot);
-            if let Err(e) =
-                macos_helper::api::set_dns_servers(&prev_snap.service, &prev_snap.captured)
-            {
+            let old_current = read_service_dns(&prev_snap.service);
+            let old_target = dns_without_gateway(&old_current, &prev_snap.gateway);
+            if let Err(e) = macos_helper::api::set_dns_servers(&prev_snap.service, &old_target) {
                 log::warn!(
                     "[dns] apply: restore old [{}] → '{}' failed: {}",
                     prev_snap.service,
-                    prev_snap.captured,
+                    old_target,
                     e
                 );
             } else {
                 log::info!(
                     "[dns] apply: restored old [{}] → '{}'",
                     prev_snap.service,
-                    prev_snap.captured
+                    old_target
                 );
             }
 
@@ -527,16 +562,18 @@ pub(crate) fn reapply_on_active_primary(gateway: &str) -> Result<(), String> {
                 new_service,
                 current
             );
-            macos_helper::api::set_dns_servers(&new_service, gateway)?;
+            let captured = dns_without_gateway(&current, gateway);
+            let target = dns_with_gateway_first(&captured, gateway);
+            macos_helper::api::set_dns_servers(&new_service, &target)?;
             macos_helper::api::flush_dns_cache().ok();
             let mut slot = ACTIVE_OVERRIDE.lock().unwrap_or_else(|e| e.into_inner());
             *slot = Some(ActiveOverride {
                 service: new_service.clone(),
-                captured: current,
+                captured,
                 gateway: gateway.to_string(),
                 released: false,
             });
-            log::info!("[dns] apply: override [{}] → {}", new_service, gateway);
+            log::info!("[dns] apply: override [{}] → {}", new_service, target);
             Ok(())
         }
         None => {
@@ -546,15 +583,17 @@ pub(crate) fn reapply_on_active_primary(gateway: &str) -> Result<(), String> {
                 new_service,
                 current
             );
-            macos_helper::api::set_dns_servers(&new_service, gateway)?;
+            let captured = dns_without_gateway(&current, gateway);
+            let target = dns_with_gateway_first(&captured, gateway);
+            macos_helper::api::set_dns_servers(&new_service, &target)?;
             macos_helper::api::flush_dns_cache().ok();
             *slot = Some(ActiveOverride {
                 service: new_service.clone(),
-                captured: current,
+                captured,
                 gateway: gateway.to_string(),
                 released: false,
             });
-            log::info!("[dns] apply: override [{}] → {}", new_service, gateway);
+            log::info!("[dns] apply: override [{}] → {}", new_service, target);
             Ok(())
         }
     }
@@ -573,17 +612,18 @@ fn apply_captured_originals_sync(taken: Option<&ActiveOverride>) -> Option<(Stri
         return None;
     };
     log::info!(
-        "[dns] phase 1 (pre-kill write): restoring [{}] → '{}'",
+        "[dns] phase 1 (pre-kill write): removing gateway from [{}]",
         active.service,
-        active.captured
     );
-    if let Err(e) = macos_helper::api::set_dns_servers(&active.service, &active.captured) {
+    let current = read_service_dns(&active.service);
+    let target = dns_without_gateway(&current, &active.gateway);
+    if let Err(e) = macos_helper::api::set_dns_servers(&active.service, &target) {
         log::warn!("[dns] phase 1 [{}] write failed: {}", active.service, e);
         return None;
     }
     macos_helper::api::flush_dns_cache().ok();
     log::info!("[dns] phase 1 done, cache flushed");
-    Some((active.service.clone(), active.captured.clone()))
+    Some((active.service.clone(), target))
 }
 
 /// Probe each restored DNS server on UDP/53. If **none** of a service's
