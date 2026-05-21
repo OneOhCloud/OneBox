@@ -70,6 +70,36 @@ pub fn format_nameserver_value(servers: &[&str]) -> String {
         .join(",")
 }
 
+pub fn parse_nameserver_value(value: &str) -> Vec<&str> {
+    value
+        .split([',', ' ', '\0'])
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+        .collect()
+}
+
+pub fn nameserver_with_gateway_first<'a>(current: &'a str, gateway: &'a str) -> Vec<&'a str> {
+    let g = gateway.trim();
+    let mut servers = Vec::new();
+    if !g.is_empty() {
+        servers.push(g);
+    }
+    servers.extend(
+        parse_nameserver_value(current)
+            .into_iter()
+            .filter(|s| *s != g),
+    );
+    servers
+}
+
+pub fn nameserver_without_gateway<'a>(current: &'a str, gateway: &str) -> Vec<&'a str> {
+    let g = gateway.trim();
+    parse_nameserver_value(current)
+        .into_iter()
+        .filter(|s| *s != g)
+        .collect()
+}
+
 pub fn has_nonzero_ip(raw: &str) -> bool {
     raw.split(['\0', ' ', ','])
         .any(|s| !s.is_empty() && s != "0.0.0.0")
@@ -292,9 +322,15 @@ pub fn apply_override(gateway: &str) -> (usize, usize) {
         if !it.is_candidate_for_dns_override() {
             continue;
         }
-        match set_interface_dns(&it.guid, &[g]) {
+        let servers = nameserver_with_gateway_first(&it.current_dns, g);
+        match set_interface_dns(&it.guid, &servers) {
             Ok(()) => {
-                log_line(&format!("dns override {} ({}) -> {}", it.guid, it.alias, g));
+                log_line(&format!(
+                    "dns override {} ({}) -> {}",
+                    it.guid,
+                    it.alias,
+                    format_nameserver_value(&servers)
+                ));
                 ok += 1;
             }
             Err(e) => {
@@ -309,8 +345,51 @@ pub fn apply_override(gateway: &str) -> (usize, usize) {
     (ok, err)
 }
 
-/// Alias for `reset_all_interfaces_dns` — scorched-earth restore of all
-/// non-TUN interfaces' NameServer values.
+/// Remove the TUN gateway from all non-TUN interfaces' NameServer values.
+/// If the gateway was the only static DNS value, writing an empty string lets
+/// Windows fall back to DHCP-provided DNS.
+pub fn remove_override(gateway: &str) -> (usize, usize) {
+    let g = gateway.trim();
+    if g.is_empty() || g == "-" {
+        return (0, 0);
+    }
+    let list = match enumerate_interfaces() {
+        Ok(l) => l,
+        Err(e) => {
+            log_line(&format!("remove_override: enumerate failed: {}", e));
+            return (0, 1);
+        }
+    };
+    let mut ok = 0usize;
+    let mut err = 0usize;
+    for it in list {
+        if !it.is_candidate_for_dns_override() {
+            continue;
+        }
+        let servers = nameserver_without_gateway(&it.current_dns, g);
+        match set_interface_dns(&it.guid, &servers) {
+            Ok(()) => {
+                log_line(&format!(
+                    "dns remove {} ({}) -> {}",
+                    it.guid,
+                    it.alias,
+                    format_nameserver_value(&servers)
+                ));
+                ok += 1;
+            }
+            Err(e) => {
+                log_line(&format!(
+                    "dns remove {} ({}) FAILED: {}",
+                    it.guid, it.alias, e
+                ));
+                err += 1;
+            }
+        }
+    }
+    (ok, err)
+}
+
+/// Crash-path fallback when the gateway is unknown.
 pub fn restore_all() -> (usize, usize) {
     reset_all_interfaces_dns()
 }
@@ -423,6 +502,30 @@ mod tests {
         assert_eq!(format_nameserver_value(&[]), "");
         assert_eq!(format_nameserver_value(&["", "  "]), "");
         assert_eq!(format_nameserver_value(&["", "8.8.8.8", ""]), "8.8.8.8");
+    }
+
+    #[test]
+    fn nameserver_with_gateway_first_preserves_existing_dns() {
+        let servers = nameserver_with_gateway_first("8.8.8.8,1.1.1.1", "172.19.0.1");
+        assert_eq!(
+            format_nameserver_value(&servers),
+            "172.19.0.1,8.8.8.8,1.1.1.1"
+        );
+    }
+
+    #[test]
+    fn nameserver_with_gateway_first_deduplicates_gateway() {
+        let servers = nameserver_with_gateway_first("8.8.8.8,172.19.0.1,1.1.1.1", "172.19.0.1");
+        assert_eq!(
+            format_nameserver_value(&servers),
+            "172.19.0.1,8.8.8.8,1.1.1.1"
+        );
+    }
+
+    #[test]
+    fn nameserver_without_gateway_removes_only_gateway() {
+        let servers = nameserver_without_gateway("172.19.0.1,8.8.8.8,1.1.1.1", "172.19.0.1");
+        assert_eq!(format_nameserver_value(&servers), "8.8.8.8,1.1.1.1");
     }
 
     // ------------------------------ has_nonzero_ip ----------------------------

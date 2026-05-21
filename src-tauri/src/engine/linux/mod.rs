@@ -53,6 +53,11 @@ pub fn create_privileged_command(
         if !gateway.is_empty() {
             args.push(iface.clone());
             args.push(gateway);
+            args.extend(
+                _original
+                    .split_whitespace()
+                    .map(|server| server.to_string()),
+            );
         }
     }
 
@@ -197,7 +202,11 @@ pub fn apply_system_dns_override(config_path: &str) -> Result<(String, String), 
         original_dns
     );
     let out = Command::new("pkexec")
-        .args([HELPER_PATH, "dns-override", &iface, &gateway])
+        .arg(HELPER_PATH)
+        .arg("dns-override")
+        .arg(&iface)
+        .arg(&gateway)
+        .args(original_dns.split_whitespace())
         .output()
         .map_err(|e| format!("pkexec dns-override failed: {}", e))?;
     if !out.status.success() {

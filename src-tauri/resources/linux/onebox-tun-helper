@@ -7,11 +7,16 @@ set -e
 case "$1" in
     start-tun)
         # $2 = sidecar path, $3 = config path
-        # Optional: $4 = iface, $5 = gateway (DNS override)
+        # Optional: $4 = iface, $5 = gateway, $6... = original DNS servers
+        sidecar="$2"
+        config="$3"
         if [ -n "$4" ] && [ -n "$5" ]; then
-            resolvectl dns "$4" "$5"
+            iface="$4"
+            gateway="$5"
+            shift 5
+            resolvectl dns "$iface" "$gateway" "$@"
         fi
-        exec "$2" run -c "$3" --disable-color
+        exec "$sidecar" run -c "$config" --disable-color
         ;;
     stop-tun)
         # $2 = iface (optional), $3... = original DNS servers (optional)
@@ -23,8 +28,11 @@ case "$1" in
         pkill -x sing-box || true
         ;;
     dns-override)
-        # $2 = iface, $3 = gateway
-        resolvectl dns "$2" "$3"
+        # $2 = iface, $3 = gateway, $4... = original DNS servers
+        iface="$2"
+        gateway="$3"
+        shift 3
+        resolvectl dns "$iface" "$gateway" "$@"
         ;;
     dns-restore)
         # $2 = iface, $3... = original DNS servers

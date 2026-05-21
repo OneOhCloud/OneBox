@@ -185,8 +185,8 @@ unsafe extern "system" fn service_main(argc: u32, argv: *mut PWSTR) {
         Ok(c) => c,
         Err(e) => {
             dns::log_line(&format!("sing-box spawn failed: {}", e));
-            let (r_ok, r_err) = dns::restore_all();
-            dns::log_line(&format!("restore_all: ok={} err={}", r_ok, r_err));
+            let (r_ok, r_err) = dns::remove_override(&gateway);
+            dns::log_line(&format!("remove_override: ok={} err={}", r_ok, r_err));
             set_state(SERVICE_STOPPED, 1, 0);
             return;
         }
@@ -220,9 +220,9 @@ unsafe extern "system" fn service_main(argc: u32, argv: *mut PWSTR) {
         std::thread::sleep(std::time::Duration::from_millis(200));
     }
 
-    // Scorched-earth DNS restore.
-    let (r_ok, r_err) = dns::restore_all();
-    dns::log_line(&format!("restore_all: ok={} err={}", r_ok, r_err));
+    // Remove only the TUN gateway we inserted at start.
+    let (r_ok, r_err) = dns::remove_override(&gateway);
+    dns::log_line(&format!("remove_override: ok={} err={}", r_ok, r_err));
 
     let exit = unexpected_exit_code.unwrap_or(0) as u32;
     set_state(SERVICE_STOPPED, exit, 0);
