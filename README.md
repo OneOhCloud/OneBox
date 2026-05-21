@@ -20,8 +20,8 @@
   </p>
 
   <p>
-    <a href="https://play.google.com/store/apps/details?id=cloud.oneoh.networktools"><img alt="Get it on Google Play" src="https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png" height="56" align="middle"></a>
-    <a href="https://apps.apple.com/us/app/oneboxm/id6759716475"><img alt="Download on the App Store" src="https://toolbox.marketingtools.apple.com/api/badges/download-on-the-app-store/black/en-us?size=250x83" height="38" align="middle"></a>
+    <a href="https://play.google.com/store/apps/details?id=cloud.oneoh.networktools"><img alt="Get it on Google Play" src="./.github/assets/store/google-play-en.png" width="185" height="56" align="middle"></a>
+    <a href="https://apps.apple.com/us/app/oneboxm/id6759716475"><img alt="Download on the App Store" src="./.github/assets/store/app-store-en.svg" width="185" height="56" align="middle"></a>
   </p>
 </div>
 
