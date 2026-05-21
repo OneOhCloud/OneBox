@@ -14,24 +14,14 @@
   </p>
 
   <p>
-    <a href="https://github.com/SagerNet/sing-box">
-      <img alt="sing-box 最新版本" src="https://repology.org/badge/version-for-repo/homebrew/sing-box.svg?header=sing-box">
-    </a>
-    <a href="https://github.com/OneOhCloud/OneBox/releases">
-      <img alt="GitHub Release" src="https://img.shields.io/github/v/release/OneOhCloud/OneBox?display_name=tag&sort=semver">
-    </a>
-    <a href="./LICENSE">
-      <img alt="许可证" src="https://img.shields.io/badge/license-Apache--2.0-blue">
-    </a>
+    <a href="https://github.com/SagerNet/sing-box"><img alt="sing-box 最新版本" src="https://repology.org/badge/version-for-repo/homebrew/sing-box.svg?header=sing-box"></a>
+    <a href="https://github.com/OneOhCloud/OneBox/releases"><img alt="GitHub Release" src="https://img.shields.io/github/v/release/OneOhCloud/OneBox?display_name=tag&sort=semver"></a>
+    <a href="./LICENSE"><img alt="许可证" src="https://img.shields.io/badge/license-Apache--2.0-blue"></a>
   </p>
 
   <p>
-    <a href="https://play.google.com/store/apps/details?id=cloud.oneoh.networktools">
-      <img alt="在 Google Play 上获取" src="https://play.google.com/intl/en_us/badges/static/images/badges/zh-cn_badge_web_generic.png" height="56" align="middle">
-    </a>
-    <a href="https://apps.apple.com/us/app/oneboxm/id6759716475">
-      <img alt="在 App Store 下载" src="https://toolbox.marketingtools.apple.com/api/badges/download-on-the-app-store/black/zh-cn?size=250x83" height="38" align="middle">
-    </a>
+    <a href="https://play.google.com/store/apps/details?id=cloud.oneoh.networktools"><img alt="在 Google Play 上获取" src="https://play.google.com/intl/en_us/badges/static/images/badges/zh-cn_badge_web_generic.png" height="56" align="middle"></a>
+    <a href="https://apps.apple.com/us/app/oneboxm/id6759716475"><img alt="在 App Store 下载" src="https://toolbox.marketingtools.apple.com/api/badges/download-on-the-app-store/black/zh-cn?size=250x83" height="38" align="middle"></a>
   </p>
 </div>
 
