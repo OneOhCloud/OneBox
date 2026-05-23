@@ -8,6 +8,9 @@ All significant changes in this version are documented here.
 
 ### Changes
 
+- Updated JavaScript and Rust dependencies.
+- Added `make update PORT=...` proxy support for dependency and binary updates.
+- Added a developer option to start VPN in non-TUN mode without setting the system proxy.
 - Changed TUN DNS override to prepend the TUN gateway DNS instead of replacing existing DNS servers.
 
 ### Bug Fixes
@@ -20,7 +23,11 @@ All significant changes in this version are documented here.
 
 ### 变更
 
+- 更新 JavaScript 与 Rust 依赖。
+- 新增开发者选项：非 TUN 模式启动 VPN 时可不设置系统代理。
+- 新增 `make update PORT=...` 代理端口支持，用于依赖和二进制更新。
 - TUN DNS 覆写改为将 TUN 网关 DNS 放在第一位，而不是替换掉现有 DNS 服务器。
+
 
 ### Bug 修复
 
