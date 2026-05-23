@@ -9,7 +9,7 @@ import { message } from '@tauri-apps/plugin-dialog';
 import en from '../../lang/en.json';
 import zh from '../../lang/zh.json';
 import setGlobalTunConfig, { setGlobalMixedConfig, setMixedConfig, setTunConfig } from '../config/merger/main';
-import { getClashApiSecret, getEnableTun, getLanguage, getStoreValue, getUserAgent } from '../single/store';
+import { getClashApiSecret, getEnableTun, getLanguage, getSkipSystemProxy, getStoreValue, getUserAgent } from '../single/store';
 const appWindow = getCurrentWindow();
 const enLang = en as Record<string, string>;
 const zhLang = zh as Record<string, string>;
@@ -112,7 +112,7 @@ export async function getSingBoxConfigPath() {
 }
 
 
-type vpnServiceManagerMode = 'SystemProxy' | 'TunProxy'
+type vpnServiceManagerMode = 'SystemProxy' | 'TunProxy' | 'ManualProxy'
 
 type SyncConfigProps = {
     onError?: (error: any) => void;
@@ -167,7 +167,8 @@ export const vpnServiceManager = {
         try {
             const configPath = await getSingBoxConfigPath();
             const tunMode: boolean | undefined = await getEnableTun();
-            let mode: vpnServiceManagerMode = tunMode ? 'TunProxy' : 'SystemProxy';
+            const skipSystemProxy = !tunMode && await getSkipSystemProxy();
+            let mode: vpnServiceManagerMode = tunMode ? 'TunProxy' : skipSystemProxy ? 'ManualProxy' : 'SystemProxy';
             console.log("启动VPN服务");
             console.log("模式:", mode);
             console.log("配置文件路径:", configPath);
@@ -251,5 +252,4 @@ export function t(id: string, params?: Record<string, any> | string, defaultMess
 export async function updateLanguage() {
     currentLanguage = await getLanguage() as "zh" | "en";
 }
-
 

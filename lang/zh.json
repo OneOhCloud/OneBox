@@ -133,6 +133,8 @@
     "kernel_version": "内核版本",
     "language_description": "Switch to English",
     "language": "语言",
+    "skip_system_proxy": "启动时不设置系统代理",
+    "skip_system_proxy_desc": "仅非 TUN 模式生效，需手动配置应用代理",
     "load_rules_failed": "加载规则失败",
     "loading": "加载中...",
     "local_file_no_expire": "本地文件，无过期时间",

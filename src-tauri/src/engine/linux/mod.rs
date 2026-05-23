@@ -252,7 +252,8 @@ impl EngineManager for LinuxEngine {
         use tauri_plugin_shell::ShellExt;
 
         match mode {
-            crate::engine::ProxyMode::SystemProxy => {
+            crate::engine::ProxyMode::SystemProxy | crate::engine::ProxyMode::ManualProxy => {
+                let should_set_system_proxy = matches!(mode, crate::engine::ProxyMode::SystemProxy);
                 let cmd = app
                     .shell()
                     .sidecar("sing-box")
@@ -275,7 +276,9 @@ impl EngineManager for LinuxEngine {
                     mgr.child = Some(child);
                     mgr.is_stopping = false;
                 }
-                set_system_proxy(app).await.map_err(|e| e.to_string())?;
+                if should_set_system_proxy {
+                    set_system_proxy(app).await.map_err(|e| e.to_string())?;
+                }
             }
             crate::engine::ProxyMode::TunProxy => {
                 // Capture the active interface's original DNS into
@@ -342,8 +345,10 @@ impl EngineManager for LinuxEngine {
             return Ok(());
         };
         match mode.as_ref() {
-            crate::engine::ProxyMode::SystemProxy => {
-                let _ = clear_system_proxy(app).await;
+            crate::engine::ProxyMode::SystemProxy | crate::engine::ProxyMode::ManualProxy => {
+                if matches!(mode.as_ref(), crate::engine::ProxyMode::SystemProxy) {
+                    let _ = clear_system_proxy(app).await;
+                }
                 if let Some(child) = child {
                     use libc::{kill, SIGTERM};
                     let pid = child.pid();

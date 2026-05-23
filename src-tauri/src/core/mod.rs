@@ -198,7 +198,7 @@ pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Resu
     }
     let mode_label = match mode {
         ProxyMode::TunProxy => "tun",
-        ProxyMode::SystemProxy => "mixed",
+        ProxyMode::SystemProxy | ProxyMode::ManualProxy => "mixed",
     };
     if let Err(e) = transition(
         &app,
@@ -386,6 +386,7 @@ pub async fn reload_config(app: tauri::AppHandle) -> Result<String, String> {
             match manager.mode.as_ref().map(|m| m.as_ref()) {
                 Some(ProxyMode::TunProxy) => false,
                 Some(ProxyMode::SystemProxy) => true,
+                Some(ProxyMode::ManualProxy) => false,
                 None => {
                     ::log::warn!("[reload] action={action} rejected: no running process");
                     return Err("No running process found".to_string());

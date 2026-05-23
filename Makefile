@@ -1,8 +1,19 @@
 .PHONY: update dev build bump helper linux-check help
 
+PROXY_HOST ?= 127.0.0.1
+PORT ?=
+PROXY_PORT ?= $(PORT)
+
+ifdef PROXY_PORT
+UPDATE_PROXY_ENV = HTTP_PROXY=http://$(PROXY_HOST):$(PROXY_PORT) HTTPS_PROXY=http://$(PROXY_HOST):$(PROXY_PORT) ALL_PROXY=socks5://$(PROXY_HOST):$(PROXY_PORT) http_proxy=http://$(PROXY_HOST):$(PROXY_PORT) https_proxy=http://$(PROXY_HOST):$(PROXY_PORT) all_proxy=socks5://$(PROXY_HOST):$(PROXY_PORT)
+else
+UPDATE_PROXY_ENV =
+endif
+
 help:
 	@echo "Available targets:"
 	@echo "  update       Update JS and Rust dependencies"
+	@echo "               Optional: make update PORT=7890 [PROXY_HOST=127.0.0.1]"
 	@echo "  dev          Start Tauri dev server"
 	@echo "  build        Build Tauri application (invokes scripts/prebundle.sh)"
 	@echo "  bump         Bump patch version in tauri.conf.json and commit all changes"
@@ -31,9 +42,9 @@ bump:
 	fi
 
 update:
-	bun run scripts/download-binaries.ts
-	bun update
-	cd src-tauri && cargo update
+	$(UPDATE_PROXY_ENV) bun run scripts/download-binaries.ts
+	$(UPDATE_PROXY_ENV) bun update
+	cd src-tauri && $(UPDATE_PROXY_ENV) cargo update
 
 dev:
 	bunx tauri dev

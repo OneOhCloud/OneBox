@@ -777,7 +777,8 @@ impl EngineManager for MacOSEngine {
         use tauri_plugin_shell::ShellExt;
 
         match mode {
-            crate::engine::ProxyMode::SystemProxy => {
+            crate::engine::ProxyMode::SystemProxy | crate::engine::ProxyMode::ManualProxy => {
+                let should_set_system_proxy = matches!(mode, crate::engine::ProxyMode::SystemProxy);
                 // User-mode sing-box sidecar — plain tauri spawn, no helper.
                 let cmd = app
                     .shell()
@@ -801,7 +802,9 @@ impl EngineManager for MacOSEngine {
                     mgr.child = Some(child);
                     mgr.is_stopping = false;
                 }
-                set_system_proxy(app).await.map_err(|e| e.to_string())?;
+                if should_set_system_proxy {
+                    set_system_proxy(app).await.map_err(|e| e.to_string())?;
+                }
             }
             crate::engine::ProxyMode::TunProxy => {
                 // Root-mode sing-box is owned by the privileged XPC helper —
@@ -886,10 +889,12 @@ impl EngineManager for MacOSEngine {
             return Ok(());
         };
         match mode.as_ref() {
-            crate::engine::ProxyMode::SystemProxy => {
+            crate::engine::ProxyMode::SystemProxy | crate::engine::ProxyMode::ManualProxy => {
                 // Best-effort proxy teardown first so apps don't keep pointing
                 // at a dying sing-box socket.
-                let _ = clear_system_proxy(app).await;
+                if matches!(mode.as_ref(), crate::engine::ProxyMode::SystemProxy) {
+                    let _ = clear_system_proxy(app).await;
+                }
                 if let Some(child) = child {
                     use libc::{kill, SIGTERM};
                     let pid = child.pid();

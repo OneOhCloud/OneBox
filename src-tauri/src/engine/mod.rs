@@ -11,6 +11,7 @@ pub const EVENT_STATUS_CHANGED: &str = "status-changed";
 pub enum ProxyMode {
     #[default]
     SystemProxy,
+    ManualProxy,
     TunProxy,
 }
 
@@ -96,7 +97,9 @@ pub trait EngineManager {
     fn start_settle_delay(mode: &ProxyMode) -> std::time::Duration {
         match mode {
             ProxyMode::TunProxy => std::time::Duration::from_millis(1500),
-            ProxyMode::SystemProxy => std::time::Duration::from_millis(1000),
+            ProxyMode::SystemProxy | ProxyMode::ManualProxy => {
+                std::time::Duration::from_millis(1000)
+            }
         }
     }
 }

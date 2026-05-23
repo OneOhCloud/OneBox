@@ -176,7 +176,8 @@ impl EngineManager for WindowsEngine {
         use tauri_plugin_shell::ShellExt;
 
         match mode {
-            crate::engine::ProxyMode::SystemProxy => {
+            crate::engine::ProxyMode::SystemProxy | crate::engine::ProxyMode::ManualProxy => {
+                let should_set_system_proxy = matches!(mode, crate::engine::ProxyMode::SystemProxy);
                 let cmd = app
                     .shell()
                     .sidecar("sing-box")
@@ -199,9 +200,12 @@ impl EngineManager for WindowsEngine {
                     mgr.child = Some(child);
                     mgr.is_stopping = false;
                 }
-                if let Err(e) = set_system_proxy(app).await {
-                    let _ = app.emit(EVENT_TAURI_LOG, (2, format!("Failed to set proxy: {}", e)));
-                    return Err(e.to_string());
+                if should_set_system_proxy {
+                    if let Err(e) = set_system_proxy(app).await {
+                        let _ =
+                            app.emit(EVENT_TAURI_LOG, (2, format!("Failed to set proxy: {}", e)));
+                        return Err(e.to_string());
+                    }
                 }
             }
             crate::engine::ProxyMode::TunProxy => {
@@ -253,13 +257,15 @@ impl EngineManager for WindowsEngine {
             child_pid_for_log
         );
         match mode.as_ref() {
-            crate::engine::ProxyMode::SystemProxy => {
-                if let Err(e) = clear_system_proxy(app).await {
-                    log::warn!("Failed to unset proxy: {}", e);
-                    let _ = app.emit(
-                        EVENT_TAURI_LOG,
-                        (2, format!("Failed to unset proxy: {}", e)),
-                    );
+            crate::engine::ProxyMode::SystemProxy | crate::engine::ProxyMode::ManualProxy => {
+                if matches!(mode.as_ref(), crate::engine::ProxyMode::SystemProxy) {
+                    if let Err(e) = clear_system_proxy(app).await {
+                        log::warn!("Failed to unset proxy: {}", e);
+                        let _ = app.emit(
+                            EVENT_TAURI_LOG,
+                            (2, format!("Failed to unset proxy: {}", e)),
+                        );
+                    }
                 }
                 if let Some(child) = child {
                     let pid = child.pid();
