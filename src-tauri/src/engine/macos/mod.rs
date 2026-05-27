@@ -807,6 +807,12 @@ impl EngineManager for MacOSEngine {
                 }
             }
             crate::engine::ProxyMode::TunProxy => {
+                // Clear stale proxy state before sing-box starts. The TUN
+                // inbound may enable its own macOS platform HTTP proxy during
+                // startup; clearing after startup would immediately disable
+                // that handoff and make TUN appear connected but ineffective.
+                let _ = clear_system_proxy(app).await;
+
                 // Root-mode sing-box is owned by the privileged XPC helper —
                 // we ask the helper to install itself if needed, then ask it
                 // to spawn sing-box, and subscribe to its exit notifications
@@ -870,10 +876,6 @@ impl EngineManager for MacOSEngine {
                 if bypass_router_enabled {
                     watchdog::spawn(app.clone(), Arc::clone(&config_path_arc));
                 }
-
-                // TUN mode doesn't use the system HTTP proxy — clear any stale
-                // one left over from a previous SystemProxy session.
-                let _ = clear_system_proxy(app).await;
             }
         }
         Ok(())
