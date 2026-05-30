@@ -3,6 +3,9 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
+  "scripts": {
+    "tauri": "deno task tauri"
+  },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.0",
     "@tauri-apps/api": "^2.11.0",
