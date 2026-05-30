@@ -292,7 +292,7 @@ Project restatement of the global "Write-test-first cadence" rule in `~/.claude/
 | Layer | How to run locally | Where CI runs it |
 |---|---|---|
 | Rust (`src-tauri`) | `cargo test --manifest-path src-tauri/Cargo.toml --lib` | `.github/workflows/test.yml` → `rust` job |
-| Frontend (Vite + React) | `bun run test` (vitest) | `.github/workflows/test.yml` → `frontend` job |
+| Frontend (Vite + React) | `deno task test` (vitest) | `.github/workflows/test.yml` → `frontend` job |
 
 Both jobs run on every push and PR and block merges on red. When authoring a new test worth keeping, wire it into the matching layer so CI exercises it automatically on the next push; disposable `scripts/tmp-*.sh` harnesses stay disposable and get deleted in the same merge cycle.
 

@@ -73,25 +73,26 @@ The macOS build is notarized by Apple, so it can be installed without manual sec
 Install dependencies:
 
 ```bash
-bun install
+deno install
+deno task prepare
 ```
 
 Start the desktop frontend during development:
 
 ```bash
-bun run dev
+deno task tauri dev
 ```
 
 Build the web bundle:
 
 ```bash
-bun run build
+deno task build
 ```
 
 Run the frontend test suite:
 
 ```bash
-bun run test
+deno task test
 ```
 
 Run Rust tests with captured output shown:

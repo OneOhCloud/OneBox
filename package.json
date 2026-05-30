@@ -3,20 +3,6 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "scripts": {
-    "sync-templates": "bun run scripts/sync-templates.ts",
-    "build:tun-service": "bun run scripts/build-tun-service.ts",
-    "check:tailwind": "bun run scripts/check-tailwind-canonical.ts",
-    "check:tailwind:fix": "bun run scripts/check-tailwind-canonical.ts --fix",
-    "predev": "bun run sync-templates && bun run build:tun-service",
-    "prebuild": "bun run sync-templates && bun run build:tun-service --release",
-    "dev": "vite",
-    "build": "tsc && vite build",
-    "preview": "vite preview",
-    "tauri": "tauri",
-    "prepare": "husky",
-    "test": "vitest run"
-  },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.0",
     "@tauri-apps/api": "^2.11.0",
@@ -50,7 +36,6 @@
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.11.2",
-    "@types/bun": "^1.3.14",
     "@types/bytes": "^3.1.5",
     "@types/node": "^25.9.1",
     "@types/react": "^19.2.15",

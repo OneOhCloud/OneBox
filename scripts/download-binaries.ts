@@ -1,10 +1,11 @@
 import fs, { createWriteStream } from 'node:fs';
 import path from 'node:path';
 import { pipeline } from 'node:stream';
+import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { x } from 'tar';
 import unzipper from 'unzipper';
-import { SING_BOX_VERSION } from '../src/types/definition';
+import { SING_BOX_VERSION } from '../src/types/definition.ts';
 
 const BINARY_NAME = 'sing-box';
 const GITHUB_RELEASE_URL = 'https://github.com/SagerNet/sing-box/releases/download/';
@@ -13,6 +14,7 @@ const GITHUB_RELEASE_URL = 'https://github.com/SagerNet/sing-box/releases/downlo
 // cronet-go repository URL
 const CRONET_REPO_API = 'https://api.github.com/repos/SagerNet/cronet-go/releases/latest';
 const CRONET_RELEASE_URL = 'https://github.com/SagerNet/cronet-go/releases/download/';
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 
 const SkipVersionList = [

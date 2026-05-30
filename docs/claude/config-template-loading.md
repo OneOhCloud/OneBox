@@ -12,7 +12,7 @@ See `conf-template/CONVENTIONS.md` for the contract.
 
 ## Build-time path (bake a snapshot into the binary)
 
-`scripts/sync-templates.ts` runs automatically before every `bun run dev` / `bun run build` via bun's npm-style `predev` / `prebuild` script hooks. It:
+`scripts/sync-templates.ts` runs automatically before every `deno task tauri dev` / `deno task build` through the Deno tasks wired into `tauri.conf.json`. It:
 
 1. Derives the version directory from the baked-in `SING_BOX_VERSION` (mirrors `store.ts::getDefaultConfigTemplateURL`).
 2. In parallel, `fetch`es the four `.jsonc` files from `https://raw.githubusercontent.com/OneOhCloud/conf-template/<branch>/conf/<version>/zh-cn/<variant>.jsonc`.
@@ -30,13 +30,13 @@ Branch defaults to `stable`; override with `CONF_TEMPLATE_BRANCH=beta|dev` in CI
 
 The tauri build chain works without modifying `tauri.conf.json`:
 ```
-tauri build → beforeBuildCommand "bun run build" → prebuild hook "sync-templates" → build (tsc && vite build)
+tauri build → beforeBuildCommand "deno task build" → sync-templates → build (tsc && vite build)
 ```
 
-The single CI release workflow (`.github/workflows/release.yml`) runs the sync **explicitly** as a "Sync config templates" step right after "Download Binaries", not relying on the prebuild hook. Two reasons:
+The single CI release workflow (`.github/workflows/release.yml`) runs the sync **explicitly** as a "Sync config templates" step right after "Download Binaries", not relying only on the Tauri build task chain. Two reasons:
 
 1. **Fail-early visibility** — if sync fails (GitHub 404, parse error, network flake), we want to see it in a dedicated CI step with clear logs, not hidden mid-`tauri build` 10 minutes later.
-2. **Belt-and-suspenders against bun pre-hook breakage** — if a future bun version changes how it invokes `prebuild`, the explicit step still produces a valid `generated.ts` before `tauri-action` runs. The prebuild hook in `package.json` remains for local dev.
+2. **Belt-and-suspenders against task-chain breakage** — if the local build task changes, the explicit step still produces a valid `generated.ts` before `tauri-action` runs. The `deno task build` chain remains for local dev.
 
 The channel-specific `CONF_TEMPLATE_BRANCH` (`stable` / `beta` / `dev` / `stable` for manual) is derived from the `resolve` job's channel output and threaded into the sync step's env. After running sync, the step greps for `BUILT_IN_TEMPLATE_OBJECTS` / `BUILD_TIME_TEMPLATE_SOURCE` / `singBoxVersion: 'v` in the output as a smoke check — catches silent corruption before the real build wastes time.
 
@@ -112,7 +112,7 @@ Purge + prime run in parallel at mount. Order doesn't matter: if purge wipes a p
 
 ## What we deliberately DON'T do
 
-- **Do not hand-edit `src/config/templates/generated.ts`.** It is `.gitignore`d and regenerated from `conf-template` by `scripts/sync-templates.ts` on every `predev` / `prebuild` hook and in the CI "Sync config templates" step. Any hand edit will be overwritten on the next dev/build and will silently diverge from upstream in the meantime.
+- **Do not hand-edit `src/config/templates/generated.ts`.** It is `.gitignore`d and regenerated from `conf-template` by `scripts/sync-templates.ts` on every `deno task dev` / `deno task build` chain and in the CI "Sync config templates" step. Any hand edit will be overwritten on the next dev/build and will silently diverge from upstream in the meantime.
 - **Do not bake built-in templates as JSON-string literals embedded in TS.** Prior design did this and introduced double-escaping bugs on any unusual character. The generator now emits real TypeScript object literals (`export const X = { ... } as const`) so `tsc` catches malformed JSON at build time. If you find yourself reaching for `JSON.stringify` inside `sync-templates.ts`, you are re-introducing the bug class — the stringification must happen only on the cache-write path in `templates/index.ts::getBuiltInTemplate`.
 - **Do not add network I/O to `getConfigTemplate` or any `set*Config` merger.** The read path is pure cache access by design so TUN toggle latency never depends on network. If a caller appears to "need fresh data", it should trigger a `primeConfigTemplateCache` via SWR and keep reading the cache, not synchronously fetch.
 - **Do not gate `primeConfigTemplateCache` on "only write if stale".** Every prime overwrites the cache unconditionally so the write path reflects the latest attempt. A stale-check would re-introduce the "built-in fallback drifted from remote" class of bug (the `www.qq.com → overseas IP` regression was this).
@@ -131,7 +131,7 @@ Purge + prime run in parallel at mount. Order doesn't matter: if purge wipes a p
 ## Files
 
 **In OneBox repo**:
-- `scripts/sync-templates.ts` — build-time fetch + emit `generated.ts` (predev/prebuild hook). Emits real TS object literals, not JSON-stringified strings.
+- `scripts/sync-templates.ts` — build-time fetch + emit `generated.ts` (Deno dev/build task chain). Emits real TS object literals, not JSON-stringified strings.
 - `src/config/templates/generated.ts` — AUTO-GENERATED, `.gitignore`d. Exports `MIXED_TEMPLATE` / `TUN_TEMPLATE` / `MIXED_GLOBAL_TEMPLATE` / `TUN_GLOBAL_TEMPLATE` as typed object constants (with `as const`) plus `BUILT_IN_TEMPLATE_OBJECTS: Record<configType, unknown>` mapping keys to those constants, plus `BUILD_TIME_TEMPLATE_SOURCE` metadata.
 - `src/config/templates/index.ts` — hand-written. Re-exports `BUILD_TIME_TEMPLATE_SOURCE`, imports `BUILT_IN_TEMPLATE_OBJECTS`, and provides `getBuiltInTemplate(mode): string` which stringifies the selected object on read.
 - `src/config/common.ts` — schema version, cache key builder, stale-URL detector
@@ -140,7 +140,7 @@ Purge + prime run in parallel at mount. Order doesn't matter: if purge wipes a p
 - `src/hooks/useSwr.ts` — `primeConfigTemplateCache` / `primeAllConfigTemplateCaches` (write path) + `purgeLegacyTemplateCache`
 - `src/single/store.ts` — `getConfigTemplateURL` / `getDefaultConfigTemplateURL` (URL resolution, including the 1.13.8 patch-version branch)
 - `src/App.tsx` — mounts both SWR hooks (purge once, prime periodically)
-- `package.json` — `sync-templates` / `prebuild` / `predev` scripts
+- `deno.json` — `sync-templates` / `dev` / `build` tasks
 - `.gitignore` — excludes `src/config/templates/generated.ts`
 
 **In conf-template repo** (separate repo, `OneOhCloud/conf-template`):

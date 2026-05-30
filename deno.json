@@ -1,0 +1,17 @@
+{
+  "nodeModulesDir": "auto",
+  "tasks": {
+    "sync-templates": "deno run -A scripts/sync-templates.ts",
+    "download-binaries": "deno run -A scripts/download-binaries.ts",
+    "build:tun-service": "deno run -A scripts/build-tun-service.ts",
+    "check:tailwind": "deno run -A scripts/check-tailwind-canonical.ts",
+    "check:tailwind:fix": "deno task check:tailwind --fix",
+    "prepare": "deno run -A npm:husky",
+    "process-changelog": "deno run -A scripts/process-changelog.ts",
+    "dev": "deno task sync-templates && deno task build:tun-service && deno run -A npm:vite",
+    "build": "deno task sync-templates && deno task build:tun-service --release && deno run -A npm:typescript@~5.9.3/bin/tsc && deno run -A npm:vite build",
+    "preview": "deno run -A npm:vite preview",
+    "tauri": "deno run -A npm:@tauri-apps/cli@^2.11.2",
+    "test": "deno run -A npm:vitest@^3.2.4 run --api.host 127.0.0.1"
+  }
+}

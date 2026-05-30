@@ -3,9 +3,9 @@
   "version": "1.4.30",
   "identifier": "cloud.oneoh.onebox",
   "build": {
-    "beforeDevCommand": "bun run dev",
+    "beforeDevCommand": "deno task dev",
     "devUrl": "http://localhost:1420",
-    "beforeBuildCommand": "bun run build",
+    "beforeBuildCommand": "deno task build",
     "frontendDist": "../dist"
   },
   "app": {

@@ -12,7 +12,7 @@ fi
 . "$(dirname "$0")/_/husky.sh"
 
 echo "运行构建检查..."
-bun run build || {
+deno task build || {
     echo "❌ 构建失败! Push 已终止"
     exit 1
 }

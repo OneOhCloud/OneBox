@@ -1,15 +1,15 @@
-#!/usr/bin/env bun
+#!/usr/bin/env -S deno run -A
 /**
  * Build the `tun-service` workspace member and stage it where Tauri can find
  * it both for `cargo tauri dev` and for production bundling.
  *
- * Dev flow (`bun run tauri dev` → `predev`):
+ * Dev flow (`deno task tauri dev` → `beforeDevCommand`):
  *   `cargo build -p tun-service` produces `src-tauri/target/debug/tun-service.exe`
  *   right next to the dev-mode `one-box.exe`. That's exactly where
  *   `vpn::windows::bundled_service_exe_path()` looks, so no further copying is
  *   needed for dev.
  *
- * Release flow (`bun run tauri build` → `prebuild`, or CI):
+ * Release flow (`deno task tauri build` → `beforeBuildCommand`, or CI):
  *   Tauri's `externalBin` contract requires the binary to live at
  *   `src-tauri/binaries/<name>-<target-triple>.exe` at bundling time. Tauri
  *   strips the triple suffix when copying into the final installer, so the

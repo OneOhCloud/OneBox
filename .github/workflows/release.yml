@@ -295,8 +295,10 @@ jobs:
         with:
           node-version: lts/*
 
-      - name: Set Up Bun
-        uses: oven-sh/setup-bun@v2
+      - name: Set Up Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
 
       - name: Set Up Rust Toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -309,10 +311,10 @@ jobs:
           workspaces: './src-tauri -> target'
 
       - name: Install Frontend Dependencies
-        run: bun install
+        run: deno install
 
       - name: Process CHANGELOG
-        run: bun run scripts/process-changelog.ts
+        run: deno task process-changelog
 
       - name: Read CHANGELOG
         id: decode
@@ -324,7 +326,7 @@ jobs:
           echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Download Binaries
-        run: bun run scripts/download-binaries.ts
+        run: deno task download-binaries
 
       - name: Sync config templates from conf-template
         env:
@@ -333,7 +335,7 @@ jobs:
         run: |
           set -euo pipefail
           rm -f src/config/templates/generated.ts
-          bun run sync-templates
+          deno task sync-templates
           test -f src/config/templates/generated.ts \
             || { echo "::error::sync-templates did not write generated.ts"; exit 1; }
           grep -q "BUILT_IN_TEMPLATE_OBJECTS" src/config/templates/generated.ts \
@@ -410,8 +412,10 @@ jobs:
         with:
           node-version: lts/*
 
-      - name: Set Up Bun
-        uses: oven-sh/setup-bun@v2
+      - name: Set Up Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
 
       - name: Set Up Rust Toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -424,10 +428,10 @@ jobs:
           workspaces: './src-tauri -> target'
 
       - name: Install Frontend Dependencies
-        run: bun install
+        run: deno install
 
       - name: Process CHANGELOG
-        run: bun run scripts/process-changelog.ts
+        run: deno task process-changelog
 
       - name: Read CHANGELOG
         id: decode
@@ -439,7 +443,7 @@ jobs:
           echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Download Binaries
-        run: bun run scripts/download-binaries.ts
+        run: deno task download-binaries
 
       - name: Sync config templates from conf-template
         env:
@@ -448,7 +452,7 @@ jobs:
         run: |
           set -euo pipefail
           rm -f src/config/templates/generated.ts
-          bun run sync-templates
+          deno task sync-templates
           test -f src/config/templates/generated.ts \
             || { echo "::error::sync-templates did not write generated.ts"; exit 1; }
           grep -q "BUILT_IN_TEMPLATE_OBJECTS" src/config/templates/generated.ts \
@@ -525,8 +529,10 @@ jobs:
         with:
           node-version: lts/*
 
-      - name: Set Up Bun
-        uses: oven-sh/setup-bun@v2
+      - name: Set Up Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
 
       - name: Install Linux Dependencies
         run: |
@@ -550,10 +556,10 @@ jobs:
           workspaces: './src-tauri -> target'
 
       - name: Install Frontend Dependencies
-        run: bun install
+        run: deno install
 
       - name: Process CHANGELOG
-        run: bun run scripts/process-changelog.ts
+        run: deno task process-changelog
 
       - name: Read CHANGELOG
         id: decode
@@ -565,7 +571,7 @@ jobs:
           echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Download Binaries
-        run: bun run scripts/download-binaries.ts
+        run: deno task download-binaries
 
       - name: Sync config templates from conf-template
         env:
@@ -574,7 +580,7 @@ jobs:
         run: |
           set -euo pipefail
           rm -f src/config/templates/generated.ts
-          bun run sync-templates
+          deno task sync-templates
           test -f src/config/templates/generated.ts \
             || { echo "::error::sync-templates did not write generated.ts"; exit 1; }
           grep -q "BUILT_IN_TEMPLATE_OBJECTS" src/config/templates/generated.ts \
@@ -615,8 +621,10 @@ jobs:
         with:
           node-version: lts/*
 
-      - name: Set Up Bun
-        uses: oven-sh/setup-bun@v2
+      - name: Set Up Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
 
       - name: Set Up Rust Toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -627,10 +635,10 @@ jobs:
           workspaces: './src-tauri -> target'
 
       - name: Install Frontend Dependencies
-        run: bun install
+        run: deno install
 
       - name: Process CHANGELOG
-        run: bun run scripts/process-changelog.ts
+        run: deno task process-changelog
 
       - name: Read CHANGELOG
         id: decode
@@ -642,7 +650,7 @@ jobs:
           echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Download Binaries
-        run: bun run scripts/download-binaries.ts
+        run: deno task download-binaries
 
       - name: Sync config templates from conf-template
         env:
@@ -651,7 +659,7 @@ jobs:
         run: |
           set -euo pipefail
           rm -f src/config/templates/generated.ts
-          bun run sync-templates
+          deno task sync-templates
           test -f src/config/templates/generated.ts \
             || { echo "::error::sync-templates did not write generated.ts"; exit 1; }
           grep -q "BUILT_IN_TEMPLATE_OBJECTS" src/config/templates/generated.ts \
@@ -666,7 +674,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          bun run build:tun-service --release
+          deno task build:tun-service --release
           test -f src-tauri/binaries/tun-service-x86_64-pc-windows-msvc.exe \
             || { echo "::error::tun-service binary was not staged for Tauri externalBin"; exit 1; }
           echo "✓ tun-service staged for Tauri externalBin"

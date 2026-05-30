@@ -1,4 +1,4 @@
-#!/usr/bin/env bun
+#!/usr/bin/env -S deno run -A
 /**
  * Enforce "prefer Tailwind canonical classes over arbitrary px values on
  * spacing-scale-backed properties" for px values small enough that the
@@ -14,13 +14,14 @@
  * issue #1527 for the upstream report.
  *
  * Usage:
- *   bun run scripts/check-tailwind-canonical.ts [--fix] [path...]
+ *   deno task check:tailwind [--fix] [path...]
  *
  * Default path: src/ . Exit 0 on clean / all-fixed, exit 1 on remaining
  * violations. Wired into `.husky/pre-commit`.
  */
 
-import { readFileSync, writeFileSync } from "node:fs";
+import { readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 
 const MAX_PX = 32;
 const SPACING_UNIT = 4;
@@ -67,6 +68,25 @@ function scanFile(path: string, apply: boolean): Hit[] {
     return hits;
 }
 
+function collectSourceFiles(root: string): string[] {
+    const stat = statSync(root);
+    if (stat.isFile()) {
+        return /\.(ts|tsx|js|jsx)$/.test(root) ? [root] : [];
+    }
+
+    const files: string[] = [];
+    for (const entry of readdirSync(root)) {
+        const path = join(root, entry);
+        const childStat = statSync(path);
+        if (childStat.isDirectory()) {
+            files.push(...collectSourceFiles(path));
+        } else if (/\.(ts|tsx|js|jsx)$/.test(entry)) {
+            files.push(path);
+        }
+    }
+    return files;
+}
+
 async function main(): Promise<void> {
     const args = process.argv.slice(2);
     const fix = args.includes("--fix");
@@ -75,9 +95,8 @@ async function main(): Promise<void> {
 
     const hits: Hit[] = [];
     for (const root of scanPaths) {
-        const glob = new Bun.Glob("**/*.{ts,tsx,js,jsx}");
-        for await (const file of glob.scan({ cwd: root })) {
-            hits.push(...scanFile(`${root}/${file}`, fix));
+        for (const file of collectSourceFiles(root)) {
+            hits.push(...scanFile(file, fix));
         }
     }
 
@@ -95,7 +114,7 @@ async function main(): Promise<void> {
     }
     console.log(
         `\n[check-tailwind-canonical] ${hits.length} occurrence(s) flagged. ` +
-        `Rerun with --fix to apply (or run 'bun run check:tailwind:fix').`,
+        `Rerun with --fix to apply (or run 'deno task check:tailwind:fix').`,
     );
     process.exit(1);
 }
