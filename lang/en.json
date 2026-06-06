@@ -186,6 +186,7 @@
     "proxy_port_saved": "Proxy port saved",
     "proxy_port_saved_stop_vpn": "Proxy port saved, VPN stopped",
     "proxy_port_save_failed": "Failed to save proxy port",
+    "port_occupied_cannot_start": "Port {{port}} is occupied and OneBox cannot stop the process. Startup aborted.",
     "proxy_rules": "Proxy Rules",
     "reconnect_failed": "Reconnect failed, please check network",
     "release_success_stop_vpn": "Resources released, vpn service stopped",
@@ -259,6 +260,6 @@
     "prestart_killing": "Cleaning up...",
     "prestart_verifying": "Verifying...",
     "prestart_success": "Repaired, starting service",
-    "prestart_failed": "Repair failed, please restart your computer",
+    "prestart_failed": "Port is occupied and OneBox cannot stop the process. Startup aborted.",
     "prestart_pid_label": "Orphan process"
 }

@@ -178,6 +178,40 @@ pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Resu
         ::log::warn!(
             "[start] action={action} :{mixed_port} already has a listener on entry — previous sing-box still bound?"
         );
+        let cleanup = tokio::task::spawn_blocking(move || {
+            crate::commands::prestart::ensure_port_available(mixed_port)
+        })
+        .await
+        .map_err(|e| {
+            format!(
+                "{}:{}: port cleanup join error: {}",
+                crate::commands::prestart::PORT_OCCUPIED_CANNOT_START,
+                mixed_port,
+                e
+            )
+        })?;
+        match cleanup {
+            Ok(result) => {
+                if result.killed_pids.is_empty() {
+                    ::log::info!(
+                        "[start] action={action} :{mixed_port} listener released before cleanup"
+                    );
+                } else {
+                    ::log::info!(
+                        "[start] action={action} killed listener pids {:?} on :{mixed_port}",
+                        result.killed_pids
+                    );
+                }
+            }
+            Err(e) => {
+                let reason = e.start_error();
+                ::log::error!(
+                    "[start] action={action} prestart port cleanup failed: {}",
+                    e
+                );
+                return Err(reason);
+            }
+        }
     }
     if matches!(pm_alive, Some(true)) {
         ::log::warn!(

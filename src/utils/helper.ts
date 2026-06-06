@@ -177,11 +177,24 @@ export const vpnServiceManager = {
 
         } catch (error: any) {
             console.error('Failed to start VPN service:', error);
+            const errorText = String(error?.message ?? error ?? '');
+            const occupiedPort = errorText.match(/PORT_OCCUPIED_CANNOT_START:(\d+)/)?.[1];
+            if (occupiedPort) {
+                await message(
+                    t(
+                        'port_occupied_cannot_start',
+                        { port: occupiedPort },
+                        'Port {{port}} is occupied and OneBox cannot stop the process. Startup aborted.'
+                    ),
+                    { title: t('error'), kind: 'error' },
+                );
+                throw error;
+            }
             // 如果是权限问题，抛出特定错误让上层处理
-            if (error?.toString().includes('REQUIRE_PRIVILEGE')) {
+            if (errorText.includes('REQUIRE_PRIVILEGE')) {
                 throw new Error('REQUIRE_PRIVILEGE');
             }
-            await message('Failed to start VPN service', { title: 'error', kind: 'error' });
+            await message(t('start_vpn_failed', 'Failed to start VPN service'), { title: t('error'), kind: 'error' });
             throw error;
         }
 
@@ -252,4 +265,3 @@ export function t(id: string, params?: Record<string, any> | string, defaultMess
 export async function updateLanguage() {
     currentLanguage = await getLanguage() as "zh" | "en";
 }
-
