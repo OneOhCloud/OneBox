@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Ethernet } from "react-bootstrap-icons";
 import { toast } from "sonner";
 import { DEFAULT_PROXY_PORT, PROXY_PORT_CHANGED_EVENT } from "../../types/definition";
-import { getProxyPort, setProxyPort } from "../../single/store";
+import { getEnableTun, getProxyPort, getSkipSystemProxy, setProxyPort, setSkipSystemProxy } from "../../single/store";
 import { t, vpnServiceManager } from "../../utils/helper";
 import { IOSTextField } from "../common/ios-text-field";
 import { SettingsModal } from "../common/settings-modal";
@@ -21,20 +21,39 @@ export default function ProxyPortSetting() {
   const [port, setPort] = useState(DEFAULT_PROXY_PORT.toString());
   const [currentPort, setCurrentPort] = useState(DEFAULT_PROXY_PORT);
   const [isLoading, setIsLoading] = useState(false);
+  const [skipSystemProxy, setSkipSystemProxyState] = useState(false);
+  const [tunEnabled, setTunEnabled] = useState(false);
 
-  const loadPort = async () => {
-    const savedPort = await getProxyPort();
+  const loadState = async () => {
+    const [savedPort, skipProxy, tunOn] = await Promise.all([
+      getProxyPort(),
+      getSkipSystemProxy(),
+      getEnableTun(),
+    ]);
     setCurrentPort(savedPort);
     setPort(savedPort.toString());
+    setSkipSystemProxyState(skipProxy);
+    setTunEnabled(tunOn);
   };
 
   useEffect(() => {
-    loadPort();
+    loadState();
   }, []);
 
   useEffect(() => {
-    if (isOpen) loadPort();
+    if (isOpen) loadState();
   }, [isOpen]);
+
+  const handleToggleSkipProxy = async () => {
+    const next = !skipSystemProxy;
+    setSkipSystemProxyState(next);
+    try {
+      await setSkipSystemProxy(next);
+    } catch (error) {
+      setSkipSystemProxyState(!next);
+      console.error("Error saving system proxy toggle state:", error);
+    }
+  };
 
   const parsedPort = normalizePort(port);
   const error = port.trim() && parsedPort === null
@@ -108,6 +127,30 @@ export default function ProxyPortSetting() {
           autoFocus
           onSubmit={handleSave}
         />
+        {!tunEnabled && (
+          <label
+            className="mt-4 pt-3 flex items-center gap-3 cursor-pointer"
+            style={{ borderTop: "0.5px solid var(--onebox-separator)" }}
+          >
+            <div className="flex-1 min-w-0">
+              <div className="text-[14px]" style={{ color: "var(--onebox-label)" }}>
+                {t("set_system_proxy")}
+              </div>
+              <div
+                className="text-[12px] mt-0.5 leading-snug"
+                style={{ color: "var(--onebox-label-secondary)" }}
+              >
+                {t("set_system_proxy_desc")}
+              </div>
+            </div>
+            <input
+              type="checkbox"
+              className="onebox-toggle"
+              checked={!skipSystemProxy}
+              onChange={handleToggleSkipProxy}
+            />
+          </label>
+        )}
       </SettingsModal>
     </>
   );

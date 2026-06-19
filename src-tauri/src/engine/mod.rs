@@ -143,8 +143,26 @@ pub(crate) use sysproxy::clear_system_proxy;
 /// `core::*` call sites (`engine::apply_system_proxy`, etc.) keep working.
 pub(crate) use sysproxy::set_system_proxy as apply_system_proxy;
 
+/// Whether shutdown cleanup should clear the system proxy. True only when
+/// the engine was driving the **system** proxy itself. In ManualProxy /
+/// TunProxy / idle (`None`) states OneBox never set the system proxy, so
+/// clearing on exit would wipe a proxy the user configured themselves.
+/// Mirrors the mode gate in `core::monitor::handle_process_termination`.
+fn should_clear_system_proxy_on_shutdown(mode: Option<&ProxyMode>) -> bool {
+    matches!(mode, Some(ProxyMode::SystemProxy))
+}
+
 /// Clean up system proxy settings on app shutdown.
 pub fn cleanup_on_shutdown() {
+    let mode = crate::core::ProcessManager::acquire().mode.clone();
+    if !should_clear_system_proxy_on_shutdown(mode.as_deref()) {
+        log::info!(
+            "Skipping system proxy cleanup on shutdown; engine mode {:?} did not set it",
+            mode.as_deref()
+        );
+        return;
+    }
+
     use onebox_sysproxy_rs::Sysproxy;
     let mut sysproxy = match Sysproxy::get_system_proxy() {
         Ok(proxy) => proxy,
@@ -158,5 +176,24 @@ pub fn cleanup_on_shutdown() {
         log::error!("Failed to unset system proxy during shutdown: {}", e);
     } else {
         log::info!("System proxy unset during shutdown");
+    }
+}
+
+#[cfg(test)]
+mod cleanup_on_shutdown_tests {
+    use super::*;
+
+    #[test]
+    fn clears_proxy_only_in_system_proxy_mode() {
+        assert!(should_clear_system_proxy_on_shutdown(Some(
+            &ProxyMode::SystemProxy
+        )));
+        assert!(!should_clear_system_proxy_on_shutdown(Some(
+            &ProxyMode::ManualProxy
+        )));
+        assert!(!should_clear_system_proxy_on_shutdown(Some(
+            &ProxyMode::TunProxy
+        )));
+        assert!(!should_clear_system_proxy_on_shutdown(None));
     }
 }

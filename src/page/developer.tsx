@@ -10,7 +10,6 @@ import DNSSettingsItem from "../components/developer/dns-settings";
 import HelperPing from "../components/developer/helper-ping";
 import ToggleLocalConfig from "../components/developer/local-config-toggle";
 import StageSetting from "../components/developer/select-stage";
-import ToggleSystemProxyOnStart from "../components/developer/system-proxy-toggle";
 import ThemeToggle from "../components/developer/theme-toggle";
 import TunStackSetting from "../components/developer/tun-stack";
 import UASettingsItem from "../components/developer/ua-settings";
@@ -25,7 +24,6 @@ export default function Page() {
                 <div className="onebox-grouped-card mb-5">
                     <ToggleDev />
                     <ToggleDHCP />
-                    <ToggleSystemProxyOnStart />
                     <ToggleBypassRouter />
                     <BypassRouterWatchdogSetting />
                     <ToggleLocalConfig />
