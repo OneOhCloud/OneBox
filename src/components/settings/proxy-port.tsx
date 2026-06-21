@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { DEFAULT_PROXY_PORT, PROXY_PORT_CHANGED_EVENT } from "../../types/definition";
 import { getEnableTun, getProxyPort, getSkipSystemProxy, setProxyPort, setSkipSystemProxy } from "../../single/store";
 import { t, vpnServiceManager } from "../../utils/helper";
+import { useEngineState } from "../../hooks/useEngineState";
 import { IOSTextField } from "../common/ios-text-field";
 import { SettingsModal } from "../common/settings-modal";
 import { SettingItem } from "./common";
@@ -17,6 +18,7 @@ function normalizePort(value: string): number | null {
 }
 
 export default function ProxyPortSetting() {
+  const engineState = useEngineState();
   const [isOpen, setIsOpen] = useState(false);
   const [port, setPort] = useState(DEFAULT_PROXY_PORT.toString());
   const [currentPort, setCurrentPort] = useState(DEFAULT_PROXY_PORT);
@@ -47,11 +49,32 @@ export default function ProxyPortSetting() {
   const handleToggleSkipProxy = async () => {
     const next = !skipSystemProxy;
     setSkipSystemProxyState(next);
-    try {
+
+    const saveSkipSystemProxy = async () => {
       await setSkipSystemProxy(next);
+    };
+
+    try {
+      if (engineState.kind === "running") {
+        await toast.promise(
+          (async () => {
+            await vpnServiceManager.stop();
+            await saveSkipSystemProxy();
+          })(),
+          {
+            loading: t("please_wait_releasing_resources"),
+            success: t("system_proxy_saved_stop_vpn", "System proxy setting saved, VPN stopped"),
+            error: t("system_proxy_save_failed", "Failed to save system proxy setting"),
+          },
+        );
+      } else {
+        await saveSkipSystemProxy();
+        toast.success(t("system_proxy_saved", "System proxy setting saved"));
+      }
     } catch (error) {
       setSkipSystemProxyState(!next);
       console.error("Error saving system proxy toggle state:", error);
+      toast.error(t("system_proxy_save_failed", "Failed to save system proxy setting"));
     }
   };
 
@@ -73,7 +96,7 @@ export default function ProxyPortSetting() {
         window.dispatchEvent(new CustomEvent<number>(PROXY_PORT_CHANGED_EVENT, { detail: parsedPort }));
       };
 
-      if (await vpnServiceManager.is_running()) {
+      if (engineState.kind === "running") {
         await toast.promise(
           (async () => {
             await vpnServiceManager.stop();
