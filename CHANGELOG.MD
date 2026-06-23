@@ -14,6 +14,7 @@ All significant changes in this version are documented here.
 ### Bug Fixes
 
 - Fixed quitting OneBox clearing a system proxy that OneBox did not set.
+- Fixed proxy and DNS settings not taking effect on macOS when the active network service had been renamed (such as a renamed Wi-Fi).
 
 ## 自 v1.4.31 以来的变更
 
@@ -27,6 +28,7 @@ All significant changes in this version are documented here.
 ### Bug 修复
 
 - 修复退出 OneBox 时清除并非由 OneBox 设置的系统代理的问题。
+- 修复 macOS 上重命名网络服务（例如改名后的 Wi-Fi）后，代理与 DNS 设置无法生效的问题。
 
 ---
 
