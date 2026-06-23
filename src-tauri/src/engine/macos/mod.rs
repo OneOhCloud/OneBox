@@ -318,48 +318,16 @@ pub async fn stop_tun_process() -> Result<(), String> {
 // rationale. The only change in Phase 2b.2 is that setdnsservers / flushDnsCache
 // now go through the XPC helper instead of `echo | sudo -S`.
 
-/// Map the default route's outgoing interface to its networksetup service name.
-/// Does NOT require root — route(1) and networksetup(1) are readable by any user.
+/// Map the default route's outgoing interface to its networksetup **service**
+/// name. Delegates to `onebox_sysproxy_rs::active_network_service`, which
+/// resolves via `route -n get default` + `-listnetworkserviceorder` (device →
+/// service name). The earlier `-listallhardwareports` lookup returned the
+/// hardware-port *label*, which diverges from the service name on renamed
+/// services and USB adapters — there `-setdnsservers "<label>"` fails with
+/// exit 4, silently dropping the system-DNS override (a DNS leak). Does NOT
+/// require root — route(1) and networksetup(1) are readable by any user.
 fn detect_active_network_service() -> Result<String, String> {
-    let out = Command::new("route")
-        .args(["-n", "get", "default"])
-        .output()
-        .map_err(|e| format!("route get default failed: {}", e))?;
-    let stdout = String::from_utf8_lossy(&out.stdout);
-    let iface = stdout
-        .lines()
-        .find_map(|l| {
-            l.trim()
-                .strip_prefix("interface:")
-                .map(|s| s.trim().to_string())
-        })
-        .ok_or_else(|| "no default interface".to_string())?;
-    log::debug!("[dns] default interface: {}", iface);
-
-    let out = Command::new("networksetup")
-        .arg("-listallhardwareports")
-        .output()
-        .map_err(|e| format!("networksetup -listallhardwareports failed: {}", e))?;
-    let stdout = String::from_utf8_lossy(&out.stdout);
-
-    let mut current_port: Option<String> = None;
-    for line in stdout.lines() {
-        let line = line.trim();
-        if let Some(rest) = line.strip_prefix("Hardware Port:") {
-            current_port = Some(rest.trim().to_string());
-        } else if let Some(rest) = line.strip_prefix("Device:") {
-            if rest.trim() == iface {
-                if let Some(svc) = current_port.take() {
-                    log::debug!("[dns] active service: {}", svc);
-                    return Ok(svc);
-                }
-            }
-        }
-    }
-    Err(format!(
-        "could not map interface {} to a network service",
-        iface
-    ))
+    onebox_sysproxy_rs::active_network_service().map_err(|e| e.to_string())
 }
 
 /// Read the DNS servers currently configured on a network service.

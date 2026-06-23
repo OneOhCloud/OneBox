@@ -14,7 +14,7 @@ Pointing system DNS at the TUN gateway (e.g. `172.19.0.1`) forces every query in
 
 | Platform | Detection | Capture (before write) | Write mechanism | Runs as |
 |---|---|---|---|---|
-| macOS | `route -n get default` → `networksetup -listallhardwareports` to map iface → service | `networksetup -getdnsservers <service>` → store `ActiveOverride { service, captured, gateway }` in the single-slot `ACTIVE_OVERRIDE`. Only the **currently-active (primary)** service is ever tracked | `networksetup -setdnsservers <service> <gw>` via privileged XPC helper | root (helper) |
+| macOS | `onebox_sysproxy_rs::active_network_service()` — `route -n get default` → `networksetup -listnetworkserviceorder` to map device → **service name** (not the hardware-port label) | `networksetup -getdnsservers <service>` → store `ActiveOverride { service, captured, gateway }` in the single-slot `ACTIVE_OVERRIDE`. Only the **currently-active (primary)** service is ever tracked | `networksetup -setdnsservers <service> <gw>` via privileged XPC helper | root (helper) |
 | Linux | `ip route get 1.1.1.1` for active iface, `nmcli` / `resolvectl status` to capture original DNS | stashed into `DNS_OVERRIDE` `Mutex<Option<(String, String)>>` | `resolvectl dns <iface> <gw>` via `pkexec` shell helper | root (pkexec) |
 | Windows | `tun_service::dns::enumerate_interfaces` — non-TUN adapters that already have an IP | not captured (scorched-earth restore) | `tun_service::dns::apply_override(gateway)` → per-iface `set_interface_dns` writes the `HKLM\SYSTEM\…\Interfaces\{GUID}\NameServer` registry value | SYSTEM (service) |
 

@@ -163,16 +163,12 @@ pub fn cleanup_on_shutdown() {
         return;
     }
 
-    use onebox_sysproxy_rs::Sysproxy;
-    let mut sysproxy = match Sysproxy::get_system_proxy() {
-        Ok(proxy) => proxy,
-        Err(e) => {
-            log::error!("Sysproxy::get_system_proxy failed during shutdown: {}", e);
-            return;
-        }
-    };
-    sysproxy.enable = false;
-    if let Err(e) = sysproxy.set_system_proxy() {
+    // Route through the same per-platform clear as the runtime path. On macOS
+    // that is the service-name-aware clear; using the upstream crate's
+    // `get_system_proxy` here meant shutdown choked with "failed to parse
+    // string `port`" whenever the active service name didn't match what the
+    // crate resolved.
+    if let Err(e) = sysproxy::clear_system_proxy_blocking() {
         log::error!("Failed to unset system proxy during shutdown: {}", e);
     } else {
         log::info!("System proxy unset during shutdown");
