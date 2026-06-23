@@ -107,6 +107,14 @@ pub(crate) fn pid_is_alive(_pid: u32) -> bool {
     true
 }
 
+/// True when a failed `kill(pid, SIGTERM)` failed with `ESRCH` — the process
+/// is already gone. That is the desired outcome of a stop, not a failure, so
+/// callers log it at debug rather than error.
+#[cfg(unix)]
+pub(crate) fn sigterm_target_already_exited(raw_os_error: Option<i32>) -> bool {
+    raw_os_error == Some(libc::ESRCH)
+}
+
 /// Snapshot of `ProcessManager` for a single log line. `(child_pid,
 /// child_pid_alive, mode)`.
 fn pm_snapshot() -> (Option<u32>, Option<bool>, Option<ProxyMode>) {
@@ -342,11 +350,26 @@ pub async fn stop(app: tauri::AppHandle) -> Result<(), String> {
     // line reports the mixed-port listener as true, the next `start` call is about
     // to collide with a still-alive sing-box.
     let mixed_port = mixed_proxy_port(&app);
-    let port_listening = probe_port_listening(mixed_port);
+    // `PlatformEngine::stop` only SIGTERMs + sleeps 500ms; the listener socket
+    // can take a little longer to actually release after the child exits.
+    // Re-probe over a short grace window so a normal slow release reads as
+    // "released" instead of a false STILL-LISTENING warning. Only a port still
+    // bound after the grace is a genuine survived-SIGTERM signal worth warning.
+    let mut port_listening = probe_port_listening(mixed_port);
+    let mut waited_ms = 0u64;
+    while port_listening && waited_ms < 500 {
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        waited_ms += 100;
+        port_listening = probe_port_listening(mixed_port);
+    }
     if port_listening {
         ::log::warn!(
-            "[stop] action={action} returning with :{mixed_port} STILL LISTENING — pm_child_pid={:?} may have survived SIGTERM",
+            "[stop] action={action} returning with :{mixed_port} STILL LISTENING after {waited_ms}ms — pm_child_pid={:?} may have survived SIGTERM",
             pm_pid
+        );
+    } else if waited_ms > 0 {
+        ::log::info!(
+            "[stop] action={action} returned, :{mixed_port} released after {waited_ms}ms"
         );
     } else {
         ::log::info!("[stop] action={action} returned, :{mixed_port} released");
@@ -471,6 +494,26 @@ pub async fn reload_config(app: tauri::AppHandle) -> Result<String, String> {
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────
+
+#[cfg(all(test, unix))]
+mod sigterm_classify_tests {
+    use super::sigterm_target_already_exited;
+
+    #[test]
+    fn esrch_means_already_exited() {
+        assert!(sigterm_target_already_exited(Some(libc::ESRCH)));
+    }
+
+    #[test]
+    fn other_errno_is_a_real_failure() {
+        assert!(!sigterm_target_already_exited(Some(libc::EPERM)));
+    }
+
+    #[test]
+    fn no_errno_is_not_already_exited() {
+        assert!(!sigterm_target_already_exited(None));
+    }
+}
 
 #[cfg(test)]
 mod tests {

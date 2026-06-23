@@ -869,11 +869,14 @@ impl EngineManager for MacOSEngine {
                     use libc::{kill, SIGTERM};
                     let pid = child.pid();
                     if unsafe { kill(pid as i32, SIGTERM) } != 0 {
-                        log::error!(
-                            "[stop] Failed to send SIGTERM to PID {}: {}",
-                            pid,
-                            std::io::Error::last_os_error()
-                        );
+                        let err = std::io::Error::last_os_error();
+                        if crate::core::sigterm_target_already_exited(err.raw_os_error()) {
+                            // Already exited before we signalled — the desired
+                            // stop outcome, not a failure.
+                            log::debug!("[stop] PID {} already exited before SIGTERM", pid);
+                        } else {
+                            log::error!("[stop] Failed to send SIGTERM to PID {}: {}", pid, err);
+                        }
                     }
                 }
                 tokio::time::sleep(std::time::Duration::from_millis(500)).await;
