@@ -1,14 +1,19 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { Globe, ShieldCheck, X } from "react-bootstrap-icons";
+import type { ReactNode } from "react";
+import { ArrowClockwise, ChevronRight, X } from "react-bootstrap-icons";
+import { RULE_ACTIONS, RULE_KINDS } from "../../config/merger/custom-rules";
 import { t } from "../../utils/helper";
+import { ActionBadge, KIND_META, KindChip } from "./rule-badges";
 
 interface HelpModalProps {
     isOpen: boolean;
     onClose: () => void;
 }
 
-// iOS-style informational modal. Two hero cards (Direct / Proxy rules),
-// three rule-type explanations, one trailing note. No daisyUI dialog.
+// iOS-style legend for the rules page. Three grouped sections — Action /
+// Match / Priority — render the EXACT colored action badges and mono
+// glyph-chips the user sees on rule rows (shared from rule-badges.tsx, so the
+// legend can't drift from the list), plus a quiet restart footnote.
 export function HelpModal({ isOpen, onClose }: HelpModalProps) {
     return (
         <AnimatePresence>
@@ -34,7 +39,7 @@ export function HelpModal({ isOpen, onClose }: HelpModalProps) {
                         className="relative w-full max-w-[320px] rounded-[14px] overflow-hidden flex flex-col"
                         style={{
                             maxHeight: "calc(100dvh - 80px)",
-                            background: 'var(--onebox-card)',
+                            background: "var(--onebox-card)",
                             boxShadow:
                                 "0 22px 48px -12px rgba(15, 23, 42, 0.3), 0 4px 14px rgba(15, 23, 42, 0.08)",
                         }}
@@ -58,83 +63,86 @@ export function HelpModal({ isOpen, onClose }: HelpModalProps) {
                             >
                                 <X
                                     size={18}
-                                    style={{
-                                        color: "var(--onebox-label-secondary)",
-                                    }}
+                                    style={{ color: "var(--onebox-label-secondary)" }}
                                 />
                             </button>
                         </div>
 
-                        <div className="px-4 pb-4 space-y-3 overflow-y-auto">
-                            <InfoCard
-                                icon={
-                                    <ShieldCheck
-                                        size={16}
-                                        style={{ color: "var(--onebox-blue)" }}
-                                    />
-                                }
-                                title={t("direct_rules", "Direct Rules")}
-                                body={t(
-                                    "direct_rules_info",
-                                    "Direct rules: Traffic will bypass proxy",
-                                )}
-                            />
-                            <InfoCard
-                                icon={
-                                    <Globe
-                                        size={16}
-                                        style={{ color: "var(--onebox-blue)" }}
-                                    />
-                                }
-                                title={t("proxy_rules", "Proxy Rules")}
-                                body={t(
-                                    "proxy_rules_info",
-                                    "Proxy rules: Traffic will go through proxy",
-                                )}
-                            />
+                        <div className="px-4 pb-4 space-y-4 overflow-y-auto">
+                            {/* Action — color-coded, in priority order. */}
+                            <Section label={t("rule_section_action", "Action")}>
+                                {RULE_ACTIONS.map((a) => (
+                                    <div key={a} className="flex items-center gap-2.5 px-3 py-2.5">
+                                        <ActionBadge action={a} />
+                                        <span
+                                            className="text-[12px] leading-snug"
+                                            style={{ color: "var(--onebox-label-secondary)" }}
+                                        >
+                                            {t(`${a}_rules_info`)}
+                                        </span>
+                                    </div>
+                                ))}
+                            </Section>
 
-                            <div
-                                className="text-[12px] leading-relaxed space-y-1.5 px-1"
+                            {/* Match — monochrome glyph-chips + example. */}
+                            <Section label={t("rule_section_match", "Match")}>
+                                {RULE_KINDS.map((k) => (
+                                    <div key={k} className="flex items-center gap-2.5 px-3 py-2.5">
+                                        <KindChip kind={k} />
+                                        <span
+                                            className="text-[13px] shrink-0"
+                                            style={{ color: "var(--onebox-label)" }}
+                                        >
+                                            {t(`kind_${k}`)}
+                                        </span>
+                                        <span className="opacity-40 text-[12px]">·</span>
+                                        <span
+                                            className="text-[12px] min-w-0 truncate"
+                                            style={{
+                                                color: "var(--onebox-label-tertiary)",
+                                                fontFamily:
+                                                    '"SF Mono", ui-monospace, "Menlo", monospace',
+                                            }}
+                                        >
+                                            {KIND_META[k].placeholder}
+                                        </span>
+                                    </div>
+                                ))}
+                            </Section>
+
+                            {/* Priority — the colored order IS the lesson. */}
+                            <Section label={t("rule_section_priority", "Priority")}>
+                                <div className="px-3 py-2.5 space-y-1.5">
+                                    <div className="flex items-center gap-1.5">
+                                        {RULE_ACTIONS.map((a, i) => (
+                                            <div key={a} className="flex items-center gap-1.5">
+                                                {i > 0 && (
+                                                    <ChevronRight
+                                                        size={10}
+                                                        style={{ color: "var(--onebox-label-tertiary)" }}
+                                                    />
+                                                )}
+                                                <ActionBadge action={a} />
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <p
+                                        className="text-[12px] leading-snug"
+                                        style={{ color: "var(--onebox-label-secondary)" }}
+                                    >
+                                        {t("rule_priority_hint")}
+                                    </p>
+                                </div>
+                            </Section>
+
+                            {/* Effect — neutral restart footnote (uncolored on purpose). */}
+                            <p
+                                className="flex items-center gap-1.5 px-1 text-[11px] leading-snug"
                                 style={{ color: "var(--onebox-label-secondary)" }}
                             >
-                                <BulletItem
-                                    label={t("domain_rules", "Domain Rules")}
-                                    desc={t(
-                                        "domain_rules_desc",
-                                        "Match exact domain names, e.g., example.com",
-                                    )}
-                                />
-                                <BulletItem
-                                    label={t(
-                                        "domain_suffix_rules",
-                                        "Domain Suffix Rules",
-                                    )}
-                                    desc={t(
-                                        "domain_suffix_rules_desc",
-                                        "Match domain suffixes, e.g., .com, .cn",
-                                    )}
-                                />
-                                <BulletItem
-                                    label={t("ip_cidr_rules", "IP CIDR Rules")}
-                                    desc={t(
-                                        "ip_cidr_rules_desc",
-                                        "Match IP ranges, e.g., 192.168.1.0/24",
-                                    )}
-                                />
-                            </div>
-
-                            <div
-                                className="rounded-xl px-3 py-2 text-[12px] leading-snug"
-                                style={{
-                                    background: "rgba(0, 122, 255, 0.08)",
-                                    color: "var(--onebox-blue)",
-                                }}
-                            >
-                                {t(
-                                    "rules_auto_save",
-                                    "Rules are automatically saved when added or removed",
-                                )}
-                            </div>
+                                <ArrowClockwise size={12} className="shrink-0" />
+                                {t("rules_effective_info")}
+                            </p>
                         </div>
 
                         <button
@@ -155,48 +163,23 @@ export function HelpModal({ isOpen, onClose }: HelpModalProps) {
     );
 }
 
-function InfoCard({
-    icon,
-    title,
-    body,
-}: {
-    icon: React.ReactNode;
-    title: string;
-    body: string;
-}) {
+// A labeled grouped card — uppercase section header over a fill card whose
+// rows carry the app-wide inset hairline separator.
+function Section({ label, children }: { label: string; children: ReactNode }) {
     return (
-        <div
-            className="rounded-xl px-3 py-2.5"
-            style={{ background: "rgba(118, 118, 128, 0.08)" }}
-        >
-            <div
-                className="flex items-center gap-2 text-[13px] font-medium mb-1"
-                style={{ color: "var(--onebox-label)" }}
-            >
-                {icon}
-                <span>{title}</span>
-            </div>
+        <div>
             <p
-                className="text-[12px] leading-snug"
+                className="text-[11px] font-semibold uppercase tracking-[0.04em] mb-1.5 px-1"
                 style={{ color: "var(--onebox-label-secondary)" }}
             >
-                {body}
-            </p>
-        </div>
-    );
-}
-
-function BulletItem({ label, desc }: { label: string; desc: string }) {
-    return (
-        <p>
-            <span
-                className="font-medium"
-                style={{ color: "var(--onebox-label)" }}
-            >
                 {label}
-            </span>
-            <span className="mx-1">·</span>
-            <span>{desc}</span>
-        </p>
+            </p>
+            <div
+                className="onebox-grouped-list rounded-xl overflow-hidden"
+                style={{ background: "var(--onebox-fill)" }}
+            >
+                {children}
+            </div>
+        </div>
     );
 }

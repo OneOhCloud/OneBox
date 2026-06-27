@@ -3,6 +3,7 @@
   "specifiers": {
     "npm:@tailwindcss/vite@^4.3.1": "4.3.1_vite@7.3.6__@types+node@25.9.4_@types+node@25.9.4",
     "npm:@tauri-apps/api@^2.11.1": "2.11.1",
+    "npm:@tauri-apps/cli@^2.11.2": "2.11.3",
     "npm:@tauri-apps/cli@^2.11.3": "2.11.3",
     "npm:@tauri-apps/plugin-autostart@^2.5.1": "2.5.1",
     "npm:@tauri-apps/plugin-clipboard-manager@~2.3.2": "2.3.2",

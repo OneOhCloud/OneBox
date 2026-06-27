@@ -3,6 +3,7 @@ import { locale, type } from '@tauri-apps/plugin-os';
 import { LazyStore } from '@tauri-apps/plugin-store';
 import { toast } from 'sonner';
 import { configType, StageVersionType } from '../config/common';
+import { emptyRuleSet, type RuleAction, type RuleSet } from '../config/merger/custom-rules';
 import { ALLOWLAN_STORE_KEY, DEFAULT_PROXY_PORT, ENABLE_BYPASS_ROUTER_STORE_KEY, ENABLE_TUN_STORE_KEY, PROXY_PORT_STORE_KEY, SING_BOX_MAJOR_VERSION, SING_BOX_VERSION, SKIP_SYSTEM_PROXY_STORE_KEY, STAGE_VERSION_STORE_KEY, USE_DHCP_STORE_KEY, USER_AGENT_STORE_KEY } from '../types/definition';
 
 const OsType = type();
@@ -148,12 +149,14 @@ export async function setSkipSystemProxy(value: boolean) {
 }
 
 
-export async function setCustomRuleSet(key: 'direct' | 'proxy', config: { domain: string[]; domain_suffix: string[]; ip_cidr: string[] }) {
+export async function setCustomRuleSet(key: RuleAction, config: RuleSet) {
     await store.set(`custom_ruleset_${key}`, JSON.stringify(config));
     await store.save();
 }
 
-export async function getCustomRuleSet(key: 'direct' | 'proxy'): Promise<{ domain: string[]; domain_suffix: string[]; ip_cidr: string[] }> {
+// Reads tolerate a missing key (e.g. the reject set on a store written by an
+// older build) by returning an empty set — no migration needed.
+export async function getCustomRuleSet(key: RuleAction): Promise<RuleSet> {
     let s = await store.get(`custom_ruleset_${key}`) as string | undefined;
     if (s) {
         try {
@@ -175,7 +178,7 @@ export async function getCustomRuleSet(key: 'direct' | 'proxy'): Promise<{ domai
             console.error('解析自定义规则集失败:', e);
         }
     }
-    return { domain: [], domain_suffix: [], ip_cidr: [] };
+    return emptyRuleSet();
 }
 
 

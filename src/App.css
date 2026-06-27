@@ -178,7 +178,7 @@ pre,
   color-scheme: light;
 
   /* Light (default) */
-  --onebox-bg: #F2F2F7;                 /* systemGroupedBackground (light) */
+  --onebox-bg: #F7F7F7;                 /* systemGroupedBackground (light) */
   --onebox-card: #FFFFFF;               /* secondarySystemGroupedBackground (light) */
   --onebox-card-muted: rgba(118, 118, 128, 0.08);   /* tertiarySystemFill-ish */
   --onebox-titlebar: #F8F8F8;

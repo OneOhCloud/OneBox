@@ -10,6 +10,7 @@ All significant changes in this version are documented here.
 
 - Updated JavaScript and Rust dependencies.
 - Added an option to start VPN in non-TUN mode without setting the system proxy.
+- Redesigned the rules page with editable rules and a new Reject action that blocks matched traffic.
 
 ### Bug Fixes
 
@@ -24,6 +25,7 @@ All significant changes in this version are documented here.
 
 - 更新 JavaScript 与 Rust 依赖。
 - 新增选项：非 TUN 模式启动 VPN 时可不设置系统代理。
+- 重新设计了规则页面，规则可编辑，并新增「拒绝」动作以拦截匹配的流量。
 
 ### Bug 修复
 

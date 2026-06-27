@@ -6,6 +6,20 @@ import { configureMixedInbound, configureTunInbound, updateDHCPSettings2Config, 
 
 import { configType, getConfigTemplateCacheKey } from '../common';
 import { getBuiltInTemplate } from '../templates';
+import { injectCustomRules } from './custom-rules';
+
+
+// Load all three custom rule sets and inject them into their anchor route
+// rules. Used by the "rules" (non-global) variants only — global variants
+// route everything to a single outbound and carry no anchors.
+async function injectAllCustomRules(newConfig: any) {
+    const [direct, reject, proxy] = await Promise.all([
+        getCustomRuleSet('direct'),
+        getCustomRuleSet('reject'),
+        getCustomRuleSet('proxy'),
+    ]);
+    injectCustomRules(newConfig, { direct, reject, proxy });
+}
 
 
 // Cache is the single intermediary. Reads are non-blocking and may return
@@ -54,35 +68,7 @@ export async function setMixedConfig(identifier: string) {
     const appConfigPath = await path.appConfigDir();
     const dbCacheFilePath = await path.join(appConfigPath, 'mixed-cache-rule-v2.db');
 
-    let directCustomRuleSet = await getCustomRuleSet('direct');
-    let proxyCustomRuleSet = await getCustomRuleSet('proxy');
-
-
-    if (directCustomRuleSet) {
-        // 找到包含 direct-tag.oneoh.cloud 的规则的坐标，插入自定义规则
-        for (let i = 0; i < newConfig.route.rules.length; i++) {
-            let rule = newConfig.route.rules[i];
-            if (rule.domain && Array.isArray(rule.domain) && rule.domain.includes('direct-tag.oneoh.cloud')) {
-                rule.domain.push(...directCustomRuleSet.domain);
-                rule.domain_suffix.push(...directCustomRuleSet.domain_suffix);
-                rule.ip_cidr.push(...directCustomRuleSet.ip_cidr);
-                break;
-            }
-        }
-    }
-
-
-    if (proxyCustomRuleSet) {
-        for (let i = 0; i < newConfig.route.rules.length; i++) {
-            let rule = newConfig.route.rules[i];
-            if (rule.domain && Array.isArray(rule.domain) && rule.domain.includes('proxy-tag.oneoh.cloud')) {
-                rule.domain.push(...proxyCustomRuleSet.domain);
-                rule.domain_suffix.push(...proxyCustomRuleSet.domain_suffix);
-                rule.ip_cidr.push(...proxyCustomRuleSet.ip_cidr);
-                break;
-            }
-        }
-    }
+    await injectAllCustomRules(newConfig);
 
     updateExperimentalConfig(newConfig, dbCacheFilePath);
     const allowLan = await getAllowLan();
@@ -104,36 +90,8 @@ export async function setTunConfig(identifier: string) {
     let dbConfigData = await getSubscriptionConfig(identifier);
     const appConfigPath = await path.appConfigDir();
     const dbCacheFilePath = await path.join(appConfigPath, 'tun-cache-rule-v2.db');
-    let directCustomRuleSet = await getCustomRuleSet('direct');
-    let proxyCustomRuleSet = await getCustomRuleSet('proxy');
 
-
-    if (directCustomRuleSet) {
-        // 找到包含 direct-tag.oneoh.cloud 的规则的坐标，插入自定义规则
-        for (let i = 0; i < newConfig.route.rules.length; i++) {
-            let rule = newConfig.route.rules[i];
-            if (rule.domain && Array.isArray(rule.domain) && rule.domain.includes('direct-tag.oneoh.cloud')) {
-                rule.domain.push(...directCustomRuleSet.domain);
-                rule.domain_suffix.push(...directCustomRuleSet.domain_suffix);
-                rule.ip_cidr.push(...directCustomRuleSet.ip_cidr);
-                break;
-            }
-
-        }
-    }
-
-
-    if (proxyCustomRuleSet) {
-        for (let i = 0; i < newConfig.route.rules.length; i++) {
-            let rule = newConfig.route.rules[i];
-            if (rule.domain && Array.isArray(rule.domain) && rule.domain.includes('proxy-tag.oneoh.cloud')) {
-                rule.domain.push(...proxyCustomRuleSet.domain);
-                rule.domain_suffix.push(...proxyCustomRuleSet.domain_suffix);
-                rule.ip_cidr.push(...proxyCustomRuleSet.ip_cidr);
-                break;
-            }
-        }
-    }
+    await injectAllCustomRules(newConfig);
 
     const bypassRouter = await isBypassRouterEnabled();
     await configureTunInbound(newConfig, bypassRouter);
