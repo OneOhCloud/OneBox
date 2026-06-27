@@ -52,6 +52,13 @@ jobs:
     runs-on: ubuntu-24.04
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+      # crates.io downloads over HTTP/2 intermittently abort with
+      # `curl failed — [16] Error in the HTTP2 framing layer`, failing the
+      # job on a pure network flake (same SHA passes on a re-run). Forcing
+      # HTTP/1.1 removes the multiplexing path that produces the framing
+      # error; the high net.retry handles the residual blips.
+      CARGO_HTTP_MULTIPLEXING: "false"
+      CARGO_NET_RETRY: "10"
     steps:
       - uses: actions/checkout@v4
 
@@ -92,5 +99,21 @@ jobs:
         with:
           workspaces: './src-tauri -> target'
 
+      # Isolate the only network-bound part of the job (registry update +
+      # crate download) into its own retried step, so a transient crates.io
+      # blip self-heals instead of failing the run. `cargo test` below then
+      # runs `--offline`, guaranteeing the test step itself never touches the
+      # network — a red there is always a real test failure, never a flake,
+      # and never wastes minutes retrying a genuine failure.
+      - name: Fetch Rust Dependencies
+        run: |
+          for attempt in 1 2 3; do
+            cargo fetch --manifest-path src-tauri/Cargo.toml && exit 0
+            echo "::warning::cargo fetch attempt ${attempt} failed (transient crates.io network error); retrying..."
+            sleep $((attempt * 5))
+          done
+          echo "::error::cargo fetch failed after 3 attempts"
+          exit 1
+
       - name: Run Rust Tests
-        run: cargo test --manifest-path src-tauri/Cargo.toml --lib
+        run: cargo test --manifest-path src-tauri/Cargo.toml --lib --offline
