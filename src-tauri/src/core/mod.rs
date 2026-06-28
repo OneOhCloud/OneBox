@@ -52,6 +52,11 @@ fn note_reload_entry() -> Option<Duration> {
 
 pub(crate) const DEFAULT_MIXED_PROXY_PORT: u16 = 6789;
 
+/// Clash API / external-controller port. Hardcoded to match
+/// `src/config/merger/main.ts` ("127.0.0.1:9191"); single source of truth on
+/// the Rust side so the start-guard and the readiness prober agree on it.
+pub(crate) const CLASH_API_PORT: u16 = 9191;
+
 pub(crate) fn mixed_proxy_port(app: &AppHandle) -> u16 {
     let Ok(config_dir) = app.path().app_config_dir() else {
         return DEFAULT_MIXED_PROXY_PORT;
@@ -167,6 +172,65 @@ lazy_static! {
         }));
 }
 
+// ── Start-time port guard ─────────────────────────────────────────────
+
+/// Ports that must be free before spawning sing-box: the mixed proxy port and
+/// the clash API / external-controller port. Deduped so a configuration where
+/// the two coincide only triggers a single cleanup pass.
+fn ports_to_free(mixed_port: u16) -> Vec<u16> {
+    let mut ports = vec![mixed_port];
+    if mixed_port != CLASH_API_PORT {
+        ports.push(CLASH_API_PORT);
+    }
+    ports
+}
+
+/// Free `port` before spawning sing-box on it. Idempotent: a silent no-op when
+/// the port is already free. Otherwise kills the current listener (user-mode
+/// SIGKILL via `ensure_port_available`) and waits for the socket to release.
+///
+/// Returns the `PORT_OCCUPIED_CANNOT_START:<port>` error string when a holder
+/// survives cleanup — e.g. a root-owned orphan that user-mode signals cannot
+/// evict. Surfacing it here turns a silent 20s readiness timeout into an
+/// actionable, logged failure.
+async fn ensure_port_free_for_spawn(action: u64, port: u16) -> Result<(), String> {
+    if !probe_port_listening(port) {
+        return Ok(());
+    }
+    ::log::warn!(
+        "[start] action={action} :{port} already has a listener on entry — previous sing-box still bound?"
+    );
+    let cleanup = tokio::task::spawn_blocking(move || {
+        crate::commands::prestart::ensure_port_available(port)
+    })
+    .await
+    .map_err(|e| {
+        format!(
+            "{}:{}: port cleanup join error: {}",
+            crate::commands::prestart::PORT_OCCUPIED_CANNOT_START,
+            port,
+            e
+        )
+    })?;
+    match cleanup {
+        Ok(result) => {
+            if result.killed_pids.is_empty() {
+                ::log::info!("[start] action={action} :{port} listener released before cleanup");
+            } else {
+                ::log::info!(
+                    "[start] action={action} killed listener pids {:?} on :{port}",
+                    result.killed_pids
+                );
+            }
+            Ok(())
+        }
+        Err(e) => {
+            ::log::error!("[start] action={action} prestart port cleanup failed: {}", e);
+            Err(e.start_error())
+        }
+    }
+}
+
 // ── Tauri Commands ────────────────────────────────────────────────────
 
 #[tauri::command]
@@ -175,51 +239,18 @@ pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Resu
     let (pm_pid, pm_alive, pm_mode) = pm_snapshot();
     let mixed_port = mixed_proxy_port(&app);
     let port_listening = probe_port_listening(mixed_port);
+    let clash_listening = probe_port_listening(CLASH_API_PORT);
     let cur_state_kind = app.state::<EngineStateCell>().snapshot().kind();
     ::log::info!(
-        "[start] action={action} mode={:?} state={} pm_child_pid={:?} pm_child_alive={:?} pm_mode={:?} :{mixed_port}_listener={}",
-        mode, cur_state_kind, pm_pid, pm_alive, pm_mode, port_listening
+        "[start] action={action} mode={:?} state={} pm_child_pid={:?} pm_child_alive={:?} pm_mode={:?} :{mixed_port}_listener={} :{CLASH_API_PORT}_listener={}",
+        mode, cur_state_kind, pm_pid, pm_alive, pm_mode, port_listening, clash_listening
     );
-    // Loud flag for the two "about to collide" preconditions. Either alone
-    // is enough to explain a subsequent EADDRINUSE in sing-box stderr.
-    if port_listening {
-        ::log::warn!(
-            "[start] action={action} :{mixed_port} already has a listener on entry — previous sing-box still bound?"
-        );
-        let cleanup = tokio::task::spawn_blocking(move || {
-            crate::commands::prestart::ensure_port_available(mixed_port)
-        })
-        .await
-        .map_err(|e| {
-            format!(
-                "{}:{}: port cleanup join error: {}",
-                crate::commands::prestart::PORT_OCCUPIED_CANNOT_START,
-                mixed_port,
-                e
-            )
-        })?;
-        match cleanup {
-            Ok(result) => {
-                if result.killed_pids.is_empty() {
-                    ::log::info!(
-                        "[start] action={action} :{mixed_port} listener released before cleanup"
-                    );
-                } else {
-                    ::log::info!(
-                        "[start] action={action} killed listener pids {:?} on :{mixed_port}",
-                        result.killed_pids
-                    );
-                }
-            }
-            Err(e) => {
-                let reason = e.start_error();
-                ::log::error!(
-                    "[start] action={action} prestart port cleanup failed: {}",
-                    e
-                );
-                return Err(reason);
-            }
-        }
+    // A listener on either the mixed proxy port or the clash API port on entry
+    // is enough to explain a subsequent EADDRINUSE in sing-box stderr — free
+    // both before spawning. `ensure_port_free_for_spawn` is idempotent and
+    // logs per-port, so an unoccupied port is a silent no-op.
+    for port in ports_to_free(mixed_port) {
+        ensure_port_free_for_spawn(action, port).await?;
     }
     if matches!(pm_alive, Some(true)) {
         ::log::warn!(
@@ -494,6 +525,22 @@ pub async fn reload_config(app: tauri::AppHandle) -> Result<String, String> {
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod port_guard_tests {
+    use super::{ports_to_free, CLASH_API_PORT};
+
+    #[test]
+    fn distinct_ports_yield_both_in_order() {
+        assert_eq!(ports_to_free(6661), vec![6661, CLASH_API_PORT]);
+        assert_eq!(ports_to_free(6789), vec![6789, CLASH_API_PORT]);
+    }
+
+    #[test]
+    fn coinciding_port_is_deduped() {
+        assert_eq!(ports_to_free(CLASH_API_PORT), vec![CLASH_API_PORT]);
+    }
+}
 
 #[cfg(all(test, unix))]
 mod sigterm_classify_tests {

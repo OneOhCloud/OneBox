@@ -310,3 +310,25 @@ pub fn kill_orphans(app: tauri::AppHandle, port: Option<u16>) -> KillOrphansResu
         message,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::ensure_port_available;
+    use std::net::TcpListener;
+
+    /// A port nobody listens on must be reported free without killing
+    /// anything — the idempotent no-op path the start guard depends on.
+    #[test]
+    fn ensure_port_available_is_noop_on_free_port() {
+        // Bind to an ephemeral port to learn a number the OS just handed out,
+        // then drop the listener so the port is free again.
+        let port = {
+            let listener = TcpListener::bind("127.0.0.1:0").expect("bind ephemeral port");
+            listener.local_addr().expect("local_addr").port()
+        };
+
+        let result = ensure_port_available(port).expect("free port must be Ok");
+        assert!(result.killed_pids.is_empty(), "nothing should be killed");
+        assert!(result.port_released, "free port must read as released");
+    }
+}

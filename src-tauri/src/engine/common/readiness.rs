@@ -21,6 +21,7 @@
 //! initialised and DNS override has already been applied synchronously on
 //! the Start path, so a successful connect implies routable readiness.
 
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::time::Duration;
 
 use tauri::{AppHandle, Manager};
@@ -31,8 +32,14 @@ use super::state_machine::{transition, EngineState, EngineStateCell, Intent};
 
 const POLL_INTERVAL: Duration = Duration::from_millis(200);
 const STARTUP_TIMEOUT: Duration = Duration::from_secs(20);
-const PROBE_ADDR: &str = "127.0.0.1:9191";
 const PROBE_CONNECT_TIMEOUT: Duration = Duration::from_millis(150);
+
+/// Clash API liveness target: `127.0.0.1:<clash api port>`. Shares the port
+/// constant with the start-time guard (`crate::core::CLASH_API_PORT`) so the
+/// prober and the guard never drift apart.
+fn probe_addr() -> SocketAddr {
+    SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), crate::core::CLASH_API_PORT)
+}
 
 /// Spawn a readiness prober. `start_epoch` must be the epoch observed right
 /// after the `Starting` transition completes.
@@ -76,7 +83,7 @@ pub fn spawn(app: AppHandle, start_epoch: u64) {
 
 async fn probe_once() -> bool {
     matches!(
-        timeout(PROBE_CONNECT_TIMEOUT, TcpStream::connect(PROBE_ADDR)).await,
+        timeout(PROBE_CONNECT_TIMEOUT, TcpStream::connect(probe_addr())).await,
         Ok(Ok(_))
     )
 }
