@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { fetch } from "@tauri-apps/plugin-http";
 import useSWR from "swr";
-import { getClashApiSecret } from "../../single/store";
+import { getClashApiSecret, getShowNodeProtocol } from "../../single/store";
 import { t } from "../../utils/helper";
 import {
     AppleSelectMenu,
@@ -26,6 +26,7 @@ type NodeSelectorData = {
     all: string[];
     now: string;
     nodeProtocols: NodeProtocolMap;
+    showProtocol: boolean;
 };
 
 type SelectNodeProps = {
@@ -38,8 +39,9 @@ export default function SelectNode(props: SelectNodeProps) {
         `swr-${baseUrl}/proxies/ExitGateway-${props.isRunning}`,
         async () => {
             if (!isRunning) {
-                return { all: [], now: "", nodeProtocols: {} };
+                return { all: [], now: "", nodeProtocols: {}, showProtocol: false };
             }
+            const showProtocol = await getShowNodeProtocol();
             const headers = {
                 Accept: "application/json",
                 "Content-Type": "application/json",
@@ -52,27 +54,29 @@ export default function SelectNode(props: SelectNodeProps) {
                     timeout: 3,
                     headers,
                 }),
-                fetch(allProxiesUrl, {
-                    method: "GET",
-                    // @ts-ignore
-                    timeout: 3,
-                    headers,
-                })
-                    .then((response) => response.json())
-                    .catch((error) => {
-                        console.warn("Failed to fetch proxy protocol metadata:", error);
-                        return undefined;
-                    }),
+                showProtocol
+                    ? fetch(allProxiesUrl, {
+                        method: "GET",
+                        // @ts-ignore
+                        timeout: 3,
+                        headers,
+                    })
+                        .then((response) => response.json())
+                        .catch((error) => {
+                            console.warn("Failed to fetch proxy protocol metadata:", error);
+                            return undefined;
+                        })
+                    : Promise.resolve(undefined),
             ]);
             const selector = (await selectorResponse.json()) as SelectorResponse;
             const nodeList = Array.isArray(selector.all) ? selector.all : [];
             return {
                 all: nodeList,
                 now: selector.now ?? "",
-                nodeProtocols: buildNodeProtocolMap(
-                    nodeList,
-                    allProxiesResponse,
-                ),
+                nodeProtocols: showProtocol
+                    ? buildNodeProtocolMap(nodeList, allProxiesResponse)
+                    : {},
+                showProtocol,
             } satisfies NodeSelectorData;
         },
         {
@@ -110,6 +114,7 @@ export default function SelectNode(props: SelectNodeProps) {
             nodeList={data.all}
             currentNode={data.now}
             nodeProtocols={data.nodeProtocols}
+            showProtocol={data.showProtocol}
             onUpdate={() => mutate()}
         />
     );
@@ -119,12 +124,13 @@ type NodeMenuProps = {
     currentNode: string;
     nodeList: string[];
     nodeProtocols: NodeProtocolMap;
+    showProtocol: boolean;
     isRunning: boolean;
     onUpdate: () => void;
 };
 
 function NodeMenu(props: NodeMenuProps) {
-    const { currentNode, nodeList, nodeProtocols, onUpdate, isRunning } = props;
+    const { currentNode, nodeList, nodeProtocols, showProtocol, onUpdate, isRunning } = props;
     const [showDelay, setShowDelay] = useState(false);
     const [lastRunning, setLastRunning] = useState(false);
 
@@ -193,6 +199,7 @@ function NodeMenu(props: NodeMenuProps) {
                 <NodeOption
                     nodeName={currentNode}
                     protocol={nodeProtocols[currentNode]}
+                    showProtocol={showProtocol}
                     showDelay={showDelay}
                 />
             )}
@@ -210,6 +217,7 @@ function NodeMenu(props: NodeMenuProps) {
                                 ? option.raw
                                 : undefined
                         }
+                        showProtocol={showProtocol}
                         showDelay={showDelay}
                     />
                 </div>

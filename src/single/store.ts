@@ -4,7 +4,7 @@ import { LazyStore } from '@tauri-apps/plugin-store';
 import { toast } from 'sonner';
 import { configType, StageVersionType } from '../config/common';
 import { emptyRuleSet, type RuleAction, type RuleSet } from '../config/merger/custom-rules';
-import { ALLOWLAN_STORE_KEY, DEFAULT_PROXY_PORT, ENABLE_BYPASS_ROUTER_STORE_KEY, ENABLE_TUN_STORE_KEY, PROXY_PORT_STORE_KEY, SING_BOX_MAJOR_VERSION, SING_BOX_VERSION, SKIP_SYSTEM_PROXY_STORE_KEY, STAGE_VERSION_STORE_KEY, USE_DHCP_STORE_KEY, USER_AGENT_STORE_KEY } from '../types/definition';
+import { ALLOWLAN_STORE_KEY, DEFAULT_PROXY_PORT, ENABLE_BYPASS_ROUTER_STORE_KEY, ENABLE_TUN_STORE_KEY, PROXY_PORT_STORE_KEY, SHOW_NODE_PROTOCOL_STORE_KEY, SING_BOX_MAJOR_VERSION, SING_BOX_VERSION, SKIP_SYSTEM_PROXY_STORE_KEY, STAGE_VERSION_STORE_KEY, USE_DHCP_STORE_KEY, USER_AGENT_STORE_KEY } from '../types/definition';
 
 const OsType = type();
 export const LANGUAGE_STORE_KEY = 'language';
@@ -135,6 +135,19 @@ export async function getUseDHCP(): Promise<boolean> {
 
 export async function setUseDHCP(value: boolean) {
     await store.set(USE_DHCP_STORE_KEY, value);
+    await store.save();
+}
+
+export async function getShowNodeProtocol(): Promise<boolean> {
+    let b = await store.get(SHOW_NODE_PROTOCOL_STORE_KEY);
+    if (b === undefined) {
+        return false;
+    }
+    return Boolean(b);
+}
+
+export async function setShowNodeProtocol(value: boolean) {
+    await store.set(SHOW_NODE_PROTOCOL_STORE_KEY, value);
     await store.save();
 }
 

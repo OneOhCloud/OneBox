@@ -222,6 +222,8 @@
     "setting_bypass_router_success": "Setting successful, vpn service stopped",
     "setting_bypass_router_up": "Setting bypass router mode and stopping vpn service...",
     "settings": "Settings",
+    "show_node_protocol": "Show protocol type",
+    "show_node_protocol_desc": "Show each node's protocol type in the list",
     "stable_version": "Stable",
     "starting": "Starting...",
     "subscription_invalid_expired": "The config link is invalid or expired",

@@ -11,6 +11,8 @@ export const STAGE_VERSION_STORE_KEY = 'stage_version_key'
 export const TUN_STACK_STORE_KEY = 'tun_stack_key'
 export const TUN_INTERFACE_NAME = 'utun233'
 export const USE_DHCP_STORE_KEY = 'use_dhcp_key'
+// 是否在节点列表中显示协议类型标签（开发者选项，默认关闭）
+export const SHOW_NODE_PROTOCOL_STORE_KEY = 'show_node_protocol_key'
 export const SKIP_SYSTEM_PROXY_STORE_KEY = 'skip_system_proxy_key'
 export const ENABLE_BYPASS_ROUTER_STORE_KEY = 'enable_bypass_router_key'
 export const BYPASS_ROUTER_WATCHDOG_INTERVAL_STORE_KEY = 'bypass_router_watchdog_interval_key'

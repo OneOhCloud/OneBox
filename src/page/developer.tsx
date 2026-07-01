@@ -9,6 +9,7 @@ import ToggleDHCP from "../components/developer/dhcp-toggle";
 import DNSSettingsItem from "../components/developer/dns-settings";
 import HelperPing from "../components/developer/helper-ping";
 import ToggleLocalConfig from "../components/developer/local-config-toggle";
+import ToggleNodeProtocol from "../components/developer/node-protocol-toggle";
 import StageSetting from "../components/developer/select-stage";
 import ThemeToggle from "../components/developer/theme-toggle";
 import TunStackSetting from "../components/developer/tun-stack";
@@ -27,6 +28,7 @@ export default function Page() {
                     <ToggleBypassRouter />
                     <BypassRouterWatchdogSetting />
                     <ToggleLocalConfig />
+                    <ToggleNodeProtocol />
                     <ThemeToggle />
                 </div>
 

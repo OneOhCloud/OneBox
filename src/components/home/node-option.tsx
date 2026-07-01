@@ -24,13 +24,16 @@ interface ProxyResponse {
 interface NodeOptionProps {
     nodeName: string;
     protocol?: string;
+    showProtocol: boolean;
     showDelay: boolean;
 }
 
 // 样式常量
 const STYLES = {
-    container: 'grid grid-cols-[minmax(0,1fr)_auto_minmax(3.5rem,auto)] items-center gap-2 w-full',
-    nodeName: 'truncate font-medium min-w-0 text-sm',
+    container: 'flex justify-between items-center w-full',
+    protocolContainer: 'grid grid-cols-[minmax(0,1fr)_auto_minmax(3.5rem,auto)] items-center gap-2 w-full',
+    nodeName: 'truncate font-medium flex-1 min-w-0 text-sm',
+    protocolNodeName: 'truncate font-medium min-w-0 text-sm',
     protocol: 'rounded-md px-1.5 py-0.5 text-[10px] font-semibold leading-4',
     startingContainer: 'onebox-select'
 } as const;
@@ -111,7 +114,7 @@ const DelayIndicator = ({ delay, showDelay, delayText }: DelayIndicatorProps) =>
     );
 };
 
-export default function NodeOption({ nodeName, protocol, showDelay }: NodeOptionProps) {
+export default function NodeOption({ nodeName, protocol, showProtocol, showDelay }: NodeOptionProps) {
     const [delayText, setDelayText] = useState<string>('-');
     const { delay } = useProxyDelay(nodeName);
 
@@ -150,21 +153,26 @@ export default function NodeOption({ nodeName, protocol, showDelay }: NodeOption
     }
 
     return (
-        <div className={STYLES.container}>
-            <span className={STYLES.nodeName} title={displayName}>
+        <div className={showProtocol ? STYLES.protocolContainer : STYLES.container}>
+            <span
+                className={showProtocol ? STYLES.protocolNodeName : STYLES.nodeName}
+                title={displayName}
+            >
                 {displayName}
             </span>
-            <span
-                className={STYLES.protocol}
-                style={{
-                    visibility: protocol ? "visible" : "hidden",
-                    color: 'var(--onebox-blue)',
-                    background: 'rgba(0, 122, 255, 0.10)',
-                }}
-                title={protocol}
-            >
-                {protocol ?? "proxy"}
-            </span>
+            {showProtocol && (
+                <span
+                    className={STYLES.protocol}
+                    style={{
+                        visibility: protocol ? "visible" : "hidden",
+                        color: 'var(--onebox-blue)',
+                        background: 'rgba(0, 122, 255, 0.10)',
+                    }}
+                    title={protocol}
+                >
+                    {protocol ?? "proxy"}
+                </span>
+            )}
             <DelayIndicator
                 delay={delay}
                 showDelay={showDelay}

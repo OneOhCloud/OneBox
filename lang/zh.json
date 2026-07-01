@@ -222,6 +222,8 @@
     "setting_bypass_router_success": "设置成功，VPN服务已停止",
     "setting_bypass_router_up": "设置旁路由模式并停止VPN服务...",
     "settings": "设置",
+    "show_node_protocol": "显示协议类型",
+    "show_node_protocol_desc": "在节点列表中显示每个节点的协议类型",
     "stable_version": "稳定版",
     "starting": "启动中...",
     "subscription_invalid_expired": "该配置链接无效或者过期",
