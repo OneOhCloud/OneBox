@@ -10,10 +10,23 @@ import {
     AppleSelectOption,
     AppleSelectPlaceholder,
 } from "./apple-select-menu";
+import { buildNodeProtocolMap, type NodeProtocolMap } from "./node-protocol";
 import NodeOption from "./node-option";
 
 const baseUrl = "http://127.0.0.1:9191";
 const proxiesUrl = `${baseUrl}/proxies/ExitGateway`;
+const allProxiesUrl = `${baseUrl}/proxies`;
+
+type SelectorResponse = {
+    all?: string[];
+    now?: string;
+};
+
+type NodeSelectorData = {
+    all: string[];
+    now: string;
+    nodeProtocols: NodeProtocolMap;
+};
 
 type SelectNodeProps = {
     isRunning: boolean;
@@ -25,21 +38,42 @@ export default function SelectNode(props: SelectNodeProps) {
         `swr-${baseUrl}/proxies/ExitGateway-${props.isRunning}`,
         async () => {
             if (!isRunning) {
-                return { all: [], now: "" };
+                return { all: [], now: "", nodeProtocols: {} };
             }
-            const url = `${baseUrl}/proxies/ExitGateway`;
-            const response = await fetch(url, {
-                method: "GET",
-                // @ts-ignore
-                timeout: 3,
-                headers: {
-                    Accept: "application/json",
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${await getClashApiSecret()}`,
-                },
-            });
-            const res = await response.json();
-            return res;
+            const headers = {
+                Accept: "application/json",
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${await getClashApiSecret()}`,
+            };
+            const [selectorResponse, allProxiesResponse] = await Promise.all([
+                fetch(proxiesUrl, {
+                    method: "GET",
+                    // @ts-ignore
+                    timeout: 3,
+                    headers,
+                }),
+                fetch(allProxiesUrl, {
+                    method: "GET",
+                    // @ts-ignore
+                    timeout: 3,
+                    headers,
+                })
+                    .then((response) => response.json())
+                    .catch((error) => {
+                        console.warn("Failed to fetch proxy protocol metadata:", error);
+                        return undefined;
+                    }),
+            ]);
+            const selector = (await selectorResponse.json()) as SelectorResponse;
+            const nodeList = Array.isArray(selector.all) ? selector.all : [];
+            return {
+                all: nodeList,
+                now: selector.now ?? "",
+                nodeProtocols: buildNodeProtocolMap(
+                    nodeList,
+                    allProxiesResponse,
+                ),
+            } satisfies NodeSelectorData;
         },
         {
             revalidateOnFocus: true,
@@ -75,6 +109,7 @@ export default function SelectNode(props: SelectNodeProps) {
             isRunning={isRunning}
             nodeList={data.all}
             currentNode={data.now}
+            nodeProtocols={data.nodeProtocols}
             onUpdate={() => mutate()}
         />
     );
@@ -83,12 +118,13 @@ export default function SelectNode(props: SelectNodeProps) {
 type NodeMenuProps = {
     currentNode: string;
     nodeList: string[];
+    nodeProtocols: NodeProtocolMap;
     isRunning: boolean;
     onUpdate: () => void;
 };
 
 function NodeMenu(props: NodeMenuProps) {
-    const { currentNode, nodeList, onUpdate, isRunning } = props;
+    const { currentNode, nodeList, nodeProtocols, onUpdate, isRunning } = props;
     const [showDelay, setShowDelay] = useState(false);
     const [lastRunning, setLastRunning] = useState(false);
 
@@ -115,8 +151,13 @@ function NodeMenu(props: NodeMenuProps) {
     }, [isRunning, lastRunning]);
 
     const options = useMemo<AppleSelectOption<string>[]>(
-        () => nodeList.map((name) => ({ value: name, key: name })),
-        [nodeList],
+        () =>
+            nodeList.map((name) => ({
+                value: name,
+                key: name,
+                raw: nodeProtocols[name],
+            })),
+        [nodeList, nodeProtocols],
     );
 
     const handleNodeChange = async (node: string) => {
@@ -149,7 +190,11 @@ function NodeMenu(props: NodeMenuProps) {
             onChange={handleNodeChange}
             menuMaxHeight={220}
             renderTrigger={() => (
-                <NodeOption nodeName={currentNode} showDelay={showDelay} />
+                <NodeOption
+                    nodeName={currentNode}
+                    protocol={nodeProtocols[currentNode]}
+                    showDelay={showDelay}
+                />
             )}
             renderOption={({ option, isSelected }) => (
                 <div
@@ -160,6 +205,11 @@ function NodeMenu(props: NodeMenuProps) {
                 >
                     <NodeOption
                         nodeName={option.value}
+                        protocol={
+                            typeof option.raw === "string"
+                                ? option.raw
+                                : undefined
+                        }
                         showDelay={showDelay}
                     />
                 </div>
