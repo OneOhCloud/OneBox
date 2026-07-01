@@ -2,37 +2,37 @@
 
 {{version-tag-date}}
 
-## Changes since v1.4.31
+## Changes since v1.4.34
 
 All significant changes in this version are documented here.
 
 ### Changes
 
 - Updated JavaScript and Rust dependencies.
-- Added an option to start VPN in non-TUN mode without setting the system proxy.
-- Redesigned the rules page with editable rules and a new Reject action that blocks matched traffic.
+- Added a developer option to show each node's protocol type in the node list (off by default). Thanks to @1392726643 for the contribution.
+
 
 ### Bug Fixes
 
-- Fixed quitting OneBox clearing a system proxy that OneBox did not set.
-- Fixed proxy and DNS settings not taking effect on macOS when the active network service had been renamed (such as a renamed Wi-Fi).
-- Fixed the proxy service sometimes failing to start when a previous run had not fully shut down.
+- Fixed the proxy service sometimes failing to start when a port from the previous run was still in use.
+- Fixed the node list, latency tests, and node switching failing when the system already had a proxy set and OneBox was started without changing the system proxy.
 
-## 自 v1.4.31 以来的变更
+
+## 自 v1.4.34 以来的变更
 
 本版本的所有重要变更将记录于此。
 
 ### 变更
 
 - 更新 JavaScript 与 Rust 依赖。
-- 新增选项：非 TUN 模式启动 VPN 时可不设置系统代理。
-- 重新设计了规则页面，规则可编辑，并新增「拒绝」动作以拦截匹配的流量。
+- 新增开发者选项：在节点列表中显示每个节点的协议类型（默认关闭）。感谢 @1392726643 的贡献。
+
 
 ### Bug 修复
 
-- 修复退出 OneBox 时清除并非由 OneBox 设置的系统代理的问题。
-- 修复 macOS 上重命名网络服务（例如改名后的 Wi-Fi）后，代理与 DNS 设置无法生效的问题。
-- 修复上一次运行未完全退出时，代理服务有时无法启动的问题。
+- 修复上一次运行的端口仍被占用时，代理服务有时无法启动的问题。
+- 修复当系统已存在代理、且以不设置系统代理方式启动时，节点列表、延迟测试与节点切换无法使用的问题。
+
 
 ---
 

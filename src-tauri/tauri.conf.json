@@ -1,6 +1,6 @@
 {
   "productName": "OneBox",
-  "version": "1.4.34",
+  "version": "1.4.35",
   "identifier": "cloud.oneoh.onebox",
   "build": {
     "beforeDevCommand": "deno task dev",
