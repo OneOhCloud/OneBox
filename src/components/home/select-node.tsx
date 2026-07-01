@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { invoke } from "@tauri-apps/api/core";
-import { fetch } from "@tauri-apps/plugin-http";
 import useSWR from "swr";
-import { getClashApiSecret, getShowNodeProtocol } from "../../single/store";
+import { getShowNodeProtocol } from "../../single/store";
+import { clashApiFetch } from "../../utils/clash-api";
 import { t } from "../../utils/helper";
 import {
     AppleSelectMenu,
@@ -12,10 +12,6 @@ import {
 } from "./apple-select-menu";
 import { buildNodeProtocolMap, type NodeProtocolMap } from "./node-protocol";
 import NodeOption from "./node-option";
-
-const baseUrl = "http://127.0.0.1:9191";
-const proxiesUrl = `${baseUrl}/proxies/ExitGateway`;
-const allProxiesUrl = `${baseUrl}/proxies`;
 
 type SelectorResponse = {
     all?: string[];
@@ -36,31 +32,16 @@ type SelectNodeProps = {
 export default function SelectNode(props: SelectNodeProps) {
     const { isRunning } = props;
     const { data, isLoading, error, mutate } = useSWR(
-        `swr-${baseUrl}/proxies/ExitGateway-${props.isRunning}`,
+        `swr-clash-proxies-ExitGateway-${props.isRunning}`,
         async () => {
             if (!isRunning) {
                 return { all: [], now: "", nodeProtocols: {}, showProtocol: false };
             }
             const showProtocol = await getShowNodeProtocol();
-            const headers = {
-                Accept: "application/json",
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${await getClashApiSecret()}`,
-            };
             const [selectorResponse, allProxiesResponse] = await Promise.all([
-                fetch(proxiesUrl, {
-                    method: "GET",
-                    // @ts-ignore
-                    timeout: 3,
-                    headers,
-                }),
+                clashApiFetch("/proxies/ExitGateway"),
                 showProtocol
-                    ? fetch(allProxiesUrl, {
-                        method: "GET",
-                        // @ts-ignore
-                        timeout: 3,
-                        headers,
-                    })
+                    ? clashApiFetch("/proxies")
                         .then((response) => response.json())
                         .catch((error) => {
                             console.warn("Failed to fetch proxy protocol metadata:", error);
@@ -168,13 +149,8 @@ function NodeMenu(props: NodeMenuProps) {
 
     const handleNodeChange = async (node: string) => {
         try {
-            await fetch(proxiesUrl, {
+            await clashApiFetch("/proxies/ExitGateway", {
                 method: "PUT",
-                headers: {
-                    Accept: "application/json",
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${await getClashApiSecret()}`,
-                },
                 body: JSON.stringify({ name: node }),
             });
             onUpdate();

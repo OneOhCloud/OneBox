@@ -1,12 +1,10 @@
-import { fetch } from '@tauri-apps/plugin-http';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import useSWR from "swr";
-import { getClashApiSecret } from '../../single/store';
+import { clashApiFetch } from '../../utils/clash-api';
 import { t } from '../../utils/helper';
 
 // 常量定义
 const API_CONFIG = {
-    BASE_URL: 'http://127.0.0.1:9191',
     TIMEOUT: 3000,
     REFRESH_INTERVAL: 5000,
     TIMEOUT_DELAY: 2000
@@ -40,20 +38,13 @@ const STYLES = {
 
 // 自定义 Hook：管理代理延迟数据
 const useProxyDelay = (nodeName: string) => {
-    const fetcher = useCallback(async (url: string): Promise<ProxyResponse> => {
+    const fetcher = useCallback(async (path: string): Promise<ProxyResponse> => {
         if (!nodeName) {
             return { delay: '-' };
         }
 
         try {
-            const response = await fetch(url, {
-                method: 'GET',
-                headers: {
-                    "Authorization": `Bearer ${await getClashApiSecret()}`,
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json',
-                },
-            });
+            const response = await clashApiFetch(path);
 
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}`);
@@ -66,7 +57,7 @@ const useProxyDelay = (nodeName: string) => {
         }
     }, [nodeName]);
 
-    const swrKey = nodeName ? `${API_CONFIG.BASE_URL}/proxies/${encodeURIComponent(nodeName)}/delay?url=${encodeURIComponent(DelayTestUrl)}&timeout=5000` : null;
+    const swrKey = nodeName ? `/proxies/${encodeURIComponent(nodeName)}/delay?url=${encodeURIComponent(DelayTestUrl)}&timeout=5000` : null;
 
     const { data, error, isLoading } = useSWR<ProxyResponse>(
         swrKey,
