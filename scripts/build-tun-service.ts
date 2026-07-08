@@ -5,17 +5,14 @@
  *
  * Dev flow (`deno task tauri dev` → `beforeDevCommand`):
  *   `cargo build -p tun-service` produces `src-tauri/target/debug/tun-service.exe`
- *   right next to the dev-mode `one-box.exe`. That's exactly where
- *   `vpn::windows::bundled_service_exe_path()` looks, so no further copying is
- *   needed for dev.
+ *   and Tauri still validates `externalBin`, so stage the debug binary at
+ *   `src-tauri/binaries/<name>-<target-triple>.exe`.
  *
  * Release flow (`deno task tauri build` → `beforeBuildCommand`, or CI):
- *   Tauri's `externalBin` contract requires the binary to live at
- *   `src-tauri/binaries/<name>-<target-triple>.exe` at bundling time. Tauri
- *   strips the triple suffix when copying into the final installer, so the
+ *   The same `externalBin` contract applies at bundling time. Tauri strips
+ *   the triple suffix when copying into the final installer, so the
  *   runtime-side lookup in the bundled app still finds `tun-service.exe` next
- *   to `one-box.exe`. Detect the rustc host triple via `rustc -vV` and copy
- *   the freshly built release binary into that location.
+ *   to `one-box.exe`.
  *
  * Platform gating: non-Windows hosts exit silently. The Windows service
  * sub-crate is cfg-gated empty on macOS/Linux — there's nothing to build and
@@ -64,13 +61,6 @@ if (!existsSync(outPath)) {
 }
 
 console.log(`[build-tun-service] built ${outPath}`);
-
-// Only stage the target-triple-suffixed copy for release builds. Dev builds
-// live in `target/debug/` and are located directly by the runtime, so there's
-// nothing extra to do.
-if (!releaseFlag) {
-    process.exit(0);
-}
 
 // Detect the rustc host triple — required by Tauri externalBin naming.
 const rustc = spawnSync("rustc", ["-vV"], { encoding: "utf8", shell: true });
