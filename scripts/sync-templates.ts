@@ -26,28 +26,28 @@
  * would fetch.
  *
  * Branch:
- *   - Defaults to `stable`. Override with `CONF_TEMPLATE_BRANCH=beta|dev` in
- *     CI workflows for non-stable release channels.
+ *   - This branch targets the dev channel, so it defaults to `dev`.
+ *     Release workflows override it for beta and stable builds.
  *
  * Offline fallback:
- *   - If fetch fails but `generated.ts` already exists from a previous run,
- *     we keep it and exit 0 with a warning. This lets offline dev continue
- *     with a slightly stale snapshot. On fresh checkouts with no network,
- *     the build fails fast.
+ *   - If fetch fails, an existing `generated.ts` is reusable only when its
+ *     channel and exact sing-box version match this build. A fresh checkout
+ *     or a stale schema fails fast instead of baking an incompatible fallback.
  */
 
-import { parse as parseJsonc } from 'jsonc-parser';
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { parse as parseJsonc, type ParseError } from 'jsonc-parser';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { SING_BOX_MAJOR_VERSION, SING_BOX_MINOR_VERSION, SING_BOX_VERSION } from '../src/types/definition.ts';
+import { SING_BOX_TEMPLATE_VERSION, SING_BOX_VERSION } from '../src/types/definition.ts';
+import { canReuseGeneratedTemplateSnapshot } from './template-snapshot.ts';
 
 // ---------------------------------------------------------------------------
 // Config
 // ---------------------------------------------------------------------------
 
 const REPO = 'OneOhCloud/conf-template';
-const BRANCH = process.env.CONF_TEMPLATE_BRANCH ?? 'stable';
+const BRANCH = process.env.CONF_TEMPLATE_BRANCH ?? 'dev';
 
 /**
  * Maps OneBox internal `configType` → the corresponding conf-template filename.
@@ -70,24 +70,11 @@ const OUTPUT_PATH = resolve(__dirname, '../src/config/templates/generated.ts');
 // ---------------------------------------------------------------------------
 
 /**
- * Decide which `conf/<dir>/zh-cn/` to pull from, mirroring the runtime
- * URL resolver. 1.13.8+ pulls from `1.13.8/`; earlier 1.13 from `1.13/`;
- * 1.12 from `1.12/`.
+ * Return the parsed template bucket shared with the runtime URL resolver.
+ * Prerelease identifiers never participate in path selection.
  */
 function resolveVersionPath(): string {
-    const [majorStr, minorStr] = SING_BOX_MAJOR_VERSION.split('.');
-    const patch = parseInt(SING_BOX_MINOR_VERSION, 10);
-    if (!majorStr || !minorStr || Number.isNaN(patch)) {
-        throw new Error(
-            `invalid SING_BOX_VERSION: cannot parse "${SING_BOX_MAJOR_VERSION}.${SING_BOX_MINOR_VERSION}"`,
-        );
-    }
-    if (majorStr === '1' && minorStr === '13' && patch >= 8) return '1.13.8';
-    if (majorStr === '1' && minorStr === '13') return '1.13';
-    if (majorStr === '1' && minorStr === '12') return '1.12';
-    throw new Error(
-        `unsupported sing-box version ${majorStr}.${minorStr}.${patch} — add a mapping in scripts/sync-templates.ts`,
-    );
+    return SING_BOX_TEMPLATE_VERSION;
 }
 
 // ---------------------------------------------------------------------------
@@ -115,13 +102,12 @@ async function fetchText(url: string, label: string): Promise<string> {
  */
 async function fetchLatestSha(): Promise<string> {
     try {
-        const res = await fetch(
+        const text = await fetchText(
             `https://api.github.com/repos/${REPO}/branches/${BRANCH}`,
-            { headers: { 'User-Agent': 'onebox-sync-templates' } },
+            `branch metadata for ${BRANCH}`,
         );
-        if (!res.ok) return 'unknown';
-        const json = (await res.json()) as { commit?: { sha?: string } };
-        return json?.commit?.sha ?? 'unknown';
+        const json = JSON.parse(text) as { commit?: { sha?: string } };
+        return json.commit?.sha ?? 'unknown';
     } catch {
         return 'unknown';
     }
@@ -221,7 +207,7 @@ async function main(): Promise<void> {
                 const file = MODE_TO_FILE[mode];
                 const url = `https://raw.githubusercontent.com/${REPO}/${BRANCH}/conf/${versionPath}/zh-cn/${file}`;
                 const text = await fetchText(url, file);
-                const errors: any[] = [];
+                const errors: ParseError[] = [];
                 const parsed = parseJsonc(text, errors, { allowTrailingComma: true });
                 if (errors.length > 0) {
                     throw new Error(
@@ -238,15 +224,24 @@ async function main(): Promise<void> {
         ]);
         commitSha = results[0] as string;
         fetched = results.slice(1) as FetchedMode[];
-    } catch (e: any) {
-        // Offline fallback: keep any existing generated.ts from a prior run.
+    } catch (e: unknown) {
+        const message = e instanceof Error ? e.message : String(e);
+        // Offline fallback is safe only when the existing snapshot was built
+        // for the same channel and kernel. Reusing an older schema here would
+        // make a successful frontend build ship a config the kernel rejects.
         if (existsSync(OUTPUT_PATH)) {
-            console.warn(
-                `[sync-templates] fetch failed (${e?.message ?? e}); keeping existing snapshot at ${OUTPUT_PATH}`,
-            );
-            return;
+            const snapshot = readFileSync(OUTPUT_PATH, 'utf-8');
+            if (canReuseGeneratedTemplateSnapshot(snapshot, BRANCH, SING_BOX_VERSION)) {
+                console.warn(
+                    `[sync-templates] fetch failed (${message}); keeping matching snapshot at ${OUTPUT_PATH}`,
+                );
+                return;
+            }
         }
-        throw e;
+        throw new Error(
+            `template fetch failed and no reusable ${BRANCH}/${SING_BOX_VERSION} snapshot exists: ` +
+                message,
+        );
     }
 
     const content = emitGeneratedFile(versionPath, commitSha, fetched);
@@ -257,7 +252,8 @@ async function main(): Promise<void> {
     console.log(`[sync-templates] done (commit: ${commitSha === 'unknown' ? 'unknown' : commitSha.slice(0, 8)})`);
 }
 
-main().catch((e) => {
-    console.error(`[sync-templates] failed: ${e?.message ?? e}`);
+main().catch((e: unknown) => {
+    const message = e instanceof Error ? e.message : String(e);
+    console.error(`[sync-templates] failed: ${message}`);
     process.exit(1);
 });

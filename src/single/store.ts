@@ -2,9 +2,10 @@ import { invoke } from '@tauri-apps/api/core';
 import { locale, type } from '@tauri-apps/plugin-os';
 import { LazyStore } from '@tauri-apps/plugin-store';
 import { toast } from 'sonner';
-import { configType, StageVersionType } from '../config/common';
+import { configType, isStageVersion, StageVersionType } from '../config/common';
+import { BUILD_TIME_TEMPLATE_SOURCE } from '../config/templates/generated';
 import { emptyRuleSet, type RuleAction, type RuleSet } from '../config/merger/custom-rules';
-import { ALLOWLAN_STORE_KEY, DEFAULT_PROXY_PORT, ENABLE_BYPASS_ROUTER_STORE_KEY, ENABLE_TUN_STORE_KEY, PROXY_PORT_STORE_KEY, SHOW_NODE_PROTOCOL_STORE_KEY, SING_BOX_MAJOR_VERSION, SING_BOX_VERSION, SKIP_SYSTEM_PROXY_STORE_KEY, STAGE_VERSION_STORE_KEY, USE_DHCP_STORE_KEY, USER_AGENT_STORE_KEY } from '../types/definition';
+import { ALLOWLAN_STORE_KEY, DEFAULT_PROXY_PORT, ENABLE_BYPASS_ROUTER_STORE_KEY, ENABLE_TUN_STORE_KEY, PROXY_PORT_STORE_KEY, SHOW_NODE_PROTOCOL_STORE_KEY, SING_BOX_TEMPLATE_VERSION, SKIP_SYSTEM_PROXY_STORE_KEY, STAGE_VERSION_STORE_KEY, USE_DHCP_STORE_KEY, USER_AGENT_STORE_KEY } from '../types/definition';
 
 const OsType = type();
 export const LANGUAGE_STORE_KEY = 'language';
@@ -248,7 +249,7 @@ export async function setProxyPort(port: number): Promise<void> {
 export async function getConfigTemplateURLKey(mode: configType): Promise<string> {
     // zh: 返回配置模版 URL 的存储键，格式为 `key-sing-box-{主版本号}-{模式}-template-path`, 如非必要请勿更改此格式。
     // en: Returns the storage key for the config template URL in the format `key-sing-box-{major-version}-{mode}-template-path`. Do not change this format unless necessary.
-    const cacheKey = `key-sing-box-${SING_BOX_MAJOR_VERSION}-${mode}-template-path`;
+    const cacheKey = `key-sing-box-${SING_BOX_TEMPLATE_VERSION}-${mode}-template-path`;
     return cacheKey;
 }
 
@@ -269,29 +270,23 @@ export async function setConfigTemplateURL(mode: configType, url: string) {
 
 export async function getDefaultConfigTemplateURL(mode: configType): Promise<string> {
     const remoteUrl = "https://onebox-updater.oneoh.cloud/conf-template";
-    let stageVersion: StageVersionType = await getStoreValue(STAGE_VERSION_STORE_KEY, "stable")
-
-    let versionNumber = SING_BOX_VERSION.replace('v', '').split('.')
-    let major = versionNumber[0];
-    let minor = versionNumber[1];
-    let patch = parseInt(versionNumber[2] || '0', 10);
-    let ver = `${major}.${minor}`;
-    // sing-box 1.13.8 rejects legacy inbound fields (`sniff`, `sniff_override_destination`)
-    // that earlier 1.13.x kernels silently ignored. Templates under conf/1.13.8/ have
-    // them migrated to route-rule sniff actions; keep conf/1.13/ for older kernels.
-    if (major === '1' && minor === '13' && patch >= 8) {
-        ver = '1.13.8';
+    const buildTimeStage = BUILD_TIME_TEMPLATE_SOURCE.branch;
+    if (!isStageVersion(buildTimeStage)) {
+        throw new Error(`invalid build-time template branch "${buildTimeStage}"`);
     }
+    const storedStage: unknown = await getStoreValue(STAGE_VERSION_STORE_KEY, buildTimeStage);
+    const stageVersion: StageVersionType = isStageVersion(storedStage) ? storedStage : buildTimeStage;
+    const version = SING_BOX_TEMPLATE_VERSION;
 
     switch (mode) {
         case 'mixed':
-            return `${remoteUrl}/raw/refs/heads/${stageVersion}/conf/${ver}/zh-cn/mixed-rules.jsonc`;
+            return `${remoteUrl}/raw/refs/heads/${stageVersion}/conf/${version}/zh-cn/mixed-rules.jsonc`;
         case 'tun':
-            return `${remoteUrl}/raw/refs/heads/${stageVersion}/conf/${ver}/zh-cn/tun-rules.jsonc`;
+            return `${remoteUrl}/raw/refs/heads/${stageVersion}/conf/${version}/zh-cn/tun-rules.jsonc`;
         case 'mixed-global':
-            return `${remoteUrl}/raw/refs/heads/${stageVersion}/conf/${ver}/zh-cn/mixed-global.jsonc`;
+            return `${remoteUrl}/raw/refs/heads/${stageVersion}/conf/${version}/zh-cn/mixed-global.jsonc`;
         case 'tun-global':
-            return `${remoteUrl}/raw/refs/heads/${stageVersion}/conf/${ver}/zh-cn/tun-global.jsonc`;
+            return `${remoteUrl}/raw/refs/heads/${stageVersion}/conf/${version}/zh-cn/tun-global.jsonc`;
         default:
             return '';
     }

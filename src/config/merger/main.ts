@@ -39,16 +39,16 @@ async function getConfigTemplate(mode: configType): Promise<any> {
 }
 
 async function updateExperimentalConfig(newConfig: any, dbCacheFilePath: string) {
-
+    const clashApiSecret = await getClashApiSecret();
     newConfig["experimental"]["clash_api"] = {
         "external_controller": "127.0.0.1:9191",
-        "secret": await getClashApiSecret(),
+        "secret": clashApiSecret,
     };
 
     newConfig["experimental"]["cache_file"] = {
         "enabled": true,
         "store_fakeip": true,
-        "store_rdrc": true,
+        "store_dns": true,
         "path": dbCacheFilePath
     };
 
@@ -70,7 +70,7 @@ export async function setMixedConfig(identifier: string) {
 
     await injectAllCustomRules(newConfig);
 
-    updateExperimentalConfig(newConfig, dbCacheFilePath);
+    await updateExperimentalConfig(newConfig, dbCacheFilePath);
     const allowLan = await getAllowLan();
     const bypassRouter = await isBypassRouterEnabled();
     await configureMixedInbound(newConfig, allowLan, bypassRouter);
@@ -96,7 +96,7 @@ export async function setTunConfig(identifier: string) {
     const bypassRouter = await isBypassRouterEnabled();
     await configureTunInbound(newConfig, bypassRouter);
 
-    updateExperimentalConfig(newConfig, dbCacheFilePath);
+    await updateExperimentalConfig(newConfig, dbCacheFilePath);
     const allowLan = await getAllowLan();
     await configureMixedInbound(newConfig, allowLan, bypassRouter);
 
@@ -118,7 +118,7 @@ export async function setGlobalMixedConfig(identifier: string) {
     const appConfigPath = await path.appConfigDir();
     const dbCacheFilePath = await path.join(appConfigPath, 'mixed-cache-global-v2.db');
 
-    updateExperimentalConfig(newConfig, dbCacheFilePath);
+    await updateExperimentalConfig(newConfig, dbCacheFilePath);
     const allowLan = await getAllowLan();
     const bypassRouter = await isBypassRouterEnabled();
     await configureMixedInbound(newConfig, allowLan, bypassRouter);
@@ -144,7 +144,7 @@ export default async function setGlobalTunConfig(identifier: string) {
     const bypassRouter = await isBypassRouterEnabled();
     await configureTunInbound(newConfig, bypassRouter);
 
-    updateExperimentalConfig(newConfig, dbCacheFilePath);
+    await updateExperimentalConfig(newConfig, dbCacheFilePath);
 
     const allowLan = await getAllowLan();
     await configureMixedInbound(newConfig, allowLan, bypassRouter);

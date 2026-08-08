@@ -9,6 +9,7 @@ import { SING_BOX_VERSION } from '../src/types/definition.ts';
 
 const BINARY_NAME = 'sing-box';
 const GITHUB_RELEASE_URL = 'https://github.com/SagerNet/sing-box/releases/download/';
+const REQUEST_TIMEOUT_MS = 60_000;
 
 
 // cronet-go repository URL
@@ -46,21 +47,23 @@ async function downloadFile(url: string, dest: string, maxRetries: number = 3): 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 seconds timeout
+            const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
-            const response = await fetch(url, {
-                signal: controller.signal,
-            }).finally(() => clearTimeout(timeoutId));
+            try {
+                const response = await fetch(url, { signal: controller.signal });
 
-            if (!response.ok) {
-                throw new Error(`Download failed: '${url}' (${response.status})`);
+                if (!response.ok) {
+                    throw new Error(`Download failed: '${url}' (${response.status})`);
+                }
+
+                if (!response.body) {
+                    throw new Error('Response body is empty');
+                }
+
+                await streamPipeline(response.body as any, createWriteStream(dest));
+            } finally {
+                clearTimeout(timeoutId);
             }
-
-            if (!response.body) {
-                throw new Error('Response body is empty');
-            }
-
-            await streamPipeline(response.body as any, createWriteStream(dest));
             return; // Success, exit function
         } catch (error) {
             lastError = error as Error;
@@ -160,17 +163,24 @@ async function getCronetLatestVersion(): Promise<string> {
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
-            const response = await fetch(CRONET_REPO_API, {
-                headers: {
-                    'User-Agent': 'OneBox-Download-Script',
-                    'Accept': 'application/vnd.github+json'
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+            try {
+                const response = await fetch(CRONET_REPO_API, {
+                    signal: controller.signal,
+                    headers: {
+                        'User-Agent': 'OneBox-Download-Script',
+                        'Accept': 'application/vnd.github+json'
+                    }
+                });
+                if (!response.ok) {
+                    throw new Error(`Failed to fetch cronet-go latest release: ${response.status}`);
                 }
-            });
-            if (!response.ok) {
-                throw new Error(`Failed to fetch cronet-go latest release: ${response.status}`);
+                const data = await response.json();
+                return data.tag_name;
+            } finally {
+                clearTimeout(timeoutId);
             }
-            const data = await response.json();
-            return data.tag_name;
         } catch (error) {
             lastError = error as Error;
             if (attempt < maxRetries) {

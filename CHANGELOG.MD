@@ -8,7 +8,7 @@ All significant changes in this version are documented here.
 
 ### Changes
 
-- Updated sing-box version to v1.13.15.
+- Updated sing-box version to v1.14.0-beta.10.
 - Updated JavaScript and Rust dependencies.
 
 ## 自 v1.4.35 以来的变更
@@ -18,7 +18,7 @@ All significant changes in this version are documented here.
 ### 变更
 
 - 更新 JavaScript 与 Rust 依赖。
-- 更新 sing-box 版本至 v1.13.15。
+- 更新 sing-box 版本至 v1.14.0-beta.10。
 
 
 ---

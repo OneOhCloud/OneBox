@@ -45,6 +45,7 @@
     "npm:unzipper@~0.12.5": "0.12.5",
     "npm:vite@*": "7.3.6_@types+node@25.9.5",
     "npm:vite@^7.3.6": "7.3.6_@types+node@25.9.5",
+    "npm:vitest@^3.2.4": "3.2.7_@types+node@25.9.5",
     "npm:vitest@^3.2.7": "3.2.7_@types+node@25.9.5",
     "npm:zod@^4.4.3": "4.4.3"
   },

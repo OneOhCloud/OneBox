@@ -6,7 +6,7 @@ Core principle: **there is one source of truth — the `conf-template` repo — 
 
 ## Single source of truth: `conf-template` repo
 
-The `conf-template` repo (`OneOhCloud/conf-template`) owns all 4 template variants (`tun-rules`, `tun-global`, `mixed-rules`, `mixed-global`) across all supported sing-box versions (`1.12`, `1.13`, `1.13.8`, …). Only `conf/1.13.8/zh-cn/*.jsonc` is hand-edited; derived versions are produced by a generator in that repo. The generator also runs the static validator + `sing-box check` on every emitted file — invalid templates can never reach the CDN.
+The `conf-template` repo (`OneOhCloud/conf-template`) owns all 4 template variants (`tun-rules`, `tun-global`, `mixed-rules`, `mixed-global`) across all supported sing-box versions (`1.12`, `1.13`, `1.13.8`, `1.14`, …). Each bucket has an independent generator backed by shared region intent. The generator also runs the static validator + the matching `sing-box check` binary on every emitted file — invalid templates can never reach the CDN.
 
 See `conf-template/CONVENTIONS.md` for the contract.
 
@@ -24,9 +24,9 @@ The emitted file is real TypeScript code, not JSON-strings-inside-TS. Advantages
 - **No escape hell.** The old design serialised each template with `JSON.stringify` and embedded the result inside a TS template literal, meaning any unusual character in a template string had to survive two layers of escaping correctly. Emitting real object literals sidesteps the whole problem.
 - **Precise literal types via `as const`.** The compiler can narrow the template shape for free if future code wants to poke at specific fields.
 
-Branch defaults to `stable`; override with `CONF_TEMPLATE_BRANCH=beta|dev` in CI for non-stable release channels.
+On `feature/dev`, the branch defaults to `dev`; release CI explicitly supplies `dev`, `beta`, or `stable`. A failed fetch may reuse an existing generated snapshot only when both its branch and exact sing-box version match the requested build.
 
-`generated.ts` is `.gitignore`d — every fresh checkout regenerates. If the network fetch fails **and** an existing `generated.ts` from a prior run is present, the script warns and keeps the stale snapshot so offline dev still works; fresh checkouts with no network fail fast.
+`generated.ts` is `.gitignore`d — every fresh checkout regenerates. If the network fetch fails, the script keeps an existing snapshot only when its recorded branch and exact sing-box version match the current build; otherwise it fails fast.
 
 The tauri build chain works without modifying `tauri.conf.json`:
 ```
@@ -70,7 +70,7 @@ The SWR hook uses `revalidateOnFocus: true` + `dedupingInterval: 30 min`. Cold s
 ## The two-path model in one picture
 
 ```
-conf-template repo (human-edited at 1.13.8 canonical)
+conf-template repo (shared intent + versioned generators)
         │
         │ generator (inside conf-template) runs on every commit
         │ static validator + sing-box check
@@ -97,7 +97,7 @@ src/config/templates/generated.ts   tauri-plugin-store v2 cache
 
 ## Cache shape
 
-- Key: `key-sing-box-${SING_BOX_MAJOR_VERSION}-${mode}-template-config-cache-v${TEMPLATE_CACHE_SCHEMA_VERSION}`
+- Key: `key-sing-box-${SING_BOX_TEMPLATE_VERSION}-${mode}-template-config-cache-v${TEMPLATE_CACHE_SCHEMA_VERSION}`
 - `TEMPLATE_CACHE_SCHEMA_VERSION` is bumped whenever a sing-box upgrade makes prior cached templates unusable (e.g. 1.13.8 rejecting legacy `sniff` inbound fields).
 - Value: JSON string (stringified sing-box config template).
 
@@ -138,13 +138,13 @@ Purge + prime run in parallel at mount. Order doesn't matter: if purge wipes a p
 - `src/config/merger/main.ts` — `getConfigTemplate` (read path) + the four `set*Config` mergers (renamed from `version_1_12/main.ts`)
 - `src/config/merger/helper.ts` — inbound configurators / DHCP / VPN server merging (renamed from `version_1_12/helper.ts`)
 - `src/hooks/useSwr.ts` — `primeConfigTemplateCache` / `primeAllConfigTemplateCaches` (write path) + `purgeLegacyTemplateCache`
-- `src/single/store.ts` — `getConfigTemplateURL` / `getDefaultConfigTemplateURL` (URL resolution, including the 1.13.8 patch-version branch)
+- `src/single/store.ts` — `getConfigTemplateURL` / `getDefaultConfigTemplateURL` (URL resolution using the parsed template bucket and build-time channel)
 - `src/App.tsx` — mounts both SWR hooks (purge once, prime periodically)
 - `deno.json` — `sync-templates` / `dev` / `build` tasks
 - `.gitignore` — excludes `src/config/templates/generated.ts`
 
 **In conf-template repo** (separate repo, `OneOhCloud/conf-template`):
-- `scripts/generate.ts` — canonical → derived transformer + static + `sing-box check` validator
-- `conf/1.13.8/zh-cn/*.jsonc` — canonical (only hand-edited files)
-- `conf/{1.13,1.12}/zh-cn/*.jsonc` — derived, regenerated on every `pnpm generate`
+- `scripts/generate.ts` — region intent → versioned output + static + matching `sing-box check` validation
+- `scripts/convention/generator/*.ts` — one independent generator per template bucket
+- `conf/{1.14,1.13.8,1.13,1.12}/zh-cn/*.jsonc` — generated output, regenerated on every `pnpm generate`
 - `CONVENTIONS.md` — full contract including validator rules and how to add variants/versions
