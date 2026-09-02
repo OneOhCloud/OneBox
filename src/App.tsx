@@ -130,6 +130,9 @@ function App() {
   const [language, setLanguage] = useState('unknown');
   const [deepLinkUrl, setDeepLinkUrl] = useState<string>('');
   const [deepLinkApplyUrl, setDeepLinkApplyUrl] = useState<string>('');
+  // Flips once the cold-start pull has settled, whether or not it found a
+  // URL. Gates auto-connect (see utils/auto-connect.ts).
+  const [pendingDeepLinkChecked, setPendingDeepLinkChecked] = useState(false);
   // Default true — deep-link apply=1 uses the auto-start contract.
   // Manual add flips this to false before firing `setDeepLinkApplyUrl`.
   const [deepLinkApplyAutoStart, setDeepLinkApplyAutoStart] = useState<boolean>(true);
@@ -161,7 +164,7 @@ function App() {
 
   useEffect(() => {
     // 统一入口：从 Rust 拉取并消费 pending deep link（take() 保证幂等）
-    const processPending = () => {
+    const processPending = () =>
       invoke<{ data: string; apply: boolean } | null>('get_pending_deep_link').then(async (payload) => {
         if (!payload) return;
         let decoded: string;
@@ -192,10 +195,9 @@ function App() {
           setActiveScreen('configuration');
         }
       });
-    };
 
     // 冷启动：前端就绪后立即拉取一次
-    processPending();
+    processPending().finally(() => setPendingDeepLinkChecked(true));
 
     // 热启动信号：on_open_url 存入 pending 后发出，WebView 就绪时收到
     const unlistenSignal = listen('deep_link_pending', () => processPending());
@@ -262,7 +264,7 @@ function App() {
 
 
   return (
-    <NavContext.Provider value={{ activeScreen, setActiveScreen, handleLanguageChange, deepLinkUrl, setDeepLinkUrl, deepLinkApplyUrl, setDeepLinkApplyUrl, deepLinkApplyAutoStart, setDeepLinkApplyAutoStart }}>
+    <NavContext.Provider value={{ activeScreen, setActiveScreen, handleLanguageChange, deepLinkUrl, setDeepLinkUrl, deepLinkApplyUrl, setDeepLinkApplyUrl, deepLinkApplyAutoStart, setDeepLinkApplyAutoStart, pendingDeepLinkChecked }}>
       <EngineStateContext.Provider value={engineState}>
       <UpdateProvider>
         <Toaster position="top-center" toastOptions={{ duration: 2000 }} />

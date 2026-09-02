@@ -1,4 +1,5 @@
 import AboutItem from '../components/settings/about';
+import ToggleAutoConnect from '../components/settings/auto-connect';
 import ToggleAutoStart from '../components/settings/auto-start';
 import ToggleLan from '../components/settings/lan';
 import ToggleLanguage from '../components/settings/language';
@@ -16,6 +17,7 @@ export default function Settings() {
       <div className="onebox-page-inner">
         <div className="onebox-grouped-card mb-5">
           <ToggleAutoStart />
+          <ToggleAutoConnect />
           <ToggleLan />
           <ProxyModeSetting />
           <ToggleLanguage />

@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 import { configType, isStageVersion, StageVersionType } from '../config/common';
 import { BUILD_TIME_TEMPLATE_SOURCE } from '../config/templates/generated';
 import { emptyRuleSet, type RuleAction, type RuleSet } from '../config/merger/custom-rules';
-import { ALLOWLAN_STORE_KEY, DEFAULT_PROXY_PORT, ENABLE_BYPASS_ROUTER_STORE_KEY, ENABLE_TUN_STORE_KEY, PROXY_MODE_STORE_KEY, PROXY_PORT_STORE_KEY, ProxyTransportMode, SHOW_NODE_PROTOCOL_STORE_KEY, SING_BOX_TEMPLATE_VERSION, SKIP_SYSTEM_PROXY_STORE_KEY, STAGE_VERSION_STORE_KEY, USE_DHCP_STORE_KEY, USER_AGENT_STORE_KEY } from '../types/definition';
+import { ALLOWLAN_STORE_KEY, AUTO_CONNECT_STORE_KEY, DEFAULT_PROXY_PORT, ENABLE_BYPASS_ROUTER_STORE_KEY, ENABLE_TUN_STORE_KEY, PROXY_MODE_STORE_KEY, PROXY_PORT_STORE_KEY, ProxyTransportMode, SHOW_NODE_PROTOCOL_STORE_KEY, SING_BOX_TEMPLATE_VERSION, SKIP_SYSTEM_PROXY_STORE_KEY, STAGE_VERSION_STORE_KEY, USE_DHCP_STORE_KEY, USER_AGENT_STORE_KEY } from '../types/definition';
 import { deriveProxyTransportMode, isProxyTransportMode } from '../utils/proxy-mode';
 
 const OsType = type();
@@ -81,6 +81,16 @@ export async function getProxyTransportMode(): Promise<ProxyTransportMode> {
 
 export async function setProxyTransportMode(mode: ProxyTransportMode) {
     await store.set(PROXY_MODE_STORE_KEY, mode);
+    await store.save();
+}
+
+export async function getAutoConnect(): Promise<boolean> {
+    let b = await store.get(AUTO_CONNECT_STORE_KEY);
+    return Boolean(b);
+}
+
+export async function setAutoConnect(value: boolean) {
+    await store.set(AUTO_CONNECT_STORE_KEY, value);
     await store.save();
 }
 

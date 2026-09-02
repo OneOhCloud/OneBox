@@ -60,30 +60,34 @@ pub fn register_plugins(builder: Builder<Wry>, migrations: Vec<Migration>) -> Bu
                 .build(),
         )
         .plugin(tauri_plugin_process::init())
+        // The login item carries `--silent`; `app::setup::should_start_hidden`
+        // reads it back to leave the window hidden on an autostart launch.
         .plugin(tauri_plugin_autostart::init(
             MacosLauncher::LaunchAgent,
-            Some(vec![]),
+            Some(vec!["--silent"]),
         ))
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
 }
 
+// A second launch means the user asked for the app, so surface the window even
+// if the first launch was a silent autostart. Every call is best-effort: the
+// window can legitimately be hidden or already gone, and neither is worth
+// aborting the running instance for.
 fn show_window(app: &AppHandle) {
-    let windows = app.webview_windows();
-
-    windows
-        .values()
-        .next()
-        .expect("Sorry, no window found")
-        .set_focus()
-        .expect("Can't Bring Window to Focus");
-
     if let Some(main_window) = app.get_webview_window("main") {
         #[cfg(any(target_os = "windows", target_os = "linux"))]
-        {
-            main_window.unminimize().unwrap();
-        }
-        main_window.show().unwrap();
-        main_window.set_focus().unwrap();
+        let _ = main_window.unminimize();
+        let _ = main_window.show();
+        let _ = main_window.set_focus();
+        // This is the only way back to the UI after a silent autostart, so
+        // record whether it actually landed.
+        log::info!(
+            "[startup] second instance -> window visible={:?}",
+            main_window.is_visible()
+        );
+    } else if let Some(window) = app.webview_windows().values().next() {
+        let _ = window.set_focus();
+        log::warn!("[startup] second instance -> no main window, focused a fallback");
     }
 }

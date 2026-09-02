@@ -23,6 +23,10 @@ interface NavContextType {
     // contract unless explicitly overridden.
     deepLinkApplyAutoStart: boolean;
     setDeepLinkApplyAutoStart: (autoStart: boolean) => void;
+    // False until the cold-start pending deep link has been fetched and
+    // dispatched. Auto-connect waits for it so it cannot race an apply=1
+    // cold start, which drives the engine itself.
+    pendingDeepLinkChecked: boolean;
 }
 
 export const NavContext = createContext<NavContextType>({
@@ -35,4 +39,5 @@ export const NavContext = createContext<NavContextType>({
     setDeepLinkApplyUrl: () => { },
     deepLinkApplyAutoStart: true,
     setDeepLinkApplyAutoStart: () => { },
+    pendingDeepLinkChecked: false,
 });

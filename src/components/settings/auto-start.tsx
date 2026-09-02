@@ -49,6 +49,7 @@ export default function ToggleAutoStart() {
             <ToggleSetting
                 icon={<Power className="text-[#FF9500]" size={22} />}
                 title={t("auto_start")}
+                subTitle={t("auto_start_desc")}
                 isEnabled={isOn}
                 onToggle={handleToggle}
             />

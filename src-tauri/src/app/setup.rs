@@ -2,7 +2,6 @@ use tauri::Emitter;
 use tauri::Manager;
 use tauri_plugin_deep_link::DeepLinkExt;
 use tauri_plugin_http::reqwest;
-#[cfg(any(windows, target_os = "linux"))]
 use tauri_plugin_store::StoreExt;
 use url::Url;
 
@@ -23,6 +22,95 @@ const UPDATE_SUPPRESS_KEY: &str = "update_suppress_argv_deeplink_at";
 // macOS where the caller is cfg'd out entirely (still exercised by tests).
 #[cfg_attr(not(any(windows, target_os = "linux")), allow(dead_code))]
 const UPDATE_SUPPRESS_TTL_MS: u128 = 5 * 60 * 1000;
+
+// Flag the autostart registration appends to the launch command line
+// (see `register_plugins` in app/plugins.rs). A manual launch — Finder, the
+// Start menu, a deep link — never carries it, so the window only stays hidden
+// for the login-item launch the user opted into.
+const SILENT_LAUNCH_FLAG: &str = "--silent";
+
+// Marks that the login item has been re-registered with SILENT_LAUNCH_FLAG.
+// Rust-only; no JS counterpart writes or reads it.
+const AUTOSTART_ARGS_MIGRATED_KEY: &str = "autostart_silent_args_migrated";
+
+/// True when this process was started by the autostart login item.
+pub fn should_start_hidden(args: &[String]) -> bool {
+    args.iter().any(|arg| arg == SILENT_LAUNCH_FLAG)
+}
+
+/// Re-register the login item once so it carries `SILENT_LAUNCH_FLAG`.
+///
+/// `tauri-plugin-autostart` writes the launch command only when autostart is
+/// switched on, so an install that enabled it before the flag existed stays
+/// registered without it and `should_start_hidden` would never see it. The
+/// one-shot marker keeps this off the hot path: re-registering on every launch
+/// would rewrite the LaunchAgent plist / Run key for no reason.
+fn migrate_autostart_launch_args(app: &tauri::AppHandle) {
+    use tauri_plugin_autostart::ManagerExt;
+
+    let store = match app.store("settings.json") {
+        Ok(s) => s,
+        Err(e) => {
+            log::warn!("[startup] autostart migration skipped, store unavailable: {}", e);
+            return;
+        }
+    };
+    if store.get(AUTOSTART_ARGS_MIGRATED_KEY).is_some() {
+        return;
+    }
+
+    let manager = app.autolaunch();
+    match manager.is_enabled() {
+        Ok(true) => {
+            if let Err(e) = manager.disable().and_then(|_| manager.enable()) {
+                log::warn!("[startup] autostart re-register failed: {}", e);
+                return;
+            }
+            log::info!("[startup] autostart re-registered with {}", SILENT_LAUNCH_FLAG);
+        }
+        Ok(false) => {}
+        Err(e) => {
+            log::warn!("[startup] autostart state unreadable: {}", e);
+            return;
+        }
+    }
+
+    store.set(AUTOSTART_ARGS_MIGRATED_KEY, serde_json::json!(true));
+    let _ = store.save();
+}
+
+/// `true` when this process is the relaunch half of an in-flight update.
+///
+/// Windows/Linux only, and for one reason: `tauri-plugin-updater` forwards the
+/// old process's argv to the new binary, so a session that started from the
+/// login item carries `SILENT_LAUNCH_FLAG` into the relaunch. The user clicked
+/// Update in a visible window, so coming back hidden reads as a failed update.
+///
+/// Reuses the marker `markPendingUpdateRelaunch` (JS) writes before
+/// `install()`. Read-only here — `should_suppress_argv_deeplink` remains the
+/// only consumer that deletes it, and it runs later in `app_setup`, so this
+/// read always sees the marker it left in place.
+#[cfg(any(windows, target_os = "linux"))]
+fn is_update_relaunch(app: &tauri::AppHandle) -> bool {
+    let Ok(store) = app.store("settings.json") else {
+        return false;
+    };
+    let now_ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis())
+        .unwrap_or(0);
+    matches!(
+        decide_suppress_argv_deeplink(store.get(UPDATE_SUPPRESS_KEY).as_ref(), now_ms),
+        SuppressDecision::Fresh { .. }
+    )
+}
+
+/// macOS relaunches without forwarding argv, so the login-item flag can never
+/// leak into an update relaunch there.
+#[cfg(not(any(windows, target_os = "linux")))]
+fn is_update_relaunch(_app: &tauri::AppHandle) -> bool {
+    false
+}
 
 /// App 初始化逻辑，对应 Builder::setup 闭包
 pub fn app_setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
@@ -52,15 +140,32 @@ pub fn app_setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>>
     crate::commands::whitelist::spawn_whitelist_refresh_task(app.handle().clone());
     report_main_window_geometry(app);
 
-    // macOS：以无 Dock 图标的附件模式运行，启动时直接显示主窗口
+    // macOS：以无 Dock 图标的附件模式运行
     // 此模式下，访达点击已运行 App 图标时触发 Reopen 事件，需要监听此事件将隐藏的主窗口重新显示
     #[cfg(target_os = "macos")]
-    {
-        app.set_activation_policy(tauri::ActivationPolicy::Accessory);
-        if let Some(w) = app.get_webview_window("main") {
-            w.show().unwrap();
-            w.set_focus().unwrap();
+    app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+
+    // The window is declared `visible: false` in tauri.conf.json so this is
+    // the only place that decides whether it appears. Showing it here rather
+    // than letting the config do it keeps Windows/Linux from painting a frame
+    // before a silent launch can hide it again.
+    let start_hidden = should_start_hidden(&std::env::args().collect::<Vec<_>>())
+        && !is_update_relaunch(app.handle());
+    log::info!("[startup] silent={}", start_hidden);
+    migrate_autostart_launch_args(app.handle());
+    if let Some(w) = app.get_webview_window("main") {
+        if start_hidden {
+            let _ = w.hide();
+        } else {
+            let _ = w.show();
+            let _ = w.set_focus();
         }
+        // Logged separately from the decision above: a silent launch that
+        // still paints a window, or a normal launch that never does, are
+        // different bugs and only this line tells them apart.
+        log::info!("[startup] window visible={:?}", w.is_visible());
+    } else {
+        log::warn!("[startup] no main window to show");
     }
     // On Linux release builds the deb/rpm .desktop file already declares
     // MimeType with `Exec=… %u`, so register_all() would create a duplicate
@@ -657,5 +762,40 @@ mod tests {
             decide_suppress_argv_deeplink(Some(&v), now_ms),
             SuppressDecision::Fresh { age_ms: 0 }
         );
+    }
+
+    fn args(items: &[&str]) -> Vec<String> {
+        items.iter().map(|s| s.to_string()).collect()
+    }
+
+    #[test]
+    fn start_hidden_only_when_the_silent_flag_is_present() {
+        assert!(should_start_hidden(&args(&["/Applications/OneBox.app", "--silent"])));
+        assert!(!should_start_hidden(&args(&["/Applications/OneBox.app"])));
+    }
+
+    #[test]
+    fn start_hidden_finds_the_flag_among_other_arguments() {
+        assert!(should_start_hidden(&args(&[
+            "OneBox.exe",
+            "--silent",
+            "oneoh-networktools://apply?data=abc",
+        ])));
+        assert!(should_start_hidden(&args(&[
+            "OneBox.exe",
+            "oneoh-networktools://apply?data=abc",
+            "--silent",
+        ])));
+    }
+
+    #[test]
+    fn start_hidden_ignores_lookalike_arguments() {
+        // A deep link that merely contains the word must not hide the window;
+        // the match is on the whole argument.
+        assert!(!should_start_hidden(&args(&[
+            "OneBox.exe",
+            "oneoh-networktools://apply?mode=--silent",
+        ])));
+        assert!(!should_start_hidden(&args(&["OneBox.exe", "--silently"])));
     }
 }

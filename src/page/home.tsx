@@ -2,6 +2,7 @@ import { useEffect, useMemo } from "react";
 import Body from "../components/home/body";
 import {
     ProxyMode,
+    useAutoConnect,
     useModeIndicator,
     useProxyMode,
     useVPNOperations,
@@ -26,6 +27,7 @@ export default function HomePage() {
         isRunning,
         operationStatus,
         toggleService,
+        startService,
         restartService,
         repairState,
         onRepairSuccess,
@@ -33,6 +35,8 @@ export default function HomePage() {
     const { indicatorStyle, modeButtonsRef } = useModeIndicator(selectedMode);
 
     const isEmpty = !subscriptions?.length;
+
+    useAutoConnect(subscriptions === undefined ? undefined : !isEmpty, startService);
 
     useEffect(() => {
         initializeMode();

@@ -169,6 +169,7 @@ Concrete case that bit this project: the SCDynamicStore DNS watcher (`engine/mac
 
 Every log line carries a short, stable prefix so triage reduces to a pipeline of `grep` commands. Currently in use (not exhaustive — run `grep -Eo '\[[a-z-]+\]' OneBox.log | sort -u` to enumerate):
 
+- `[startup]` — the launch-time window decision: `silent=<bool>` (was `--silent` in argv), `window visible=<Result>` (what the window actually ended up as), and `second instance -> window visible=<Result>` from the single-instance handler. Also carries the one-shot autostart re-registration.
 - `[engine-state]` — lifecycle state machine transitions, with `epoch=N`.
 - `[dns]` / `[dns-watch]` — DNS override state machine and SCDynamicStore watcher.
 - `[helper]` / `[helper-bridge]` — macOS privileged XPC helper install / ping / exit bridging.

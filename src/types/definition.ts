@@ -14,6 +14,8 @@ export const TUN_INTERFACE_NAME = 'utun233'
 export const USE_DHCP_STORE_KEY = 'use_dhcp_key'
 // 是否在节点列表中显示协议类型标签（开发者选项，默认关闭）
 export const SHOW_NODE_PROTOCOL_STORE_KEY = 'show_node_protocol_key'
+// 启动后自动连接
+export const AUTO_CONNECT_STORE_KEY = 'auto_connect_key'
 // 代理传输模式：TUN / 系统代理 / 手动代理
 export const PROXY_MODE_STORE_KEY = 'proxy_mode_key'
 export type ProxyTransportMode = 'tun' | 'system' | 'manual'

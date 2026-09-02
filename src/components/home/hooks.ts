@@ -6,8 +6,9 @@ import useSWR, { mutate as swrMutate } from "swr";
 import { insertSubscription } from "../../action/db";
 import { clearEngineError, useEngineState } from "../../hooks/useEngineState";
 import { NavContext } from "../../single/context";
-import { getProxyPort, getStoreValue, setStoreValue } from "../../single/store";
+import { getAutoConnect, getProxyPort, getStoreValue, setStoreValue } from "../../single/store";
 import { GET_SUBSCRIPTIONS_LIST_SWR_KEY, RULE_MODE_STORE_KEY, SSI_STORE_KEY } from "../../types/definition";
+import { AutoConnectGate, shouldAutoConnect } from "../../utils/auto-connect";
 import { t, vpnServiceManager } from "../../utils/helper";
 import type { DeepLinkApplyPhase } from "./deep-link-apply-progress-modal";
 
@@ -132,6 +133,53 @@ export const useProxyMode = () => {
  * level and fire regardless of which page is currently visible — manual
  * add no longer needs to switch to Home to get the modal.
  */
+// Auto-connect is a launch-time action, but HomePage remounts every time the
+// user leaves and comes back to the Home tab. A module-level latch keeps it to
+// one attempt per process.
+let autoConnectAttempted = false;
+
+/**
+ * Connect once on launch when the setting is on.
+ *
+ * `hasConfig` is `undefined` while the config list is still loading — the
+ * attempt waits rather than latching on an empty list. Startup is routed
+ * through `startService` so it gets the same prestart port check and orphan
+ * repair as the power button.
+ */
+export const useAutoConnect = (
+    hasConfig: boolean | undefined,
+    startService: (isEmpty: boolean) => Promise<unknown>,
+) => {
+    const engineState = useEngineState();
+    const { deepLinkApplyUrl, pendingDeepLinkChecked } = useContext(NavContext);
+
+    useEffect(() => {
+        if (autoConnectAttempted) return;
+        if (hasConfig === undefined) return;
+        if (!pendingDeepLinkChecked) return;
+
+        // Everything the decision needs is settled, so claim the single
+        // attempt before the async setting read can be re-entered.
+        autoConnectAttempted = true;
+
+        (async () => {
+            try {
+                const gate: AutoConnectGate = {
+                    enabled: await getAutoConnect(),
+                    hasConfig,
+                    engineIdle: engineState.kind === 'idle',
+                    deepLinkChecked: true,
+                    deepLinkApplyPending: Boolean(deepLinkApplyUrl),
+                };
+                if (!shouldAutoConnect(gate)) return;
+                await startService(false);
+            } catch (error) {
+                console.error('自动连接失败:', error);
+            }
+        })();
+    }, [hasConfig, pendingDeepLinkChecked, engineState.kind, deepLinkApplyUrl]);
+};
+
 export const useApplyPipelineRoot = () => {
     const engineState = useEngineState();
     const {

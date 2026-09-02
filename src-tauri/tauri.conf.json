@@ -12,6 +12,7 @@
     "windows": [
       {
         "devtools": true,
+        "visible": false,
         "maximizable": false,
         "decorations": true,
         "resizable": false,
