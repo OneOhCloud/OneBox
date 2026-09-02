@@ -2,7 +2,7 @@ import { type } from "@tauri-apps/plugin-os";
 import { useEffect, useState } from "react";
 import { Modem } from "react-bootstrap-icons";
 import { toast } from "sonner";
-import { isBypassRouterEnabled, setBypassRouterEnabled, setEnableTun, setUseDHCP } from "../../single/store";
+import { isBypassRouterEnabled, setBypassRouterEnabled, setProxyTransportMode, setUseDHCP } from "../../single/store";
 import { t, vpnServiceManager } from "../../utils/helper";
 import { ToggleSetting } from "../settings/common";
 
@@ -30,19 +30,16 @@ export default function ToggleBypassRouter() {
 
 
     const handleToggle = async () => {
-        // 切换旁路由模式时，同时切换 TUN 模式并禁用 DHCP
-        // When toggling bypass router mode, also toggle TUN mode and disable DHCP
-
         await setBypassRouterEnabled(!toggle);
-        await setEnableTun(!toggle);
-
 
         // off -> on
         if (!toggle) {
-            // 启用旁路由模式时，禁用 DHCP
-            // Disable DHCP when enabling bypass router mode
+            // 旁路由是 TUN 的子模式，开启时把代理模式带到 TUN 并禁用 DHCP。
+            // 关闭时不改代理模式：用户可能只是想回到纯 TUN。
+            // Bypass router is a TUN sub-mode: enabling it implies TUN and
+            // disables DHCP. Disabling it leaves the transport mode alone.
+            await setProxyTransportMode("tun");
             await setUseDHCP(false);
-
         }
 
         setToggle(!toggle);

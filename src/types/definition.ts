@@ -14,7 +14,9 @@ export const TUN_INTERFACE_NAME = 'utun233'
 export const USE_DHCP_STORE_KEY = 'use_dhcp_key'
 // 是否在节点列表中显示协议类型标签（开发者选项，默认关闭）
 export const SHOW_NODE_PROTOCOL_STORE_KEY = 'show_node_protocol_key'
-export const SKIP_SYSTEM_PROXY_STORE_KEY = 'skip_system_proxy_key'
+// 代理传输模式：TUN / 系统代理 / 手动代理
+export const PROXY_MODE_STORE_KEY = 'proxy_mode_key'
+export type ProxyTransportMode = 'tun' | 'system' | 'manual'
 export const ENABLE_BYPASS_ROUTER_STORE_KEY = 'enable_bypass_router_key'
 export const BYPASS_ROUTER_WATCHDOG_INTERVAL_STORE_KEY = 'bypass_router_watchdog_interval_key'
 export const SUPPORT_LOCAL_FILE_STORE_KEY = 'support_local_file_key'
@@ -46,8 +48,9 @@ export const THEME_PREF_STORE_KEY = 'theme_pref_key'
 
 // 允许局域网连接
 export const ALLOWLAN_STORE_KEY = 'allow_lan_key'
-// 是否启用 tun 模式
+// PROXY_MODE_STORE_KEY 之前的布尔对，只在首次读取时用于推导模式，之后不再读写
 export const ENABLE_TUN_STORE_KEY = 'enable_tun_key'
+export const SKIP_SYSTEM_PROXY_STORE_KEY = 'skip_system_proxy_key'
 // 当前规则模式
 export const RULE_MODE_STORE_KEY = 'rule_mode_key'
 

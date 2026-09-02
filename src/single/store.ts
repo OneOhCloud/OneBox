@@ -5,7 +5,8 @@ import { toast } from 'sonner';
 import { configType, isStageVersion, StageVersionType } from '../config/common';
 import { BUILD_TIME_TEMPLATE_SOURCE } from '../config/templates/generated';
 import { emptyRuleSet, type RuleAction, type RuleSet } from '../config/merger/custom-rules';
-import { ALLOWLAN_STORE_KEY, DEFAULT_PROXY_PORT, ENABLE_BYPASS_ROUTER_STORE_KEY, ENABLE_TUN_STORE_KEY, PROXY_PORT_STORE_KEY, SHOW_NODE_PROTOCOL_STORE_KEY, SING_BOX_TEMPLATE_VERSION, SKIP_SYSTEM_PROXY_STORE_KEY, STAGE_VERSION_STORE_KEY, USE_DHCP_STORE_KEY, USER_AGENT_STORE_KEY } from '../types/definition';
+import { ALLOWLAN_STORE_KEY, DEFAULT_PROXY_PORT, ENABLE_BYPASS_ROUTER_STORE_KEY, ENABLE_TUN_STORE_KEY, PROXY_MODE_STORE_KEY, PROXY_PORT_STORE_KEY, ProxyTransportMode, SHOW_NODE_PROTOCOL_STORE_KEY, SING_BOX_TEMPLATE_VERSION, SKIP_SYSTEM_PROXY_STORE_KEY, STAGE_VERSION_STORE_KEY, USE_DHCP_STORE_KEY, USER_AGENT_STORE_KEY } from '../types/definition';
+import { deriveProxyTransportMode, isProxyTransportMode } from '../utils/proxy-mode';
 
 const OsType = type();
 export const LANGUAGE_STORE_KEY = 'language';
@@ -59,17 +60,30 @@ export async function setStoreValue(key: string, value: any) {
 }
 
 
-export async function getEnableTun(): Promise<boolean> {
-    let b = await store.get(ENABLE_TUN_STORE_KEY);
-    return Boolean(b);
+/**
+ * The proxy transport mode is the single source of truth for how traffic is
+ * captured. Installs written before the enum existed only have the
+ * `enable_tun_key` / `skip_system_proxy_key` pair, so the first read derives
+ * the mode from them and writes it back; the legacy keys are never read again.
+ */
+export async function getProxyTransportMode(): Promise<ProxyTransportMode> {
+    const stored = await store.get(PROXY_MODE_STORE_KEY);
+    if (isProxyTransportMode(stored)) {
+        return stored;
+    }
+    const migrated = deriveProxyTransportMode(
+        await store.get(ENABLE_TUN_STORE_KEY),
+        await store.get(SKIP_SYSTEM_PROXY_STORE_KEY),
+    );
+    await setProxyTransportMode(migrated);
+    return migrated;
 }
 
-
-
-export async function setEnableTun(value: boolean) {
-    await store.set(ENABLE_TUN_STORE_KEY, value);
+export async function setProxyTransportMode(mode: ProxyTransportMode) {
+    await store.set(PROXY_MODE_STORE_KEY, mode);
     await store.save();
 }
+
 export async function getAllowLan(): Promise<boolean> {
     let b = await store.get(ALLOWLAN_STORE_KEY);
     return Boolean(b);
@@ -151,17 +165,6 @@ export async function setShowNodeProtocol(value: boolean) {
     await store.set(SHOW_NODE_PROTOCOL_STORE_KEY, value);
     await store.save();
 }
-
-export async function getSkipSystemProxy(): Promise<boolean> {
-    let b = await store.get(SKIP_SYSTEM_PROXY_STORE_KEY);
-    return Boolean(b);
-}
-
-export async function setSkipSystemProxy(value: boolean) {
-    await store.set(SKIP_SYSTEM_PROXY_STORE_KEY, value);
-    await store.save();
-}
-
 
 export async function setCustomRuleSet(key: RuleAction, config: RuleSet) {
     await store.set(`custom_ruleset_${key}`, JSON.stringify(config));

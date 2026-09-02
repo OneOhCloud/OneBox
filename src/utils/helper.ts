@@ -2,14 +2,14 @@ import { invoke } from '@tauri-apps/api/core';
 import * as path from '@tauri-apps/api/path';
 import { writeText } from '@tauri-apps/plugin-clipboard-manager';
 import { arch, locale, type, version } from '@tauri-apps/plugin-os';
-import { OsInfo, RULE_MODE_STORE_KEY, SING_BOX_VERSION, SSI_STORE_KEY } from '../types/definition';
+import { OsInfo, ProxyTransportMode, RULE_MODE_STORE_KEY, SING_BOX_VERSION, SSI_STORE_KEY } from '../types/definition';
 
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { message } from '@tauri-apps/plugin-dialog';
 import en from '../../lang/en.json';
 import zh from '../../lang/zh.json';
 import setGlobalTunConfig, { setGlobalMixedConfig, setMixedConfig, setTunConfig } from '../config/merger/main';
-import { getClashApiSecret, getEnableTun, getLanguage, getSkipSystemProxy, getStoreValue, getUserAgent } from '../single/store';
+import { getClashApiSecret, getLanguage, getProxyTransportMode, getStoreValue, getUserAgent } from '../single/store';
 const appWindow = getCurrentWindow();
 const enLang = en as Record<string, string>;
 const zhLang = zh as Record<string, string>;
@@ -114,6 +114,13 @@ export async function getSingBoxConfigPath() {
 
 type vpnServiceManagerMode = 'SystemProxy' | 'TunProxy' | 'ManualProxy'
 
+// Mirrors the Rust `ProxyMode` enum in src-tauri/src/engine/mod.rs.
+const VPN_SERVICE_MODE_BY_TRANSPORT: Record<ProxyTransportMode, vpnServiceManagerMode> = {
+    tun: 'TunProxy',
+    system: 'SystemProxy',
+    manual: 'ManualProxy',
+};
+
 type SyncConfigProps = {
     onError?: (error: any) => void;
     onSuccess?: () => void;
@@ -133,7 +140,7 @@ async function isRunning() {
 async function syncConfig(props: SyncConfigProps) {
     try {
         const identifier = await getStoreValue(SSI_STORE_KEY);
-        const useTun = await getEnableTun();
+        const useTun = (await getProxyTransportMode()) === 'tun';
 
         //zh: 直接使用 getStoreValue(RULE_MODE_STORE_KEY) 代替 setStoreValue 来获取当前模式，这样不会读到旧的值
         //en: Directly use getStoreValue(RULE_MODE_STORE_KEY) instead of setStoreValue to get the current mode, so that the old value will not be read
@@ -166,9 +173,7 @@ export const vpnServiceManager = {
     start: async () => {
         try {
             const configPath = await getSingBoxConfigPath();
-            const tunMode: boolean | undefined = await getEnableTun();
-            const skipSystemProxy = !tunMode && await getSkipSystemProxy();
-            let mode: vpnServiceManagerMode = tunMode ? 'TunProxy' : skipSystemProxy ? 'ManualProxy' : 'SystemProxy';
+            const mode = VPN_SERVICE_MODE_BY_TRANSPORT[await getProxyTransportMode()];
             console.log("启动VPN服务");
             console.log("模式:", mode);
             console.log("配置文件路径:", configPath);
@@ -212,7 +217,7 @@ export const vpnServiceManager = {
 
     reload: async (delay: number) => {
         if (await isRunning()) {
-            const useTun = await getEnableTun();
+            const useTun = (await getProxyTransportMode()) === 'tun';
             await new Promise(resolve => setTimeout(resolve, delay));
 
             // 判断系统类型
