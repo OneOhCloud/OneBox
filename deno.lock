@@ -10,7 +10,7 @@
     "npm:@tauri-apps/plugin-deep-link@~2.4.10": "2.4.10",
     "npm:@tauri-apps/plugin-dialog@^2.7.3": "2.7.3",
     "npm:@tauri-apps/plugin-fs@~2.5.2": "2.5.2",
-    "npm:@tauri-apps/plugin-http@~2.5.9": "2.5.9",
+    "npm:@tauri-apps/plugin-http@2.6": "2.6.0",
     "npm:@tauri-apps/plugin-log@~2.9.1": "2.9.1",
     "npm:@tauri-apps/plugin-opener@^2.5.5": "2.5.5",
     "npm:@tauri-apps/plugin-os@~2.3.2": "2.3.2",
@@ -34,6 +34,7 @@
     "npm:husky@^9.1.7": "9.1.7",
     "npm:jsonc-parser@^3.3.1": "3.3.1",
     "npm:jsonc@2": "2.0.0",
+    "npm:npm@latest": "12.0.2",
     "npm:react-bootstrap-icons@^1.11.6": "1.11.6_react@19.2.8",
     "npm:react-dom@^19.2.8": "19.2.8_react@19.2.8",
     "npm:react@^19.2.8": "19.2.8",
@@ -707,8 +708,8 @@
         "@tauri-apps/api"
       ]
     },
-    "@tauri-apps/plugin-http@2.5.9": {
-      "integrity": "sha512-lCiY0+vs4HvIUSvZrBs8TC3TiCB0MOPRmiUjTq4prW7SlcJE2jdLeT6KBsJrT9Tlplufl7W1pY6SFAO3gCWxDA==",
+    "@tauri-apps/plugin-http@2.6.0": {
+      "integrity": "sha512-QYXwbGb4hQ9/8Riv/ejU/kPFFnbBIrBcWwV1LIXv2xBKfoj8lkWfGkd9pkCSsBI/pljPtz+IPqfrE3t3bVl3mg==",
       "dependencies": [
         "@tauri-apps/api"
       ]
@@ -1473,6 +1474,10 @@
     "node-releases@2.0.46": {
       "integrity": "sha512-GYVXHE2KnrzAfsAjl4uP++evGFCrAU1jta4ubEjIG7YWt/64Gqv66a30yKwWczVjA6j3bM4nBwH7Pk1JmDHaxQ=="
     },
+    "npm@12.0.2": {
+      "integrity": "sha512-uIXokLlBj6FpNUTQX1PmT5pz7BlIN9QlixX+zdaSNHsd0qUXsbDLr50xzY6Sw7cJVr0uzHKDOle0swmPW/p5Qw==",
+      "bin": true
+    },
     "object-assign@4.1.1": {
       "integrity": "sha512-rJgTQnkUnH1sFw8yT6VSU3zD3sWmu6sZhIseY8VX+GRu3P6F7Fu+JNDoXfklElbLJSnc3FUQHVe4cU5hj+BcUg=="
     },
@@ -1908,7 +1913,7 @@
         "npm:@tauri-apps/plugin-deep-link@~2.4.10",
         "npm:@tauri-apps/plugin-dialog@^2.7.3",
         "npm:@tauri-apps/plugin-fs@~2.5.2",
-        "npm:@tauri-apps/plugin-http@~2.5.9",
+        "npm:@tauri-apps/plugin-http@2.6",
         "npm:@tauri-apps/plugin-log@~2.9.1",
         "npm:@tauri-apps/plugin-opener@^2.5.5",
         "npm:@tauri-apps/plugin-os@~2.3.2",
