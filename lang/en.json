@@ -20,6 +20,8 @@
     "auto_connect": "Connect on launch",
     "auto_connect_desc": "Connect automatically when OneBox opens",
     "auto_connect_failed": "Failed to save the connect on launch setting",
+    "on": "On",
+    "off": "Off",
     "auto": "Auto",
     "beta_version": "Beta",
     "boot_password": "Boot password",

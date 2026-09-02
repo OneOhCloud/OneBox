@@ -1,6 +1,5 @@
 import AboutItem from '../components/settings/about';
-import ToggleAutoConnect from '../components/settings/auto-connect';
-import ToggleAutoStart from '../components/settings/auto-start';
+import AutoStartSetting from '../components/settings/auto-start';
 import ToggleLan from '../components/settings/lan';
 import ToggleLanguage from '../components/settings/language';
 import ProxyModeSetting from '../components/settings/proxy-mode';
@@ -16,8 +15,7 @@ export default function Settings() {
     <div className="onebox-scrollpage">
       <div className="onebox-page-inner">
         <div className="onebox-grouped-card mb-5">
-          <ToggleAutoStart />
-          <ToggleAutoConnect />
+          <AutoStartSetting />
           <ToggleLan />
           <ProxyModeSetting />
           <ToggleLanguage />

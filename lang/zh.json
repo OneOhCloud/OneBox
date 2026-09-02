@@ -20,6 +20,8 @@
     "auto_connect": "启动后自动连接",
     "auto_connect_desc": "打开 OneBox 时自动连接",
     "auto_connect_failed": "保存自动连接设置失败",
+    "on": "开",
+    "off": "关",
     "auto": "自动选择",
     "beta_version": "测试版",
     "boot_password": "开机密码",

@@ -1,58 +1,102 @@
-import { ToggleSetting } from "./common";
-
 import { disable, enable, isEnabled } from '@tauri-apps/plugin-autostart';
 import { useEffect, useState } from 'react';
-import { Power } from "react-bootstrap-icons";
+import { LightningCharge, Power } from "react-bootstrap-icons";
 import { toast } from 'sonner';
+import { getAutoConnect, setAutoConnect } from "../../single/store";
 import { t } from "../../utils/helper";
+import { SettingsModal } from "../common/settings-modal";
+import { SettingItem, ToggleSetting } from "./common";
 
-export default function ToggleAutoStart() {
-    const [isOn, setIsOn] = useState(false);
+/**
+ * Both launch-time behaviours live in one sheet so the settings list carries a
+ * single startup entry. They stay independent switches — connect on launch
+ * applies to every launch, not just the login item — and apply immediately,
+ * because neither write is expensive enough to justify a staged Save.
+ */
+export default function AutoStartSetting() {
+    const [isOpen, setIsOpen] = useState(false);
+    const [autoStart, setAutoStart] = useState(false);
+    const [autoConnect, setAutoConnectState] = useState(false);
+
+    const loadState = async () => {
+        try {
+            // Autostart state lives in the OS, not the store, so it can change
+            // behind our back — re-read it every time the sheet opens.
+            setAutoStart(await isEnabled());
+        } catch (error) {
+            console.error("检查自动启动状态失败:", error);
+            toast.error(t("auto_start_failed"));
+        }
+        try {
+            setAutoConnectState(await getAutoConnect());
+        } catch (error) {
+            console.error("Failed to load auto connect state:", error);
+        }
+    };
 
     useEffect(() => {
-        const checkAutoStart = async () => {
-            try {
-                const isAutoStartEnabled = await isEnabled();
-                setIsOn(isAutoStartEnabled);
-            } catch (error) {
-                console.error("检查自动启动状态失败:", error);
-                toast.error(t("auto_start_failed"));
-            }
-        };
-        checkAutoStart();
+        loadState();
     }, []);
 
-    const handleToggle = async () => {
-        // 保存当前状态用于可能的回滚
-        const previousState = isOn;
+    useEffect(() => {
+        if (isOpen) loadState();
+    }, [isOpen]);
 
-        // 乐观更新 UI
-        setIsOn(!isOn);
-
+    const handleToggleAutoStart = async () => {
+        const next = !autoStart;
+        setAutoStart(next);
         try {
-            if (!isOn) {
-                await enable();
-            } else {
-                await disable();
-            }
+            await (next ? enable() : disable());
         } catch (error) {
-            // 操作失败，回滚到之前的状态
-            setIsOn(previousState);
+            setAutoStart(!next);
             console.error("切换自动启动设置失败:", error);
             toast.error(t("auto_start_failed_1"));
-        } finally {
+        }
+    };
+
+    const handleToggleAutoConnect = async () => {
+        const next = !autoConnect;
+        setAutoConnectState(next);
+        try {
+            await setAutoConnect(next);
+        } catch (error) {
+            setAutoConnectState(!next);
+            console.error("Failed to save auto connect state:", error);
+            toast.error(t("auto_connect_failed"));
         }
     };
 
     return (
-        <div>
-            <ToggleSetting
+        <>
+            <SettingItem
                 icon={<Power className="text-[#FF9500]" size={22} />}
                 title={t("auto_start")}
                 subTitle={t("auto_start_desc")}
-                isEnabled={isOn}
-                onToggle={handleToggle}
+                badge={autoStart ? t("on") : t("off")}
+                onPress={() => setIsOpen(true)}
             />
-        </div>
-    )
+            <SettingsModal
+                isOpen={isOpen}
+                onClose={() => setIsOpen(false)}
+                title={t("auto_start")}
+            >
+                <div className="onebox-grouped-list">
+                    <ToggleSetting
+                        icon={<Power className="text-[#FF9500]" size={22} />}
+                        title={t("auto_start")}
+                        subTitle={t("auto_start_desc")}
+                        isEnabled={autoStart}
+                        onToggle={handleToggleAutoStart}
+                    />
+                    <ToggleSetting
+                        icon={<LightningCharge className="text-[#FF9500]" size={22} />}
+                        title={t("auto_connect")}
+                        subTitle={t("auto_connect_desc")}
+                        isEnabled={autoConnect}
+                        onToggle={handleToggleAutoConnect}
+                    />
+                </div>
+            </SettingsModal>
+        </>
+    );
 }
