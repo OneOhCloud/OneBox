@@ -48,6 +48,13 @@ pub fn should_start_hidden(args: &[String]) -> bool {
 fn migrate_autostart_launch_args(app: &tauri::AppHandle) {
     use tauri_plugin_autostart::ManagerExt;
 
+    // Release-only, for the same reason `clear_stale_hkcu_deep_link` is: a
+    // debug build runs out of target/debug, so re-registering here would
+    // repoint the user's real login item at the dev binary.
+    if cfg!(debug_assertions) {
+        return;
+    }
+
     let store = match app.store("settings.json") {
         Ok(s) => s,
         Err(e) => {

@@ -197,7 +197,11 @@ function App() {
       });
 
     // 冷启动：前端就绪后立即拉取一次
-    processPending().finally(() => setPendingDeepLinkChecked(true));
+    // Auto-connect waits on this flag, so it must flip even when the pull
+    // fails — otherwise a failed IPC would disable connect-on-launch.
+    processPending()
+      .catch((e) => console.error('Failed to process pending deep link:', e))
+      .finally(() => setPendingDeepLinkChecked(true));
 
     // 热启动信号：on_open_url 存入 pending 后发出，WebView 就绪时收到
     const unlistenSignal = listen('deep_link_pending', () => processPending());

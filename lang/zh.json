@@ -177,7 +177,6 @@
     "please_wait_releasing_resources": "请稍候，正在释放资源...",
     "proxy_rules_info": "经代理连出",
     "proxy_port": "代理端口",
-    "proxy_port_desc": "HTTP/SOCKS 混合入站端口",
     "proxy_port_invalid": "端口必须在 1 到 65535 之间",
     "proxy_mode": "代理模式",
     "proxy_mode_system": "系统代理",

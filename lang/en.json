@@ -177,7 +177,6 @@
     "please_wait_releasing_resources": "Please wait, releasing resources...",
     "proxy_rules_info": "Goes out through the proxy",
     "proxy_port": "Proxy port",
-    "proxy_port_desc": "HTTP/SOCKS mixed inbound",
     "proxy_port_invalid": "Port must be between 1 and 65535",
     "proxy_mode": "Proxy mode",
     "proxy_mode_system": "System proxy",
