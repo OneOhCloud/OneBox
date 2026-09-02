@@ -28,6 +28,9 @@ export const DEFAULT_BYPASS_ROUTER_WATCHDOG_INTERVAL: BypassRouterWatchdogInterv
 export const USER_AGENT_STORE_KEY = 'user_agent_key'
 export const DEFAULT_PROXY_PORT = 6789
 export const PROXY_PORT_STORE_KEY = 'proxy_port_key'
+// The LAN row shows `<lan-ip>:<port>`, so it needs to hear about port edits
+// made in the proxy sheet.
+export const PROXY_PORT_CHANGED_EVENT = 'onebox-proxy-port-changed'
 
 // 上次检查更新的时间戳（ms），跨会话持久化
 export const LAST_UPDATE_CHECK_TIME_KEY = 'last_update_check_time_key'

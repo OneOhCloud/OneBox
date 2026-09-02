@@ -1,26 +1,24 @@
-import { invoke } from "@tauri-apps/api/core";
-import { message } from "@tauri-apps/plugin-dialog";
 import { useEffect, useState } from "react";
-import { Cpu, Modem, Router } from "react-bootstrap-icons";
+import { Cpu, Modem } from "react-bootstrap-icons";
 import { toast } from "sonner";
 import { useEngineState } from "../../hooks/useEngineState";
 import {
-    getAllowLan,
     getProxyPort,
     getProxyTransportMode,
     isBypassRouterEnabled,
-    setAllowLan,
     setProxyPort,
     setProxyTransportMode,
 } from "../../single/store";
-import { DEFAULT_PROXY_PORT, ProxyTransportMode } from "../../types/definition";
+import {
+    DEFAULT_PROXY_PORT,
+    PROXY_PORT_CHANGED_EVENT,
+    ProxyTransportMode,
+} from "../../types/definition";
 import { t, vpnServiceManager } from "../../utils/helper";
 import { IOSTextField } from "../common/ios-text-field";
 import { RadioOption, RadioOptionList } from "../common/radio-option-list";
 import { SettingsModal } from "../common/settings-modal";
-import { SettingItem, ToggleSetting } from "./common";
-
-const NO_LAN_ADDRESS = "127.0.0.1";
+import { SettingItem } from "./common";
 
 function normalizePort(value: string): number | null {
     const port = Number(value.trim());
@@ -28,15 +26,6 @@ function normalizePort(value: string): number | null {
         return null;
     }
     return port;
-}
-
-async function getLanIP(): Promise<string> {
-    try {
-        return await invoke<string>("get_lan_ip");
-    } catch (error) {
-        console.error("Failed to get LAN IP:", error);
-        return NO_LAN_ADDRESS;
-    }
 }
 
 function modeLabel(mode: ProxyTransportMode): string {
@@ -62,12 +51,10 @@ function modeDescription(mode: ProxyTransportMode): string {
 }
 
 /**
- * Everything that decides how traffic reaches OneBox: the three mutually
- * exclusive transport modes, the port they listen on, and who may reach it.
- *
- * All three are staged until Save. What Save then does depends on what moved —
- * mode and port need the engine stopped, LAN access only needs a reload — so
- * flipping LAN alone never costs a reconnect.
+ * The three transport modes are mutually exclusive, so they are one radio
+ * group rather than the boolean pair they used to be. The listening port
+ * lives in the same sheet because it applies to all three, and both are
+ * staged until Save so switching mode costs a single engine stop.
  */
 export default function ProxyModeSetting() {
     const engineState = useEngineState();
@@ -75,29 +62,21 @@ export default function ProxyModeSetting() {
     const [isLoading, setIsLoading] = useState(false);
     const [mode, setMode] = useState<ProxyTransportMode>("system");
     const [port, setPort] = useState(DEFAULT_PROXY_PORT);
-    const [allowLan, setAllowLanState] = useState(false);
-    const [lanIP, setLanIP] = useState(NO_LAN_ADDRESS);
     const [useBypassRouter, setUseBypassRouter] = useState(false);
     const [draftMode, setDraftMode] = useState<ProxyTransportMode>("system");
     const [draftPort, setDraftPort] = useState(DEFAULT_PROXY_PORT.toString());
-    const [draftLan, setDraftLan] = useState(false);
 
     const loadState = async () => {
-        const [savedMode, savedPort, savedLan, bypassRouter, ip] = await Promise.all([
+        const [savedMode, savedPort, bypassRouter] = await Promise.all([
             getProxyTransportMode(),
             getProxyPort(),
-            getAllowLan(),
             isBypassRouterEnabled(),
-            getLanIP(),
         ]);
         setMode(savedMode);
         setPort(savedPort);
-        setAllowLanState(savedLan);
         setUseBypassRouter(bypassRouter);
-        setLanIP(ip);
         setDraftMode(savedMode);
         setDraftPort(savedPort.toString());
-        setDraftLan(savedLan);
     };
 
     useEffect(() => {
@@ -117,17 +96,6 @@ export default function ProxyModeSetting() {
         sublabel: modeDescription(key),
     }));
 
-    const handleToggleLan = async () => {
-        if (!draftLan && lanIP === NO_LAN_ADDRESS) {
-            await message(t("cannot_open_lan_connection"), {
-                title: t("error"),
-                kind: "error",
-            });
-            return;
-        }
-        setDraftLan(!draftLan);
-    };
-
     const handleSave = async () => {
         if (parsedPort === null) {
             toast.error(t("proxy_port_invalid"));
@@ -136,17 +104,12 @@ export default function ProxyModeSetting() {
 
         const modeChanged = draftMode !== mode;
         const portChanged = parsedPort !== port;
-        const lanChanged = draftLan !== allowLan;
-        if (!modeChanged && !portChanged && !lanChanged) {
+        if (!modeChanged && !portChanged) {
             setIsOpen(false);
             return;
         }
 
-        const isRunning = engineState.kind === "running";
-        // Mode and port are baked into the running process; LAN access only
-        // changes which address the inbound binds to, which a reload picks up.
-        const needsStop = isRunning && (modeChanged || portChanged);
-        const needsReload = isRunning && !needsStop;
+        const needsStop = engineState.kind === "running";
 
         setIsLoading(true);
         try {
@@ -158,15 +121,18 @@ export default function ProxyModeSetting() {
                     await vpnServiceManager.stop();
                 }
                 if (modeChanged) await setProxyTransportMode(draftMode);
-                if (portChanged) await setProxyPort(parsedPort);
-                if (lanChanged) await setAllowLan(draftLan);
+                if (portChanged) {
+                    await setProxyPort(parsedPort);
+                    // The LAN row renders `<lan-ip>:<port>`; nothing else links
+                    // the two components.
+                    window.dispatchEvent(
+                        new CustomEvent<number>(PROXY_PORT_CHANGED_EVENT, {
+                            detail: parsedPort,
+                        }),
+                    );
+                }
                 setMode(draftMode);
                 setPort(parsedPort);
-                setAllowLanState(draftLan);
-                if (needsReload) {
-                    await vpnServiceManager.syncConfig({});
-                    await vpnServiceManager.reload(1000);
-                }
             };
 
             if (needsStop) {
@@ -205,7 +171,6 @@ export default function ProxyModeSetting() {
                 onPress={() => {
                     setDraftMode(mode);
                     setDraftPort(port.toString());
-                    setDraftLan(allowLan);
                     loadState();
                     setIsOpen(true);
                 }}
@@ -242,20 +207,6 @@ export default function ProxyModeSetting() {
                         monospace
                         onSubmit={handleSave}
                     />
-                </div>
-                <div
-                    className="mt-4 pt-3"
-                    style={{ borderTop: "0.5px solid var(--onebox-separator)" }}
-                >
-                    <div className="onebox-grouped-list">
-                        <ToggleSetting
-                            icon={<Router className="text-[#5856D6]" size={22} />}
-                            title={t("allow_lan_connection")}
-                            subTitle={`${lanIP}:${parsedPort ?? port}`}
-                            isEnabled={draftLan}
-                            onToggle={handleToggleLan}
-                        />
-                    </div>
                 </div>
             </SettingsModal>
         </>
