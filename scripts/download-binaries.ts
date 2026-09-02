@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { x } from 'tar';
 import unzipper from 'unzipper';
-import { SING_BOX_VERSION } from '../src/types/definition.ts';
+import { SING_BOX_TEMPLATE_VERSION, SING_BOX_VERSION } from '../src/types/definition.ts';
 
 const BINARY_NAME = 'sing-box';
 const GITHUB_RELEASE_URL = 'https://github.com/SagerNet/sing-box/releases/download/';
@@ -227,15 +227,19 @@ async function downloadCronetLibraries(): Promise<void> {
 
 // Upstream conf-template still publishes v1-named rule caches; rename to v2
 // on save so OneBox's v2 migration picks them up without touching upstream.
+// The version segment tracks SING_BOX_TEMPLATE_VERSION so the rule cache can
+// never drift away from the config templates it was generated against.
 async function downloadDatabaseFiles(): Promise<void> {
+    const dbBaseUrl =
+        `https://github.com/OneOhCloud/conf-template/raw/refs/heads/database/database/stable/${SING_BOX_TEMPLATE_VERSION}/zh-cn`;
     const dbFiles = [
         {
             name: 'mixed-cache-rule-v2.db',
-            url: 'https://github.com/OneOhCloud/conf-template/raw/refs/heads/database/database/stable/1.13/zh-cn/mixed-cache-rule-v1.db',
+            url: `${dbBaseUrl}/mixed-cache-rule-v1.db`,
         },
         {
             name: 'tun-cache-rule-v2.db',
-            url: 'https://github.com/OneOhCloud/conf-template/raw/refs/heads/database/database/stable/1.13/zh-cn/tun-cache-rule-v1.db'
+            url: `${dbBaseUrl}/tun-cache-rule-v1.db`,
         }
     ];
 
