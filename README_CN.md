@@ -14,7 +14,7 @@
   </p>
 
   <p>
-    <a href="https://github.com/SagerNet/sing-box"><img alt="sing-box 最新版本" src="https://repology.org/badge/version-for-repo/homebrew/sing-box.svg?header=sing-box"></a>
+    <a href="https://github.com/SagerNet/sing-box"><img alt="sing-box 最新版本" src="https://img.shields.io/github/v/tag/SagerNet/sing-box?filter=v*&label=sing-box&sort=semver"></a>
     <a href="https://github.com/OneOhCloud/OneBox/releases"><img alt="GitHub Release" src="https://img.shields.io/github/v/release/OneOhCloud/OneBox?display_name=tag&sort=semver"></a>
     <a href="./LICENSE"><img alt="许可证" src="https://img.shields.io/badge/license-Apache--2.0-blue"></a>
   </p>
