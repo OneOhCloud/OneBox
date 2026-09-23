@@ -126,6 +126,27 @@ pub(crate) async fn probe_dns_reachable(dns: &str) -> bool {
     rx.recv().await.is_some()
 }
 
+/// Probe `entries` in order and return the first one `probe` reports
+/// reachable. Sequential on purpose: the order is the user's resolver
+/// preference, and the first live one is all the callers need.
+// Only the macOS DNS restore / repair paths consume it.
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+pub(crate) async fn first_reachable<'a, F, Fut>(
+    entries: &[&'a str],
+    mut probe: F,
+) -> Option<&'a str>
+where
+    F: FnMut(&'a str) -> Fut,
+    Fut: std::future::Future<Output = bool>,
+{
+    for &entry in entries {
+        if probe(entry).await {
+            return Some(entry);
+        }
+    }
+    None
+}
+
 /// Race every DNS server in DNSSERVERDICT in parallel; return the first
 /// one that replies. Falls back to 223.5.5.5 if all fail.
 pub async fn get_best_dns_server() -> Option<String> {
@@ -324,6 +345,39 @@ mod tests {
     fn dns_socket_addr_rejects_non_ip() {
         assert_eq!(dns_socket_addr("dns.google"), None);
         assert_eq!(dns_socket_addr(""), None);
+    }
+
+    #[tokio::test]
+    async fn first_reachable_returns_none_when_all_unreachable() {
+        let found =
+            first_reachable(&["172.19.0.2", "fdfe:dcba:9876::2"], |_| async { false }).await;
+        assert_eq!(found, None);
+    }
+
+    #[tokio::test]
+    async fn first_reachable_returns_first_alive_in_order() {
+        let found = first_reachable(&["172.19.0.2", "223.5.5.5", "223.6.6.6"], |ip| async move {
+            ip.starts_with("223.")
+        })
+        .await;
+        assert_eq!(found, Some("223.5.5.5"));
+    }
+
+    #[tokio::test]
+    async fn first_reachable_stops_probing_after_first_alive() {
+        let mut probed = Vec::new();
+        first_reachable(&["223.5.5.5", "223.6.6.6"], |ip| {
+            probed.push(ip);
+            async { true }
+        })
+        .await;
+        assert_eq!(probed, vec!["223.5.5.5"]);
+    }
+
+    #[tokio::test]
+    async fn first_reachable_on_empty_list_is_none() {
+        let found = first_reachable(&[], |_| async { true }).await;
+        assert_eq!(found, None);
     }
 
     #[test]

@@ -15,6 +15,16 @@ pub enum ProxyMode {
     TunProxy,
 }
 
+/// Result of a user-triggered system DNS repair, serialized for the frontend.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DnsRepairOutcome {
+    /// Unreachable DNS servers were cleared; the service is back on DHCP.
+    Repaired,
+    /// Already on DHCP, or at least one configured server still answers.
+    NothingToRepair,
+}
+
 /// Platform-specific sing-box engine management.
 ///
 /// `core::*` is only allowed to call the five verbs on this trait —
@@ -82,6 +92,14 @@ pub trait EngineManager {
     /// companion is installed.
     async fn ensure_installed(app: &AppHandle) -> Result<(), String>;
 
+    /// Clear system DNS servers that no longer answer (e.g. a TUN address
+    /// another tool left behind after crashing), falling back to DHCP.
+    /// User-triggered from the home WLAN indicator. Only macOS implements
+    /// it — the stale-DNS failure has only been observed there.
+    async fn repair_system_dns(_app: &AppHandle) -> Result<DnsRepairOutcome, String> {
+        Err("DNS repair is not supported on this platform".to_string())
+    }
+
     /// Smoke-test that the privileged companion is reachable. macOS does
     /// an XPC `ping`, Windows queries the SCM service state, Linux stats
     /// the helper script on disk. Returns a short human-readable string
@@ -122,6 +140,11 @@ pub mod windows;
 #[tauri::command]
 pub async fn engine_ensure_installed(app: AppHandle) -> Result<(), String> {
     PlatformEngine::ensure_installed(&app).await
+}
+
+#[tauri::command]
+pub async fn engine_repair_system_dns(app: AppHandle) -> Result<DnsRepairOutcome, String> {
+    PlatformEngine::repair_system_dns(&app).await
 }
 
 /// Dev probe: round-trip a liveness check to the privileged companion.

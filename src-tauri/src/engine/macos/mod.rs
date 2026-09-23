@@ -3,9 +3,10 @@ pub mod helper;
 pub(crate) mod watchdog;
 
 use self::helper as macos_helper;
+use crate::commands::dns::{first_reachable, probe_dns_reachable};
 use crate::engine::helper::extract_tun_gateway_from_config;
 use crate::engine::sysproxy::{clear_system_proxy, set_system_proxy};
-use crate::engine::EngineManager;
+use crate::engine::{DnsRepairOutcome, EngineManager};
 use std::process::Command;
 use std::sync::Mutex;
 use tauri::AppHandle;
@@ -622,14 +623,11 @@ async fn verify_and_fallback(applied: Option<&(String, String)>) {
         log::info!("[dns] phase 2 [{}] kept DHCP default (no probe)", service);
         return;
     }
-    let mut alive_ip: Option<String> = None;
-    for ip in original.split_whitespace() {
+    let alive_ip = first_reachable(&dns_entries(original), |ip| {
         log::info!("[dns] phase 2 probe [{}] → {} ...", service, ip);
-        if crate::commands::dns::probe_dns_reachable(ip).await {
-            alive_ip = Some(ip.to_string());
-            break;
-        }
-    }
+        probe_dns_reachable(ip)
+    })
+    .await;
     if let Some(ip) = alive_ip {
         log::info!(
             "[dns] phase 2 [{}] {} alive, keeping original '{}'",
@@ -722,6 +720,60 @@ pub async fn restore_system_dns() -> Result<(), String> {
     verify_and_fallback(applied.as_ref()).await;
     log::info!("[dns] crash-path restore: complete");
     Ok(())
+}
+
+/// User-triggered repair for DNS OneBox did not write: another tool's TUN
+/// peer address (e.g. `172.19.0.2`) left in Setup after that tool died
+/// without restoring it, which breaks every lookup outside a proxy.
+///
+/// Refuses while OneBox's own TUN holds the override — that session owns
+/// the primary service's DNS and restores it on stop. Reads the slot only;
+/// never writes it (see the ACTIVE_OVERRIDE invariants in
+/// docs/claude/dns-override.md). Writes `"empty"` rather than a public
+/// resolver for the same self-propagation reason as `verify_and_fallback`.
+async fn repair_unreachable_system_dns(app: &AppHandle) -> Result<DnsRepairOutcome, String> {
+    if let Some(active) = active_override_snapshot() {
+        log::info!(
+            "[dns] repair: refused, TUN override active on [{}]",
+            active.service
+        );
+        return Err("TUN mode manages system DNS; stop it first".to_string());
+    }
+    let service = detect_active_network_service()?;
+    let current = read_service_dns(&service);
+    if current == "empty" {
+        log::info!("[dns] repair: [{}] already automatic (DHCP)", service);
+        return Ok(DnsRepairOutcome::NothingToRepair);
+    }
+    if let Some(ip) = first_reachable(&dns_entries(&current), probe_dns_reachable).await {
+        log::info!(
+            "[dns] repair: [{}] {} answers, keeping '{}'",
+            service,
+            ip,
+            current
+        );
+        return Ok(DnsRepairOutcome::NothingToRepair);
+    }
+
+    MacOSEngine::ensure_installed(app).await?;
+    log::warn!(
+        "[dns] repair: [{}] all of '{}' unreachable, writing empty (DHCP)",
+        service,
+        current
+    );
+    let target = service.clone();
+    tokio::task::spawn_blocking(move || macos_helper::api::set_dns_servers(&target, "empty"))
+        .await
+        .map_err(|e| format!("repair join error: {}", e))?
+        .inspect_err(|e| log::warn!("[dns] repair: [{}] write failed: {}", service, e))?;
+    tokio::task::spawn_blocking(macos_helper::api::flush_dns_cache)
+        .await
+        .ok();
+    log::info!(
+        "[dns] repair: [{}] now automatic (DHCP), cache flushed",
+        service
+    );
+    Ok(DnsRepairOutcome::Repaired)
 }
 
 // ============================================================================
@@ -943,6 +995,10 @@ impl EngineManager for MacOSEngine {
         tokio::task::spawn_blocking(ensure_helper_installed)
             .await
             .map_err(|e| format!("ensure_installed join error: {}", e))?
+    }
+
+    async fn repair_system_dns(app: &AppHandle) -> Result<DnsRepairOutcome, String> {
+        repair_unreachable_system_dns(app).await
     }
 
     async fn probe(_app: &AppHandle) -> Result<String, String> {

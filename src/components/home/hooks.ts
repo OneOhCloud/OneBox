@@ -10,6 +10,7 @@ import { getAutoConnect, getProxyPort, getStoreValue, setStoreValue } from "../.
 import { GET_SUBSCRIPTIONS_LIST_SWR_KEY, RULE_MODE_STORE_KEY, SSI_STORE_KEY } from "../../types/definition";
 import { AutoConnectGate, shouldAutoConnect } from "../../utils/auto-connect";
 import { t, vpnServiceManager } from "../../utils/helper";
+import { toWlanStatus, WlanStatus } from "../../utils/wlan-status";
 import type { DeepLinkApplyPhase } from "./deep-link-apply-progress-modal";
 
 
@@ -18,14 +19,15 @@ export function useNetworkCheck(key: string, checkFn: () => Promise<number>) {
     const [shouldRefresh, setShouldRefresh] = useState(true);
     const [confirmShown, setConfirmShown] = useState(false);
 
-    async function handleNetworkCheck() {
+    async function handleNetworkCheck(): Promise<WlanStatus> {
+        // Polling pauses while the captive-portal login prompt is pending.
         if (!shouldRefresh) {
-            return false
+            return 'captive_portal';
         }
 
         try {
-            const status = await checkFn();
-            if (status == 1 && !confirmShown) {
+            const status = toWlanStatus(await checkFn());
+            if (status === 'captive_portal' && !confirmShown) {
                 setShouldRefresh(false);
                 setConfirmShown(true);
                 const answer = await confirm(t("network_need_login"), {
@@ -49,11 +51,10 @@ export function useNetworkCheck(key: string, checkFn: () => Promise<number>) {
                 }, 15000);
             }
 
-            //  状态为 0 代表网络正常。
-            return status == 0;
+            return status;
         } catch (error) {
             console.error(`Network check failed: ${error}`);
-            return false;
+            return 'unreachable';
         }
 
     }

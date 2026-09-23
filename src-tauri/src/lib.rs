@@ -72,6 +72,7 @@ pub fn run() {
             commands::theme::set_native_window_theme,
             engine::engine_probe,
             engine::engine_ensure_installed,
+            engine::engine_repair_system_dns,
             commands::prestart::prestart_check,
             commands::prestart::kill_orphans,
         ])

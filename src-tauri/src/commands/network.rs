@@ -1,5 +1,8 @@
 //! LAN reachability + captive-portal probes exposed as Tauri commands.
 
+use std::sync::Mutex;
+use std::time::Duration;
+
 use tauri::http::{header::LOCATION, StatusCode};
 use tauri::AppHandle;
 use tauri_plugin_http::reqwest::{self, redirect::Policy};
@@ -146,30 +149,101 @@ pub async fn open_browser(app: AppHandle, url: String) -> Result<(), String> {
     }
 }
 
-/// Returns: -1 unreachable, 0 reachable, 1 behind captive portal.
-///
-/// Any replacement URL must: reach from both mainland China and overseas,
+/// Any replacement host must: reach from both mainland China and overseas,
 /// speak plain HTTP with no redirect required, and resolve to IPv4 only
 /// (any IPv6 record causes a false positive in v4-only networks).
-#[tauri::command]
-pub async fn check_captive_portal_status() -> i8 {
-    let url = "http://captive.apple.com/";
+const CAPTIVE_PROBE_HOST: &str = "captive.apple.com";
 
-    let client = build_no_redirect_client();
-    match client.get(url).send().await {
+/// Resolved separately from the HTTP request: a stalled system resolver
+/// would otherwise run into the 10 s client timeout and be reported as a
+/// generic unreachable network instead of a DNS failure.
+const CAPTIVE_DNS_TIMEOUT: Duration = Duration::from_secs(3);
+
+/// WLAN probe outcome. The discriminant is the wire value decoded by the
+/// frontend's `toWlanStatus`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(i8)]
+enum CaptiveProbeStatus {
+    DnsFailed = -2,
+    Unreachable = -1,
+    Online = 0,
+    CaptivePortal = 1,
+}
+
+/// The frontend polls every 5 s; only a status change is worth an info line.
+static LAST_CAPTIVE_STATUS: Mutex<Option<CaptiveProbeStatus>> = Mutex::new(None);
+
+fn classify_http_status(status: StatusCode) -> CaptiveProbeStatus {
+    if status == StatusCode::OK {
+        CaptiveProbeStatus::Online
+    } else if status.is_redirection() {
+        CaptiveProbeStatus::CaptivePortal
+    } else {
+        CaptiveProbeStatus::Unreachable
+    }
+}
+
+/// reqwest's top-level message ("error sending request for url") hides the
+/// cause; the source chain carries it.
+fn error_chain(error: &dyn std::error::Error) -> String {
+    let mut message = error.to_string();
+    let mut source = error.source();
+    while let Some(cause) = source {
+        message.push_str(": ");
+        message.push_str(&cause.to_string());
+        source = cause.source();
+    }
+    message
+}
+
+async fn resolve_captive_probe_host() -> Result<(), String> {
+    match tokio::time::timeout(
+        CAPTIVE_DNS_TIMEOUT,
+        tokio::net::lookup_host((CAPTIVE_PROBE_HOST, 80)),
+    )
+    .await
+    {
+        Err(_) => Err(format!("lookup timed out after {:?}", CAPTIVE_DNS_TIMEOUT)),
+        Ok(Err(e)) => Err(e.to_string()),
+        Ok(Ok(mut addresses)) => match addresses.next() {
+            Some(_) => Ok(()),
+            None => Err("lookup returned no addresses".to_string()),
+        },
+    }
+}
+
+/// Returns the status plus a human-readable detail for the log line.
+async fn probe_captive_portal() -> (CaptiveProbeStatus, String) {
+    if let Err(detail) = resolve_captive_probe_host().await {
+        return (CaptiveProbeStatus::DnsFailed, detail);
+    }
+    let url = format!("http://{}/", CAPTIVE_PROBE_HOST);
+    match build_no_redirect_client().get(url).send().await {
         Ok(response) => {
             let status = response.status();
-            if status == StatusCode::OK {
-                0
-            } else if status.is_redirection() {
-                1
-            } else {
-                log::error!("Unexpected status code: {}", status);
-                -1
-            }
+            (classify_http_status(status), format!("http {}", status))
         }
-        Err(_) => -1,
+        Err(e) => (CaptiveProbeStatus::Unreachable, error_chain(&e)),
     }
+}
+
+fn log_captive_status(status: CaptiveProbeStatus, detail: &str) {
+    let previous = LAST_CAPTIVE_STATUS
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .replace(status);
+    if previous == Some(status) {
+        log::debug!("[captive] {:?} unchanged ({})", status, detail);
+    } else {
+        log::info!("[captive] {:?} -> {:?} ({})", previous, status, detail);
+    }
+}
+
+#[tauri::command]
+pub async fn check_captive_portal_status() -> i8 {
+    let (status, detail) = probe_captive_portal().await;
+    log_captive_status(status, &detail);
+    status as i8
 }
 
 #[tauri::command]
@@ -227,5 +301,61 @@ mod tests {
         assert!(is_private_ip("10.0.0.1"));
         assert!(is_private_ip("192.168.1.1"));
         assert!(!is_private_ip("8.8.8.8"));
+    }
+
+    #[test]
+    fn captive_http_200_is_online() {
+        assert_eq!(
+            classify_http_status(StatusCode::OK),
+            CaptiveProbeStatus::Online
+        );
+    }
+
+    #[test]
+    fn captive_http_redirect_is_captive_portal() {
+        assert_eq!(
+            classify_http_status(StatusCode::FOUND),
+            CaptiveProbeStatus::CaptivePortal
+        );
+    }
+
+    #[test]
+    fn captive_http_other_status_is_unreachable() {
+        assert_eq!(
+            classify_http_status(StatusCode::INTERNAL_SERVER_ERROR),
+            CaptiveProbeStatus::Unreachable
+        );
+    }
+
+    #[test]
+    fn captive_status_wire_values_match_frontend_contract() {
+        assert_eq!(CaptiveProbeStatus::DnsFailed as i8, -2);
+        assert_eq!(CaptiveProbeStatus::Unreachable as i8, -1);
+        assert_eq!(CaptiveProbeStatus::Online as i8, 0);
+        assert_eq!(CaptiveProbeStatus::CaptivePortal as i8, 1);
+    }
+
+    #[derive(Debug)]
+    struct SendError(std::io::Error);
+
+    impl std::fmt::Display for SendError {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            f.write_str("error sending request")
+        }
+    }
+
+    impl std::error::Error for SendError {
+        fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+            Some(&self.0)
+        }
+    }
+
+    #[test]
+    fn error_chain_joins_every_source() {
+        let error = SendError(std::io::Error::other("connection refused"));
+        assert_eq!(
+            error_chain(&error),
+            "error sending request: connection refused"
+        );
     }
 }

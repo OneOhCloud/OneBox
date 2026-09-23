@@ -1,6 +1,6 @@
 # System DNS Override Flow
 
-> **Claude-facing, not human-facing.** Optimised for Claude execution; see [`README.md`](README.md) for directory-wide conventions (preamble shape, `Do not X` framing, file:line style). Read when touching `engine/macos/mod.rs`, `engine/macos/dns_watcher.rs`, `engine/linux/mod.rs`, `engine/windows/native.rs`, `tun-service/src/dns.rs`, `commands/dns.rs`, or `core/monitor.rs::handle_process_termination`. Paths are repo-relative; if anything here disagrees with the code, trust the code and update this file.
+> **Claude-facing, not human-facing.** Optimised for Claude execution; see [`README.md`](README.md) for directory-wide conventions (preamble shape, `Do not X` framing, file:line style). Read when touching `engine/macos/mod.rs`, `engine/macos/dns_watcher.rs`, `engine/linux/mod.rs`, `engine/windows/native.rs`, `tun-service/src/dns.rs`, `commands/dns.rs`, `commands/network.rs::check_captive_portal_status`, or `core/monitor.rs::handle_process_termination`. Paths are repo-relative; if anything here disagrees with the code, trust the code and update this file.
 
 Core principle: **DNS override is a single directed "set" on the active (or every non-TUN) interface. Restore is targeted on macOS and Linux (re-apply per-service/iface captured originals; verify + fall back to best public DNS if the original is unreachable), and scorched-earth on Windows (enumerate → blank registry) because Windows' per-adapter restore would require a lot more state tracking for little user benefit.**
 
@@ -63,6 +63,32 @@ Restore is called from two paths:
    - Linux: `take_dns_override()` — drained on user-stop path, so this is a no-op there; on crash it's the only restore that runs.
    - Windows: if `!was_user_stop`, self-elevates via UAC to re-run `reset_all_interfaces_dns` (crash path only); user-stop path already cleaned up via the service.
 
+## macOS: user-triggered repair of foreign stale DNS
+
+Entry: home WLAN icon (`src/components/home/network-check.tsx::AppleNetworkStatus`) → `engine_repair_system_dns` (`src-tauri/src/engine/mod.rs`) → `engine/macos/mod.rs::repair_unreachable_system_dns`. Covers DNS that OneBox did **not** write — e.g. another TUN client's peer address (`172.19.0.2 fdfe:dcba:9876::2`) left in Setup after that client died without restoring. Every non-proxied lookup then times out while proxied traffic still works.
+
+Detection (`commands/network.rs::check_captive_portal_status`): resolve `captive.apple.com` via the system resolver with a 3 s timeout *before* the HTTP GET. Failure returns `CaptiveProbeStatus::DnsFailed` (`-2`). The separate timeout exists because a stalled resolver otherwise hits the 10 s client timeout and is reported as a generic `Unreachable` (`-1`). The frontend (`src/utils/wlan-status.ts::canRepairDns`) makes the icon clickable only for `dns_failed` on macOS.
+
+Repair decision (`repair_unreachable_system_dns`):
+
+| Condition | Action | Outcome |
+|---|---|---|
+| `ACTIVE_OVERRIDE` is `Some` | refuse (`Err`) | OneBox TUN owns the primary's DNS and restores it on stop |
+| primary Setup DNS is `"empty"` | none | `NothingToRepair` |
+| any configured server answers `probe_dns_reachable` (first hit via `commands/dns.rs::first_reachable`) | none | `NothingToRepair` |
+| every configured server is unreachable | `ensure_installed` → helper `set_dns_servers(service, "empty")` → `flush_dns_cache` | `Repaired` |
+
+The watcher (`dns_watcher.rs::on_dynamic_store_change`) early-returns on an empty slot, so the repair write never triggers a re-override.
+
+**Triage recipe**:
+
+```bash
+# Probe status transitions (info on change only; unchanged polls are debug):
+grep -E '\[captive\]' OneBox.log
+# Repair branch taken (refused / already automatic / kept / writing empty / write failed / now automatic):
+grep -E '\[dns\] repair:' OneBox.log
+```
+
 On top of restore, `PlatformEngine::restart` (the config-reload path) also flushes the OS DNS cache — `dscacheutil -flushcache` + `killall -HUP mDNSResponder` on macOS, `resolvectl flush-caches` on Linux (bundled into the pkexec `reload` verb), `ipconfig /flushdns` from the Windows service. Without this, stale FakeIP entries linger for up to sing-box's 600s DNS TTL after a mode switch.
 
 ## What we deliberately DON'T do
@@ -76,6 +102,11 @@ On top of restore, `PlatformEngine::restart` (the config-reload path) also flush
 - **No public-DNS fallback in `verify_and_fallback` on probe failure.** When all probes of the `captured` value fail, `engine/macos/mod.rs::verify_and_fallback` writes `"empty"` to the service — **not** a hardcoded public resolver. Reason: any hardcoded fallback (prior design used `223.5.5.5` via `get_best_dns_server`) gets read back by the next `reapply_on_active_primary` → `read_service_dns` → committed to `ACTIVE_OVERRIDE.captured`, so the polluted value self-propagates across stop/start cycles. Writing `"empty"` gives control to DHCP, which in captive state is the portal hijacker — the only pre-auth resolver that answers. Accept cost: a user who had manually configured Setup DNS loses it after one NetworkDown/NetworkUp or stop cycle. **Do not reintroduce `get_best_dns_server` into this path — the pollution cycle is the blocker regardless of which fallback IP is chosen.** `get_best_dns_server` itself stays callable (used by `lib.rs`, `commands/config_fetch.rs`, `commands/dns.rs`); only its `verify_and_fallback` call site is removed.
 - **`EngineManager::on_network_down` is macOS-only.** The `NetworkDown → write Setup empty` release is implemented only in `engine/macos/mod.rs::release_dns_on_network_down`; Windows and Linux use the trait's default no-op in `engine/mod.rs`. Reason: Windows `NameServer` is owned by the SCM TUN service, so releasing from the app process needs a new SCM control verb or UAC self-elevation (unacceptable on every NetworkDown); Linux's lifecycle listener is gated behind `cfg(any(target_os = "windows", target_os = "macos"))` in `app/setup.rs::spawn_lifecycle_listener`, so no NetworkDown event exists on Linux. **Do not add a Windows impl that silently "releases" without actually rewriting the registry — either wire a proper SCM control verb or leave the default.**
 
+- **Repair: no automatic run.** `repair_unreachable_system_dns` runs only on an explicit click + confirm. Reason: it overwrites Setup DNS the user may have set; a manual resolver that is merely down for a while would be wiped without consent. Tempting because the probe already knows DNS is broken — don't wire the repair into the poll.
+- **Repair: no match on the TUN subnet.** Staleness is decided by UDP/53 reachability, not by address pattern. Reason: foreign clients leave different addresses (fake-IP ranges, other TUN subnets), and the TUN address lives in remotely overridable templates with no Rust constant — a hardcoded subnet would be a second source of truth. Tempting because the observed case was `172.19.0.2`.
+- **Repair: never touches `ACTIVE_OVERRIDE`.** It reads the slot (refuses when `Some`) and never writes it; see invariant 4 below.
+- **No bare `format!("{ip}:53")` socket addresses.** `commands/dns.rs::dns_socket_addr` builds `SocketAddr::new(ip, 53)`. Reason: the string form doesn't parse for IPv6 (needs brackets), which made every IPv6 resolver look dead and let `verify_and_fallback` reset a user's IPv6-only manual DNS to `"empty"`.
+
 **ACTIVE_OVERRIDE invariants (macOS)**:
 1. At most one entry, always representing the currently-active primary service (never a stale previous primary).
 2. The `captured` field is updated only by `reapply_on_active_primary` when it observes `current_dns != gateway` on the current primary — that's the user's latest intent.
@@ -86,9 +117,12 @@ On top of restore, `PlatformEngine::restart` (the config-reload path) also flush
 ## Files
 
 - `src-tauri/src/engine/common/helper.rs` — `extract_tun_gateway_from_config` (parses the rendered config for the TUN inbound's IPv4).
-- `src-tauri/src/engine/macos/mod.rs` — `ACTIVE_OVERRIDE` slot, `apply_system_dns_override` (public entry from TUN start + NetworkUp) and `reapply_on_active_primary` (shared state-machine driver; `dns_watcher` uses this directly with the cached gateway), `apply_captured_originals_sync` + `verify_and_fallback` (the two restore phases), `restore_system_dns` (crash-path wrapper), `read_service_dns`, `detect_active_network_service`, `stop_tun_process`. XPC calls go to the privileged helper in `engine/macos/helper.{rs,m}`.
+- `src-tauri/src/engine/macos/mod.rs` — `ACTIVE_OVERRIDE` slot, `apply_system_dns_override` (public entry from TUN start + NetworkUp) and `reapply_on_active_primary` (shared state-machine driver; `dns_watcher` uses this directly with the cached gateway), `apply_captured_originals_sync` + `verify_and_fallback` (the two restore phases), `restore_system_dns` (crash-path wrapper), `repair_unreachable_system_dns` (user-triggered repair), `read_service_dns`, `detect_active_network_service`, `stop_tun_process`. XPC calls go to the privileged helper in `engine/macos/helper.{rs,m}`.
 - `src-tauri/src/engine/macos/dns_watcher.rs` — SCDynamicStore watcher thread. `ensure_started()` is idempotent and called from `start_tun_via_helper`. Callback delegates to `reapply_on_active_primary`; early-returns when `ACTIVE_OVERRIDE` is `None`.
-- `src-tauri/src/commands/dns.rs` — `probe_dns_reachable` (single-server UDP/53 liveness probe, 500 ms timeout) and `get_best_dns_server` (races 29 public resolvers, picks the fastest). Consumed by the macOS verify pass.
+- `src-tauri/src/commands/dns.rs` — `probe_dns_reachable` (single-server UDP/53 liveness probe, 500 ms timeout), `dns_socket_addr` (IPv4/IPv6-safe `:53` endpoint), `first_reachable` (ordered first-alive search with an injected probe; shared by the verify pass and the repair) and `get_best_dns_server` (races 29 public resolvers, picks the fastest).
+- `src-tauri/src/commands/network.rs` — `check_captive_portal_status` (WLAN probe; `CaptiveProbeStatus::DnsFailed` is the repair trigger) with `[captive]` transition logging.
+- `src-tauri/src/engine/mod.rs` — `DnsRepairOutcome`, `EngineManager::repair_system_dns` (default `Err`, macOS-only override), `engine_repair_system_dns` command.
+- `src/utils/wlan-status.ts` / `src/components/home/network-check.tsx` — status decoding, `canRepairDns` gate, confirm → repair → re-probe.
 - `src-tauri/src/engine/linux/mod.rs` — `apply_system_dns_override` / `restore_system_dns`, `detect_active_iface`, `capture_original_dns`, `stop_tun_and_restore_dns` (pkexec), and the private `DNS_OVERRIDE` stash. Shell helper at `src-tauri/resources/linux/onebox-tun-helper` runs as root.
 - `src-tauri/src/engine/windows/native.rs` — `enumerate_interfaces`, `reset_all_interfaces_dns`, `self_elevate_helper` (used on the crash-recovery restore path). Pure native Win32 registry writes, no PowerShell.
 - `src-tauri/tun-service/src/dns.rs` — the SCM service's own copy of the same interface-enumeration + apply/reset logic, called from `service_main` on normal start and stop.
