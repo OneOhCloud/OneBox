@@ -48,15 +48,22 @@ pub(crate) fn is_ip_address(s: &str) -> bool {
 
 // ── DNS probe (benchmark) ─────────────────────────────────────────────
 
+/// UDP/53 endpoint of a resolver. Built from the parsed `IpAddr` rather than
+/// `format!("{ip}:53")`, which only parses for IPv4 — an IPv6 socket address
+/// needs brackets, so every IPv6 resolver used to look unreachable.
+fn dns_socket_addr(dns: &str) -> Option<SocketAddr> {
+    let ip: IpAddr = dns.parse().ok()?;
+    Some(SocketAddr::new(ip, 53))
+}
+
 pub(crate) async fn probe_dns_server(
     dns: String,
     tx: Option<mpsc::Sender<(String, std::time::Duration)>>,
 ) {
     let start = std::time::Instant::now();
 
-    let ns_addr: SocketAddr = match format!("{}:53", dns).parse() {
-        Ok(addr) => addr,
-        Err(_) => return,
+    let Some(ns_addr) = dns_socket_addr(&dns) else {
+        return;
     };
     let bind_addr = if ns_addr.is_ipv4() {
         "0.0.0.0:0"
@@ -295,6 +302,28 @@ mod tests {
             .is_test(true)
             .filter_level(log::LevelFilter::Info)
             .try_init();
+    }
+
+    #[test]
+    fn dns_socket_addr_targets_port_53_for_ipv4() {
+        assert_eq!(
+            dns_socket_addr("223.5.5.5"),
+            Some("223.5.5.5:53".parse().unwrap())
+        );
+    }
+
+    #[test]
+    fn dns_socket_addr_brackets_ipv6() {
+        assert_eq!(
+            dns_socket_addr("fdfe:dcba:9876::2"),
+            Some("[fdfe:dcba:9876::2]:53".parse().unwrap())
+        );
+    }
+
+    #[test]
+    fn dns_socket_addr_rejects_non_ip() {
+        assert_eq!(dns_socket_addr("dns.google"), None);
+        assert_eq!(dns_socket_addr(""), None);
     }
 
     #[test]
