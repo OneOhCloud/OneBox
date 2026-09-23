@@ -131,10 +131,14 @@ fn tunnel_interfaces(base: &Value) -> Vec<String> {
 
 async fn confirmed_policy(base: &Value, current: &Policy) -> Option<Policy> {
     let mut confirmation = probe::Confirmation::default();
+    let mut preferred = current.clone();
     for _ in 0..2 {
         let network = native::snapshot(&tunnel_interfaces(base)).ok()?;
         let observation =
-            probe::observe(Arc::new(native::NativeProbe), network.clone(), current).await;
+            probe::observe(Arc::new(native::NativeProbe), network.clone(), &preferred).await;
+        if let Some(policy) = &observation {
+            preferred = policy.clone();
+        }
         if let Some(policy) = confirmation.observe(&network, observation, current) {
             return Some(policy);
         }
@@ -145,6 +149,7 @@ async fn confirmed_policy(base: &Value, current: &Policy) -> Option<Policy> {
 pub(crate) async fn start(base: &str, sidecar: &str) -> Result<String, String> {
     cancel();
     let base_content = read_base(base).await?;
+    let preparation_started = std::time::Instant::now();
     let policy = confirmed_policy(&base_content, &Policy::SystemDefault)
         .await
         .unwrap_or(Policy::SystemDefault);
@@ -157,7 +162,11 @@ pub(crate) async fn start(base: &str, sidecar: &str) -> Result<String, String> {
         content,
         policy,
     };
-    log::info!("[egress] initial policy: {:?}", session.policy);
+    log::info!(
+        "[egress] initial policy: {:?}; preparation={}ms",
+        session.policy,
+        preparation_started.elapsed().as_millis()
+    );
     let retired = SESSION
         .lock()
         .unwrap_or_else(|error| error.into_inner())

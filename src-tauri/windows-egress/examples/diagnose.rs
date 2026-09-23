@@ -9,6 +9,7 @@ async fn main() {
                 network.interface,
                 network.sources.len()
             );
+            let started = std::time::Instant::now();
             println!(
                 "Observed policy: {:?}",
                 probe::observe(
@@ -18,6 +19,7 @@ async fn main() {
                 )
                 .await
             );
+            println!("Probe elapsed: {}ms", started.elapsed().as_millis());
         }
         Err(error) => {
             eprintln!("{error}");

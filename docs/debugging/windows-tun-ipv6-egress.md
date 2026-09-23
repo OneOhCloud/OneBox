@@ -24,7 +24,11 @@ for interface aliases such as `以太网`.
 `src-tauri/windows-egress` enumerates Windows default routes and preferred global
 unicast sources through IP Helper. Probes are TCP/443 connections explicitly bound
 to the selected egress interface, using two AliDNS dual-stack endpoints. Default
-IPv6 is tried first, then candidate sources with bounded concurrency. Every socket
+IPv6, IPv4 control and candidate sources run concurrently, with at most eight
+candidates in flight. A successful endpoint completes its pair immediately. A
+healthy candidate allows a 50 ms grace period for a healthy default or preferred
+source, then cancels outstanding probes. Negative conclusions still require all
+IPv6 probes to fail and a successful IPv4 control. Every socket
 has a two-second deadline; a round has a six-second deadline. Offline, incomplete,
 and setup-error observations do not trigger IPv4 fallback.
 
@@ -84,3 +88,21 @@ previous runtime content and running state intact. After Stop, the app remained
 idle beyond the 60-second monitor interval; a subsequent Start succeeded. Actual
 service activation rollback is covered by fake-activation tests; the live rejection
 experiment exercises validation before activation, not that rollback branch.
+
+## Startup latency regression (2026-09-23)
+
+The initial implementation waited for the default-source timeout before trying
+candidates, waited for both endpoints even after one succeeded, and then waited
+for all failed candidates and the IPv4 control. Two confirmation rounds stacked
+these waits into roughly eight seconds before service activation.
+
+Two paused-clock regressions reproduced the unnecessary waits before the fix:
+a healthy candidate took four seconds, and one healthy endpoint with a stalled
+peer took two seconds. Both now finish within 100 ms. The original offline,
+incomplete-observation, deadline and confirmation tests continue to pass.
+
+On the affected Windows host, a native probe selected a healthy IPv6 source in
+63 ms. The rebuilt app completed both confirmations and runtime validation in
+225 ms; the log interval from Start to Running was approximately two seconds.
+Baidu and Google remained reachable over both IPv4 and IPv6. Dependencies were
+checked again and were already at the newest compatible versions.

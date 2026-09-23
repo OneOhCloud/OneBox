@@ -37,16 +37,20 @@ async fn pair<P: Probe>(
     source: Option<IpAddr>,
     destinations: [std::net::SocketAddr; 2],
 ) -> Reachability {
-    let (first, second) = tokio::join!(
-        probe.connect(network, destinations[0], source),
-        probe.connect(network, destinations[1], source)
-    );
-    if [first, second].contains(&Reachability::Reachable) {
-        Reachability::Reachable
-    } else if [first, second].contains(&Reachability::Uncertain) {
-        Reachability::Uncertain
-    } else {
-        Reachability::Failed
+    let first = probe.connect(network, destinations[0], source);
+    let second = probe.connect(network, destinations[1], source);
+    tokio::pin!(first, second);
+    let (completed, remaining) = tokio::select! {
+        result = &mut first => (result, second),
+        result = &mut second => (result, first),
+    };
+    if completed == Reachability::Reachable {
+        return completed;
+    }
+    match remaining.await {
+        Reachability::Reachable => Reachability::Reachable,
+        Reachability::Failed if completed == Reachability::Failed => Reachability::Failed,
+        _ => Reachability::Uncertain,
     }
 }
 
@@ -57,56 +61,91 @@ pub async fn observe<P: Probe>(
 ) -> Option<Policy> {
     tokio::time::timeout(Duration::from_secs(6), async {
         let ipv6 = TARGETS.map(|target| target.1.parse().expect("static IPv6 target"));
-        let default = pair(probe.as_ref(), &network, None, ipv6).await;
-        if default == Reachability::Reachable {
-            return Some(Policy::SystemDefault);
-        }
+        let ipv4 = TARGETS.map(|target| target.0.parse().expect("static IPv4 target"));
         let mut sources = network.sources.clone();
         if let Policy::BoundSource { interface, address } = current {
             if *interface == network.interface {
                 sources.sort_by_key(|source| source != address);
             }
         }
-        let mut candidates = tokio::task::JoinSet::new();
-        // Bound parallelism prevents a machine with many temporary addresses from flooding probes.
+        // Default, control and candidate probes must not serialize their failure timeouts.
+        let mut tasks = tokio::task::JoinSet::new();
         let permits = Arc::new(tokio::sync::Semaphore::new(8));
-        for (priority, source) in sources.into_iter().enumerate() {
+        for (priority, source, destinations) in std::iter::once((0, None, ipv6))
+            .chain(
+                sources
+                    .iter()
+                    .enumerate()
+                    .map(|(index, source)| (index + 1, Some(IpAddr::V6(*source)), ipv6)),
+            )
+            .chain(std::iter::once((usize::MAX, None, ipv4)))
+        {
             let probe = probe.clone();
             let network = network.clone();
             let permits = permits.clone();
-            candidates.spawn(async move {
-                let _permit = permits
-                    .acquire()
-                    .await
-                    .expect("probe semaphore remains open");
+            tasks.spawn(async move {
+                let _permit = if source.is_some() {
+                    Some(
+                        permits
+                            .acquire()
+                            .await
+                            .expect("probe semaphore remains open"),
+                    )
+                } else {
+                    None
+                };
                 (
                     priority,
-                    source,
-                    pair(probe.as_ref(), &network, Some(source.into()), ipv6).await,
+                    pair(probe.as_ref(), &network, source, destinations).await,
                 )
             });
         }
-        let ipv4 = TARGETS.map(|target| target.0.parse().expect("static IPv4 target"));
-        let control = pair(probe.as_ref(), &network, None, ipv4).await;
-        let mut results = Vec::new();
-        while let Some(result) = candidates.join_next().await {
-            results.push(result.ok()?);
+        let mut best: Option<(usize, Policy)> = None;
+        let mut default = Reachability::Uncertain;
+        let mut control = Reachability::Uncertain;
+        let mut candidates_failed = true;
+        let mut settle_at = tokio::time::Instant::now() + Duration::from_secs(6);
+        while !tasks.is_empty() {
+            let result = tokio::select! {
+                result = tasks.join_next() => result?.ok()?,
+                _ = tokio::time::sleep_until(settle_at), if best.is_some() => break,
+            };
+            let (priority, result) = result;
+            match priority {
+                0 => {
+                    default = result;
+                    if result == Reachability::Reachable {
+                        return Some(Policy::SystemDefault);
+                    }
+                }
+                usize::MAX => control = result,
+                _ => {
+                    candidates_failed &= result == Reachability::Failed;
+                    if result == Reachability::Reachable
+                        && best.as_ref().is_none_or(|best| priority < best.0)
+                    {
+                        if best.is_none() {
+                            // Allow a fast default/current-source result to win, without waiting for bad paths.
+                            settle_at = tokio::time::Instant::now() + Duration::from_millis(50);
+                        }
+                        best = Some((
+                            priority,
+                            Policy::BoundSource {
+                                interface: network.interface.clone(),
+                                address: sources[priority - 1],
+                            },
+                        ));
+                    }
+                }
+            }
         }
-        results.sort_by_key(|result| result.0);
-        if let Some((_, address, _)) = results
-            .iter()
-            .find(|result| result.2 == Reachability::Reachable)
-        {
-            return Some(Policy::BoundSource {
-                interface: network.interface,
-                address: *address,
-            });
+        // Dropping JoinSet cancels outstanding probes after a positive result.
+        if let Some((_, policy)) = best {
+            return Some(policy);
         }
         if default == Reachability::Failed
             && control == Reachability::Reachable
-            && results
-                .iter()
-                .all(|result| result.2 == Reachability::Failed)
+            && candidates_failed
         {
             Some(Policy::Ipv4Fallback)
         } else {
@@ -319,6 +358,72 @@ mod tests {
         assert_eq!(
             observe(Arc::new(MultiplePrefixes), network, &current).await,
             Some(current)
+        );
+    }
+    struct SlowFailures;
+    impl Probe for SlowFailures {
+        async fn connect(
+            &self,
+            _: &Network,
+            _: std::net::SocketAddr,
+            source: Option<IpAddr>,
+        ) -> Reachability {
+            if source.is_some() {
+                tokio::time::sleep(Duration::from_millis(20)).await;
+                Reachability::Reachable
+            } else {
+                tokio::time::sleep(Duration::from_secs(2)).await;
+                Reachability::Failed
+            }
+        }
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn healthy_candidate_does_not_wait_for_default_or_ipv4_timeouts() {
+        let start = tokio::time::Instant::now();
+        let policy = observe(Arc::new(SlowFailures), network(), &Policy::SystemDefault).await;
+        assert!(matches!(policy, Some(Policy::BoundSource { .. })));
+        assert!(
+            start.elapsed() <= Duration::from_millis(100),
+            "elapsed: {:?}",
+            start.elapsed()
+        );
+    }
+
+    struct SlowSecondaryEndpoint;
+    impl Probe for SlowSecondaryEndpoint {
+        async fn connect(
+            &self,
+            _: &Network,
+            target: std::net::SocketAddr,
+            _: Option<IpAddr>,
+        ) -> Reachability {
+            if target == TARGETS[0].1.parse().unwrap() {
+                tokio::time::sleep(Duration::from_millis(20)).await;
+                Reachability::Reachable
+            } else {
+                tokio::time::sleep(Duration::from_secs(2)).await;
+                Reachability::Failed
+            }
+        }
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn one_healthy_endpoint_is_enough_without_waiting_for_its_peer() {
+        let start = tokio::time::Instant::now();
+        assert_eq!(
+            observe(
+                Arc::new(SlowSecondaryEndpoint),
+                network(),
+                &Policy::SystemDefault
+            )
+            .await,
+            Some(Policy::SystemDefault)
+        );
+        assert!(
+            start.elapsed() <= Duration::from_millis(100),
+            "elapsed: {:?}",
+            start.elapsed()
         );
     }
 }
