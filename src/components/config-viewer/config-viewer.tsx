@@ -1,12 +1,10 @@
-import { BaseDirectory, readTextFile } from '@tauri-apps/plugin-fs';
+import { invoke } from '@tauri-apps/api/core';
 import { useEffect } from 'react';
 import useSWR from 'swr';
 import { t } from "../../utils/helper";
 
 const loadConfig = async () => {
-    const configJson = await readTextFile('config.json', {
-        baseDir: BaseDirectory.AppConfig,
-    });
+    const configJson = await invoke<string>('read_effective_config');
     return JSON.stringify(JSON.parse(configJson), null, 2);
 };
 
@@ -18,7 +16,7 @@ interface ConfigViewerProps {
 
 export default function ConfigViewer({ onContent }: ConfigViewerProps) {
     const { data: configContent, error } = useSWR(
-        'config.json',
+        'effective-config',
         loadConfig,
         {
             refreshInterval: 1000,

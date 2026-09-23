@@ -59,6 +59,7 @@ pub fn run() {
             core::get_engine_state,
             core::clear_engine_error,
             core::reload_config,
+            core::read_effective_config,
             commands::shell::version,
             commands::shell::read_logs,
             commands::shell::open_devtools,

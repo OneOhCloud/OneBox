@@ -18,10 +18,18 @@ use crate::core::{ProcessManager, ProxyMode};
 /// don't fire on the initial "not yet started" window), synthesize a
 /// `handle_process_termination` call.
 pub(crate) fn spawn(app: AppHandle, process_mode: Arc<ProxyMode>, spawn_epoch: u64) {
+    let generation = super::egress::generation();
     tokio::spawn(async move {
         use tun_service::scm::{query_state, QueriedState};
         let mut observed_running = false;
         loop {
+            if generation != super::egress::generation() {
+                return;
+            }
+            if super::egress::reconfiguring() {
+                tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+                continue;
+            }
             let still_tun = {
                 let m = ProcessManager::acquire();
                 m.mode
@@ -33,6 +41,11 @@ pub(crate) fn spawn(app: AppHandle, process_mode: Arc<ProxyMode>, spawn_epoch: u
                 return;
             }
 
+            // Serialize the state sample with service replacement, including rollback.
+            let operation = super::egress::OPERATIONS.lock().await;
+            if generation != super::egress::generation() {
+                return;
+            }
             match query_state() {
                 QueriedState::Running => observed_running = true,
                 QueriedState::Stopped | QueriedState::NotInstalled if observed_running => {
@@ -48,6 +61,7 @@ pub(crate) fn spawn(app: AppHandle, process_mode: Arc<ProxyMode>, spawn_epoch: u
                 }
                 _ => {}
             }
+            drop(operation);
             tokio::time::sleep(std::time::Duration::from_secs(1)).await;
         }
     });

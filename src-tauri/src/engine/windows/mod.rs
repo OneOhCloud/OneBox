@@ -4,6 +4,7 @@ use tauri::Emitter;
 
 use crate::engine::helper::extract_tun_gateway_from_config;
 use crate::engine::sysproxy::{clear_system_proxy, set_system_proxy};
+pub(crate) mod egress;
 pub mod native;
 pub(crate) mod watchdog;
 use self::native as windows_native;
@@ -142,7 +143,16 @@ pub fn restart_privileged_command(sidecar_path: String, path: String) -> Result<
     // restart = stop + start via the Windows service; no UAC prompts because
     // the ACL granted at install time lets Authenticated Users do both.
     stop_tun_process()?;
-    std::thread::sleep(std::time::Duration::from_millis(500));
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(15);
+    while !matches!(
+        tun_service::scm::query_state(),
+        tun_service::scm::QueriedState::Stopped
+    ) {
+        if std::time::Instant::now() >= deadline {
+            return Err("TUN service stop timed out".into());
+        }
+        std::thread::sleep(std::time::Duration::from_millis(100));
+    }
 
     let gateway = extract_tun_gateway_from_config(&path).unwrap_or_default();
     let gateway_arg: String = if gateway.is_empty() {
@@ -175,6 +185,7 @@ impl EngineManager for WindowsEngine {
         use std::sync::Arc;
         use tauri_plugin_shell::ShellExt;
 
+        egress::cancel();
         match mode {
             crate::engine::ProxyMode::SystemProxy | crate::engine::ProxyMode::ManualProxy => {
                 let should_set_system_proxy = matches!(mode, crate::engine::ProxyMode::SystemProxy);
@@ -212,7 +223,8 @@ impl EngineManager for WindowsEngine {
                 let sidecar_path =
                     crate::engine::helper::get_sidecar_path(std::path::Path::new("sing-box"))
                         .map_err(|e| format!("Failed to get sidecar path: {}", e))?;
-                start_tun_service(app, sidecar_path, config_path.clone())?;
+                let effective = egress::start(&config_path, &sidecar_path).await?;
+                start_tun_service(app, sidecar_path.clone(), effective)?;
 
                 let mode_arc = Arc::new(mode);
                 {
@@ -226,6 +238,7 @@ impl EngineManager for WindowsEngine {
                 // The watchdog polls SCM state and synthesizes
                 // handle_process_termination on external kills / crashes.
                 watchdog::spawn(app.clone(), mode_arc, start_epoch);
+                egress::monitor(sidecar_path);
                 // SystemProxy setting may linger across mode switches on
                 // Windows; best-effort unset so browsers stop pointing at
                 // the mixed port.
@@ -242,6 +255,7 @@ impl EngineManager for WindowsEngine {
     }
 
     async fn stop(app: &AppHandle) -> Result<(), String> {
+        egress::cancel();
         let (mode, child) = {
             let mut mgr = crate::core::ProcessManager::acquire();
             mgr.is_stopping = true;
@@ -298,11 +312,12 @@ impl EngineManager for WindowsEngine {
         Ok(())
     }
 
-    // Windows has no NetworkUp DNS re-apply — DNS override lives in the
-    // service process which reads interface state on start. Default no-op
-    // from the trait is fine.
+    fn on_network_up(_app: &AppHandle) {
+        egress::network_up();
+    }
 
     fn on_process_terminated(_app: &AppHandle, was_user_stop: bool) {
+        egress::cancel();
         if was_user_stop {
             log::info!(
                 "[dns] user-initiated stop; service already reset DNS, skipping UAC fallback"
@@ -360,7 +375,15 @@ impl EngineManager for WindowsEngine {
                 .map_err(|e| format!("Failed to get sidecar path: {}", e))?;
             (cfg, sidecar)
         };
-        restart_privileged_command(sidecar_path, config_path)
+        let is_tun = crate::core::ProcessManager::acquire()
+            .mode
+            .as_ref()
+            .is_some_and(|mode| matches!(**mode, crate::engine::ProxyMode::TunProxy));
+        if is_tun {
+            egress::reload(&sidecar_path).await
+        } else {
+            restart_privileged_command(sidecar_path, config_path)
+        }
     }
 }
 

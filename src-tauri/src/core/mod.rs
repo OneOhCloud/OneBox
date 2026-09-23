@@ -235,6 +235,8 @@ async fn ensure_port_free_for_spawn(action: u64, port: u16) -> Result<(), String
 
 #[tauri::command]
 pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    let _operation = crate::engine::windows::egress::OPERATIONS.lock().await;
     let action = next_action_token();
     let (pm_pid, pm_alive, pm_mode) = pm_snapshot();
     let mixed_port = mixed_proxy_port(&app);
@@ -316,6 +318,8 @@ pub async fn start(app: tauri::AppHandle, path: String, mode: ProxyMode) -> Resu
 
 #[tauri::command]
 pub async fn stop(app: tauri::AppHandle) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    let _operation = crate::engine::windows::egress::OPERATIONS.lock().await;
     let action = next_action_token();
     let (pm_pid, pm_alive, pm_mode) = pm_snapshot();
     let is_stopping_before = ProcessManager::acquire().is_stopping;
@@ -441,6 +445,8 @@ pub fn get_running_config() -> Option<(ProxyMode, String)> {
 
 #[tauri::command]
 pub async fn reload_config(app: tauri::AppHandle) -> Result<String, String> {
+    #[cfg(target_os = "windows")]
+    let _operation = crate::engine::windows::egress::OPERATIONS.lock().await;
     let action = next_action_token();
     let since_last = note_reload_entry();
     let since_last_str = since_last
@@ -649,4 +655,22 @@ mod tests {
         let mut writer: Option<std::fs::File> = None;
         write_singbox_log(&mut writer, "should not panic");
     }
+}
+
+#[tauri::command]
+pub async fn read_effective_config(app: tauri::AppHandle) -> Result<String, String> {
+    #[cfg(target_os = "windows")]
+    if let Some(path) = crate::engine::windows::egress::effective_path() {
+        return tokio::fs::read_to_string(path)
+            .await
+            .map_err(|error| error.to_string());
+    }
+    let path = app
+        .path()
+        .app_config_dir()
+        .map_err(|error| error.to_string())?
+        .join("config.json");
+    tokio::fs::read_to_string(path)
+        .await
+        .map_err(|error| error.to_string())
 }

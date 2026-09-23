@@ -2,31 +2,16 @@
 
 {{version-tag-date}}
 
-## Changes since v1.4.39
+## Changes
 
-All significant changes in this version are documented here.
-
-### Changes
-
-- Added a connect on launch option, and OneBox now starts in the background when launched at login.
-- Combined TUN, system proxy and manual proxy into a single proxy mode setting, with the port alongside it.
-- Updated sing-box version to v1.14.1.
+- Fixed mainland China websites failing to open in Windows TUN mode on some IPv6 networks.
+- OneBox now automatically selects a working IPv6 connection and temporarily uses IPv4 when IPv6 is unavailable.
+- The config viewer now shows the config currently in use.
 - Updated JavaScript and Rust dependencies.
 
-## 自 v1.4.39 以来的变更
+## 变更
 
-本版本的所有重要变更将记录于此。
-
-### 变更
-
+- 修复部分 IPv6 网络下 Windows 开启 TUN 后无法访问中国大陆网站的问题。
+- 自动选择可用的 IPv6 连接，IPv6 不可用时临时使用 IPv4。
+- 配置查看器现在显示实际生效的配置。
 - 更新 JavaScript 与 Rust 依赖。
-- 新增启动后自动连接选项，开机启动时改为在后台启动。
-- TUN、系统代理与手动代理合并为一处「代理模式」设置，端口也在同一处调整。
-- 更新 sing-box 版本至 v1.14.1。
-
-
----
-
-> 请确保您了解潜在风险后再使用开发版和测试版。
->
-> Use development and beta versions only if you are aware of the potential risks.
