@@ -43,7 +43,8 @@ serde_json = "1"
 tauri-plugin-dialog = "2"
 tauri-plugin-process = "2"
 tauri-plugin-sql = { version = "2", features = ["sqlite"] }
-tauri-plugin-http = "2"
+# Tauri requires the same minor version as the published npm HTTP plugin.
+tauri-plugin-http = "~2.6.1"
 tauri-plugin-os = "2"
 tauri-plugin-shell = "2"
 tauri-plugin-store = "2"
