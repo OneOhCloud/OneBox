@@ -68,6 +68,17 @@ Why: it's a local config store, not a SaaS service — "subscription" misleads u
 
 ### CHANGELOG entries
 
+`CHANGELOG.MD` describes the cumulative user-visible difference from the latest
+version already released from `main`. Before editing it, verify that stable
+release's tag and commit, then compare the current branch against that baseline.
+Do not use the previous dev/beta release, the latest commit, or the current task
+as the baseline. Preserve earlier unreleased changes that still differ from the
+stable baseline; consolidate overlapping entries and remove changes that were
+reverted. Describe the final behavior, not intermediate development regressions.
+Keep one bilingual change list, without historical version sections. Reset the
+baseline only after a new `main` release is published. GitHub release notes and
+updater notes must use the same change list.
+
 `CHANGELOG.MD` is written for **end users**, not developers. Each entry should be a single sentence describing what the user can observe. Do not include implementation details, file paths, config field names, code-level terms (e.g. `route_exclude_address`, `inbound`, `hijack-dns`), root-cause analysis, RFC terminology, or emoji. Provide both English and Simplified Chinese entries.
 
 Bad: `Fixed bypass-router mode where the Mixed inbound listened on 127.0.0.1, making LAN hosts unreachable`
