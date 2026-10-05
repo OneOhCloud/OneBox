@@ -25,6 +25,9 @@
   </p>
 </div>
 
+> [!IMPORTANT]
+> 本项目将于 **2027 年 12 月 31 日** 停止维护。
+
 ## 项目简介
 
 OneBox 是一个基于 Tauri、React、Rust 和 [sing-box](https://github.com/SagerNet/sing-box) 网络内核构建的跨平台桌面客户端。

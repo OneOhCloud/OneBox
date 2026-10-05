@@ -25,6 +25,9 @@
   </p>
 </div>
 
+> [!IMPORTANT]
+> Maintenance of this project will end on **December 31, 2027**.
+
 ## About
 
 OneBox is a cross-platform desktop client built with Tauri, React, Rust, and the [sing-box](https://github.com/SagerNet/sing-box) network core.
